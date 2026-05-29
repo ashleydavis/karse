@@ -20,9 +20,11 @@
 ## Code style
 
 - Idiomatic TypeScript casing: `camelCase` for variables, functions, methods, and object properties; `PascalCase` for types, interfaces, classes, enums, and React components; `UPPER_SNAKE_CASE` only for true compile-time constants and env var names.
+- Every module-level symbol (function, type, interface, constant, class) must have a `//` comment explaining its purpose and responsibility.
 - Named exports only. No default exports.
 - 4-space indentation.
 - One statement per line. Never combine multiple statements on a single line with semicolons or commas.
+- Object literals are never written on a single line. Every property is on its own line.
 - Always use curly braces around conditional bodies (`if`, `else`, `for`, `while`, etc.), even for single-statement bodies.
 - `else` always starts on a new line (Allman-style `else`, not K&R `} else {`).
 

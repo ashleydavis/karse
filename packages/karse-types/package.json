@@ -1,0 +1,6 @@
+{
+  "name": "karse-types",
+  "type": "module",
+  "private": true,
+  "main": "./src/index.ts"
+}

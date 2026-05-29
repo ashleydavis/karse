@@ -1,0 +1,19 @@
+{
+  "name": "karse",
+  "private": true,
+  "workspaces": ["backend", "frontend", "packages/*"],
+  "scripts": {
+    "dev":       "bun run --filter '*' dev",
+    "start":     "bun run --filter '*' start",
+    "compile":   "bun run --filter '*' compile",
+    "test":      "bun run --filter 'karse-backend' test",
+    "tests:all": "bun run compile && bun run test && bun run smoke",
+    "smoke":     "bash scripts/smoke-tests.sh",
+    "d":  "bun run dev",
+    "s":  "bun run start",
+    "c":  "bun run compile",
+    "t":  "bun run test",
+    "ta": "bun run tests:all",
+    "sm": "bun run smoke"
+  }
+}

@@ -30,4 +30,8 @@ From `backend/`: `bun run compile` and `bun run test` (all seven cases plus the 
 
 ## Summary
 
-_To be completed when this step is implemented._
+Created `backend/src/command-runner.ts` exporting `CommandResult` and `run`. Uses `spawn` with a `settled` flag to resolve/reject exactly once across `error` and `close` events. `exitCode = code ?? (signal ? 1 : 0)` handles signal-killed children.
+
+Created `backend/src/tests/command-runner.test.ts` with all 7 cases (A-G). Test imports use extensionless paths (`"../command-runner"`) rather than `"../command-runner.js"` because the broad `.js -> .ts` moduleNameMapper needed to support `.js` imports also incorrectly rewrites internal node_modules relative imports. Extensionless imports are valid under `moduleResolution: "bundler"` and resolve correctly with `@swc/jest`.
+
+`bun run compile` and `bun run test` (7/7) both exit 0.

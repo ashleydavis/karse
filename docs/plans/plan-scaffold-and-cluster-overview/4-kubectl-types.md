@@ -14,33 +14,38 @@ Create the `packages/karse-types` workspace package that exports the five contra
 3. **`packages/karse-types/src/index.ts`** exporting:
 
 ```ts
+// A single kubectl context entry from kubeconfig.
 export type Context = {
-  name: string;
-  cluster: string;
-  user: string;
-  namespace: string | null;
+    name: string;
+    cluster: string;
+    user: string;
+    namespace: string | null;
 };
 
+// The full list of contexts plus the currently-active context name.
 export type ContextsResponse = {
-  contexts: Context[];
-  current: string | null;
+    contexts: Context[];
+    current: string | null;
 };
 
+// The Ready/NotReady/Unknown health state of a node.
 export type NodeStatus = "Ready" | "NotReady" | "Unknown";
 
+// A single cluster node with display-ready fields.
 export type Node = {
-  name: string;
-  status: NodeStatus;
-  roles: string[];           // empty array means "<none>"
-  version: string;           // kubeletVersion
-  createdAt: string;         // ISO timestamp; UI computes age
+    name: string;
+    status: NodeStatus;
+    roles: string[];           // empty array means "<none>"
+    version: string;           // kubeletVersion
+    createdAt: string;         // ISO timestamp; UI computes age
 };
 
+// Aggregate cluster statistics for the overview tiles.
 export type ClusterOverview = {
-  serverVersion: string | null;   // null if cluster unreachable
-  nodeCount: number;
-  namespaceCount: number;
-  podCount: number;
+    serverVersion: string | null;   // null if cluster unreachable
+    nodeCount: number;
+    namespaceCount: number;
+    podCount: number;
 };
 ```
 

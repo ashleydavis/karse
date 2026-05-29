@@ -52,4 +52,16 @@ From `/home/ash/projects/karse`: run `bun install`. Then from `backend/`: `bun r
 
 ## Summary
 
-_To be completed when this step is implemented._
+Created all six files specified in the step plus two stubs required to unblock the install:
+
+- `.gitignore`: preserved existing Claude entries, added all specified ignores.
+- `mise.toml`: pinned Bun to `1.3.14` (latest stable as of 2026-05-30).
+- `package.json` (repo root): workspace root with all scripts as specified.
+- `backend/package.json`: `"test"` script uses `jest --passWithNoTests` so the zero-test baseline exits 0 (Jest exits 1 with no tests by default).
+- `backend/tsconfig.json`: as specified, with `"include": ["src"]`.
+- `backend/jest.config.js`: ESM default export with `moduleNameMapper` for `karse-types`.
+- `packages/karse-types/package.json` + `packages/karse-types/src/index.ts`: minimal stub so `bun install` resolves the workspace dependency and Jest's `moduleNameMapper` has a file to point at. Content to be replaced in step 4.
+- `frontend/package.json`: minimal stub so `bun install` does not error on the missing workspace. Content to be replaced in step 8.
+- `backend/src/index.ts`: single-line placeholder so `tsc --noEmit` has at least one input file. Content to be replaced in step 7.
+
+`bun install` ran successfully (694 packages). `bun run compile` and `bun run test` both exit 0 from `backend/`.

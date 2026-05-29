@@ -19,10 +19,15 @@ Wire the Express app, both route modules, and the entrypoint. Covers plan sectio
 
 5. **`backend/src/kubectl/__mocks__/kubectl-adapter.ts`** Jest manual mock:
    ```ts
+   // Jest mock for listContexts.
    export const listContexts = jest.fn();
+   // Jest mock for getCurrentContext.
    export const getCurrentContext = jest.fn();
+   // Jest mock for setCurrentContext.
    export const setCurrentContext = jest.fn();
+   // Jest mock for listNodes.
    export const listNodes = jest.fn();
+   // Jest mock for getClusterOverview.
    export const getClusterOverview = jest.fn();
    ```
 

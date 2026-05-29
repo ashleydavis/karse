@@ -3,8 +3,8 @@
 ## Implementation Steps
 
 - [x] 1. Write documentation — `plan-scaffold-and-cluster-overview/1-write-documentation.md`
-- [ ] 2. Root scaffolding and backend package — `plan-scaffold-and-cluster-overview/2-root-and-backend-scaffolding.md`
-- [ ] 3. Command runner abstraction — `plan-scaffold-and-cluster-overview/3-command-runner.md`
+- [x] 2. Root scaffolding and backend package — `plan-scaffold-and-cluster-overview/2-root-and-backend-scaffolding.md`
+- [x] 3. Command runner abstraction — `plan-scaffold-and-cluster-overview/3-command-runner.md`
 - [ ] 4. Shared types package (`packages/karse-types`) — `plan-scaffold-and-cluster-overview/4-kubectl-types.md`
 - [ ] 5. Audit log — `plan-scaffold-and-cluster-overview/5-audit-log.md`
 - [ ] 6. kubectl adapter — `plan-scaffold-and-cluster-overview/6-kubectl-adapter.md`

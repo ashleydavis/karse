@@ -17,14 +17,20 @@ Create **`backend/src/audit-log.ts`**:
   cutoff.setDate(Math.min(now.getDate(), lastDay));
   cutoff.setHours(0, 0, 0, 0);
   ```
+
   Then `readdir(baseDir, { withFileTypes: true })`, skip non-dirs and non-integer names, and for each `<year>/<month>/<day>` dir strictly older than the cutoff (day granularity), `rm(dayPath, { recursive: true, force: true })`. Empty month/year dirs are not aggressively cleaned.
 
 Also create the Jest manual mock **`backend/src/__mocks__/audit-log.ts`** (used by the adapter tests in step 6):
 ```ts
+// Jest mock for audit.
 export const audit = jest.fn().mockResolvedValue(undefined);
+// Jest mock for pruneOldLogs.
 export const pruneOldLogs = jest.fn().mockResolvedValue(undefined);
+// Jest mock for getAuditDir.
 export const getAuditDir = jest.fn();
+// Jest mock for getAuditFile.
 export const getAuditFile = jest.fn();
+// Jest mock for formatLocalISO.
 export const formatLocalISO = jest.fn();
 ```
 

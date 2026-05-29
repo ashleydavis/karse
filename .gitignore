@@ -1,2 +1,10 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+.env*
+backend/dist/
+logs/
+frontend/dist/
 .claude/permissions-debug.log
 .claude/permissions-log/

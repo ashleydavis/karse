@@ -1,0 +1,28 @@
+{
+  "name": "karse-backend",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev":     "bun --watch src/index.ts",
+    "start":   "bun src/index.ts",
+    "test":    "jest --passWithNoTests",
+    "compile": "tsc --noEmit",
+    "d": "bun run dev",
+    "s": "bun run start",
+    "t": "bun run test",
+    "c": "bun run compile"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "karse-types": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.15.21",
+    "@types/jest": "^29.5.14",
+    "jest": "^29.7.0",
+    "@swc/jest": "^0.2.37",
+    "@swc/core": "^1.11.21"
+  }
+}

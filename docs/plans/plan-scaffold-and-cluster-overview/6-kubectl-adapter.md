@@ -6,10 +6,12 @@ Build the read-only kubectl adapter as free async functions that parse kubectl J
 
 Create **`backend/src/kubectl/kubectl-adapter.ts`** (no factory, no interface, no injection). Imports `run` from `../command-runner`, `audit` from `../audit-log`, and the five contract types (`Context`, `ContextsResponse`, `NodeStatus`, `Node`, `ClusterOverview`) from `karse-types` (the shared workspace package; no `kubectl-types.ts` file exists in the backend). Declare a module-level constant before the helper:
 ```ts
+// Audit log base directory; overridable via KARSE_LOGS_DIR for custom paths.
 const LOGS_DIR = process.env.KARSE_LOGS_DIR ?? "../logs";
 ```
 Private helper:
 ```ts
+// Writes an audit entry then runs kubectl; the only path that calls run("kubectl", ...).
 async function kubectl(args: readonly string[]): Promise<CommandResult> {
     await audit(LOGS_DIR, "kubectl", args);
     return run("kubectl", args);
@@ -28,6 +30,7 @@ Exports and behaviour:
 
 Also create the Jest manual mock **`backend/src/__mocks__/command-runner.ts`**:
 ```ts
+// Jest mock for run.
 export const run = jest.fn();
 ```
 
