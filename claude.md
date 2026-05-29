@@ -1,9 +1,9 @@
 # Karse project guidance
 
 - **Purpose**: a local-only Kubernetes dashboard wrapping the locally-installed `kubectl` binary. Read-only cluster information plus context switching. Never deployed.
-- **Stack**: backend is Bun + TypeScript + Express 5; frontend is Vite + React 19 + React Router 7 + MUI 7 + Tailwind 4, with axios, TanStack Query, TanStack Table, and Font Awesome.
-- **Repo layout**: `backend/` (Express app and kubectl adapter), `frontend/` (React app), `docs/` (guides and plans), `scripts/` (smoke test).
-- **Documentation map**: `docs/architecture.md`, `docs/api.md`, `docs/e2e-testing.md`, `docs/user-guide.md`, `docs/audit-log.md`, `docs/roadmap.md`.
+- **Stack**: backend is Bun + TypeScript + Express 5; frontend is Vite + React 19 + React Router 7 + MUI 7 + Tailwind 4, with axios, TanStack Query, TanStack Table, and Font Awesome. Backend tests use Jest (via `@swc/jest`).
+- **Repo layout**: root `package.json` (bun workspaces), `backend/` (Express app and kubectl adapter), `frontend/` (React app), `docs/` (guides and plans), `scripts/` (smoke tests).
+- **Documentation**: see `docs/`.
 
 ## File naming
 
@@ -12,9 +12,10 @@
 
 ## Source layout
 
-- Every source file lives under `src/`.
+- Every source file lives under its package's `src/` (`backend/src/` or `frontend/src/`). No source files sit directly in the package root.
 - Backend tests live under `backend/src/tests/`, mirroring the source directory tree. Tests are **not** co-located with the modules they cover.
 - The frontend splits its `src/` into `pages/` (route-level), `components/` (reusable visual parts), and `lib/` (non-UI code).
+- The backend has `src/lib/` for reusable server-side code shared across routes and modules.
 
 ## Code style
 
@@ -63,7 +64,7 @@
 
 - Every **backend** non-React TypeScript module has tests under `backend/src/tests/`. The one exception is `index.ts`, pure bootstrap wiring covered by the smoke script.
 - Tests run with `bun run test` (which invokes Jest).
-- React UI code is not unit-tested. **The frontend is not unit-tested at all** per project policy: this includes the non-React `frontend/src/lib/*.ts` modules (`api-client.ts`, `query-client.ts`, `kubectl-types.ts`, `font-awesome.ts`), which are exercised only by the manual e2e flow and `scripts/smoke.sh`. So "every non-React module is tested" applies to the **backend**, not the frontend.
+- React UI code is not unit-tested. **The frontend is not unit-tested at all** per project policy: this includes the non-React `frontend/src/lib/*.ts` modules (`api-client.ts`, `query-client.ts`, `kubectl-types.ts`, `font-awesome.ts`), which are exercised only by the manual e2e flow and `scripts/smoke-tests.sh`. So "every non-React module is tested" applies to the **backend**, not the frontend.
 - Tests **never** use `test.skip` or `describe.skip`.
 - Tests **always** use `describe` and `test`, never `it`.
 - Tests must not be fudged: each assertion checks a specific value, fixtures use realistic shapes (the structurally significant fields the real tool would return), and fakes are not asserted against themselves. Inject collaborators (e.g. a fake `run`) rather than mocking the module under test.
@@ -72,12 +73,12 @@
 
 ## Run
 
-- `cd backend && bun run dev` (port 3000), `cd frontend && bun run dev` (port 5173). Vite proxies `/api` to the backend.
-- **The backend is always launched with its working directory set to `backend/`** (the `dev`/`start` scripts and `scripts/smoke.sh` all `cd backend` first). This matters because the audit-log base path `"./logs"` is cwd-relative: running from `backend/` it resolves to `backend/logs/` (which is what `.gitignore` and the docs assume). Do not launch the backend from the repo root.
+- `bun start` (or `bun run dev` for hot reload) from the repo root starts both processes concurrently via bun workspaces: backend on port 5172, frontend on port 5173. Vite proxies `/api` to the backend.
+- Bun workspace scripts run with each package's directory as cwd. The audit log directory is set by `KARSE_LOGS_DIR` (default `"../logs"`, resolving to the repo root `logs/` with cwd `backend/`). The `scripts/smoke-tests.sh` also explicitly `cd backend` before launching.
 
 ## Deployment
 
-- None. The backend binds to `127.0.0.1` only. No CORS configuration.
+- Local only. The backend binds to `127.0.0.1` only. No CORS configuration.
 
 ## kubectl assumption
 
@@ -91,4 +92,4 @@
 
 ## Audit log
 
-- Every kubectl invocation is logged via `audit("./logs", "kubectl", args)` from `audit-log.ts` before the spawn. The private `kubectl(args)` helper in the adapter is the only path that calls `run("kubectl", ...)`. Do not bypass it. See `docs/audit-log.md`.
+- Every kubectl invocation is logged via `audit(LOGS_DIR, "kubectl", args)` from `audit-log.ts` before the spawn. `LOGS_DIR` is a module-level constant in `kubectl-adapter.ts` set to `process.env.KARSE_LOGS_DIR ?? "../logs"`. With the backend's cwd being `backend/`, the default resolves to the repo root `logs/`. The private `kubectl(args)` helper in the adapter is the only path that calls `run("kubectl", ...)`. Do not bypass it. See `docs/audit-log.md`.

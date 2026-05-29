@@ -1,21 +1,24 @@
 # Karse end-to-end testing guide
 
-This guide is for someone confirming that the implementation matches the plan: it walks the running stack and checks each behaviour by hand. It is the companion to `scripts/smoke.sh`, which automates the backend-only checks. For a usage-oriented walkthrough see `docs/user-guide.md`.
+This guide is for someone confirming that the implementation matches the plan: it walks the running stack and checks each behaviour by hand. For a usage-oriented walkthrough see `docs/user-guide.md`.
 
 ## Prerequisites
 
 - `kubectl` on `PATH`, with at least one configured kubeconfig context (ideally **two or more**, so the context-switch check below is meaningful).
-- `bun` installed (via mise: `mise install`).
-- `jq`, `curl`, and `bash` on `PATH`. `scripts/smoke.sh` requires `jq` and `curl` and runs under `bash`; it fails early with a clear message if either tool is missing.
-- Dependencies installed: `cd backend && bun install`, then `cd frontend && bun install`.
+- `bun` installed (any installation method; mise users can run `mise install`).
+- `jq` and `curl` on `PATH` (used in the backend curl checks below).
+- Dependencies installed: `bun install` from the repo root.
 
 ## Start the stack
 
-In two terminals:
+```sh
+bun start
+```
+
+Or, for development with hot reload:
 
 ```sh
-cd backend && bun run dev    # http://127.0.0.1:3000
-cd frontend && bun run dev   # http://localhost:5173
+bun run dev
 ```
 
 Open http://localhost:5173.
@@ -28,7 +31,7 @@ Open http://localhost:5173.
 
 ## Interaction checks
 
-These two checks stand in for the frontend's missing unit coverage (the frontend is not unit-tested and `smoke.sh` is backend-only). Run both explicitly.
+The frontend is not unit-tested, so run both of these checks explicitly.
 
 ### Context-switch refetch
 
@@ -56,28 +59,19 @@ This exercises `enabled: current !== null` on both the overview and nodes querie
 
 ## Backend-only curl checks
 
-These mirror what `scripts/smoke.sh` asserts. With the backend running:
+With the backend running:
 
 ```sh
-curl -fsS http://127.0.0.1:3000/api/contexts | jq '.contexts, .current'
-curl -fsS http://127.0.0.1:3000/api/cluster/overview \
+curl -fsS http://127.0.0.1:5172/api/contexts | jq '.contexts, .current'
+curl -fsS http://127.0.0.1:5172/api/cluster/overview \
   | jq -e 'has("serverVersion") and has("nodeCount") and has("namespaceCount") and has("podCount")'
-curl -fsS http://127.0.0.1:3000/api/cluster/nodes | jq -e 'has("nodes")'
+curl -fsS http://127.0.0.1:5172/api/cluster/nodes | jq -e 'has("nodes")'
 ```
-
-Run the full automated pass with:
-
-```sh
-bash scripts/smoke.sh
-```
-
-It boots the backend, asserts every endpoint's JSON shape, switches context (or asserts the empty-name 400 when no contexts exist), then builds the frontend.
 
 ## Triage when something fails
 
 - **Tiles or table show an error alert**: read the message; it is kubectl's stderr verbatim. Common causes: API server unreachable, expired credentials, wrong context.
 - **Server version shows `-` but counts are present**: the version call failed while the cluster is otherwise reachable. Expected when `kubectl version` cannot reach the API server.
 - **No data and no request fired**: there is no current context. Set one with `kubectl config use-context <name>`.
-- **Frontend cannot reach the backend**: confirm the backend is running on port 3000 and the Vite proxy target matches (`KARSE_PORT` must agree on both sides).
-- **`smoke.sh` aborts immediately**: `jq` or `curl` is missing from `PATH`.
-- **Audit log not appearing**: confirm the backend was launched from `backend/` so `"./logs"` resolves to `backend/logs/` (see `docs/audit-log.md`).
+- **Frontend cannot reach the backend**: confirm the backend is running on the expected port (`KARSE_PORT`, default 5172) and that the Vite proxy target matches.
+- **Audit log not appearing**: confirm logs are being written to `logs/` at the repo root (see `docs/audit-log.md`).

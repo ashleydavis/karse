@@ -1,43 +1,12 @@
 # Karse HTTP API
 
-All routes are served by the backend under `/api`, bound to `127.0.0.1` only. They are **local-only and unauthenticated**: there is no auth layer, because the only intended client is the same-machine browser. On a kubectl failure, a route responds `HTTP 500` with `{ "error": "<kubectl stderr>" }`. kubectl's stderr is surfaced **verbatim** in 500 bodies, which may reveal cluster or kubeconfig detail; this is an accepted tradeoff for a local-only tool (see `docs/architecture.md`, accepted risks).
+All routes are served by the backend under `/api`, bound to `127.0.0.1` only. They are **local-only and unauthenticated**: there is no auth layer, because the only intended client is the same-machine browser. On a kubectl failure, a route responds `HTTP 500` with `{ "error": "<kubectl stderr>" }`. See `docs/security.md` for the security model and accepted risks.
 
-During development the frontend reaches these routes through the Vite proxy at `http://localhost:5173/api/...`. The curl examples below talk to the backend directly at `http://127.0.0.1:3000`.
+During development the frontend reaches these routes through the Vite proxy at `http://localhost:5173/api/...`. The curl examples below talk to the backend directly at `http://127.0.0.1:5172`.
 
 ## Shared types
 
-These mirror `backend/src/kubectl/kubectl-types.ts`:
-
-```ts
-type Context = {
-    name: string;
-    cluster: string;
-    user: string;
-    namespace: string | null;
-};
-
-type ContextsResponse = {
-    contexts: Context[];
-    current: string | null;
-};
-
-type NodeStatus = "Ready" | "NotReady" | "Unknown";
-
-type Node = {
-    name: string;
-    status: NodeStatus;
-    roles: string[];        // empty array means "<none>"
-    version: string;        // kubeletVersion
-    createdAt: string;      // ISO timestamp; UI computes age
-};
-
-type ClusterOverview = {
-    serverVersion: string | null;   // null if the cluster is unreachable
-    nodeCount: number;
-    namespaceCount: number;
-    podCount: number;
-};
-```
+Canonical type definitions live in [packages/karse-types/src/index.ts](../packages/karse-types/src/index.ts). The key shapes are `Context`, `ContextsResponse`, `Node`, and `ClusterOverview`.
 
 ## GET /api/contexts
 
@@ -48,7 +17,7 @@ Lists every kubeconfig context plus the current one.
 - **Response 500**: `{ "error": "<kubectl stderr>" }` if listing contexts fails.
 
 ```sh
-curl -fsS http://127.0.0.1:3000/api/contexts
+curl -fsS http://127.0.0.1:5172/api/contexts
 ```
 
 ```json
@@ -72,7 +41,7 @@ Switches the active kubeconfig context (`kubectl config use-context <name>`), th
 - **Response 500**: `{ "error": "<kubectl stderr>" }` when kubectl rejects the name (e.g. no such context).
 
 ```sh
-curl -fsS -X POST http://127.0.0.1:3000/api/contexts/current \
+curl -fsS -X POST http://127.0.0.1:5172/api/contexts/current \
   -H 'Content-Type: application/json' \
   -d '{"name":"beta"}'
 ```
@@ -90,9 +59,9 @@ curl -fsS -X POST http://127.0.0.1:3000/api/contexts/current \
 Validation errors:
 
 ```sh
-curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:3000/api/contexts/current \
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:5172/api/contexts/current \
   -H 'Content-Type: application/json' -d '{"name":""}'      # 400
-curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:3000/api/contexts/current \
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:5172/api/contexts/current \
   -H 'Content-Type: application/json' -d '{"name":"-x"}'     # 400
 ```
 
@@ -105,7 +74,7 @@ Returns the cluster overview for the current context.
 - **Response 500**: `{ "error": "<kubectl stderr>" }` when a node/namespace/pod count call fails.
 
 ```sh
-curl -fsS http://127.0.0.1:3000/api/cluster/overview
+curl -fsS http://127.0.0.1:5172/api/cluster/overview
 ```
 
 ```json
@@ -126,7 +95,7 @@ Returns the nodes in the current context, shaped for the nodes table.
 - **Response 500**: `{ "error": "<kubectl stderr>" }` when listing nodes fails.
 
 ```sh
-curl -fsS http://127.0.0.1:3000/api/cluster/nodes
+curl -fsS http://127.0.0.1:5172/api/cluster/nodes
 ```
 
 ```json

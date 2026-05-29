@@ -15,7 +15,7 @@ Wire the Express app, both route modules, and the entrypoint. Covers plan sectio
    - `GET /cluster/nodes`: returns `{ nodes }` from `listNodes()`.
    - Plain `async` handlers.
 
-4. **`backend/src/index.ts`**: `import { createServer } from "./server";`, `import { pruneOldLogs } from "./audit-log";`; read `process.env.KARSE_PORT` (default `3000`); `await pruneOldLogs("./logs");` (top-level await); `const app = createServer();`; `app.listen(port, "127.0.0.1", () => console.log(...))`. **No unit tests** (pure wiring; covered by the smoke script in step 12).
+4. **`backend/src/index.ts`**: `import { createServer } from "./server";`, `import { pruneOldLogs } from "./audit-log";`; read `process.env.KARSE_PORT` (default `5172`); read `process.env.KARSE_LOGS_DIR` (default `"../logs"`) into a `logsDir` const; `await pruneOldLogs(logsDir);` (top-level await; with the backend's cwd `backend/`, the default resolves to the repo root `logs/`); `const app = createServer();`; `app.listen(port, "127.0.0.1", () => console.log(...))`. **No unit tests** (pure wiring; covered by the smoke script in step 12).
 
 5. **`backend/src/kubectl/__mocks__/kubectl-adapter.ts`** Jest manual mock:
    ```ts

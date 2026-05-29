@@ -1,10 +1,17 @@
-# Step 4: kubectl types
+# Step 4: Shared types package
 
-Define the backend type aliases shared by the adapter and routes. Covers plan section 5 (substep 14).
+Create the `packages/karse-types` workspace package that exports the five contract types shared between the backend and frontend. Update the root workspaces, backend dependency, and Jest config to resolve the package. Covers plan section 5 (substep 14).
 
-## Code
+## Files to create
 
-Create **`backend/src/kubectl/kubectl-types.ts`** exporting:
+1. **`packages/karse-types/package.json`**:
+   - `"name": "karse-types"`, `"type": "module"`, `"private": true`.
+   - `"exports": { ".": "./src/index.ts" }`.
+   - No runtime dependencies.
+
+2. **`packages/karse-types/tsconfig.json`**: `target: "ESNext"`, `module: "ESNext"`, `moduleResolution: "bundler"`, `strict: true`, `skipLibCheck: true`, `rootDir: "src"`.
+
+3. **`packages/karse-types/src/index.ts`** exporting:
 
 ```ts
 export type Context = {
@@ -37,13 +44,32 @@ export type ClusterOverview = {
 };
 ```
 
+## Configuration changes
+
+4. Update **`package.json`** (repo root) workspaces to `["backend", "frontend", "packages/*"]` so any future package added under `packages/` is automatically picked up without editing the root config.
+
+5. Update **`backend/package.json`** to add `"karse-types": "*"` under `dependencies`.
+
+6. Update **`backend/jest.config.js`** to add `moduleNameMapper` so Jest resolves the workspace package to its TypeScript source (Jest ignores workspace symlinks in `node_modules` by default):
+
+```js
+export default {
+    testEnvironment: "node",
+    testMatch: ["<rootDir>/src/tests/**/*.test.ts"],
+    transform: { "^.+\\.ts$": "@swc/jest" },
+    moduleNameMapper: {
+        "^karse-types$": "<rootDir>/../packages/karse-types/src/index.ts"
+    }
+};
+```
+
 ## Tests
 
 No tests: this file contains only type aliases (no runtime code). `bun run test` is unchanged (still green).
 
 ## Verification
 
-From `backend/`: `bun run compile` (the new types must type-check) and `bun run test` (unchanged, still passing). Run all tests and confirm they pass before marking this step complete.
+From the repo root: `bun install` (picks up the new workspace). From `backend/`: `bun run compile` and `bun run test` (unchanged, still passing). Run all tests and confirm they pass before marking this step complete.
 
 ## Summary
 

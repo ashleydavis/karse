@@ -4,10 +4,14 @@ Build the read-only kubectl adapter as free async functions that parse kubectl J
 
 ## Code
 
-Create **`backend/src/kubectl/kubectl-adapter.ts`** (no factory, no interface, no injection). Imports `run` from `../command-runner` and `audit` from `../audit-log`. Private helper:
+Create **`backend/src/kubectl/kubectl-adapter.ts`** (no factory, no interface, no injection). Imports `run` from `../command-runner`, `audit` from `../audit-log`, and the five contract types (`Context`, `ContextsResponse`, `NodeStatus`, `Node`, `ClusterOverview`) from `karse-types` (the shared workspace package; no `kubectl-types.ts` file exists in the backend). Declare a module-level constant before the helper:
+```ts
+const LOGS_DIR = process.env.KARSE_LOGS_DIR ?? "../logs";
+```
+Private helper:
 ```ts
 async function kubectl(args: readonly string[]): Promise<CommandResult> {
-    await audit("./logs", "kubectl", args);
+    await audit(LOGS_DIR, "kubectl", args);
     return run("kubectl", args);
 }
 ```
@@ -33,7 +37,7 @@ Create **`backend/src/tests/kubectl/kubectl-adapter.test.ts`** using Jest global
 - Top: `jest.mock("../../command-runner");` and `jest.mock("../../audit-log");`. Import `run` and `audit`, cast to `jest.Mock`.
 - `beforeEach`: `(run as jest.Mock).mockReset();` and `(audit as jest.Mock).mockReset().mockResolvedValue(undefined);`.
 - Helper `setRunnerHandlers(handlers)` keyed by `args.join(" ")`; **unmatched argv throws a loud error**; handlers may throw or return `Promise.reject(...)`.
-- Audit wiring case: `listContexts()` success → `expect(audit).toHaveBeenCalledWith("./logs", "kubectl", ["config", "view", "-o", "json"])`.
+- Audit wiring case: `listContexts()` success → `expect(audit).toHaveBeenCalledWith(process.env.KARSE_LOGS_DIR ?? "../logs", "kubectl", ["config", "view", "-o", "json"])`. Since no env var is set in tests, this asserts the value `"../logs"`.
 - Contexts: parses two real-shaped contexts (deep-equal both, second's missing namespace → `null`); empty-string namespace → `null`; `contexts: null` → `[]`; throws on non-zero exit (`"boom"`); `getCurrentContext` trimmed name; returns `null` when not set; throws on other non-zero exit (`"permission denied"`); `setCurrentContext` exact argv `["config", "use-context", "my-ctx"]` called once; throws on non-zero exit (`"no such context"`).
 - Nodes: parses Ready + NotReady fixture (deep-equal both rows; control-plane role from label, worker `[]`); multiple role labels sorted (`["control-plane", "etcd"]`); Unknown when Ready missing; `[]` when items empty; throws on non-zero exit (`"denied"`).
 - Overview: happy path deep-equals `{ serverVersion: "v1.30.0", nodeCount: 3, namespaceCount: 4, podCount: 15 }`; `serverVersion: null` when version call non-zero; `serverVersion: null` when version handler throws; throws when nodes/namespaces/pods non-zero (`"denied"`); rejects when a count call *rejects* (`get nodes` handler returns `Promise.reject(new Error("spawn kubectl ENOENT"))`); tolerates the version call *rejecting* (`serverVersion === null`, counts intact).

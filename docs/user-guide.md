@@ -2,31 +2,34 @@
 
 ## What Karse is (and isn't)
 
-Karse is a local-only dashboard for looking at your Kubernetes clusters through your existing `kubectl` setup. It gives you a quick cluster overview and a read-only nodes table for whichever kubeconfig context you have selected.
+Karse is a local-only dashboard for looking at your Kubernetes clusters through your existing `kubectl` setup. It gives you read-only visibility into your clusters for whichever kubeconfig context you have selected.
 
 Karse **is**: a read-only viewer plus a convenient context switcher. Karse **is not**: a cluster management tool. It never creates, edits, or deletes anything in a cluster. The only thing it writes is the active context in your local kubeconfig (the same as running `kubectl config use-context`).
 
 ## Prerequisites
 
 - `kubectl` on your `PATH`, configured against at least one cluster.
-- `bun`, installed via mise (`mise install`).
-- At least one kubeconfig context. Karse reads `~/.kube/config`; it does not set up clusters or credentials for you.
+- `bun` (any installation method works; mise users can run `mise install`).
+- At least one kubeconfig context. Karse shells out to `kubectl`, which reads your kubeconfig as normal; Karse does not set up clusters or credentials for you.
 
 ## Setup
 
+If you use mise, install Bun first (optional):
+
 ```sh
 mise install
-cd backend && bun install
-cd ../frontend && bun install
+```
+
+Then install dependencies:
+
+```sh
+bun install
 ```
 
 ## Running
 
-In two terminals:
-
 ```sh
-cd backend && bun run dev    # backend on http://127.0.0.1:3000
-cd frontend && bun run dev   # frontend on http://localhost:5173
+bun start
 ```
 
 Open http://localhost:5173.
@@ -62,9 +65,17 @@ You can **sort** by clicking a column header (a small up/down chevron shows the 
 
 Use the context picker in the header to switch to another kubeconfig context. Karse switches the active context (via `kubectl config use-context`) and immediately refreshes both the overview tiles and the nodes table to show the new context's data. If you have only one context configured, the picker simply shows that context.
 
+## Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `KARSE_PORT` | `5172` | Port the backend listens on. |
+| `KARSE_FRONTEND_PORT` | `5173` | Port the Vite frontend listens on. |
+| `KARSE_LOGS_DIR` | `../logs` (repo root `logs/`) | Directory for audit log files. Set to an absolute path to write logs elsewhere. |
+
 ## Audit log
 
-Every kubectl call Karse makes is logged to a rolling text file under `backend/logs/<YYYY>/<MM>/<DD>/<HH>.log`, named from your machine's local time, one file per hour. Logs are kept for 3 months and older ones are pruned when the backend starts. See `docs/audit-log.md` for the full description and how to read them.
+Every kubectl call Karse makes is logged to a rolling text file under `logs/<YYYY>/<MM>/<DD>/<HH>.log` at the repo root, named from your machine's local time, one file per hour. Logs are kept for 3 months and older ones are pruned when the backend starts. See `docs/audit-log.md` for the full description and how to read them.
 
 ## Limitations
 
@@ -78,7 +89,7 @@ Every kubectl call Karse makes is logged to a rolling text file under `backend/l
 - **Tiles or table show an error**: the message is kubectl's own stderr. Check that your context is valid and the cluster is reachable.
 - **Server version shows `-`**: the API server could not be reached for the version call, though other queries may still work.
 - **Nothing loads and no context is shown**: no current context is set. Run `kubectl config use-context <name>` (or pick one in the header once contexts are listed).
-- **Frontend cannot reach the backend**: make sure the backend is running on port 3000.
+- **Frontend cannot reach the backend**: make sure the backend is running on port 5172.
 
 ## More
 

@@ -5,28 +5,34 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
 ## Requirements
 
 - `kubectl` available on your `PATH`, already configured against at least one kubeconfig context.
-- [`bun`](https://bun.sh), installed via [mise](https://mise.jdx.dev) (see `mise.toml`).
+- [`bun`](https://bun.sh) installed and on your `PATH`. If you use [mise](https://mise.jdx.dev), `mise trust && mise install` at the repo root will install the pinned version.
 - At least one configured kubeconfig context (Karse reads `~/.kube/config`; it does not create clusters or credentials).
+
+## Getting the code
+
+```sh
+git clone git@github.com:ashleydavis/karse.git
+cd karse
+```
 
 ## Getting started
 
-1. Install the toolchain:
+1. (Optional) Quick install for Bun, if you use [mise](https://mise.jdx.dev):
    ```sh
+   mise trust
    mise install
    ```
-2. Install dependencies in each package:
+2. Install Bun dependencies:
    ```sh
-   cd backend && bun install
-   cd ../frontend && bun install
+   bun install
    ```
-3. Run both processes (in separate terminals):
+3. Start Karse:
    ```sh
-   cd backend && bun run dev    # http://127.0.0.1:3000
-   cd frontend && bun run dev   # http://localhost:5173
+   bun start
    ```
-   The Vite dev server proxies `/api` to the backend, so open http://localhost:5173 in your browser.
-
-The backend is always launched with its working directory set to `backend/` (the `dev`/`start` scripts and `scripts/smoke.sh` all `cd backend` first). This matters because the audit log base path `"./logs"` is relative to the process working directory and resolves to `backend/logs/`.
+   Open http://localhost:5173. 
+   
+   Use `bun run dev` instead for hot reload during development.
 
 ## Documentation
 
@@ -34,7 +40,9 @@ The guide files under `docs/`:
 
 - [`architecture.md`](docs/architecture.md): system layers, the read-only kubectl invariant, the local-only threat model, and how failures surface.
 - [`api.md`](docs/api.md): every HTTP endpoint with request/response types, status codes, and curl examples.
-- [`e2e-testing.md`](docs/e2e-testing.md): manual end-to-end test guide and companion to `scripts/smoke.sh`.
+- [`e2e-testing.md`](docs/e2e-testing.md): manual end-to-end test guide and companion to `scripts/smoke-tests.sh`.
 - [`user-guide.md`](docs/user-guide.md): end-user tour of the cluster home page.
 - [`audit-log.md`](docs/audit-log.md): what Karse logs, where, in what format, and for how long.
+- [`security.md`](docs/security.md): safety and security Q&A (read-only invariant, network exposure, accepted risks).
+- [`development.md`](docs/development.md): development setup, testing, and contributing guide.
 - [`roadmap.md`](docs/roadmap.md): upcoming features and what has already shipped.
