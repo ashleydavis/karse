@@ -2,6 +2,17 @@
 
 Karse is a local-only Kubernetes dashboard that wraps your locally-installed `kubectl` binary. It runs entirely on your own machine, shells out to `kubectl` for read-only cluster queries, and presents a single cluster home page combining a cluster overview (server version, node count, namespace count, pod count) and a read-only nodes table for the currently-selected kubeconfig context. It is for information only: it never mutates cluster state, and the one thing it writes is the active context in your kubeconfig (via `kubectl config use-context`).
 
+## Todo
+
+- Move page title to nav bar.
+- Going to need breadcrumbs here as well.
+- Can we have the URL have all the details so users can share a link?
+   - Context
+   - Namespace
+   - Page
+   - Resource
+   - etc
+
 ## Requirements
 
 - `kubectl` available on your `PATH`, already configured against at least one kubeconfig context.

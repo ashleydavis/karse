@@ -354,8 +354,12 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[aria-label='namespaces']")).toBeVisible();
         });
 
-        test("shows quick picker button", async () => {
-            await expect(page.locator("[aria-label='quick picker']")).toBeVisible();
+        test("shows context picker button", async () => {
+            await expect(page.locator("[aria-label='context picker']")).toBeVisible();
+        });
+
+        test("shows namespace picker button", async () => {
+            await expect(page.locator("[aria-label='namespace picker']")).toBeVisible();
         });
 
         test("clicking namespaces nav button navigates to /namespaces", async () => {
@@ -463,100 +467,134 @@ test.describe("karse e2e", () => {
         });
     });
 
-    // ── Quick picker ──────────────────────────────────────────────────────────
+    // ── Context picker ────────────────────────────────────────────────────────
 
-    test.describe("quick picker", () => {
+    test.describe("context picker", () => {
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
             await navigateTo();
         });
 
-        // Opens the quick picker via the header button and waits for it to appear.
         async function openPicker(): Promise<void> {
-            await page.locator("[aria-label='quick picker']").click();
-            await expect(page.locator("[data-test-id='quick-picker-dialog']")).toBeVisible();
+            await page.locator("[aria-label='context picker']").click();
+            await expect(page.locator("[data-test-id='context-quick-picker-dialog']")).toBeVisible();
         }
 
-        // Dismisses the quick picker with Escape and waits for it to disappear.
         async function closePicker(): Promise<void> {
             await page.keyboard.press("Escape");
-            await expect(page.locator("[data-test-id='quick-picker-dialog']")).not.toBeVisible();
+            await expect(page.locator("[data-test-id='context-quick-picker-dialog']")).not.toBeVisible();
         }
 
-        test("opens with the quick picker header button", async () => {
+        test("opens with the context picker header button", async () => {
             await openPicker();
             await closePicker();
         });
 
         test("opens with the Ctrl+K keyboard shortcut", async () => {
             await page.keyboard.press("Control+k");
-            await expect(page.locator("[data-test-id='quick-picker-dialog']")).toBeVisible();
+            await expect(page.locator("[data-test-id='context-quick-picker-dialog']")).toBeVisible();
             await closePicker();
         });
 
-        test("shows both clusters in the contexts section", async () => {
+        test("shows both clusters", async () => {
             await openPicker();
-            const rows = page.locator("[data-test-id='quick-picker-context-row']");
+            const rows = page.locator("[data-test-id='context-quick-picker-row']");
             await expect(rows.filter({ hasText: CLUSTER_1 })).toBeVisible();
             await expect(rows.filter({ hasText: CLUSTER_2 })).toBeVisible();
             await closePicker();
         });
 
-        test("shows namespace rows for the active context", async () => {
+        test("filter hides non-matching context rows", async () => {
             await openPicker();
-            await expect(page.locator("[data-test-id='quick-picker-namespace-row']").first()).toBeVisible();
+            await page.locator("[data-test-id='context-quick-picker-dialog'] input").fill(CLUSTER_1);
+            await expect(page.locator("[data-test-id='context-quick-picker-row']").filter({ hasText: CLUSTER_1 })).toBeVisible();
+            await expect(page.locator("[data-test-id='context-quick-picker-row']").filter({ hasText: CLUSTER_2 })).toHaveCount(0);
             await closePicker();
         });
 
-        test("filter hides non-matching context and namespace rows", async () => {
+        test("selecting a context closes the picker and updates the context display", async () => {
             await openPicker();
-            await page.locator("[data-test-id='quick-picker-search'] input").fill("kube");
-            const nsTexts = await page.locator("[data-test-id='quick-picker-namespace-row']").allTextContents();
-            expect(nsTexts.every((n) => n.toLowerCase().includes("kube"))).toBe(true);
-            // Neither cluster name contains the substring "kube".
-            await expect(page.locator("[data-test-id='quick-picker-context-row']")).toHaveCount(0);
-            await closePicker();
-        });
-
-        test("selecting a namespace closes the picker", async () => {
-            await openPicker();
-            await page.locator("[data-test-id='quick-picker-namespace-row']").filter({ hasText: /^default/ }).click();
-            await expect(page.locator("[data-test-id='quick-picker-dialog']")).not.toBeVisible();
-        });
-
-        test("reopening the picker shows the selected namespace highlighted", async () => {
-            await openPicker();
-            const defaultRow = page.locator("[data-test-id='quick-picker-namespace-row']").filter({ hasText: /^default/ });
-            await expect(defaultRow).toHaveClass(/Mui-selected/);
-            await closePicker();
-        });
-
-        test("shows All namespaces row when a namespace is selected", async () => {
-            await openPicker();
-            await expect(page.locator("[data-test-id='quick-picker-clear-namespace']")).toBeVisible();
-            await closePicker();
-        });
-
-        test("clicking All namespaces clears the namespace selection", async () => {
-            await openPicker();
-            await page.locator("[data-test-id='quick-picker-clear-namespace']").click();
-            await expect(page.locator("[data-test-id='quick-picker-dialog']")).not.toBeVisible();
-            // Reopen and confirm the clear row is gone (no namespace selected).
-            await openPicker();
-            await expect(page.locator("[data-test-id='quick-picker-clear-namespace']")).toHaveCount(0);
-            await closePicker();
-        });
-
-        test("selecting a context in the picker closes the picker and updates the context display", async () => {
-            await openPicker();
-            await page.locator("[data-test-id='quick-picker-context-row']").filter({ hasText: CLUSTER_2 }).click();
-            await expect(page.locator("[data-test-id='quick-picker-dialog']")).not.toBeVisible();
+            await page.locator("[data-test-id='context-quick-picker-row']").filter({ hasText: CLUSTER_2 }).click();
+            await expect(page.locator("[data-test-id='context-quick-picker-dialog']")).not.toBeVisible();
             await expect(page.locator("[aria-haspopup='listbox']")).toContainText(CLUSTER_2);
         });
 
         test.afterAll(() => {
             setContext(CLUSTER_1);
         });
+    });
+
+    // ── Namespace picker ──────────────────────────────────────────────────────
+
+    test.describe("namespace picker", () => {
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await navigateTo();
+        });
+
+        async function openPicker(): Promise<void> {
+            await page.locator("[aria-label='namespace picker']").click();
+            await expect(page.locator("[data-test-id='namespace-quick-picker-dialog']")).toBeVisible();
+        }
+
+        async function closePicker(): Promise<void> {
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='namespace-quick-picker-dialog']")).not.toBeVisible();
+        }
+
+        test("opens with the namespace picker header button", async () => {
+            await openPicker();
+            await closePicker();
+        });
+
+        test("opens with the Ctrl+Shift+K keyboard shortcut", async () => {
+            await page.keyboard.press("Control+Shift+K");
+            await expect(page.locator("[data-test-id='namespace-quick-picker-dialog']")).toBeVisible();
+            await closePicker();
+        });
+
+        test("shows All namespaces row", async () => {
+            await openPicker();
+            await expect(page.locator("[data-test-id='namespace-quick-picker-all']")).toBeVisible();
+            await closePicker();
+        });
+
+        test("shows namespace rows for the active context", async () => {
+            await openPicker();
+            await expect(page.locator("[data-test-id='namespace-quick-picker-row']").first()).toBeVisible();
+            await closePicker();
+        });
+
+        test("filter hides non-matching namespace rows", async () => {
+            await openPicker();
+            await page.locator("[data-test-id='namespace-quick-picker-dialog'] input").fill("kube");
+            const nsTexts = await page.locator("[data-test-id='namespace-quick-picker-row']").allTextContents();
+            expect(nsTexts.every((n) => n.toLowerCase().includes("kube"))).toBe(true);
+            await closePicker();
+        });
+
+        test("selecting a namespace closes the picker", async () => {
+            await openPicker();
+            await page.locator("[data-test-id='namespace-quick-picker-row']").filter({ hasText: /^default/ }).click();
+            await expect(page.locator("[data-test-id='namespace-quick-picker-dialog']")).not.toBeVisible();
+        });
+
+        test("reopening the picker shows the selected namespace highlighted", async () => {
+            await openPicker();
+            const defaultRow = page.locator("[data-test-id='namespace-quick-picker-row']").filter({ hasText: /^default/ });
+            await expect(defaultRow).toHaveClass(/Mui-selected/);
+            await closePicker();
+        });
+
+        test("clicking All namespaces clears the namespace selection", async () => {
+            await openPicker();
+            await page.locator("[data-test-id='namespace-quick-picker-all']").click();
+            await expect(page.locator("[data-test-id='namespace-quick-picker-dialog']")).not.toBeVisible();
+            await openPicker();
+            await expect(page.locator("[data-test-id='namespace-quick-picker-all']")).toHaveClass(/Mui-selected/);
+            await closePicker();
+        });
+
     });
 
     // ── Pods page ─────────────────────────────────────────────────────────────
@@ -653,9 +691,9 @@ test.describe("karse e2e", () => {
         });
 
         test("shows namespace chip when scoped to a namespace", async () => {
-            // Select a namespace via quick picker then navigate to pods page.
-            await page.locator("[aria-label='quick picker']").click();
-            await page.locator("[data-test-id='quick-picker-namespace-row']").filter({ hasText: /^default/ }).click();
+            // Select a namespace via namespace picker then navigate to pods page.
+            await page.locator("[aria-label='namespace picker']").click();
+            await page.locator("[data-test-id='namespace-quick-picker-row']").filter({ hasText: /^default/ }).click();
             await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
             await expect(page.locator(".MuiChip-root", { hasText: "default" })).toBeVisible();
         });
@@ -666,9 +704,9 @@ test.describe("karse e2e", () => {
         });
 
         test("shows Namespace column when all-namespaces is selected", async () => {
-            // Clear namespace via quick picker.
-            await page.locator("[aria-label='quick picker']").click();
-            await page.locator("[data-test-id='quick-picker-clear-namespace']").click();
+            // Clear namespace via namespace picker.
+            await page.locator("[aria-label='namespace picker']").click();
+            await page.locator("[data-test-id='namespace-quick-picker-all']").click();
             const headers = page.locator("[data-test-id='pods-table'] thead th");
             await expect(headers.filter({ hasText: "Namespace" })).toBeVisible();
         });

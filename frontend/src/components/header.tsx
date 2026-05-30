@@ -7,10 +7,11 @@ import { useConfig } from "../lib/config";
 import { ContextPicker } from "./context-picker";
 
 type Props = {
-    onOpenPicker: () => void;
+    onOpenContextPicker: () => void;
+    onOpenNamespacePicker: () => void;
 };
 
-export function Header({ onOpenPicker }: Props) {
+export function Header({ onOpenContextPicker, onOpenNamespacePicker }: Props) {
     const { contexts, current, isLoading, error, switchTo } = useKubeContext();
     const { config: { colorMode }, setColorMode } = useConfig();
     const qc = useQueryClient();
@@ -30,8 +31,13 @@ export function Header({ onOpenPicker }: Props) {
                 <Toolbar variant="dense" sx={{ gap: 0.5, minHeight: 48 }}>
                     <Box sx={{ flexGrow: 1 }} />
                     <ContextPicker contexts={contexts} current={current} onSwitch={switchTo} />
-                    <Tooltip title="Quick pick (Ctrl+K)">
-                        <IconButton size="small" onClick={onOpenPicker} aria-label="quick picker">
+                    <Tooltip title="Context picker (Ctrl+K)">
+                        <IconButton size="small" onClick={onOpenContextPicker} aria-label="context picker">
+                            <FontAwesomeIcon icon={["fas", "link"]} />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Namespace picker (Ctrl+Shift+K)">
+                        <IconButton size="small" onClick={onOpenNamespacePicker} aria-label="namespace picker">
                             <FontAwesomeIcon icon={["fas", "layer-group"]} />
                         </IconButton>
                     </Tooltip>
