@@ -1,8 +1,8 @@
 # Karse project guidance
 
 - **Purpose**: a local-only Kubernetes dashboard wrapping the locally-installed `kubectl` binary. Read-only cluster information plus context switching. Never deployed.
-- **Stack**: backend is Bun + TypeScript + Express 5; frontend is Vite + React 19 + React Router 7 + MUI 7 + Tailwind 4, with axios, TanStack Query, TanStack Table, and Font Awesome. Backend tests use Jest (via `@swc/jest`).
-- **Repo layout**: root `package.json` (bun workspaces), `backend/` (Express app and kubectl adapter), `frontend/` (React app), `docs/` (guides and plans), `scripts/` (smoke tests).
+- **Stack**: backend is Bun + TypeScript + Express 5; frontend is Vite + React 19 + React Router 7 + MUI 7 + Tailwind 4, with axios, TanStack Query, TanStack Table, and Font Awesome. Backend tests use Jest (via `@swc/jest`). E2E tests use Playwright (`@playwright/test`).
+- **Repo layout**: root `package.json` (bun workspaces), `backend/` (Express app and kubectl adapter), `frontend/` (React app), `e2e/` (Playwright e2e tests), `docs/` (guides and plans), `scripts/` (smoke tests and e2e runner).
 - **Documentation**: see `docs/`.
 
 ## File naming
@@ -66,9 +66,11 @@
 
 ## Testing discipline
 
+- The two testing frameworks for this project are **Jest** (backend unit tests) and **Playwright** (e2e tests). No other test runners are used.
 - Every **backend** non-React TypeScript module has tests under `backend/src/tests/`. The one exception is `index.ts`, pure bootstrap wiring covered by the smoke script.
-- Tests run with `bun run test` (which invokes Jest).
-- The **frontend is not unit-tested at all** per project policy. This includes React components, pages, and non-React `frontend/src/lib/*.ts` modules (`api-client.ts`, `query-client.ts`, `font-awesome.ts`). They are exercised by the manual e2e flow and `scripts/smoke-tests.sh`.
+- Backend tests run with `bun run test` (which invokes Jest via `@swc/jest`).
+- The **frontend is not unit-tested at all** per project policy. This includes React components, pages, and non-React `frontend/src/lib/*.ts` modules (`api-client.ts`, `query-client.ts`, `font-awesome.ts`). They are exercised by the Playwright e2e suite and `scripts/smoke-tests.sh`.
+- **E2E tests** live in `e2e/src/` and use `@playwright/test`. They are run by `scripts/e2e-tests.sh`, which spins up two kwok clusters, starts the full stack, then invokes Playwright. E2E tests use `test.describe` and `test` (Playwright's API).
 - Tests **never** use `test.skip` or `describe.skip`.
 - Tests **always** use `describe` and `test`, never `it`.
 - Tests must not be fudged: each assertion checks a specific value, fixtures use realistic shapes (the structurally significant fields the real tool would return), and fakes are not asserted against themselves. Inject collaborators (e.g. a fake `run`) rather than mocking the module under test.

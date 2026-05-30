@@ -9,11 +9,12 @@ type StatTileProps = {
     icon: IconProp;
     label: string;
     value: string | number;
+    testId: string;
 };
 
-function StatTile({ icon, label, value }: StatTileProps) {
+function StatTile({ icon, label, value, testId }: StatTileProps) {
     return (
-        <Card>
+        <Card data-test-id={testId}>
             <CardContent sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
                 <FontAwesomeIcon icon={icon} size="2x" />
                 <Typography variant="h5">{value}</Typography>
@@ -35,7 +36,9 @@ export function ClusterOverview() {
 
     if (current === null) {
         return (
-            <Typography color="text.secondary">Select a context to see cluster overview.</Typography>
+            <Typography color="text.secondary" data-test-id="no-context-message">
+                Select a context to see cluster overview.
+            </Typography>
         );
     }
 
@@ -48,18 +51,18 @@ export function ClusterOverview() {
     }
 
     return (
-        <Grid container spacing={2}>
+        <Grid container spacing={2} data-test-id="stat-tiles">
             <Grid size={3}>
-                <StatTile icon={["fas", "server"]} label="Server version" value={data.serverVersion ?? "-"} />
+                <StatTile icon={["fas", "server"]} label="Server version" value={data.serverVersion ?? "-"} testId="stat-server-version" />
             </Grid>
             <Grid size={3}>
-                <StatTile icon={["fas", "dharmachakra"]} label="Nodes" value={data.nodeCount} />
+                <StatTile icon={["fas", "dharmachakra"]} label="Nodes" value={data.nodeCount} testId="stat-nodes" />
             </Grid>
             <Grid size={3}>
-                <StatTile icon={["fas", "layer-group"]} label="Namespaces" value={data.namespaceCount} />
+                <StatTile icon={["fas", "layer-group"]} label="Namespaces" value={data.namespaceCount} testId="stat-namespaces" />
             </Grid>
             <Grid size={3}>
-                <StatTile icon={["fas", "cube"]} label="Pods" value={data.podCount} />
+                <StatTile icon={["fas", "cube"]} label="Pods" value={data.podCount} testId="stat-pods" />
             </Grid>
         </Grid>
     );

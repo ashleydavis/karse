@@ -157,6 +157,7 @@ export function NodesTable() {
                 placeholder="Search nodes..."
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
+                data-test-id="nodes-search"
                 slotProps={{
                     input: {
                         startAdornment: (
@@ -165,7 +166,7 @@ export function NodesTable() {
                     },
                 }}
             />
-            <TableContainer component={Paper}>
+            <TableContainer component={Paper} data-test-id="nodes-table">
                 <Table size="small">
                     <TableHead>
                         {table.getHeaderGroups().map((hg) => (
@@ -189,19 +190,19 @@ export function NodesTable() {
                         {rows.length === 0 && allNodes.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={columns.length}>
-                                    <Typography color="text.secondary">No nodes.</Typography>
+                                    <Typography color="text.secondary" data-test-id="no-nodes-empty">No nodes.</Typography>
                                 </TableCell>
                             </TableRow>
                         )}
                         {rows.length === 0 && allNodes.length > 0 && (
                             <TableRow>
                                 <TableCell colSpan={columns.length}>
-                                    <Typography color="text.secondary">No nodes match the search.</Typography>
+                                    <Typography color="text.secondary" data-test-id="no-nodes-match">No nodes match the search.</Typography>
                                 </TableCell>
                             </TableRow>
                         )}
                         {rows.map((row) => (
-                            <TableRow key={row.id}>
+                            <TableRow key={row.id} data-test-id="node-row">
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell key={cell.id}>
                                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

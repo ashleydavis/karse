@@ -18,7 +18,7 @@ export function Header() {
             <AppBar position="static">
                 <Toolbar sx={{ gap: 1 }}>
                     <FontAwesomeIcon icon={["fas", "dharmachakra"]} />
-                    <Typography variant="h6" sx={{ flexGrow: 1 }}>
+                    <Typography variant="h6" sx={{ flexGrow: 1 }} data-test-id="karse-title">
                         Karse
                     </Typography>
                     <ContextPicker contexts={contexts} current={current} onSwitch={switchTo} />
