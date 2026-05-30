@@ -30,4 +30,10 @@ From `frontend/`: `bun run compile` (these modules must type-check). From `backe
 
 ## Summary
 
-_To be completed when this step is implemented._
+Created all three files in `frontend/src/lib/`:
+
+- `api-client.ts`: private axios instance with `/api` base URL and a response-error interceptor; exports `fetchContexts`, `switchContext`, `fetchClusterOverview`, `fetchNodes`. Removed the unused `Context` import that caused a `noUnusedLocals` compile error.
+- `query-client.ts`: exports a single shared `QueryClient` with `retry: false`, `refetchOnWindowFocus: false`, `staleTime: 5000`.
+- `kube-context.tsx`: `KubeContextProvider` wraps `useQuery(["contexts"])`, exposes `switchTo` (calls `switchContext` then invalidates `["contexts"]` and `["cluster"]`), and provides the `KubeContextValue`. `useKubeContext` throws if called outside the provider.
+
+Frontend `bun run compile` and backend `bun run test` (51 tests) both green.

@@ -39,4 +39,14 @@ From `frontend/`: `bun run compile` (passes once the referenced components exist
 
 ## Summary
 
-_To be completed when this step is implemented._
+Created all five files for the app shell:
+
+- `frontend/src/lib/font-awesome.ts`: configures Font Awesome (auto CSS disabled) and registers 12 icons used across the feature.
+- `frontend/src/components/app-layout.tsx`: stateless layout with `<Header />` and MUI `Container` wrapping `<Outlet />`.
+- `frontend/src/pages/cluster-home-page.tsx`: stacks `<ClusterOverview />` and `<NodesTable />` in a flex column.
+- `frontend/src/app.tsx`: `BrowserRouter` with a single `path="/"` route on `AppLayout` and an index route on `ClusterHomePage`.
+- `frontend/src/main.tsx`: renders `QueryClientProvider > KubeContextProvider > ThemeProvider > CssBaseline > App` with `StrictMode`.
+
+Stub files created for step 11 components (`header.tsx`, `cluster-overview.tsx`, `nodes-table.tsx`) so type-check passes now. Step 11 will replace the stubs with full implementations.
+
+Frontend `bun run compile` and backend `bun run test` (51 tests) both green.

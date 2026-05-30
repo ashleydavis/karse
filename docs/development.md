@@ -7,6 +7,7 @@ This guide covers everything needed to develop, test, and contribute to Karse. F
 - **`bun`** on `PATH`. Install it however you prefer: the [official installer](https://bun.sh), Homebrew, mise, or your system package manager. See [Installing Bun via mise](#installing-bun-via-mise) below.
 - **`kubectl`** on `PATH`, configured against at least one kubeconfig context.
 - **`jq`** and **`curl`** on `PATH` (required by `scripts/smoke-tests.sh`).
+- **`kwokctl`** and **`kubectl`** on `PATH` (required by `scripts/smoke-tests.sh` to spin up a local fake cluster). Install kwokctl from the [kwok releases page](https://github.com/kubernetes-sigs/kwok/releases); kubectl is available via your system package manager or via the Kubernetes docs.
 
 ### Installing Bun via mise
 

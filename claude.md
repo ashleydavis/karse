@@ -68,8 +68,7 @@
 
 - Every **backend** non-React TypeScript module has tests under `backend/src/tests/`. The one exception is `index.ts`, pure bootstrap wiring covered by the smoke script.
 - Tests run with `bun run test` (which invokes Jest).
-- React components and pages are not unit-tested.
-- Non-React TypeScript modules in the frontend that contain testable logic should have tests in `frontend/src/tests/`. Frontend tests use Vitest (`bun run test` in `frontend/`). Modules that are pure side-effects or thin wrappers with no logic (e.g. `font-awesome.ts`, `api-client.ts`) are exempt and are exercised by the manual e2e flow and `scripts/smoke-tests.sh`.
+- The **frontend is not unit-tested at all** per project policy. This includes React components, pages, and non-React `frontend/src/lib/*.ts` modules (`api-client.ts`, `query-client.ts`, `font-awesome.ts`). They are exercised by the manual e2e flow and `scripts/smoke-tests.sh`.
 - Tests **never** use `test.skip` or `describe.skip`.
 - Tests **always** use `describe` and `test`, never `it`.
 - Tests must not be fudged: each assertion checks a specific value, fixtures use realistic shapes (the structurally significant fields the real tool would return), and fakes are not asserted against themselves. Inject collaborators (e.g. a fake `run`) rather than mocking the module under test.

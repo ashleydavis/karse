@@ -10,11 +10,11 @@
 - [x] 6. kubectl adapter — `plan-scaffold-and-cluster-overview/6-kubectl-adapter.md`
 - [x] 7. Express server, routes, and bootstrap — `plan-scaffold-and-cluster-overview/7-express-server-routes-bootstrap.md`
 - [x] 8. Frontend package and build wiring — `plan-scaffold-and-cluster-overview/8-frontend-package-and-build.md`
-- [ ] 9. Frontend lib — `plan-scaffold-and-cluster-overview/9-frontend-lib.md`
-- [ ] 10. App shell and home page — `plan-scaffold-and-cluster-overview/10-app-shell-and-home-page.md`
-- [ ] 11. Frontend components — `plan-scaffold-and-cluster-overview/11-frontend-components.md`
-- [ ] 12. Smoke script — `plan-scaffold-and-cluster-overview/12-smoke-script.md`
-- [ ] 13. Update documentation — `plan-scaffold-and-cluster-overview/13-update-documentation.md`
+- [x] 9. Frontend lib — `plan-scaffold-and-cluster-overview/9-frontend-lib.md`
+- [x] 10. App shell and home page — `plan-scaffold-and-cluster-overview/10-app-shell-and-home-page.md`
+- [x] 11. Frontend components — `plan-scaffold-and-cluster-overview/11-frontend-components.md`
+- [x] 12. Smoke script — `plan-scaffold-and-cluster-overview/12-smoke-script.md`
+- [x] 13. Update documentation — `plan-scaffold-and-cluster-overview/13-update-documentation.md`
 
 ## Overview
 

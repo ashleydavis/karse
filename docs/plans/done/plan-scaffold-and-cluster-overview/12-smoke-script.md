@@ -28,4 +28,11 @@ From `/home/ash/projects/karse`: `bash scripts/smoke-tests.sh` (backend boots, e
 
 ## Summary
 
-_To be completed when this step is implemented._
+Created `scripts/smoke-tests.sh`. Key decisions and deviations from the original step spec:
+
+- **kwok integrated directly into the script** (not a CI-only concern): the script creates a `karse-smoke` kwok cluster (`--runtime binary`), applies two fake nodes, waits for them to be Ready, runs all endpoint checks, then tears down the cluster on EXIT. This makes the script self-contained -- it works locally and in CI without a real cluster.
+- **`mkdir -p ~/.kwok/clusters/$KWOK_CLUSTER/logs`** added before `kwokctl create cluster` to work around a kwok v0.7.0 bug where it fails to create its own log directory.
+- **URL fix**: the step spec said `/api/contexts/switch` but the actual route is `POST /api/contexts/current`. Fixed in both `smoke-tests.sh` and `frontend/src/lib/api-client.ts`.
+- **CI workflow** (`.github/workflows/ci.yml`) created: installs Bun + deps, backend compile + unit tests, frontend compile, installs kwokctl, then runs `bash scripts/smoke-tests.sh`.
+
+All smoke tests passed end-to-end: kwok cluster up in ~2 s (cached binaries), both fake nodes Ready, all four endpoint checks green, frontend build clean.

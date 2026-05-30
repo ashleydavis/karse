@@ -6,7 +6,8 @@ This guide is for someone confirming that the implementation matches the plan: i
 
 - `kubectl` on `PATH`, with at least one configured kubeconfig context (ideally **two or more**, so the context-switch check below is meaningful).
 - `bun` installed (any installation method; mise users can run `mise install`).
-- `jq` and `curl` on `PATH` (used in the backend curl checks below).
+- `jq` and `curl` on `PATH` (used in the backend curl checks below and by `scripts/smoke-tests.sh`).
+- `kwokctl` and `kubectl` on `PATH` (required by `scripts/smoke-tests.sh`, which spins up its own local fake cluster -- no real cluster needed to run the script).
 - Dependencies installed: `bun install` from the repo root.
 
 ## Start the stack

@@ -29,4 +29,16 @@ Run all tests and confirm they pass before marking this step complete.
 
 ## Summary
 
-_To be completed when this step is implemented._
+All documentation reviewed and reconciled against the implementation:
+
+- **`readme.md`**: no changes needed -- install/run commands, doc links, and description all match.
+- **`claude.md`**: fixed the testing discipline section, which incorrectly stated that frontend non-React modules should have Vitest tests in `frontend/src/tests/`. The frontend has no `test` script and the project policy is that it is not unit-tested at all. Replaced with a clear "frontend is not unit-tested at all" statement.
+- **`docs/architecture.md`**: no changes needed -- diagrams and module descriptions match the implementation.
+- **`docs/api.md`**: no changes needed -- endpoints, request/response shapes, and status codes all match `contexts-route.ts` and `cluster-route.ts`.
+- **`docs/e2e-testing.md`**: added `kwokctl` and `kubectl` to prerequisites (the smoke script now spins up its own kwok cluster; no real cluster required).
+- **`docs/user-guide.md`**: no changes needed.
+- **`docs/audit-log.md`**: no changes needed.
+- **`docs/roadmap.md`**: no changes needed -- "Already shipped" accurately describes the cluster overview + nodes feature.
+- **`docs/development.md`**: added `kwokctl` and `kubectl` as prerequisites (required by `scripts/smoke-tests.sh`).
+
+Full verify sequence passed: backend compile, 51 unit tests, frontend compile + build, smoke tests (kwok cluster up in ~2 s with cached binaries).

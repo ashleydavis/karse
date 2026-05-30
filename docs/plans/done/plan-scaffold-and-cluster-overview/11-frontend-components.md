@@ -27,4 +27,11 @@ From `frontend/`: `bun run compile` and `bun run build` (the full frontend now t
 
 ## Summary
 
-_To be completed when this step is implemented._
+Created all four visual components:
+
+- `context-picker.tsx`: shows a `Chip` when there is zero or one context; shows an MUI `Select` when there are multiple contexts; calls `onSwitch` on change.
+- `header.tsx`: `AppBar` with dharmachakra icon, "Karse" title, `ContextPicker`, and a refresh `IconButton` that invalidates `["contexts"]` and `["cluster"]`; renders an MUI `Alert` when the kube-context query has an error.
+- `cluster-overview.tsx`: four-tile `Grid` with server version, node count, namespace count, pod count. Shows a muted message when no context is selected; shows `Alert severity="error"` on query error. Fixed a TS error by typing the `icon` prop as `IconProp` (from `@fortawesome/fontawesome-svg-core`) rather than `["fas", string]`.
+- `nodes-table.tsx`: TanStack Table with sorting and global-filter state; MUI `Table` + `TextField` search input; `StatusChip` with Font Awesome icons per `NodeStatus`; age formatted as largest non-zero unit (`Nd`/`Nh`/`Nm`); distinct empty vs. "no match" states.
+
+Frontend `bun run compile`, `bun run build`, and backend `bun run test` (51 tests) all green.

@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Backend - compile
+        run: cd backend && bun run compile
+
+      - name: Backend - unit tests
+        run: cd backend && bun run test
+
+      - name: Frontend - compile
+        run: cd frontend && bun run compile
+
+      - name: Install kwokctl
+        env:
+          KWOK_REPO: kubernetes-sigs/kwok
+        run: |
+          LATEST=$(curl -sSL "https://api.github.com/repos/${KWOK_REPO}/releases/latest" | jq -r '.tag_name')
+          curl -sSLo /usr/local/bin/kwokctl \
+            "https://github.com/${KWOK_REPO}/releases/download/${LATEST}/kwokctl-linux-amd64"
+          chmod +x /usr/local/bin/kwokctl
+
+      - name: Smoke tests
+        run: bash scripts/smoke-tests.sh
