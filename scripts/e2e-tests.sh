@@ -118,9 +118,9 @@ echo "--- Starting frontend dev server ---"
 FRONTEND_PID=$!
 
 TRIES=0
-until curl -fsS http://127.0.0.1:5173 >/dev/null 2>&1; do
+until curl -fsS http://localhost:5173 >/dev/null 2>&1; do
     TRIES=$((TRIES+1))
-    [[ $TRIES -ge 200 ]] && { echo "Frontend did not start within 20s" >&2; exit 1; }
+    [[ $TRIES -ge 600 ]] && { echo "Frontend did not start within 60s" >&2; exit 1; }
     sleep 0.1
 done
 

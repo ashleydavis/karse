@@ -8,6 +8,7 @@ export default defineConfig({
     timeout: 30000,
     use: {
         baseURL: process.env.KARSE_E2E_URL ?? "http://localhost:5173",
+        // 127.0.0.1 is not reliable on all CI environments; localhost is used throughout.
         headless: true,
         actionTimeout: 10000,
         navigationTimeout: 20000,
