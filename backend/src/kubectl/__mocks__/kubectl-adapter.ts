@@ -5,3 +5,4 @@ export const listNamespaces = jest.fn();
 export const setContextNamespace = jest.fn();
 export const listNodes = jest.fn();
 export const getClusterOverview = jest.fn();
+export const listPods = jest.fn();

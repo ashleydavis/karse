@@ -136,9 +136,9 @@ test.describe("karse e2e", () => {
         });
 
         test("has all five column headers", async () => {
-            const headers = page.locator("[data-test-id='nodes-table'] thead th");
+            const table = page.locator("[data-test-id='nodes-table']");
             for (const name of ["Name", "Status", "Roles", "Version", "Age"]) {
-                await expect(headers.filter({ hasText: name })).toBeVisible();
+                await expect(table.getByRole("columnheader", { name, exact: true })).toBeVisible();
             }
         });
 
@@ -368,6 +368,17 @@ test.describe("karse e2e", () => {
             await expect(page).toHaveURL(/\/$/);
             await expect(page.locator("[data-test-id='stat-tiles']")).toBeVisible();
         });
+
+        test("shows pods nav button", async () => {
+            await expect(page.locator("[aria-label='pods']")).toBeVisible();
+        });
+
+        test("clicking pods nav button navigates to /pods", async () => {
+            await page.locator("[aria-label='pods']").click();
+            await expect(page).toHaveURL(/\/pods/);
+            await page.locator("[data-test-id='karse-title']").click();
+            await expect(page).toHaveURL(/\/$/);
+        });
     });
 
     // ── Namespaces page ───────────────────────────────────────────────────────
@@ -520,6 +531,22 @@ test.describe("karse e2e", () => {
             await closePicker();
         });
 
+        test("shows All namespaces row when a namespace is selected", async () => {
+            await openPicker();
+            await expect(page.locator("[data-test-id='quick-picker-clear-namespace']")).toBeVisible();
+            await closePicker();
+        });
+
+        test("clicking All namespaces clears the namespace selection", async () => {
+            await openPicker();
+            await page.locator("[data-test-id='quick-picker-clear-namespace']").click();
+            await expect(page.locator("[data-test-id='quick-picker-dialog']")).not.toBeVisible();
+            // Reopen and confirm the clear row is gone (no namespace selected).
+            await openPicker();
+            await expect(page.locator("[data-test-id='quick-picker-clear-namespace']")).toHaveCount(0);
+            await closePicker();
+        });
+
         test("selecting a context in the picker closes the picker and updates the context display", async () => {
             await openPicker();
             await page.locator("[data-test-id='quick-picker-context-row']").filter({ hasText: CLUSTER_2 }).click();
@@ -529,6 +556,121 @@ test.describe("karse e2e", () => {
 
         test.afterAll(() => {
             setContext(CLUSTER_1);
+        });
+    });
+
+    // ── Pods page ─────────────────────────────────────────────────────────────
+
+    test.describe("pods page", () => {
+        // Predictable pod data injected via route interception.
+        const FAKE_PODS = {
+            pods: [
+                {
+                    name: "nginx-abc",
+                    namespace: "default",
+                    phase: "Running",
+                    ready: "1/1",
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                },
+                {
+                    name: "redis-xyz",
+                    namespace: "kube-system",
+                    phase: "Pending",
+                    ready: "0/1",
+                    restarts: 2,
+                    createdAt: new Date().toISOString(),
+                    node: "node-cp",
+                },
+            ],
+        };
+
+        // Install a route override that returns FAKE_PODS for every /api/pods request.
+        async function interceptPods(): Promise<void> {
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: FAKE_PODS });
+            });
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await interceptPods();
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+            setContext(CLUSTER_1);
+        });
+
+        test("has all column headers in all-namespaces view", async () => {
+            const table = page.locator("[data-test-id='pods-table']");
+            for (const name of ["Name", "Namespace", "Status", "Ready", "Restarts", "Node", "Age"]) {
+                await expect(table.getByRole("columnheader", { name, exact: true })).toBeVisible();
+            }
+        });
+
+        test("shows a row for each fake pod", async () => {
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
+        });
+
+        test("shows Running chip for nginx-abc", async () => {
+            const row = page.locator("[data-test-id='pod-row']").filter({ hasText: "nginx-abc" });
+            await expect(row.locator(".MuiChip-label")).toHaveText("Running");
+        });
+
+        test("shows Pending chip for redis-xyz", async () => {
+            const row = page.locator("[data-test-id='pod-row']").filter({ hasText: "redis-xyz" });
+            await expect(row.locator(".MuiChip-label")).toHaveText("Pending");
+        });
+
+        test("search filters pods by name", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("nginx");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("nginx-abc");
+        });
+
+        test("shows no-pods-match message when search has no results", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("zzznotfound");
+            await expect(page.locator("[data-test-id='no-pods-match']")).toBeVisible();
+        });
+
+        test("clearing search restores all pods", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
+        });
+
+        test("shows prompt when no context is selected", async () => {
+            unsetContext();
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("text=Select a context to view pods")).toBeVisible();
+            setContext(CLUSTER_1);
+            await interceptPods();
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+        });
+
+        test("shows namespace chip when scoped to a namespace", async () => {
+            // Select a namespace via quick picker then navigate to pods page.
+            await page.locator("[aria-label='quick picker']").click();
+            await page.locator("[data-test-id='quick-picker-namespace-row']").filter({ hasText: /^default/ }).click();
+            await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+            await expect(page.locator(".MuiChip-root", { hasText: "default" })).toBeVisible();
+        });
+
+        test("hides Namespace column when scoped to a namespace", async () => {
+            const headers = page.locator("[data-test-id='pods-table'] thead th");
+            await expect(headers.filter({ hasText: "Namespace" })).toHaveCount(0);
+        });
+
+        test("shows Namespace column when all-namespaces is selected", async () => {
+            // Clear namespace via quick picker.
+            await page.locator("[aria-label='quick picker']").click();
+            await page.locator("[data-test-id='quick-picker-clear-namespace']").click();
+            const headers = page.locator("[data-test-id='pods-table'] thead th");
+            await expect(headers.filter({ hasText: "Namespace" })).toBeVisible();
         });
     });
 });

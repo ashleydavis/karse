@@ -48,6 +48,16 @@ export function Header({ onOpenPicker }: Props) {
                             <FontAwesomeIcon icon={["fas", "layer-group"]} />
                         </IconButton>
                     </Tooltip>
+                    <Tooltip title="Pods">
+                        <IconButton
+                            color="inherit"
+                            component={Link}
+                            to="/pods"
+                            aria-label="pods"
+                        >
+                            <FontAwesomeIcon icon={["fas", "cube"]} />
+                        </IconButton>
+                    </Tooltip>
                     <Box sx={{ flexGrow: 1 }} />
                     <ContextPicker contexts={contexts} current={current} onSwitch={switchTo} />
                     <Tooltip title="Quick pick (Ctrl+K)">

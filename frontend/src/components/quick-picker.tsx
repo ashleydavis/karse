@@ -104,6 +104,11 @@ export function QuickPicker({ open, onClose }: Props) {
         onClose();
     }
 
+    function handleClearNamespace(): void {
+        setNamespace(null);
+        onClose();
+    }
+
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth data-test-id="quick-picker-dialog">
             <DialogContent sx={{ p: 0 }}>
@@ -152,6 +157,17 @@ export function QuickPicker({ open, onClose }: Props) {
                     )}
                     <Divider sx={{ my: 1 }} />
                     <SectionLabel text="Namespaces" />
+                    {currentContext !== null && currentNamespace !== null && (
+                        <List dense disablePadding>
+                            <PickerRow
+                                label="All namespaces"
+                                sublabel="Clear namespace selection"
+                                active={false}
+                                onClick={handleClearNamespace}
+                                testId="quick-picker-clear-namespace"
+                            />
+                        </List>
+                    )}
                     {currentContext === null && (
                         <Typography sx={{ px: 2, pb: 1 }} color="text.secondary" variant="body2">
                             Select a context first.

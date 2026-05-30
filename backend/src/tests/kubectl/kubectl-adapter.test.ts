@@ -10,6 +10,7 @@ import {
     setContextNamespace,
     listNodes,
     getClusterOverview,
+    listPods,
 } from "../../kubectl/kubectl-adapter";
 
 // jest.requireMock returns any, so mock methods are accessible without casting.
@@ -445,6 +446,151 @@ describe("getClusterOverview", () => {
         expect(result.nodeCount).toBe(3);
         expect(result.namespaceCount).toBe(4);
         expect(result.podCount).toBe(15);
+    });
+});
+
+describe("listPods", () => {
+    // Minimal pod item shape with the fields listPods reads.
+    function makePodItem(overrides: {
+        name?: string;
+        namespace?: string;
+        phase?: string;
+        containerStatuses?: any[];
+        initContainerStatuses?: any[];
+        nodeName?: string;
+        creationTimestamp?: string;
+    } = {}): object {
+        return {
+            metadata: {
+                name: overrides.name ?? "my-pod",
+                namespace: overrides.namespace ?? "default",
+                creationTimestamp: overrides.creationTimestamp ?? "2024-06-01T00:00:00Z",
+            },
+            spec: {
+                nodeName: overrides.nodeName ?? "node-1",
+            },
+            status: {
+                phase: overrides.phase ?? "Running",
+                containerStatuses: overrides.containerStatuses ?? [
+                    {
+                        ready: true,
+                        restartCount: 0,
+                    },
+                ],
+                initContainerStatuses: overrides.initContainerStatuses ?? [],
+            },
+        };
+    }
+
+    test("uses -A flag when no namespace is given", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get pods -A -o json": () => ok(JSON.stringify({
+                items: [makePodItem()],
+            })),
+        });
+        const result = await listPods("test-ctx");
+        expect(result).toHaveLength(1);
+    });
+
+    test("uses -n flag when namespace is given", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get pods -n my-ns -o json": () => ok(JSON.stringify({
+                items: [makePodItem({ namespace: "my-ns" })],
+            })),
+        });
+        const result = await listPods("test-ctx", "my-ns");
+        expect(result).toHaveLength(1);
+    });
+
+    test("maps all fields from a Running pod correctly", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get pods -A -o json": () => ok(JSON.stringify({
+                items: [
+                    makePodItem({
+                        name: "nginx",
+                        namespace: "default",
+                        phase: "Running",
+                        containerStatuses: [
+                            {
+                                ready: true,
+                                restartCount: 2,
+                            },
+                            {
+                                ready: false,
+                                restartCount: 1,
+                            },
+                        ],
+                        nodeName: "node-worker",
+                        creationTimestamp: "2024-01-15T12:00:00Z",
+                    }),
+                ],
+            })),
+        });
+        const result = await listPods("test-ctx");
+        expect(result[0]).toEqual({
+            name: "nginx",
+            namespace: "default",
+            phase: "Running",
+            ready: "1/2",
+            restarts: 3,
+            node: "node-worker",
+            createdAt: "2024-01-15T12:00:00Z",
+        });
+    });
+
+    test("counts init container restarts in total restarts", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get pods -A -o json": () => ok(JSON.stringify({
+                items: [
+                    makePodItem({
+                        containerStatuses: [
+                            {
+                                ready: true,
+                                restartCount: 1,
+                            },
+                        ],
+                        initContainerStatuses: [
+                            {
+                                ready: false,
+                                restartCount: 5,
+                            },
+                        ],
+                    }),
+                ],
+            })),
+        });
+        const result = await listPods("test-ctx");
+        expect(result[0]!.restarts).toBe(6);
+    });
+
+    test("handles pod with no containerStatuses gracefully", async () => {
+        const item = makePodItem();
+        (item as any).status.containerStatuses = undefined;
+        setRunnerHandlers({
+            "--context test-ctx get pods -A -o json": () => ok(JSON.stringify({
+                items: [item],
+            })),
+        });
+        const result = await listPods("test-ctx");
+        expect(result[0]!.ready).toBe("0/0");
+        expect(result[0]!.restarts).toBe(0);
+    });
+
+    test("returns empty array when items is empty", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get pods -A -o json": () => ok(JSON.stringify({
+                items: [],
+            })),
+        });
+        const result = await listPods("test-ctx");
+        expect(result.length).toBe(0);
+    });
+
+    test("throws on non-zero exit code", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get pods -A -o json": () => fail("access denied"),
+        });
+        await expect(listPods("test-ctx")).rejects.toThrow("access denied");
     });
 });
 

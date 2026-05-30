@@ -36,3 +36,20 @@ export type Namespace = {
 export type NamespacesResponse = {
     namespaces: Namespace[];
 };
+
+export type PodPhase = "Running" | "Pending" | "Succeeded" | "Failed" | "Unknown";
+
+export type Pod = {
+    name: string;
+    namespace: string;
+    phase: PodPhase;
+    ready: string;      // e.g. "2/3"
+    restarts: number;
+    createdAt: string;  // ISO timestamp
+    node: string;
+};
+
+// Response body for GET /api/pods.
+export type PodsResponse = {
+    pods: Pod[];
+};

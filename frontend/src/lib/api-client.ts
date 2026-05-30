@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { ContextsResponse, ClusterOverview, Node, NamespacesResponse } from "karse-types";
+import type { ContextsResponse, ClusterOverview, Node, NamespacesResponse, PodsResponse } from "karse-types";
 
 const http = axios.create({ baseURL: "/api", headers: { "Content-Type": "application/json" } });
 
@@ -40,4 +40,15 @@ export async function fetchNamespaces(context: string): Promise<NamespacesRespon
 // Sets the default namespace for the given context in the local kubeconfig.
 export async function setGlobalNamespace(context: string, namespace: string): Promise<void> {
     await http.post("/namespaces/default", { context, namespace });
+}
+
+// Fetches pods for the given context. Pass namespace to scope to one namespace,
+// or omit to fetch all pods across all namespaces.
+export async function fetchPods(context: string, namespace?: string): Promise<PodsResponse> {
+    const params: Record<string, string> = { context };
+    if (namespace) {
+        params.namespace = namespace;
+    }
+    const response = await http.get<PodsResponse>("/pods", { params });
+    return response.data;
 }

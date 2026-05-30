@@ -1,6 +1,6 @@
 import { run, type CommandResult } from "../command-runner";
 import { audit, formatLocalISO } from "../audit-log";
-import type { Context, NodeStatus, Node, ClusterOverview, Namespace } from "karse-types";
+import type { Context, NodeStatus, Node, ClusterOverview, Namespace, Pod, PodPhase } from "karse-types";
 
 // Base directory for the rolling audit log; overridable via KARSE_LOGS_DIR.
 const LOGS_DIR = process.env.KARSE_LOGS_DIR ?? "../logs";
@@ -107,6 +107,35 @@ export async function listNodes(context: string): Promise<Node[]> {
             roles,
             version: item.status.nodeInfo.kubeletVersion,
             createdAt: item.metadata.creationTimestamp,
+        };
+    });
+}
+
+// Returns pods for the given context, optionally scoped to a namespace.
+// Pass namespace=undefined (or omit) to fetch all pods across all namespaces.
+export async function listPods(context: string, namespace?: string): Promise<Pod[]> {
+    const nsArgs = namespace ? ["-n", namespace] : ["-A"];
+    const result = await kubectl(["--context", context, "get", "pods", ...nsArgs, "-o", "json"]);
+    if (result.exitCode !== 0) {
+        throw new Error(result.stderr);
+    }
+    const data = JSON.parse(result.stdout);
+    return (data.items as any[]).map((item) => {
+        const phase: PodPhase = (item.status?.phase as PodPhase) ?? "Unknown";
+        const containerStatuses: any[] = item.status?.containerStatuses ?? [];
+        const initStatuses: any[] = item.status?.initContainerStatuses ?? [];
+        const allStatuses = [...containerStatuses, ...initStatuses];
+        const readyCount = containerStatuses.filter((cs) => cs.ready === true).length;
+        const totalCount = containerStatuses.length;
+        const restarts = allStatuses.reduce((sum, cs) => sum + (cs.restartCount ?? 0), 0);
+        return {
+            name: item.metadata.name,
+            namespace: item.metadata.namespace,
+            phase,
+            ready: `${readyCount}/${totalCount}`,
+            restarts,
+            createdAt: item.metadata.creationTimestamp,
+            node: item.spec?.nodeName ?? "",
         };
     });
 }
