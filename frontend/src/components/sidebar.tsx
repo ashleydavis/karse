@@ -1,4 +1,5 @@
-import { Box, Typography, List, ListItemButton, ListItemIcon, ListItemText, Divider } from "@mui/material";
+import { useState } from "react";
+import { Box, Typography, List, ListItemButton, ListItemIcon, ListItemText, Divider, Tooltip, IconButton } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link, useLocation } from "react-router-dom";
 
@@ -11,12 +12,13 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
     const { pathname } = useLocation();
+    const [collapsed, setCollapsed] = useState(false);
 
     return (
         <Box
             component="nav"
             sx={{
-                width: 200,
+                width: collapsed ? 56 : 200,
                 flexShrink: 0,
                 display: "flex",
                 flexDirection: "column",
@@ -24,20 +26,24 @@ export function Sidebar() {
                 borderColor: "divider",
                 bgcolor: "background.paper",
                 height: "100vh",
+                transition: "width 0.2s ease",
+                overflow: "hidden",
             }}
         >
-            <Box sx={{ px: 2.5, py: 2.25, display: "flex", alignItems: "center", gap: 1.5 }}>
-                <Box sx={{ color: "primary.main" }}>
+            <Box sx={{ px: collapsed ? 0 : 2.5, height: 48, display: "flex", alignItems: "center", gap: 1.5, justifyContent: collapsed ? "center" : "flex-start" }}>
+                <Box sx={{ color: "primary.main", flexShrink: 0 }}>
                     <FontAwesomeIcon icon={["fas", "dharmachakra"]} />
                 </Box>
-                <Typography
-                    variant="subtitle1"
-                    component={Link}
-                    to="/"
-                    sx={{ fontWeight: 700, textDecoration: "none", color: "inherit", letterSpacing: "-0.02em" }}
-                >
-                    Karse
-                </Typography>
+                {!collapsed && (
+                    <Typography
+                        variant="subtitle1"
+                        component={Link}
+                        to="/"
+                        sx={{ fontWeight: 700, textDecoration: "none", color: "inherit", letterSpacing: "-0.02em" }}
+                    >
+                        Karse
+                    </Typography>
+                )}
             </Box>
 
             <Divider />
@@ -46,36 +52,52 @@ export function Sidebar() {
                 {NAV_ITEMS.map(({ to, icon, label }) => {
                     const active = pathname === to;
                     return (
-                        <ListItemButton
-                            key={to}
-                            component={Link}
-                            to={to}
-                            selected={active}
-                            sx={{
-                                borderRadius: 1.5,
-                                mb: 0.25,
-                                py: 0.75,
-                                "& .MuiListItemIcon-root": {
-                                    color: active ? "primary.main" : "text.secondary",
-                                    transition: "color 0.15s",
-                                },
-                            }}
-                        >
-                            <ListItemIcon sx={{ minWidth: 32 }}>
-                                <FontAwesomeIcon icon={["fas", icon]} />
-                            </ListItemIcon>
-                            <ListItemText
-                                primary={label}
-                                slotProps={{
-                                    primary: {
-                                        sx: { fontSize: "0.875rem", fontWeight: active ? 600 : 400 },
+                        <Tooltip key={to} title={collapsed ? label : ""} placement="right">
+                            <ListItemButton
+                                component={Link}
+                                to={to}
+                                selected={active}
+                                sx={{
+                                    borderRadius: 1.5,
+                                    mb: 0.25,
+                                    py: 0.75,
+                                    justifyContent: collapsed ? "center" : "flex-start",
+                                    "& .MuiListItemIcon-root": {
+                                        color: active ? "primary.main" : "text.secondary",
+                                        transition: "color 0.15s",
                                     },
                                 }}
-                            />
-                        </ListItemButton>
+                            >
+                                <ListItemIcon sx={{ minWidth: collapsed ? 0 : 32 }}>
+                                    <FontAwesomeIcon icon={["fas", icon]} />
+                                </ListItemIcon>
+                                {!collapsed && (
+                                    <ListItemText
+                                        primary={label}
+                                        slotProps={{
+                                            primary: {
+                                                sx: { fontSize: "0.875rem", fontWeight: active ? 600 : 400 },
+                                            },
+                                        }}
+                                    />
+                                )}
+                            </ListItemButton>
+                        </Tooltip>
                     );
                 })}
             </List>
+
+            <Divider />
+
+            <Box sx={{ p: 0.5, display: "flex", justifyContent: collapsed ? "center" : "flex-end" }}>
+                <IconButton
+                    size="small"
+                    onClick={() => setCollapsed(!collapsed)}
+                    aria-label={collapsed ? "expand sidebar" : "collapse sidebar"}
+                >
+                    <FontAwesomeIcon icon={["fas", collapsed ? "chevron-right" : "chevron-left"]} />
+                </IconButton>
+            </Box>
         </Box>
     );
 }
