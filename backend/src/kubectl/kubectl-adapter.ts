@@ -157,9 +157,11 @@ export async function getClusterOverview(context: string): Promise<ClusterOvervi
     const podsResult = results[3]!;
 
     let serverVersion: string | null = null;
+    let clientVersion: string | null = null;
     if (versionResult.status === "fulfilled" && versionResult.value.exitCode === 0) {
         const data = JSON.parse(versionResult.value.stdout);
         serverVersion = data.serverVersion?.gitVersion ?? null;
+        clientVersion = data.clientVersion?.gitVersion ?? null;
     }
 
     if (nodesResult.status === "rejected") {
@@ -168,7 +170,11 @@ export async function getClusterOverview(context: string): Promise<ClusterOvervi
     if (nodesResult.value.exitCode !== 0) {
         throw new Error(nodesResult.value.stderr);
     }
-    const nodeCount: number = JSON.parse(nodesResult.value.stdout).items.length;
+    const nodeItems: any[] = JSON.parse(nodesResult.value.stdout).items;
+    const nodeCount = nodeItems.length;
+    const readyNodeCount = nodeItems.filter((item: any) =>
+        item.status?.conditions?.some((c: any) => c.type === "Ready" && c.status === "True")
+    ).length;
 
     if (nsResult.status === "rejected") {
         throw nsResult.reason;
@@ -184,12 +190,21 @@ export async function getClusterOverview(context: string): Promise<ClusterOvervi
     if (podsResult.value.exitCode !== 0) {
         throw new Error(podsResult.value.stderr);
     }
-    const podCount: number = JSON.parse(podsResult.value.stdout).items.length;
+    const podItems: any[] = JSON.parse(podsResult.value.stdout).items;
+    const podCount = podItems.length;
+    const runningPodCount = podItems.filter((p: any) => p.status?.phase === "Running").length;
+    const pendingPodCount = podItems.filter((p: any) => p.status?.phase === "Pending").length;
+    const failedPodCount  = podItems.filter((p: any) => p.status?.phase === "Failed").length;
 
     return {
         serverVersion,
+        clientVersion,
         nodeCount,
+        readyNodeCount,
         namespaceCount,
         podCount,
+        runningPodCount,
+        pendingPodCount,
+        failedPodCount,
     };
 }

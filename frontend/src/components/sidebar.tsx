@@ -3,9 +3,10 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link, useLocation } from "react-router-dom";
 
 const NAV_ITEMS = [
-    { to: "/",           icon: "server"      as const, label: "Cluster"    },
-    { to: "/namespaces", icon: "layer-group" as const, label: "Namespaces" },
-    { to: "/pods",       icon: "cube"        as const, label: "Pods"       },
+    { to: "/",           icon: "dharmachakra" as const, label: "Cluster"    },
+    { to: "/nodes",      icon: "server"       as const, label: "Nodes"      },
+    { to: "/namespaces", icon: "layer-group"  as const, label: "Namespaces" },
+    { to: "/pods",       icon: "cube"         as const, label: "Pods"       },
 ];
 
 export function Sidebar() {

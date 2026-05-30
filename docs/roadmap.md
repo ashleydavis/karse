@@ -2,6 +2,10 @@
 
 Karse currently ships a single cluster home page (overview tiles plus a read-only nodes table) with kubeconfig context switching. This roadmap lists the features and hardening work we expect to take on next. It is a rough ordering of intent, not a commitment.
 
+## Open questions
+
+**Should there just be a single "resource" page?** That allows the user to pick "All resources" or select particular types (e.g. Pods and Deployments). From there the user could sort, search, and filter all resources in one place. It would also be good if they could export a CSV from there.
+
 1. **Namespace selector**: scope the views to a chosen namespace instead of cluster-wide reads only.
 2. **Workloads views**: read-only tables for pods, deployments, statefulsets, and daemonsets.
 3. **Pod detail page**: a `/pods/:name` route showing containers, status, restarts, and events.
@@ -25,6 +29,15 @@ Karse currently ships a single cluster home page (overview tiles plus a read-onl
 18. **Resource quota utilisation**: show how much of each `ResourceQuota` is consumed per namespace (CPU, memory, object counts) so quota exhaustion is caught before it blocks deployments.
 19. **OOMKilled and eviction tracker**: highlight pods that have been terminated due to memory pressure or evicted by the kubelet, with the exit reason, timestamp, and how many times it has happened.
 20. **Historical metrics charts**: time-series sparklines or graphs for key signals (cluster CPU, cluster memory, per-node load) so trends and spikes are visible over a configurable lookback window.
+21. **Per-pod CPU and memory charts**: CPU utilisation and memory usage charts on the pod detail page, showing current usage alongside requests and limits, so resource pressure on individual pods is immediately visible.
+22. **All-resources browser**: a dedicated page with a searchable, sortable table listing every resource in the cluster (scoped to the selected namespace or cluster-wide), across all resource kinds, so users can browse the full inventory without knowing the specific resource type in advance.
+23. **Networking views**: read-only, searchable, sortable tables for Services and Ingresses, with detail pages showing spec, status, ports, and associated endpoints.
+24. **Storage views**: read-only, searchable, sortable tables for PersistentVolumes and PersistentVolumeClaims, with detail pages showing capacity, access modes, storage class, and binding status.
+25. **Configuration views**: read-only, searchable, sortable tables for ConfigMaps and Secrets (key names only, values redacted for Secrets), with detail pages.
+26. **Batch workload views**: read-only, searchable, sortable tables for Jobs and CronJobs, with detail pages showing schedule, last run time, and completion status.
+27. **ReplicaSet view**: read-only, searchable, sortable table for ReplicaSets, with detail pages showing desired/ready/available replica counts and owner reference.
+28. **RBAC views**: read-only, searchable, sortable tables for ServiceAccounts, Roles, ClusterRoles, RoleBindings, and ClusterRoleBindings, with detail pages showing rules and subjects.
+29. **CRD browser**: a view listing installed CustomResourceDefinitions and allowing users to browse instances of each CRD kind in a searchable, sortable table.
 
 ## Already shipped
 

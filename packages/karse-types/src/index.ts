@@ -22,9 +22,14 @@ export type Node = {
 
 export type ClusterOverview = {
     serverVersion: string | null;   // null if cluster unreachable
+    clientVersion: string | null;
     nodeCount: number;
+    readyNodeCount: number;
     namespaceCount: number;
     podCount: number;
+    runningPodCount: number;
+    pendingPodCount: number;
+    failedPodCount: number;
 };
 
 // A single Kubernetes namespace in the active cluster.
