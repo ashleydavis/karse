@@ -65,7 +65,10 @@ export async function listNamespaces(context: string): Promise<Namespace[]> {
 // Sets the default namespace for the given context in the local kubeconfig.
 // This mutates only the local kubeconfig file, not the cluster.
 export async function setContextNamespace(context: string, namespace: string): Promise<void> {
-    const result = await kubectl(["config", "set-context", context, `--namespace=${namespace}`]);
+    const args = namespace.trim() === ""
+        ? ["config", "unset", `contexts.${context}.namespace`]
+        : ["config", "set-context", context, `--namespace=${namespace}`];
+    const result = await kubectl(args);
     if (result.exitCode !== 0) {
         throw new Error(result.stderr);
     }

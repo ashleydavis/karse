@@ -20,27 +20,23 @@ import {
     TextField,
     Typography,
     Button,
-    CircularProgress,
-    Alert,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import type { Namespace } from "karse-types";
+import type { Context } from "karse-types";
 
 type Props = {
-    namespaces: Namespace[];
+    contexts: Context[];
     active: string | null;
     terminalDefault: string | null;
-    isLoading: boolean;
-    error: Error | null;
-    onUse: (name: string | null) => void;
-    onSetDefault?: (name: string | null) => void;
+    onUse: (name: string) => void;
+    onSetDefault: (name: string) => void;
 };
 
-export function NamespaceList({ namespaces, active, terminalDefault, isLoading, error, onUse, onSetDefault }: Props) {
+export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetDefault }: Props) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
 
-    const columns: ColumnDef<Namespace>[] = [
+    const columns: ColumnDef<Context>[] = [
         {
             accessorKey: "name",
             header: "Name",
@@ -57,6 +53,22 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
             ),
         },
         {
+            accessorKey: "cluster",
+            header: "Cluster",
+        },
+        {
+            accessorKey: "user",
+            header: "User",
+        },
+        {
+            accessorKey: "namespace",
+            header: "Default Namespace",
+            cell: (info) => {
+                const ns = info.getValue<string | null>();
+                return ns ?? <Typography component="span" color="text.secondary" variant="body2">—</Typography>;
+            },
+        },
+        {
             id: "action",
             header: "Actions",
             enableSorting: false,
@@ -64,22 +76,12 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
                 const name = info.row.original.name;
                 return (
                     <span style={{ display: "inline-flex", gap: 8 }}>
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => onUse(name === active ? null : name)}
-                        >
-                            {name === active ? "Clear active" : "Set as active"}
+                        <Button size="small" variant="outlined" disabled={name === active} onClick={() => onUse(name)}>
+                            Set as active
                         </Button>
-                        {onSetDefault !== undefined && (
-                            <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={() => onSetDefault(name === terminalDefault ? null : name)}
-                            >
-                                {name === terminalDefault ? "Clear default" : "Set as default"}
-                            </Button>
-                        )}
+                        <Button size="small" variant="outlined" disabled={name === terminalDefault} onClick={() => onSetDefault(name)}>
+                            Set as default
+                        </Button>
                     </span>
                 );
             },
@@ -87,7 +89,7 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
     ];
 
     const table = useReactTable({
-        data: namespaces,
+        data: contexts,
         columns,
         state: { sorting, globalFilter },
         onSortingChange: setSorting,
@@ -97,14 +99,6 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
         getFilteredRowModel: getFilteredRowModel(),
         globalFilterFn: "includesString",
     });
-
-    if (isLoading) {
-        return <CircularProgress size={24} />;
-    }
-
-    if (error) {
-        return <Alert severity="error">{error.message}</Alert>;
-    }
 
     const rows = table.getRowModel().rows;
 
@@ -120,10 +114,10 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
         <div className="flex flex-col gap-2">
             <TextField
                 size="small"
-                placeholder="Search namespaces..."
+                placeholder="Search contexts..."
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
-                data-test-id="namespaces-filter"
+                data-test-id="contexts-search"
                 slotProps={{
                     input: {
                         startAdornment: (
@@ -132,7 +126,7 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
                     },
                 }}
             />
-            <TableContainer component={Paper} data-test-id="namespaces-list">
+            <TableContainer component={Paper} data-test-id="contexts-table">
                 <Table size="small">
                     <TableHead>
                         {table.getHeaderGroups().map((hg) => (
@@ -153,26 +147,26 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
                         ))}
                     </TableHead>
                     <TableBody>
-                        {rows.length === 0 && namespaces.length === 0 && (
+                        {rows.length === 0 && contexts.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={columns.length}>
-                                    <Typography color="text.secondary" data-test-id="no-namespaces-found">
-                                        No namespaces found.
+                                    <Typography color="text.secondary" data-test-id="no-contexts-empty">
+                                        No contexts found.
                                     </Typography>
                                 </TableCell>
                             </TableRow>
                         )}
-                        {rows.length === 0 && namespaces.length > 0 && (
+                        {rows.length === 0 && contexts.length > 0 && (
                             <TableRow>
                                 <TableCell colSpan={columns.length}>
-                                    <Typography color="text.secondary" data-test-id="no-namespaces-match">
-                                        No namespaces match the search.
+                                    <Typography color="text.secondary" data-test-id="no-contexts-match">
+                                        No contexts match the search.
                                     </Typography>
                                 </TableCell>
                             </TableRow>
                         )}
                         {rows.map((row) => (
-                            <TableRow key={row.id} data-test-id="namespace-row">
+                            <TableRow key={row.id} data-test-id="context-row">
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell key={cell.id}>
                                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

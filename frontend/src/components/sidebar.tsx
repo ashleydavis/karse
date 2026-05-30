@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link, useLocation } from "react-router-dom";
 
 const NAV_ITEMS = [
+    { to: "/contexts",   icon: "link"         as const, label: "Contexts"   },
     { to: "/",           icon: "dharmachakra" as const, label: "Cluster"    },
     { to: "/nodes",      icon: "server"       as const, label: "Nodes"      },
     { to: "/namespaces", icon: "layer-group"  as const, label: "Namespaces" },

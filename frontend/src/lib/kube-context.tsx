@@ -6,6 +6,7 @@ import { fetchContexts } from "./api-client";
 type KubeContextValue = {
     contexts: Context[];
     current: string | null;
+    terminalDefault: string | null;
     isLoading: boolean;
     error: Error | null;
     switchTo: (name: string) => void;
@@ -24,6 +25,7 @@ export function KubeContextProvider({ children }: { children: ReactNode }) {
     const value: KubeContextValue = {
         contexts: data?.contexts ?? [],
         current,
+        terminalDefault: data?.current ?? null,
         isLoading: query.isLoading,
         error: (query.error as Error | null) ?? null,
         switchTo: setUserSelection,

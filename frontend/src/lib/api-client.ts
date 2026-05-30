@@ -38,8 +38,8 @@ export async function fetchNamespaces(context: string): Promise<NamespacesRespon
 }
 
 // Sets the default namespace for the given context in the local kubeconfig.
-export async function setGlobalNamespace(context: string, namespace: string): Promise<void> {
-    await http.post("/namespaces/default", { context, namespace });
+export async function setGlobalNamespace(context: string, namespace: string | null): Promise<void> {
+    await http.post("/namespaces/default", { context, namespace: namespace ?? "" });
 }
 
 // Fetches pods for the given context. Pass namespace to scope to one namespace,

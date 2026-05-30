@@ -27,9 +27,9 @@ namespacesRouter.post("/namespaces/default", async (req, res) => {
         });
         return;
     }
-    if (typeof namespace !== "string" || namespace.trim() === "") {
+    if (typeof namespace !== "string") {
         res.status(400).json({
-            error: "namespace must be a non-empty string",
+            error: "namespace must be a string",
         });
         return;
     }

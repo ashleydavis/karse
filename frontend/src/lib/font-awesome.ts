@@ -19,6 +19,7 @@ import {
     faCircleHalfStroke,
     faChevronLeft,
     faChevronRight,
+    faLink,
 } from "@fortawesome/free-solid-svg-icons";
 
 config.autoAddCss = false;
@@ -41,5 +42,6 @@ library.add(
     faMoon,
     faCircleHalfStroke,
     faChevronLeft,
-    faChevronRight
+    faChevronRight,
+    faLink
 );

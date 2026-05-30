@@ -22,7 +22,7 @@ export function NamespacesPage() {
     });
 
     const setGlobalMutation = useMutation({
-        mutationFn: ({ ctx, ns }: { ctx: string; ns: string }) => setGlobalNamespace(ctx, ns),
+        mutationFn: ({ ctx, ns }: { ctx: string; ns: string | null }) => setGlobalNamespace(ctx, ns),
         onSuccess: () => {
             void qc.invalidateQueries({ queryKey: ["contexts"] });
         },
@@ -46,14 +46,12 @@ export function NamespacesPage() {
             )}
             <NamespaceList
                 namespaces={data?.namespaces ?? []}
-                selected={namespace}
-                globalDefault={globalDefault}
+                active={namespace}
+                terminalDefault={globalDefault}
                 isLoading={isLoading}
                 error={(error as Error | null)}
-                onSelect={setNamespace}
-                onSetGlobal={(ns) => {
-                    setGlobalMutation.mutate({ ctx: context, ns });
-                }}
+                onUse={setNamespace}
+                onSetDefault={(ns) => setGlobalMutation.mutate({ ctx: context, ns })}
             />
         </Box>
     );
