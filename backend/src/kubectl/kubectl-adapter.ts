@@ -1,13 +1,15 @@
 import { run, type CommandResult } from "../command-runner";
-import { audit } from "../audit-log";
+import { audit, formatLocalISO } from "../audit-log";
 import type { Context, NodeStatus, Node, ClusterOverview } from "karse-types";
 
 // Base directory for the rolling audit log; overridable via KARSE_LOGS_DIR.
 const LOGS_DIR = process.env.KARSE_LOGS_DIR ?? "../logs";
 
-// Writes an audit entry then shells out to kubectl. The only call site for run("kubectl", ...).
+// Writes an audit entry, prints to stdout, then shells out to kubectl.
 async function kubectl(args: readonly string[]): Promise<CommandResult> {
-    await audit(LOGS_DIR, "kubectl", args);
+    const now = new Date();
+    await audit(LOGS_DIR, "kubectl", args, now);
+    console.log(formatLocalISO(now) + " kubectl " + args.join(" "));
     return run("kubectl", args);
 }
 
