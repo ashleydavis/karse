@@ -15,7 +15,7 @@ export function ContextPicker({ contexts, current, onSwitch }: Props) {
     }
 
     if (contexts.length <= 1) {
-        return <Chip label={current ?? "no context"} size="small" />;
+        return <Chip label={current ?? "no context"} size="small" sx={{ color: "inherit", borderColor: "rgba(255,255,255,0.5)" }} variant="outlined" />;
     }
 
     return (

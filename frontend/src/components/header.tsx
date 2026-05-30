@@ -1,19 +1,23 @@
-import { AppBar, Toolbar, Typography, IconButton, Alert, Tooltip, Box } from "@mui/material";
+import { useState } from "react";
+import { AppBar, Toolbar, Typography, IconButton, Alert, Tooltip, Box, Menu, MenuItem, ListItemIcon, ListItemText } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useKubeContext } from "../lib/kube-context";
+import { useConfig } from "../lib/config";
 import { ContextPicker } from "./context-picker";
 
-// Props for the Header component.
 type Props = {
     onOpenPicker: () => void;
 };
 
-// Top application bar with navigation, context picker, quick picker trigger, and refresh.
 export function Header({ onOpenPicker }: Props) {
     const { contexts, current, isLoading, error, switchTo } = useKubeContext();
+    const { config: { colorMode }, setColorMode } = useConfig();
     const qc = useQueryClient();
+    const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+
+    const colorModeIcon = colorMode === "dark" ? "sun" : colorMode === "light" ? "moon" : "circle-half-stroke";
 
     async function handleRefresh(): Promise<void> {
         await qc.invalidateQueries({ queryKey: ["contexts"] });
@@ -69,6 +73,33 @@ export function Header({ onOpenPicker }: Props) {
                             <FontAwesomeIcon icon={["fas", "magnifying-glass"]} />
                         </IconButton>
                     </Tooltip>
+                    <Tooltip title="Color mode">
+                        <IconButton
+                            color="inherit"
+                            onClick={(e) => setMenuAnchor(e.currentTarget)}
+                            aria-label="color mode"
+                        >
+                            <FontAwesomeIcon icon={["fas", colorModeIcon]} />
+                        </IconButton>
+                    </Tooltip>
+                    <Menu
+                        anchorEl={menuAnchor}
+                        open={Boolean(menuAnchor)}
+                        onClose={() => setMenuAnchor(null)}
+                    >
+                        {(["light", "dark", "system"] as const).map((m) => (
+                            <MenuItem
+                                key={m}
+                                selected={colorMode === m}
+                                onClick={() => { setColorMode(m); setMenuAnchor(null); }}
+                            >
+                                <ListItemIcon>
+                                    <FontAwesomeIcon icon={["fas", m === "dark" ? "moon" : m === "light" ? "sun" : "circle-half-stroke"]} />
+                                </ListItemIcon>
+                                <ListItemText>{m.charAt(0).toUpperCase() + m.slice(1)}</ListItemText>
+                            </MenuItem>
+                        ))}
+                    </Menu>
                     <IconButton
                         color="inherit"
                         onClick={handleRefresh}

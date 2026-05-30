@@ -14,6 +14,9 @@ import {
     faSortUp,
     faSortDown,
     faMagnifyingGlass,
+    faSun,
+    faMoon,
+    faCircleHalfStroke,
 } from "@fortawesome/free-solid-svg-icons";
 
 config.autoAddCss = false;
@@ -31,5 +34,8 @@ library.add(
     faSort,
     faSortUp,
     faSortDown,
-    faMagnifyingGlass
+    faMagnifyingGlass,
+    faSun,
+    faMoon,
+    faCircleHalfStroke
 );
