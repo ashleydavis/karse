@@ -6,6 +6,8 @@ import {
     listContexts,
     getCurrentContext,
     setCurrentContext,
+    listNamespaces,
+    setContextNamespace,
     listNodes,
     getClusterOverview,
 } from "../../kubectl/kubectl-adapter";
@@ -443,5 +445,70 @@ describe("getClusterOverview", () => {
         expect(result.nodeCount).toBe(3);
         expect(result.namespaceCount).toBe(4);
         expect(result.podCount).toBe(15);
+    });
+});
+
+describe("listNamespaces", () => {
+    test("parses a fixture with two namespaces", async () => {
+        const fixture = {
+            items: [
+                {
+                    metadata: {
+                        name: "default",
+                    },
+                },
+                {
+                    metadata: {
+                        name: "kube-system",
+                    },
+                },
+            ],
+        };
+        setRunnerHandlers({
+            "--context test-ctx get namespaces -o json": () => ok(JSON.stringify(fixture)),
+        });
+        const result = await listNamespaces("test-ctx");
+        expect(result.length).toBe(2);
+        expect(result[0]!).toEqual({
+            name: "default",
+        });
+        expect(result[1]!).toEqual({
+            name: "kube-system",
+        });
+    });
+
+    test("returns [] when items is empty", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get namespaces -o json": () => ok(JSON.stringify({
+                items: [],
+            })),
+        });
+        const result = await listNamespaces("test-ctx");
+        expect(result.length).toBe(0);
+    });
+
+    test("throws on non-zero exit", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get namespaces -o json": () => fail("denied"),
+        });
+        await expect(listNamespaces("test-ctx")).rejects.toThrow("denied");
+    });
+});
+
+describe("setContextNamespace", () => {
+    test("invokes runner with exact argv", async () => {
+        setRunnerHandlers({
+            "config set-context my-ctx --namespace=my-ns": () => ok(""),
+        });
+        await setContextNamespace("my-ctx", "my-ns");
+        expect(run).toHaveBeenCalledTimes(1);
+        expect(run).toHaveBeenCalledWith("kubectl", ["config", "set-context", "my-ctx", "--namespace=my-ns"]);
+    });
+
+    test("throws on non-zero exit", async () => {
+        setRunnerHandlers({
+            "config set-context ghost --namespace=ns1": () => fail("no such context"),
+        });
+        await expect(setContextNamespace("ghost", "ns1")).rejects.toThrow("no such context");
     });
 });

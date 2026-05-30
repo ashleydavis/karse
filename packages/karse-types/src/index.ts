@@ -26,3 +26,13 @@ export type ClusterOverview = {
     namespaceCount: number;
     podCount: number;
 };
+
+// A single Kubernetes namespace in the active cluster.
+export type Namespace = {
+    name: string;
+};
+
+// Response body for GET /api/namespaces.
+export type NamespacesResponse = {
+    namespaces: Namespace[];
+};

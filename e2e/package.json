@@ -3,9 +3,12 @@
     "private": true,
     "type": "module",
     "scripts": {
+        "compile": "tsc --noEmit",
         "test": "playwright test"
     },
     "devDependencies": {
-        "@playwright/test": "*"
+        "@playwright/test": "*",
+        "@types/node": "*",
+        "typescript": "*"
     }
 }

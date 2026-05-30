@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { ContextsResponse, ClusterOverview, Node } from "karse-types";
+import type { ContextsResponse, ClusterOverview, Node, NamespacesResponse } from "karse-types";
 
 const http = axios.create({ baseURL: "/api", headers: { "Content-Type": "application/json" } });
 
@@ -29,4 +29,15 @@ export async function fetchClusterOverview(context: string): Promise<ClusterOver
 export async function fetchNodes(context: string): Promise<{ nodes: Node[] }> {
     const response = await http.get<{ nodes: Node[] }>("/cluster/nodes", { params: { context } });
     return response.data;
+}
+
+// Fetches the list of namespaces in the cluster for the given context.
+export async function fetchNamespaces(context: string): Promise<NamespacesResponse> {
+    const response = await http.get<NamespacesResponse>("/namespaces", { params: { context } });
+    return response.data;
+}
+
+// Sets the default namespace for the given context in the local kubeconfig.
+export async function setGlobalNamespace(context: string, namespace: string): Promise<void> {
+    await http.post("/namespaces/default", { context, namespace });
 }

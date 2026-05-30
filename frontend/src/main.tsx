@@ -6,6 +6,7 @@ import "./index.css";
 import "./lib/font-awesome";
 import { queryClient } from "./lib/query-client";
 import { KubeContextProvider } from "./lib/kube-context";
+import { KubeNamespaceProvider } from "./lib/kube-namespace";
 import { App } from "./app";
 
 const theme = createTheme();
@@ -15,10 +16,12 @@ createRoot(root).render(
     <StrictMode>
         <QueryClientProvider client={queryClient}>
             <KubeContextProvider>
-                <ThemeProvider theme={theme}>
-                    <CssBaseline />
-                    <App />
-                </ThemeProvider>
+                <KubeNamespaceProvider>
+                    <ThemeProvider theme={theme}>
+                        <CssBaseline />
+                        <App />
+                    </ThemeProvider>
+                </KubeNamespaceProvider>
             </KubeContextProvider>
         </QueryClientProvider>
     </StrictMode>

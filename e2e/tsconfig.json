@@ -4,7 +4,8 @@
         "module": "ESNext",
         "moduleResolution": "bundler",
         "strict": true,
-        "lib": ["ESNext", "DOM"]
+        "lib": ["ESNext", "DOM"],
+        "types": ["node"]
     },
     "include": ["src", "playwright.config.ts"]
 }

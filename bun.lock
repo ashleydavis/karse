@@ -25,6 +25,8 @@
       "name": "karse-e2e",
       "devDependencies": {
         "@playwright/test": "*",
+        "@types/node": "*",
+        "typescript": "*",
       },
     },
     "frontend": {

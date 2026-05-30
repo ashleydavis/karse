@@ -2,6 +2,7 @@ import express from "express";
 import type { ErrorRequestHandler } from "express";
 import { contextsRouter } from "./routes/contexts-route";
 import { clusterRouter } from "./routes/cluster-route";
+import { namespacesRouter } from "./routes/namespaces-route";
 
 // Builds and returns the configured Express application.
 // Applies JSON body parsing, mounts both API routers, and installs the
@@ -11,6 +12,7 @@ export function createServer(): express.Express {
     app.use(express.json());
     app.use("/api", contextsRouter);
     app.use("/api", clusterRouter);
+    app.use("/api", namespacesRouter);
     const errorHandler: ErrorRequestHandler = (err: Error, _req, res, _next) => {
         res.status(500).json({
             error: err.message,

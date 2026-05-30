@@ -78,6 +78,12 @@ curl -fsS "http://127.0.0.1:5172/api/cluster/nodes?context=$CURRENT_CTX" \
     > /dev/null
 echo "OK"
 
+echo "--- GET /api/namespaces ---"
+curl -fsS "http://127.0.0.1:5172/api/namespaces?context=$CURRENT_CTX" \
+    | jq -e 'has("namespaces")' \
+    > /dev/null
+echo "OK"
+
 echo "--- POST /api/contexts/current ---"
 CONTEXT_COUNT=$(echo "$CONTEXTS_RESP" | jq '.contexts | length')
 if [[ "$CONTEXT_COUNT" -ge 1 ]]; then

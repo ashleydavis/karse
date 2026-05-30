@@ -1,6 +1,6 @@
 import { run, type CommandResult } from "../command-runner";
 import { audit, formatLocalISO } from "../audit-log";
-import type { Context, NodeStatus, Node, ClusterOverview } from "karse-types";
+import type { Context, NodeStatus, Node, ClusterOverview, Namespace } from "karse-types";
 
 // Base directory for the rolling audit log; overridable via KARSE_LOGS_DIR.
 const LOGS_DIR = process.env.KARSE_LOGS_DIR ?? "../logs";
@@ -45,6 +45,27 @@ export async function getCurrentContext(): Promise<string | null> {
 // Validation of the name (non-empty, no leading dash) is done at the route layer.
 export async function setCurrentContext(name: string): Promise<void> {
     const result = await kubectl(["config", "use-context", name]);
+    if (result.exitCode !== 0) {
+        throw new Error(result.stderr);
+    }
+}
+
+// Returns every namespace in the cluster for the given context.
+export async function listNamespaces(context: string): Promise<Namespace[]> {
+    const result = await kubectl(["--context", context, "get", "namespaces", "-o", "json"]);
+    if (result.exitCode !== 0) {
+        throw new Error(result.stderr);
+    }
+    const data = JSON.parse(result.stdout);
+    return (data.items as any[]).map((item) => ({
+        name: item.metadata.name,
+    }));
+}
+
+// Sets the default namespace for the given context in the local kubeconfig.
+// This mutates only the local kubeconfig file, not the cluster.
+export async function setContextNamespace(context: string, namespace: string): Promise<void> {
+    const result = await kubectl(["config", "set-context", context, `--namespace=${namespace}`]);
     if (result.exitCode !== 0) {
         throw new Error(result.stderr);
     }

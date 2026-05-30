@@ -341,4 +341,194 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='nodes-table']")).toHaveCount(0);
         });
     });
+
+    // ── Header navigation ─────────────────────────────────────────────────────
+
+    test.describe("header navigation", () => {
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await navigateTo();
+        });
+
+        test("shows namespaces nav button", async () => {
+            await expect(page.locator("[aria-label='namespaces']")).toBeVisible();
+        });
+
+        test("shows quick picker button", async () => {
+            await expect(page.locator("[aria-label='quick picker']")).toBeVisible();
+        });
+
+        test("clicking namespaces nav button navigates to /namespaces", async () => {
+            await page.locator("[aria-label='namespaces']").click();
+            await expect(page).toHaveURL(/\/namespaces/);
+        });
+
+        test("karse title link navigates back to home", async () => {
+            await page.locator("[data-test-id='karse-title']").click();
+            await expect(page).toHaveURL(/\/$/);
+            await expect(page.locator("[data-test-id='stat-tiles']")).toBeVisible();
+        });
+    });
+
+    // ── Namespaces page ───────────────────────────────────────────────────────
+
+    test.describe("namespaces page", () => {
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.goto("/namespaces", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='namespace-row']").first()).toBeVisible();
+        });
+
+        test.afterAll(() => {
+            // Clear any namespace default set during tests.
+            execSync(`kubectl config set-context ${CLUSTER_1} --namespace=`, { stdio: "ignore" });
+        });
+
+        test("shows standard Kubernetes namespaces including default and kube-system", async () => {
+            const names = await page.locator("[data-test-id='namespace-row']").allTextContents();
+            expect(names.some((n) => n.includes("default"))).toBe(true);
+            expect(names.some((n) => n.includes("kube-system"))).toBe(true);
+        });
+
+        test("filtering narrows the list to matching namespaces", async () => {
+            await page.locator("[data-test-id='namespaces-filter'] input").fill("kube");
+            const names = await page.locator("[data-test-id='namespace-row']").allTextContents();
+            expect(names.every((n) => n.toLowerCase().includes("kube"))).toBe(true);
+            expect(names.some((n) => n.includes("default"))).toBe(false);
+        });
+
+        test("shows no-namespaces-found message when filter has no results", async () => {
+            await page.locator("[data-test-id='namespaces-filter'] input").fill("zzznotfound");
+            await expect(page.locator("[data-test-id='no-namespaces-found']")).toBeVisible();
+        });
+
+        test("clearing the filter restores all namespaces", async () => {
+            await page.locator("[data-test-id='namespaces-filter'] input").fill("");
+            await expect(page.locator("[data-test-id='no-namespaces-found']")).toHaveCount(0);
+            const count = await page.locator("[data-test-id='namespace-row']").count();
+            expect(count).toBeGreaterThan(0);
+        });
+
+        test("Z-A sort puts kube-system before default", async () => {
+            await page.locator("text=Z-A").click();
+            const names = await page.locator("[data-test-id='namespace-row']").allTextContents();
+            const defaultIdx = names.findIndex((n) => n.includes("default"));
+            const systemIdx = names.findIndex((n) => n.includes("kube-system"));
+            expect(systemIdx).toBeGreaterThanOrEqual(0);
+            expect(defaultIdx).toBeGreaterThanOrEqual(0);
+            expect(systemIdx).toBeLessThan(defaultIdx);
+        });
+
+        test("A-Z sort puts default before kube-system", async () => {
+            await page.locator("text=A-Z").click();
+            const names = await page.locator("[data-test-id='namespace-row']").allTextContents();
+            const defaultIdx = names.findIndex((n) => n.includes("default"));
+            const systemIdx = names.findIndex((n) => n.includes("kube-system"));
+            expect(defaultIdx).toBeLessThan(systemIdx);
+        });
+
+        test("clicking a namespace marks it as the tab-local selection", async () => {
+            const defaultRow = page.locator("[data-test-id='namespace-row']").filter({ hasText: /^default/ });
+            await defaultRow.click();
+            await expect(defaultRow).toHaveClass(/Mui-selected/);
+        });
+
+        test("Set terminal default button is shown for each namespace", async () => {
+            await expect(page.locator("[data-test-id='namespaces-list'] button", { hasText: "Set terminal default" }).first()).toBeVisible();
+        });
+
+        test("clicking Set terminal default changes the button label to Terminal default", async () => {
+            const list = page.locator("[data-test-id='namespaces-list']");
+            const btn = list.locator("button", { hasText: "Set terminal default" }).first();
+            await btn.click();
+            await expect(list.locator("button", { hasText: "Terminal default" }).first()).toBeVisible();
+        });
+
+        test("namespaces page shows prompt when no context is selected", async () => {
+            unsetContext();
+            await page.goto("/namespaces", { waitUntil: "networkidle" });
+            await expect(page.locator("text=Select a context to view namespaces")).toBeVisible();
+            setContext(CLUSTER_1);
+        });
+    });
+
+    // ── Quick picker ──────────────────────────────────────────────────────────
+
+    test.describe("quick picker", () => {
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await navigateTo();
+        });
+
+        // Opens the quick picker via the header button and waits for it to appear.
+        async function openPicker(): Promise<void> {
+            await page.locator("[aria-label='quick picker']").click();
+            await expect(page.locator("[data-test-id='quick-picker-dialog']")).toBeVisible();
+        }
+
+        // Dismisses the quick picker with Escape and waits for it to disappear.
+        async function closePicker(): Promise<void> {
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='quick-picker-dialog']")).not.toBeVisible();
+        }
+
+        test("opens with the quick picker header button", async () => {
+            await openPicker();
+            await closePicker();
+        });
+
+        test("opens with the Ctrl+K keyboard shortcut", async () => {
+            await page.keyboard.press("Control+k");
+            await expect(page.locator("[data-test-id='quick-picker-dialog']")).toBeVisible();
+            await closePicker();
+        });
+
+        test("shows both clusters in the contexts section", async () => {
+            await openPicker();
+            const rows = page.locator("[data-test-id='quick-picker-context-row']");
+            await expect(rows.filter({ hasText: CLUSTER_1 })).toBeVisible();
+            await expect(rows.filter({ hasText: CLUSTER_2 })).toBeVisible();
+            await closePicker();
+        });
+
+        test("shows namespace rows for the active context", async () => {
+            await openPicker();
+            await expect(page.locator("[data-test-id='quick-picker-namespace-row']").first()).toBeVisible();
+            await closePicker();
+        });
+
+        test("filter hides non-matching context and namespace rows", async () => {
+            await openPicker();
+            await page.locator("[data-test-id='quick-picker-search'] input").fill("kube");
+            const nsTexts = await page.locator("[data-test-id='quick-picker-namespace-row']").allTextContents();
+            expect(nsTexts.every((n) => n.toLowerCase().includes("kube"))).toBe(true);
+            // Neither cluster name contains the substring "kube".
+            await expect(page.locator("[data-test-id='quick-picker-context-row']")).toHaveCount(0);
+            await closePicker();
+        });
+
+        test("selecting a namespace closes the picker", async () => {
+            await openPicker();
+            await page.locator("[data-test-id='quick-picker-namespace-row']").filter({ hasText: /^default/ }).click();
+            await expect(page.locator("[data-test-id='quick-picker-dialog']")).not.toBeVisible();
+        });
+
+        test("reopening the picker shows the selected namespace highlighted", async () => {
+            await openPicker();
+            const defaultRow = page.locator("[data-test-id='quick-picker-namespace-row']").filter({ hasText: /^default/ });
+            await expect(defaultRow).toHaveClass(/Mui-selected/);
+            await closePicker();
+        });
+
+        test("selecting a context in the picker closes the picker and updates the context display", async () => {
+            await openPicker();
+            await page.locator("[data-test-id='quick-picker-context-row']").filter({ hasText: CLUSTER_2 }).click();
+            await expect(page.locator("[data-test-id='quick-picker-dialog']")).not.toBeVisible();
+            await expect(page.locator("[aria-haspopup='listbox']")).toContainText(CLUSTER_2);
+        });
+
+        test.afterAll(() => {
+            setContext(CLUSTER_1);
+        });
+    });
 });

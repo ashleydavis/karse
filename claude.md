@@ -71,6 +71,7 @@
 - Backend tests run with `bun run test` (which invokes Jest via `@swc/jest`).
 - The **frontend is not unit-tested at all** per project policy. This includes React components, pages, and non-React `frontend/src/lib/*.ts` modules (`api-client.ts`, `query-client.ts`, `font-awesome.ts`). They are exercised by the Playwright e2e suite and `scripts/smoke-tests.sh`.
 - **E2E tests** live in `e2e/src/` and use `@playwright/test`. They are run by `scripts/e2e-tests.sh`, which spins up two kwok clusters, starts the full stack, then invokes Playwright. E2E tests use `test.describe` and `test` (Playwright's API).
+- **Every new frontend feature must have e2e test coverage.** New pages, components, and interactions are not considered done until `e2e/src/e2e.test.ts` has a `test.describe` block covering them. Add `data-test-id` attributes to new elements as needed to make assertions reliable. Do not ship frontend code without corresponding e2e tests.
 - Tests **never** use `test.skip` or `describe.skip`.
 - Tests **always** use `describe` and `test`, never `it`.
 - Tests must not be fudged: each assertion checks a specific value, fixtures use realistic shapes (the structurally significant fields the real tool would return), and fakes are not asserted against themselves. Inject collaborators (e.g. a fake `run`) rather than mocking the module under test.
