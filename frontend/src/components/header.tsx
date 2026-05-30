@@ -32,7 +32,7 @@ export function Header({ onOpenPicker }: Props) {
                     <ContextPicker contexts={contexts} current={current} onSwitch={switchTo} />
                     <Tooltip title="Quick pick (Ctrl+K)">
                         <IconButton size="small" onClick={onOpenPicker} aria-label="quick picker">
-                            <FontAwesomeIcon icon={["fas", "magnifying-glass"]} />
+                            <FontAwesomeIcon icon={["fas", "layer-group"]} />
                         </IconButton>
                     </Tooltip>
                     <Tooltip title="Color mode">
