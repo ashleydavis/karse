@@ -52,4 +52,10 @@ From `backend/`: `bun run compile` and `bun run test` (command-runner tests + ev
 
 ## Summary
 
-_To be completed when this step is implemented._
+Created three files:
+
+- `backend/src/audit-log.ts`: implements `formatLocalISO` (local-time ISO with explicit offset, never UTC Z), `getAuditDir` (zero-padded `baseDir/YYYY/MM/DD`), `getAuditFile` (`…/HH.log`), `audit` (mkdir + appendFile), and `pruneOldLogs` (overflow-safe 3-month cutoff using the pin-to-first/clamp-day pattern from the plan; walks year/month/day directory tree and removes day dirs strictly older than the cutoff).
+- `backend/src/__mocks__/audit-log.ts`: Jest manual mock for all five exports; used by the kubectl-adapter tests in step 6.
+- `backend/src/tests/audit-log.test.ts`: 8 test cases covering all functions, including the `getAuditDir`/`getAuditFile` direct-path assertions, the two-line append ordering check, the 4-month-old vs 1-month-old prune, the current-day survival case, the 2026-05-31 month-end edge, and the empty-baseDir no-throw case.
+
+`bun run compile` and `bun run test` (15 tests: 7 command-runner + 8 audit-log) both pass.

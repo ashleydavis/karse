@@ -27,4 +27,14 @@ From the repo root: `bun install` (idempotent). From `frontend/`: `bun run compi
 
 ## Summary
 
-_To be completed when this step is implemented._
+Created six files (plus updated `frontend/package.json`):
+
+- `frontend/package.json`: full dependency list (react, react-router-dom ^7, axios, karse-types, tanstack/react-query, tanstack/react-table, mui/material, emotion, fontawesome) and devDependencies (vite, @vitejs/plugin-react, typescript, @types/react, @types/react-dom, tailwindcss ^4, @tailwindcss/vite). All scripts wired.
+- `frontend/tsconfig.json`: Vite React-TS template defaults (ES2020 target, DOM lib, bundler moduleResolution, strict, JSX react-jsx, noEmit, allowImportingTsExtensions). References `tsconfig.node.json`.
+- `frontend/tsconfig.node.json`: ES2022 target, composite, for type-checking `vite.config.ts` in build mode.
+- `frontend/vite.config.ts`: react() + tailwindcss() plugins; port from `KARSE_FRONTEND_PORT` env var; `/api` proxy to `KARSE_PORT`.
+- `frontend/index.html`: title "Karse", `<div id="root">`, script entry `src/main.tsx`.
+- `frontend/src/index.css`: `@import "tailwindcss";` (Tailwind 4 CSS-first config).
+- `frontend/src/vite-env.d.ts`: `/// <reference types="vite/client" />` (provides a TypeScript input file so tsc does not error with TS18003 on the otherwise-empty src/).
+
+`bun install` resolved 222 packages. `bun run compile` from `frontend/` passes. Backend 51 tests still pass.

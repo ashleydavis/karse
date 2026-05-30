@@ -53,4 +53,10 @@ From `backend/`: `bun run compile` and `bun run test` (command-runner + audit-lo
 
 ## Summary
 
-_To be completed when this step is implemented._
+Created three files:
+
+- `backend/src/kubectl/kubectl-adapter.ts`: five exported free async functions (`listContexts`, `getCurrentContext`, `setCurrentContext`, `listNodes`, `getClusterOverview`) plus the private `kubectl(args)` helper that writes the audit entry then calls `run`. `LOGS_DIR` defaults to `"../logs"` via `KARSE_LOGS_DIR` env var. `getClusterOverview` uses a `Promise.allSettled` cast to a tuple type to satisfy `noUncheckedIndexedAccess`. JSON is parsed as `any` throughout (unaffected by the flag). Role labels use `match[1]!` non-null assertion.
+- `backend/src/__mocks__/command-runner.ts`: Jest manual mock exporting `run = jest.fn()`.
+- `backend/src/tests/kubectl/kubectl-adapter.test.ts`: 23 test cases covering audit wiring, all five functions, and the full `getClusterOverview` rejection/tolerance matrix. `setRunnerHandlers` helper keys on `args.join(" ")` and throws loudly on unmatched calls.
+
+`bun run compile` and `bun run test` (38 tests: 7 command-runner + 8 audit-log + 23 adapter) both pass.

@@ -56,4 +56,14 @@ From `backend/`: `bun run compile` and `bun run test` (every backend test). Run 
 
 ## Summary
 
-_To be completed when this step is implemented._
+Created seven files:
+
+- `backend/src/routes/contexts-route.ts`: `GET /contexts` (parallel listContexts + getCurrentContext) and `POST /contexts/current` (three-stage validation: non-string/empty → 400, leading-dash → 400, then setCurrentContext + refreshed response).
+- `backend/src/routes/cluster-route.ts`: `GET /cluster/overview` and `GET /cluster/nodes`, both plain async handlers.
+- `backend/src/server.ts`: `createServer()` applies `express.json()`, mounts both routers under `/api`, and installs a one-branch `ErrorRequestHandler` returning `{ error: err.message }` with status 500.
+- `backend/src/index.ts`: top-level-await bootstrap; reads `KARSE_PORT` and `KARSE_LOGS_DIR` env vars; calls `pruneOldLogs` then `createServer().listen` bound to `127.0.0.1`. No unit tests (pure wiring, covered by the smoke script in step 12).
+- `backend/src/kubectl/__mocks__/kubectl-adapter.ts`: Jest manual mock for all five adapter exports.
+- `backend/src/tests/routes/contexts-route.test.ts`: 8 cases using `listen(0)` random port and global `fetch`.
+- `backend/src/tests/routes/cluster-route.test.ts`: 5 cases using the same pattern.
+
+`bun run compile` and `bun run test` (51 tests across 5 suites) both pass.

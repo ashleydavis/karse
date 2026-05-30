@@ -1,5 +1,39 @@
 {
-  "name": "karse-frontend",
-  "type": "module",
-  "private": true
+    "name": "karse-frontend",
+    "type": "module",
+    "private": true,
+    "scripts": {
+        "dev":     "vite",
+        "build":   "tsc --noEmit && vite build",
+        "preview": "vite preview",
+        "compile": "tsc --noEmit -p tsconfig.json",
+        "d": "bun run dev",
+        "b": "bun run build",
+        "p": "bun run preview",
+        "c": "bun run compile"
+    },
+    "dependencies": {
+        "react": "*",
+        "react-dom": "*",
+        "react-router-dom": "^7",
+        "axios": "*",
+        "karse-types": "*",
+        "@tanstack/react-query": "*",
+        "@tanstack/react-table": "*",
+        "@mui/material": "*",
+        "@emotion/react": "*",
+        "@emotion/styled": "*",
+        "@fortawesome/fontawesome-svg-core": "*",
+        "@fortawesome/free-solid-svg-icons": "*",
+        "@fortawesome/react-fontawesome": "*"
+    },
+    "devDependencies": {
+        "vite": "*",
+        "@vitejs/plugin-react": "*",
+        "typescript": "*",
+        "@types/react": "*",
+        "@types/react-dom": "*",
+        "tailwindcss": "^4",
+        "@tailwindcss/vite": "*"
+    }
 }

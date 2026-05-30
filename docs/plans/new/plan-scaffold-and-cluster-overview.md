@@ -5,11 +5,11 @@
 - [x] 1. Write documentation — `plan-scaffold-and-cluster-overview/1-write-documentation.md`
 - [x] 2. Root scaffolding and backend package — `plan-scaffold-and-cluster-overview/2-root-and-backend-scaffolding.md`
 - [x] 3. Command runner abstraction — `plan-scaffold-and-cluster-overview/3-command-runner.md`
-- [ ] 4. Shared types package (`packages/karse-types`) — `plan-scaffold-and-cluster-overview/4-kubectl-types.md`
-- [ ] 5. Audit log — `plan-scaffold-and-cluster-overview/5-audit-log.md`
-- [ ] 6. kubectl adapter — `plan-scaffold-and-cluster-overview/6-kubectl-adapter.md`
-- [ ] 7. Express server, routes, and bootstrap — `plan-scaffold-and-cluster-overview/7-express-server-routes-bootstrap.md`
-- [ ] 8. Frontend package and build wiring — `plan-scaffold-and-cluster-overview/8-frontend-package-and-build.md`
+- [x] 4. Shared types package (`packages/karse-types`) — `plan-scaffold-and-cluster-overview/4-kubectl-types.md`
+- [x] 5. Audit log — `plan-scaffold-and-cluster-overview/5-audit-log.md`
+- [x] 6. kubectl adapter — `plan-scaffold-and-cluster-overview/6-kubectl-adapter.md`
+- [x] 7. Express server, routes, and bootstrap — `plan-scaffold-and-cluster-overview/7-express-server-routes-bootstrap.md`
+- [x] 8. Frontend package and build wiring — `plan-scaffold-and-cluster-overview/8-frontend-package-and-build.md`
 - [ ] 9. Frontend lib — `plan-scaffold-and-cluster-overview/9-frontend-lib.md`
 - [ ] 10. App shell and home page — `plan-scaffold-and-cluster-overview/10-app-shell-and-home-page.md`
 - [ ] 11. Frontend components — `plan-scaffold-and-cluster-overview/11-frontend-components.md`

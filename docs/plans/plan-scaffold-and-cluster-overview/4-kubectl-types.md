@@ -78,4 +78,12 @@ From the repo root: `bun install` (picks up the new workspace). From `backend/`:
 
 ## Summary
 
-_To be completed when this step is implemented._
+Created the `packages/karse-types` workspace package with three files:
+
+- `package.json`: name `karse-types`, `"exports": { ".": "./src/index.ts" }` (replaced the placeholder `"main"` field that was already present).
+- `tsconfig.json`: created fresh with ESNext target/module, bundler moduleResolution, strict, skipLibCheck, rootDir `"src"`.
+- `src/index.ts`: populated with the five contract types (`Context`, `ContextsResponse`, `NodeStatus`, `Node`, `ClusterOverview`).
+
+The root `package.json` workspaces (`["backend", "frontend", "packages/*"]`), `backend/package.json` dependency (`"karse-types": "*"`), and `backend/jest.config.js` `moduleNameMapper` were all already correct from the prior scaffolding step and required no changes.
+
+`bun install` picked up the new workspace. `bun run compile` and `bun run test` (7 command-runner tests) both pass.

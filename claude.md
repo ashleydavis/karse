@@ -22,6 +22,8 @@
 - Idiomatic TypeScript casing: `camelCase` for variables, functions, methods, and object properties; `PascalCase` for types, interfaces, classes, enums, and React components; `UPPER_SNAKE_CASE` only for true compile-time constants and env var names.
 - Every module-level symbol (function, type, interface, constant, class) must have a `//` comment explaining its purpose and responsibility.
 - Named exports only. No default exports.
+- Avoid `as` type casts. Only use them when TypeScript cannot infer the correct type and there is no better alternative (e.g. casting an `allSettled` result array to a tuple so destructuring is non-nullable, or `as jest.Mock` in tests to access mock methods). Never use `as` to silence a type error that could be fixed with a proper type annotation or type guard.
+- Prefer `any` over `unknown`. Use `any` for values whose type is not statically known.
 - 4-space indentation.
 - One statement per line. Never combine multiple statements on a single line with semicolons or commas.
 - Object literals are never written on a single line. Every property is on its own line.
@@ -66,7 +68,8 @@
 
 - Every **backend** non-React TypeScript module has tests under `backend/src/tests/`. The one exception is `index.ts`, pure bootstrap wiring covered by the smoke script.
 - Tests run with `bun run test` (which invokes Jest).
-- React UI code is not unit-tested. **The frontend is not unit-tested at all** per project policy: this includes the non-React `frontend/src/lib/*.ts` modules (`api-client.ts`, `query-client.ts`, `kubectl-types.ts`, `font-awesome.ts`), which are exercised only by the manual e2e flow and `scripts/smoke-tests.sh`. So "every non-React module is tested" applies to the **backend**, not the frontend.
+- React components and pages are not unit-tested.
+- Non-React TypeScript modules in the frontend that contain testable logic should have tests in `frontend/src/tests/`. Frontend tests use Vitest (`bun run test` in `frontend/`). Modules that are pure side-effects or thin wrappers with no logic (e.g. `font-awesome.ts`, `api-client.ts`) are exempt and are exercised by the manual e2e flow and `scripts/smoke-tests.sh`.
 - Tests **never** use `test.skip` or `describe.skip`.
 - Tests **always** use `describe` and `test`, never `it`.
 - Tests must not be fudged: each assertion checks a specific value, fixtures use realistic shapes (the structurally significant fields the real tool would return), and fakes are not asserted against themselves. Inject collaborators (e.g. a fake `run`) rather than mocking the module under test.
