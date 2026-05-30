@@ -58,7 +58,7 @@ test.describe("karse e2e", () => {
     // Intercept /api/cluster/nodes and force node-notready to have the given status.
     // kwok manages all nodes and keeps them Ready; this lets status-chip tests work reliably.
     async function interceptNotReadyStatus(): Promise<void> {
-        await page.route("**/api/cluster/nodes", async route => {
+        await page.route("**/api/cluster/nodes*", async route => {
             const response = await route.fetch();
             const body: NodesBody = await response.json();
             const nodes = body.nodes.map(n =>
@@ -70,7 +70,7 @@ test.describe("karse e2e", () => {
 
     // Remove the nodes route override and reload with real cluster data.
     async function clearNodeOverride(): Promise<void> {
-        await page.unroute("**/api/cluster/nodes");
+        await page.unroute("**/api/cluster/nodes*");
         await navigateTo();
         await waitForNodeRows();
     }
@@ -232,7 +232,7 @@ test.describe("karse e2e", () => {
             expect(notReadyIdx).toBeGreaterThanOrEqual(0);
             expect(readyIdx).toBeLessThan(notReadyIdx);
 
-            await page.unroute("**/api/cluster/nodes");
+            await page.unroute("**/api/cluster/nodes*");
         });
     });
 

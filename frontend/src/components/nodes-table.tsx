@@ -112,7 +112,7 @@ export function NodesTable() {
     const { current } = useKubeContext();
     const { data, error, isLoading } = useQuery({
         queryKey: ["cluster", "nodes", current],
-        queryFn: fetchNodes,
+        queryFn: () => fetchNodes(current!),
         enabled: current !== null,
     });
 

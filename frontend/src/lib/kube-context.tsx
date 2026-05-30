@@ -1,35 +1,32 @@
-import { createContext, useContext, type ReactNode } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createContext, useContext, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { Context } from "karse-types";
-import { fetchContexts, switchContext } from "./api-client";
+import { fetchContexts } from "./api-client";
 
 type KubeContextValue = {
     contexts: Context[];
     current: string | null;
     isLoading: boolean;
     error: Error | null;
-    switchTo: (name: string) => Promise<void>;
+    switchTo: (name: string) => void;
 };
 
 const Ctx = createContext<KubeContextValue | null>(null);
 
 export function KubeContextProvider({ children }: { children: ReactNode }) {
-    const qc = useQueryClient();
+    // undefined = user hasn't picked yet (fall through to global current); string = tab-local pick
+    const [userSelection, setUserSelection] = useState<string | undefined>(undefined);
     const query = useQuery({ queryKey: ["contexts"], queryFn: fetchContexts });
     const data = query.data;
 
-    async function switchTo(name: string): Promise<void> {
-        await switchContext(name);
-        await qc.invalidateQueries({ queryKey: ["contexts"] });
-        await qc.invalidateQueries({ queryKey: ["cluster"] });
-    }
+    const current = userSelection !== undefined ? userSelection : (data?.current ?? null);
 
     const value: KubeContextValue = {
         contexts: data?.contexts ?? [],
-        current: data?.current ?? null,
+        current,
         isLoading: query.isLoading,
         error: (query.error as Error | null) ?? null,
-        switchTo,
+        switchTo: setUserSelection,
     };
 
     return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

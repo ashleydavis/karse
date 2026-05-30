@@ -7,7 +7,7 @@ This guide covers everything needed to develop, test, and contribute to Karse. F
 - **`bun`** on `PATH`. Install it however you prefer: the [official installer](https://bun.sh), Homebrew, mise, or your system package manager. See [Installing Bun via mise](#installing-bun-via-mise) below.
 - **`kubectl`** on `PATH`, configured against at least one kubeconfig context.
 - **`jq`** and **`curl`** on `PATH` (required by `scripts/smoke-tests.sh`).
-- **`kwokctl`** and **`kubectl`** on `PATH` (required by `scripts/smoke-tests.sh` to spin up a local fake cluster). Install kwokctl from the [kwok releases page](https://github.com/kubernetes-sigs/kwok/releases); kubectl is available via your system package manager or via the Kubernetes docs.
+- **`kwokctl`** and **`kubectl`** on `PATH` (required by `scripts/smoke-tests.sh` and `scripts/e2e-tests.sh` to spin up local fake clusters). Install kwokctl from the [kwok releases page](https://github.com/kubernetes-sigs/kwok/releases); kubectl is available via your system package manager or via the Kubernetes docs.
 
 ### Installing Bun via mise
 
@@ -62,9 +62,14 @@ karse/
 │       ├── pages/
 │       ├── components/
 │       └── lib/          api-client, query-client, kube-context, etc.
+├── e2e/
+│   ├── playwright.config.ts
+│   └── src/
+│       └── e2e.test.ts   Playwright e2e suite (30 tests)
 ├── logs/                 audit log (created at runtime, gitignored)
 ├── scripts/
-│   └── smoke-tests.sh
+│   ├── smoke-tests.sh
+│   └── e2e-tests.sh      spins up kwok clusters, starts stack, runs Playwright
 └── docs/
 ```
 
@@ -94,7 +99,7 @@ bun run test
 bun run tests:all
 ```
 
-Runs all tests: unit and smoke.
+Runs compile, unit tests, smoke tests, and the Playwright e2e suite in sequence.
 
 ### Smoke tests (standalone)
 
@@ -102,7 +107,15 @@ Runs all tests: unit and smoke.
 bun run smoke
 ```
 
-Smoke tests the real backend.
+Smoke tests the real backend API with a kwok cluster.
+
+### E2E tests (standalone)
+
+```sh
+bun run e2e
+```
+
+Runs the full Playwright e2e suite. `scripts/e2e-tests.sh` creates two kwok clusters, starts the backend and Vite dev server, then runs 30 browser-based tests covering every frontend feature: header, stat tiles, nodes table (status chips, roles, age), sort, search, refresh, context switching, and the no-context gate. Requires `kwokctl` on `PATH`.
 
 ## Code conventions
 
@@ -168,7 +181,7 @@ Font Awesome via `@fortawesome/react-fontawesome`. Register icons in `src/lib/fo
 
 Every backend non-React TypeScript module has unit tests under `backend/src/tests/` mirroring the source tree. The sole exception is `index.ts` (pure bootstrap wiring, covered by `scripts/smoke-tests.sh`).
 
-The frontend is not unit-tested at all per project policy, including `frontend/src/lib/*.ts` modules. These are exercised by the manual e2e flow in [docs/e2e-testing.md](docs/e2e-testing.md) and by `scripts/smoke-tests.sh`.
+The frontend is not unit-tested at all per project policy, including `frontend/src/lib/*.ts` modules. Frontend behaviour is exercised by the Playwright e2e suite (`bun run e2e`) and by `scripts/smoke-tests.sh`. The manual checklist in [docs/e2e-testing.md](docs/e2e-testing.md) remains useful for exploratory testing.
 
 Tests must:
 
@@ -190,7 +203,7 @@ Mock modules using Jest `__mocks__` directories adjacent to the module being moc
 5. Add the corresponding `api-client.ts` function on the frontend.
 6. Add the page or component under `src/pages/` or `src/components/`. Use `useQuery`/`useMutation` via the api-client function, not raw axios.
 7. Run `bun run compile` and `bun run test` from `backend/` after every code step.
-8. Run `bash scripts/smoke-tests.sh` before considering the feature complete.
+8. Run `bun run smoke` and `bun run e2e` before considering the feature complete. Add or update Playwright tests in `e2e/src/e2e.test.ts` if the change affects any frontend behaviour.
 9. Update [docs/api.md](docs/api.md) for any new or changed endpoints, [docs/architecture.md](docs/architecture.md) if the system topology changes, and [docs/roadmap.md](docs/roadmap.md) to move completed items to "Already shipped".
 
 ## Read-only kubectl invariant

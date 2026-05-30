@@ -61,7 +61,7 @@ describe("audit wiring", () => {
             })),
         });
         await listContexts();
-        expect(audit).toHaveBeenCalledWith("../logs", "kubectl", ["config", "view", "-o", "json"]);
+        expect(audit).toHaveBeenCalledWith("../logs", "kubectl", ["config", "view", "-o", "json"], expect.any(Date));
     });
 });
 
@@ -236,9 +236,9 @@ describe("listNodes", () => {
             ],
         };
         setRunnerHandlers({
-            "get nodes -o json": () => ok(JSON.stringify(fixture)),
+            "--context test-ctx get nodes -o json": () => ok(JSON.stringify(fixture)),
         });
-        const result = await listNodes();
+        const result = await listNodes("test-ctx");
         expect(result.length).toBe(2);
         expect(result[0]!).toEqual({
             name: "ctrl-0",
@@ -283,9 +283,9 @@ describe("listNodes", () => {
             ],
         };
         setRunnerHandlers({
-            "get nodes -o json": () => ok(JSON.stringify(fixture)),
+            "--context test-ctx get nodes -o json": () => ok(JSON.stringify(fixture)),
         });
-        const result = await listNodes();
+        const result = await listNodes("test-ctx");
         expect(result[0]!.roles).toEqual(["control-plane", "etcd"]);
     });
 
@@ -313,35 +313,35 @@ describe("listNodes", () => {
             ],
         };
         setRunnerHandlers({
-            "get nodes -o json": () => ok(JSON.stringify(fixture)),
+            "--context test-ctx get nodes -o json": () => ok(JSON.stringify(fixture)),
         });
-        const result = await listNodes();
+        const result = await listNodes("test-ctx");
         expect(result[0]!.status).toBe("Unknown");
     });
 
     test("returns [] when items is empty", async () => {
         setRunnerHandlers({
-            "get nodes -o json": () => ok(JSON.stringify({
+            "--context test-ctx get nodes -o json": () => ok(JSON.stringify({
                 items: [],
             })),
         });
-        const result = await listNodes();
+        const result = await listNodes("test-ctx");
         expect(result.length).toBe(0);
     });
 
     test("throws on non-zero exit", async () => {
         setRunnerHandlers({
-            "get nodes -o json": () => fail("denied"),
+            "--context test-ctx get nodes -o json": () => fail("denied"),
         });
-        await expect(listNodes()).rejects.toThrow("denied");
+        await expect(listNodes("test-ctx")).rejects.toThrow("denied");
     });
 });
 
 describe("getClusterOverview", () => {
-    const VERSION_KEY = "version -o json";
-    const NODES_KEY = "get nodes -o json";
-    const NS_KEY = "get namespaces -o json";
-    const PODS_KEY = "get pods -A -o json";
+    const VERSION_KEY = "--context test-ctx version -o json";
+    const NODES_KEY = "--context test-ctx get nodes -o json";
+    const NS_KEY = "--context test-ctx get namespaces -o json";
+    const PODS_KEY = "--context test-ctx get pods -A -o json";
 
     // Returns a kubectl JSON response body with n empty item objects.
     function makeItems(n: number): object {
@@ -370,7 +370,7 @@ describe("getClusterOverview", () => {
 
     test("happy path", async () => {
         setRunnerHandlers(happyHandlers());
-        const result = await getClusterOverview();
+        const result = await getClusterOverview("test-ctx");
         expect(result).toEqual({
             serverVersion: "v1.30.0",
             nodeCount: 3,
@@ -384,7 +384,7 @@ describe("getClusterOverview", () => {
             ...happyHandlers(),
             [VERSION_KEY]: () => fail("unreachable"),
         });
-        const result = await getClusterOverview();
+        const result = await getClusterOverview("test-ctx");
         expect(result.serverVersion).toBe(null);
         expect(result.nodeCount).toBe(3);
     });
@@ -396,7 +396,7 @@ describe("getClusterOverview", () => {
                 throw new Error("version error");
             },
         });
-        const result = await getClusterOverview();
+        const result = await getClusterOverview("test-ctx");
         expect(result.serverVersion).toBe(null);
         expect(result.nodeCount).toBe(3);
     });
@@ -406,7 +406,7 @@ describe("getClusterOverview", () => {
             ...happyHandlers(),
             [NODES_KEY]: () => fail("denied"),
         });
-        await expect(getClusterOverview()).rejects.toThrow("denied");
+        await expect(getClusterOverview("test-ctx")).rejects.toThrow("denied");
     });
 
     test("throws when namespaces call fails", async () => {
@@ -414,7 +414,7 @@ describe("getClusterOverview", () => {
             ...happyHandlers(),
             [NS_KEY]: () => fail("denied"),
         });
-        await expect(getClusterOverview()).rejects.toThrow("denied");
+        await expect(getClusterOverview("test-ctx")).rejects.toThrow("denied");
     });
 
     test("throws when pods call fails", async () => {
@@ -422,7 +422,7 @@ describe("getClusterOverview", () => {
             ...happyHandlers(),
             [PODS_KEY]: () => fail("denied"),
         });
-        await expect(getClusterOverview()).rejects.toThrow("denied");
+        await expect(getClusterOverview("test-ctx")).rejects.toThrow("denied");
     });
 
     test("rejects when a count call rejects (not just non-zero exit)", async () => {
@@ -430,7 +430,7 @@ describe("getClusterOverview", () => {
             ...happyHandlers(),
             [NODES_KEY]: () => Promise.reject(new Error("spawn kubectl ENOENT")),
         });
-        await expect(getClusterOverview()).rejects.toThrow("spawn kubectl ENOENT");
+        await expect(getClusterOverview("test-ctx")).rejects.toThrow("spawn kubectl ENOENT");
     });
 
     test("tolerates the version call rejecting", async () => {
@@ -438,7 +438,7 @@ describe("getClusterOverview", () => {
             ...happyHandlers(),
             [VERSION_KEY]: () => Promise.reject(new Error("ENOENT")),
         });
-        const result = await getClusterOverview();
+        const result = await getClusterOverview("test-ctx");
         expect(result.serverVersion).toBe(null);
         expect(result.nodeCount).toBe(3);
         expect(result.namespaceCount).toBe(4);

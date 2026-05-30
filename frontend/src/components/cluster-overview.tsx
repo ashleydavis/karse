@@ -30,7 +30,7 @@ export function ClusterOverview() {
     const { current } = useKubeContext();
     const { data, error, isLoading } = useQuery({
         queryKey: ["cluster", "overview", current],
-        queryFn: fetchClusterOverview,
+        queryFn: () => fetchClusterOverview(current!),
         enabled: current !== null,
     });
 

@@ -21,12 +21,12 @@ export async function switchContext(name: string): Promise<ContextsResponse> {
     return response.data;
 }
 
-export async function fetchClusterOverview(): Promise<ClusterOverview> {
-    const response = await http.get<ClusterOverview>("/cluster/overview");
+export async function fetchClusterOverview(context: string): Promise<ClusterOverview> {
+    const response = await http.get<ClusterOverview>("/cluster/overview", { params: { context } });
     return response.data;
 }
 
-export async function fetchNodes(): Promise<{ nodes: Node[] }> {
-    const response = await http.get<{ nodes: Node[] }>("/cluster/nodes");
+export async function fetchNodes(context: string): Promise<{ nodes: Node[] }> {
+    const response = await http.get<{ nodes: Node[] }>("/cluster/nodes", { params: { context } });
     return response.data;
 }

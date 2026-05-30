@@ -64,14 +64,16 @@ echo "--- GET /api/contexts ---"
 CONTEXTS_RESP=$(curl -fsS http://127.0.0.1:5172/api/contexts)
 echo "$CONTEXTS_RESP" | jq '.contexts, .current'
 
+CURRENT_CTX=$(echo "$CONTEXTS_RESP" | jq -r '.current')
+
 echo "--- GET /api/cluster/overview ---"
-curl -fsS http://127.0.0.1:5172/api/cluster/overview \
+curl -fsS "http://127.0.0.1:5172/api/cluster/overview?context=$CURRENT_CTX" \
     | jq -e 'has("serverVersion") and has("nodeCount") and has("namespaceCount") and has("podCount")' \
     > /dev/null
 echo "OK"
 
 echo "--- GET /api/cluster/nodes ---"
-curl -fsS http://127.0.0.1:5172/api/cluster/nodes \
+curl -fsS "http://127.0.0.1:5172/api/cluster/nodes?context=$CURRENT_CTX" \
     | jq -e 'has("nodes")' \
     > /dev/null
 echo "OK"

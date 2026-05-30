@@ -50,9 +50,10 @@ export async function setCurrentContext(name: string): Promise<void> {
     }
 }
 
-// Returns the list of nodes in the current context with display-ready fields.
-export async function listNodes(): Promise<Node[]> {
-    const result = await kubectl(["get", "nodes", "-o", "json"]);
+// Returns the list of nodes for the given context.
+export async function listNodes(context: string): Promise<Node[]> {
+    const ctxArgs = ["--context", context];
+    const result = await kubectl([...ctxArgs, "get", "nodes", "-o", "json"]);
     if (result.exitCode !== 0) {
         throw new Error(result.stderr);
     }
@@ -92,12 +93,13 @@ export async function listNodes(): Promise<Node[]> {
 // Returns aggregate cluster statistics (version + node/namespace/pod counts).
 // Runs four kubectl calls in parallel. The version branch tolerates failures
 // (returns null); the three count branches re-throw on any failure.
-export async function getClusterOverview(): Promise<ClusterOverview> {
+export async function getClusterOverview(context: string): Promise<ClusterOverview> {
+    const ctxArgs = ["--context", context];
     const results = await Promise.allSettled([
-        kubectl(["version", "-o", "json"]),
-        kubectl(["get", "nodes", "-o", "json"]),
-        kubectl(["get", "namespaces", "-o", "json"]),
-        kubectl(["get", "pods", "-A", "-o", "json"]),
+        kubectl([...ctxArgs, "version", "-o", "json"]),
+        kubectl([...ctxArgs, "get", "nodes", "-o", "json"]),
+        kubectl([...ctxArgs, "get", "namespaces", "-o", "json"]),
+        kubectl([...ctxArgs, "get", "pods", "-A", "-o", "json"]),
     ]);
     const versionResult = results[0]!;
     const nodesResult = results[1]!;

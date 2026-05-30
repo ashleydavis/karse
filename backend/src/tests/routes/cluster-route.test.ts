@@ -34,23 +34,33 @@ beforeEach(() => {
 });
 
 describe("GET /api/cluster/overview", () => {
-    test("happy path returns overview payload", async () => {
-        const payload = {
-            serverVersion: "v1.30.0",
-            nodeCount: 2,
-            namespaceCount: 3,
-            podCount: 10,
-        };
+    const payload = {
+        serverVersion: "v1.30.0",
+        nodeCount: 2,
+        namespaceCount: 3,
+        podCount: 10,
+    };
+
+    test("with ?context forwards it to adapter", async () => {
         kubectlMocks.getClusterOverview.mockResolvedValue(payload);
-        const res = await fetch(`http://127.0.0.1:${port}/api/cluster/overview`);
+        const res = await fetch(`http://127.0.0.1:${port}/api/cluster/overview?context=my-ctx`);
         const body = await res.json();
         expect(res.status).toBe(200);
         expect(body).toEqual(payload);
+        expect(kubectlMocks.getClusterOverview).toHaveBeenCalledWith("my-ctx");
+    });
+
+    test("without ?context returns 400", async () => {
+        const res = await fetch(`http://127.0.0.1:${port}/api/cluster/overview`);
+        const body = await res.json();
+        expect(res.status).toBe(400);
+        expect(body).toEqual({ error: "context query parameter is required" });
+        expect(kubectlMocks.getClusterOverview).not.toHaveBeenCalled();
     });
 
     test("adapter throws returns 500", async () => {
         kubectlMocks.getClusterOverview.mockRejectedValue(new Error("unreachable"));
-        const res = await fetch(`http://127.0.0.1:${port}/api/cluster/overview`);
+        const res = await fetch(`http://127.0.0.1:${port}/api/cluster/overview?context=my-ctx`);
         const body = await res.json();
         expect(res.status).toBe(500);
         expect(body).toEqual({
@@ -60,7 +70,6 @@ describe("GET /api/cluster/overview", () => {
 });
 
 describe("GET /api/cluster/nodes", () => {
-    // A single realistic node fixture used across multiple test cases.
     const node: KubeNode = {
         name: "ctrl-0",
         status: "Ready",
@@ -69,29 +78,34 @@ describe("GET /api/cluster/nodes", () => {
         createdAt: "2024-01-01T00:00:00Z",
     };
 
-    test("happy path returns nodes array", async () => {
+    test("with ?context forwards it to adapter", async () => {
         kubectlMocks.listNodes.mockResolvedValue([node]);
-        const res = await fetch(`http://127.0.0.1:${port}/api/cluster/nodes`);
+        const res = await fetch(`http://127.0.0.1:${port}/api/cluster/nodes?context=my-ctx`);
         const body = await res.json();
         expect(res.status).toBe(200);
-        expect(body).toEqual({
-            nodes: [node],
-        });
+        expect(body).toEqual({ nodes: [node] });
+        expect(kubectlMocks.listNodes).toHaveBeenCalledWith("my-ctx");
+    });
+
+    test("without ?context returns 400", async () => {
+        const res = await fetch(`http://127.0.0.1:${port}/api/cluster/nodes`);
+        const body = await res.json();
+        expect(res.status).toBe(400);
+        expect(body).toEqual({ error: "context query parameter is required" });
+        expect(kubectlMocks.listNodes).not.toHaveBeenCalled();
     });
 
     test("empty returns { nodes: [] }", async () => {
         kubectlMocks.listNodes.mockResolvedValue([]);
-        const res = await fetch(`http://127.0.0.1:${port}/api/cluster/nodes`);
+        const res = await fetch(`http://127.0.0.1:${port}/api/cluster/nodes?context=my-ctx`);
         const body = await res.json();
         expect(res.status).toBe(200);
-        expect(body).toEqual({
-            nodes: [],
-        });
+        expect(body).toEqual({ nodes: [] });
     });
 
     test("adapter throws returns 500", async () => {
         kubectlMocks.listNodes.mockRejectedValue(new Error("denied"));
-        const res = await fetch(`http://127.0.0.1:${port}/api/cluster/nodes`);
+        const res = await fetch(`http://127.0.0.1:${port}/api/cluster/nodes?context=my-ctx`);
         const body = await res.json();
         expect(res.status).toBe(500);
         expect(body).toEqual({
