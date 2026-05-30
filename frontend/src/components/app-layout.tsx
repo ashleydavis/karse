@@ -1,15 +1,13 @@
 import { useState, useEffect } from "react";
-import { Container } from "@mui/material";
+import { Box } from "@mui/material";
 import { Outlet } from "react-router-dom";
 import { Header } from "./header";
+import { Sidebar } from "./sidebar";
 import { QuickPicker } from "./quick-picker";
 
-// Root layout shell rendered for every route.
-// Owns the quick picker open/close state and the Ctrl+K keyboard shortcut.
 export function AppLayout() {
     const [pickerOpen, setPickerOpen] = useState(false);
 
-    // Open the quick picker on Ctrl+K (or Cmd+K on macOS).
     useEffect(() => {
         function onKey(e: KeyboardEvent): void {
             if ((e.ctrlKey || e.metaKey) && e.key === "k") {
@@ -18,18 +16,19 @@ export function AppLayout() {
             }
         }
         window.addEventListener("keydown", onKey);
-        return () => {
-            window.removeEventListener("keydown", onKey);
-        };
+        return () => window.removeEventListener("keydown", onKey);
     }, []);
 
     return (
-        <>
-            <Header onOpenPicker={() => setPickerOpen(true)} />
-            <Container maxWidth="lg" className="py-6">
-                <Outlet />
-            </Container>
+        <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+            <Sidebar />
+            <Box sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <Header onOpenPicker={() => setPickerOpen(true)} />
+                <Box component="main" sx={{ flex: 1, overflow: "auto", p: 3 }}>
+                    <Outlet />
+                </Box>
+            </Box>
             <QuickPicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
-        </>
+        </Box>
     );
 }

@@ -15,7 +15,7 @@ export function ContextPicker({ contexts, current, onSwitch }: Props) {
     }
 
     if (contexts.length <= 1) {
-        return <Chip label={current ?? "no context"} size="small" sx={{ color: "inherit", borderColor: "rgba(255,255,255,0.5)" }} variant="outlined" />;
+        return <Chip label={current ?? "no context"} size="small" variant="outlined" />;
     }
 
     return (
@@ -24,7 +24,6 @@ export function ContextPicker({ contexts, current, onSwitch }: Props) {
             onChange={handleChange}
             size="small"
             variant="outlined"
-            sx={{ color: "inherit", ".MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.5)" } }}
         >
             {contexts.map((ctx) => (
                 <MenuItem key={ctx.name} value={ctx.name}>

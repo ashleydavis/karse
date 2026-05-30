@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { AppBar, Toolbar, Typography, IconButton, Alert, Tooltip, Box, Menu, MenuItem, ListItemIcon, ListItemText } from "@mui/material";
+import { AppBar, Toolbar, IconButton, Alert, Tooltip, Box, Menu, MenuItem, ListItemIcon, ListItemText } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useKubeContext } from "../lib/kube-context";
 import { useConfig } from "../lib/config";
@@ -27,66 +26,21 @@ export function Header({ onOpenPicker }: Props) {
 
     return (
         <>
-            <AppBar position="static">
-                <Toolbar sx={{ gap: 1 }}>
-                    <FontAwesomeIcon icon={["fas", "dharmachakra"]} />
-                    <Typography
-                        variant="h6"
-                        component={Link}
-                        to="/"
-                        data-test-id="karse-title"
-                        sx={{
-                            textDecoration: "none",
-                            color: "inherit",
-                        }}
-                    >
-                        Karse
-                    </Typography>
-                    <Tooltip title="Namespaces">
-                        <IconButton
-                            color="inherit"
-                            component={Link}
-                            to="/namespaces"
-                            aria-label="namespaces"
-                        >
-                            <FontAwesomeIcon icon={["fas", "layer-group"]} />
-                        </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Pods">
-                        <IconButton
-                            color="inherit"
-                            component={Link}
-                            to="/pods"
-                            aria-label="pods"
-                        >
-                            <FontAwesomeIcon icon={["fas", "cube"]} />
-                        </IconButton>
-                    </Tooltip>
+            <AppBar position="static" color="default" elevation={0}>
+                <Toolbar variant="dense" sx={{ gap: 0.5, minHeight: 48 }}>
                     <Box sx={{ flexGrow: 1 }} />
                     <ContextPicker contexts={contexts} current={current} onSwitch={switchTo} />
                     <Tooltip title="Quick pick (Ctrl+K)">
-                        <IconButton
-                            color="inherit"
-                            onClick={onOpenPicker}
-                            aria-label="quick picker"
-                        >
+                        <IconButton size="small" onClick={onOpenPicker} aria-label="quick picker">
                             <FontAwesomeIcon icon={["fas", "magnifying-glass"]} />
                         </IconButton>
                     </Tooltip>
                     <Tooltip title="Color mode">
-                        <IconButton
-                            color="inherit"
-                            onClick={(e) => setMenuAnchor(e.currentTarget)}
-                            aria-label="color mode"
-                        >
+                        <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)} aria-label="color mode">
                             <FontAwesomeIcon icon={["fas", colorModeIcon]} />
                         </IconButton>
                     </Tooltip>
-                    <Menu
-                        anchorEl={menuAnchor}
-                        open={Boolean(menuAnchor)}
-                        onClose={() => setMenuAnchor(null)}
-                    >
+                    <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}>
                         {(["light", "dark", "system"] as const).map((m) => (
                             <MenuItem
                                 key={m}
@@ -100,14 +54,11 @@ export function Header({ onOpenPicker }: Props) {
                             </MenuItem>
                         ))}
                     </Menu>
-                    <IconButton
-                        color="inherit"
-                        onClick={handleRefresh}
-                        disabled={isLoading}
-                        aria-label="refresh"
-                    >
-                        <FontAwesomeIcon icon={["fas", "rotate"]} />
-                    </IconButton>
+                    <Tooltip title="Refresh">
+                        <IconButton size="small" onClick={handleRefresh} disabled={isLoading} aria-label="refresh">
+                            <FontAwesomeIcon icon={["fas", "rotate"]} />
+                        </IconButton>
+                    </Tooltip>
                 </Toolbar>
             </AppBar>
             {error !== null && (
