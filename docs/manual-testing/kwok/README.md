@@ -28,3 +28,4 @@ To tear down every test cluster at once (handy after running several scenarios, 
 | [16](16-detail-pages-and-logs/) | Detail pages and log viewer: node detail, pod detail, clickable rows |
 | [17](17-raw-yaml-view/) | Raw YAML view for every viewable resource |
 | [18](18-guided-commands/) | Guided commands: display-only kubectl suggestions with copy-to-clipboard |
+| [19](19-multi-container-pods/) | Multi-container pods: container count column and per-container drill-down |

@@ -133,6 +133,13 @@ function buildColumns(): ColumnDef<Pod>[] {
             header: "Ready",
         },
         {
+            accessorKey: "containerCount",
+            header: "Containers",
+            cell: (info) => (
+                <span data-test-id="pod-container-count">{info.getValue<number>()}</span>
+            ),
+        },
+        {
             accessorKey: "restarts",
             header: "Restarts",
         },

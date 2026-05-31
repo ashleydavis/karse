@@ -128,24 +128,33 @@ export async function listPods(context: string, namespace?: string): Promise<Pod
         throw new Error(result.stderr);
     }
     const data = JSON.parse(result.stdout);
-    return (data.items as any[]).map((item) => {
-        const phase: PodPhase = (item.status?.phase as PodPhase) ?? "Unknown";
-        const containerStatuses: any[] = item.status?.containerStatuses ?? [];
-        const initStatuses: any[] = item.status?.initContainerStatuses ?? [];
-        const allStatuses = [...containerStatuses, ...initStatuses];
-        const readyCount = containerStatuses.filter((cs) => cs.ready === true).length;
-        const totalCount = containerStatuses.length;
-        const restarts = allStatuses.reduce((sum, cs) => sum + (cs.restartCount ?? 0), 0);
-        return {
-            name: item.metadata.name,
-            namespace: item.metadata.namespace,
-            phase,
-            ready: `${readyCount}/${totalCount}`,
-            restarts,
-            createdAt: item.metadata.creationTimestamp,
-            node: item.spec?.nodeName ?? "",
-        };
-    });
+    return (data.items as any[]).map((item) => mapPodListItem(item));
+}
+
+// Maps a raw pod item from kubectl JSON list output to a typed Pod summary.
+// Shared by listPods and getNodeDetail so the pod-list shape stays consistent.
+function mapPodListItem(item: any): Pod {
+    const phase: PodPhase = (item.status?.phase as PodPhase) ?? "Unknown";
+    const containerStatuses: any[] = item.status?.containerStatuses ?? [];
+    const initStatuses: any[] = item.status?.initContainerStatuses ?? [];
+    const allStatuses = [...containerStatuses, ...initStatuses];
+    const readyCount = containerStatuses.filter((cs) => cs.ready === true).length;
+    const totalCount = containerStatuses.length;
+    const restarts = allStatuses.reduce((sum, cs) => sum + (cs.restartCount ?? 0), 0);
+    const specContainers: any[] = item.spec?.containers ?? [];
+    // Prefer the spec container count (authoritative even before statuses populate),
+    // falling back to the status count when the spec is unavailable.
+    const containerCount = specContainers.length > 0 ? specContainers.length : totalCount;
+    return {
+        name: item.metadata.name,
+        namespace: item.metadata.namespace,
+        phase,
+        ready: `${readyCount}/${totalCount}`,
+        containerCount,
+        restarts,
+        createdAt: item.metadata.creationTimestamp,
+        node: item.spec?.nodeName ?? "",
+    };
 }
 
 // Returns deployments for the given context, optionally scoped to a namespace.
@@ -351,24 +360,7 @@ export async function getNodeDetail(context: string, name: string): Promise<Node
     let pods: Pod[] = [];
     if (podsResult.exitCode === 0) {
         const podsData = JSON.parse(podsResult.stdout);
-        pods = (podsData.items as any[]).map((p) => {
-            const phase: PodPhase = (p.status?.phase as PodPhase) ?? "Unknown";
-            const containerStatuses: any[] = p.status?.containerStatuses ?? [];
-            const initStatuses: any[] = p.status?.initContainerStatuses ?? [];
-            const allStatuses = [...containerStatuses, ...initStatuses];
-            const readyCount = containerStatuses.filter((cs) => cs.ready === true).length;
-            const totalCount = containerStatuses.length;
-            const restarts = allStatuses.reduce((sum, cs) => sum + (cs.restartCount ?? 0), 0);
-            return {
-                name: p.metadata.name,
-                namespace: p.metadata.namespace,
-                phase,
-                ready: `${readyCount}/${totalCount}`,
-                restarts,
-                createdAt: p.metadata.creationTimestamp,
-                node: p.spec?.nodeName ?? "",
-            };
-        });
+        pods = (podsData.items as any[]).map((p) => mapPodListItem(p));
     }
 
     return {
