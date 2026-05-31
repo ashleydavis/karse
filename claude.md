@@ -4,6 +4,10 @@
 
 - **Important: Prefer official scripts defined in the root `package.json`.** Never use a raw command (e.g. `tsc`, `jest`, `npx`, `vite`, `playwright`) when an official script already covers that task. If no official script exists for a task, other commands are acceptable.
 
+- **Never permanently switch directories.** Do not run a bare `cd` that persists across commands. The working directory is the repo root and must stay there. Always use absolute paths, or scope a directory change to a single command with a subshell (e.g. `(cd e2e && bunx playwright test)`). Persisting a `cd` repeatedly causes later relative-path commands to run in the wrong place.
+
+- **Never claim a root cause is "confirmed" until it is proven by running tests.** Reading code and reasoning about a failure produces a *hypothesis*, not a confirmation. Say "I suspect" or "my hypothesis is" until you have reproduced the failure and verified the fix by actually running the relevant tests (with kwok where applicable). Do not state or imply that a cause is confirmed, or that a fix works, on the basis of static analysis alone.
+
 - **Purpose**: a local-only Kubernetes dashboard wrapping the locally-installed `kubectl` binary. Read-only cluster information plus context switching. Never deployed.
 - **Stack**: backend is Bun + TypeScript + Express 5; frontend is Vite + React 19 + React Router 7 + MUI 7 + Tailwind 4, with axios, TanStack Query, TanStack Table, and Font Awesome. Backend tests use Jest (via `@swc/jest`). E2E tests use Playwright (`@playwright/test`).
 - **Repo layout**: root `package.json` (bun workspaces), `backend/` (Express app and kubectl adapter), `frontend/` (React app), `e2e/` (Playwright e2e tests), `docs/` (guides and plans), `scripts/` (smoke tests and e2e runner).

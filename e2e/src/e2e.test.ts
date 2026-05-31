@@ -729,6 +729,51 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Share button ──────────────────────────────────────────────────────────
+
+    test.describe("share button", () => {
+        test.beforeAll(async () => {
+            // The button copies to the clipboard, which needs explicit permission in the browser context.
+            await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+            setContext(CLUSTER_1);
+        });
+
+        test.afterAll(async () => {
+            setContext(CLUSTER_1);
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+        });
+
+        test("is visible on every page", async () => {
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='share-button']")).toBeVisible();
+        });
+
+        test("copies the current page URL (page, context, and namespace) to the clipboard", async () => {
+            await page.goto(`/nodes?context=${CLUSTER_1}&namespace=kube-system`, { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='share-button']").click();
+            const copied = await page.evaluate(() => navigator.clipboard.readText());
+            expect(copied).toBe(page.url());
+            expect(copied).toContain("/nodes");
+            expect(copied).toContain(`context=${CLUSTER_1}`);
+            expect(copied).toContain("namespace=kube-system");
+        });
+
+        test("copies a resource detail URL so the exact resource can be shared", async () => {
+            await page.goto(`/nodes/node-cp?context=${CLUSTER_1}`, { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='share-button']").click();
+            const copied = await page.evaluate(() => navigator.clipboard.readText());
+            expect(copied).toContain("/nodes/node-cp");
+            expect(copied).toContain(`context=${CLUSTER_1}`);
+        });
+
+        test("shows copied feedback after clicking", async () => {
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='share-button']").click();
+            await expect(page.locator("[data-test-id='share-button']")).toHaveAttribute("aria-label", "share link");
+            await expect(page.locator("[aria-label='share link'] svg[data-icon='check']")).toBeVisible();
+        });
+    });
+
     // ── Workloads pages ───────────────────────────────────────────────────────
 
     test.describe("deployments page", () => {

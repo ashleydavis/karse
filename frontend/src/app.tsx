@@ -1,4 +1,4 @@
-import { Route, Routes, Navigate } from "react-router-dom";
+import { Route, Routes, Navigate, useLocation } from "react-router-dom";
 import { AppLayout } from "./components/app-layout";
 import { ClusterHomePage } from "./pages/cluster-home-page";
 import { ContextsPage } from "./pages/contexts-page";
@@ -11,11 +11,17 @@ import { DaemonSetsPage } from "./pages/daemonsets-page";
 import { PodDetailPage } from "./pages/pod-detail-page";
 import { NodeDetailPage } from "./pages/node-detail-page";
 
+// Redirects the index route to the cluster home while preserving the shareable query string (context, namespace) so a link to the bare root stays shareable.
+function IndexRedirect() {
+    const { search } = useLocation();
+    return <Navigate to={{ pathname: "/cluster", search }} replace />;
+}
+
 export function App() {
     return (
         <Routes>
             <Route path="/" element={<AppLayout />}>
-                <Route index element={<Navigate to="/cluster" replace />} />
+                <Route index element={<IndexRedirect />} />
                 <Route path="cluster" element={<ClusterHomePage />} />
                 <Route path="contexts" element={<ContextsPage />} />
                 <Route path="nodes" element={<NodesPage />} />
