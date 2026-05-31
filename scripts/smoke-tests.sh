@@ -18,7 +18,11 @@ trap cleanup EXIT
 
 echo "--- Creating kwok cluster ---"
 mkdir -p "$HOME/.kwok/clusters/$KWOK_CLUSTER/logs"
-kwokctl create cluster --name "$KWOK_CLUSTER" --runtime binary --wait 60s
+# Restrict kwok node management to annotated nodes so fake-node-notready (which
+# omits the annotation) keeps its patched Ready=False status and stays NotReady.
+kwokctl create cluster --name "$KWOK_CLUSTER" --runtime binary --wait 60s \
+    --extra-args=kwok-controller=manage-all-nodes=false \
+    --extra-args=kwok-controller=manage-nodes-with-annotation-selector=kwok.x-k8s.io/node=fake
 
 kubectl apply -f - <<'EOF'
 apiVersion: v1
@@ -42,9 +46,23 @@ metadata:
   annotations:
     kwok.x-k8s.io/node: fake
 spec: {}
+---
+apiVersion: v1
+kind: Node
+metadata:
+  name: fake-node-notready
+  labels:
+    node-role.kubernetes.io/worker: ""
+    kubernetes.io/hostname: fake-node-notready
+spec: {}
 EOF
 
 kubectl wait --for=condition=Ready node/fake-node-1 node/fake-node-2 --timeout=30s
+
+# fake-node-notready has no kwok annotation, so kwok leaves it alone. Patch a
+# Ready=False condition that sticks, giving a genuinely NotReady node.
+kubectl patch node fake-node-notready --subresource=status --type=merge -p \
+  '{"status":{"conditions":[{"type":"Ready","status":"False","reason":"KubeletNotReady","message":"Simulated NotReady node","lastHeartbeatTime":"2024-01-01T00:00:00Z","lastTransitionTime":"2024-01-01T00:00:00Z"}],"nodeInfo":{"kubeletVersion":"fake"}}}'
 
 kubectl apply -f - <<'EOF'
 apiVersion: v1
@@ -85,9 +103,11 @@ curl -fsS "http://127.0.0.1:5172/api/cluster/overview?context=$CURRENT_CTX" \
 echo "OK"
 
 echo "--- GET /api/cluster/nodes ---"
-curl -fsS "http://127.0.0.1:5172/api/cluster/nodes?context=$CURRENT_CTX" \
-    | jq -e 'has("nodes")' \
-    > /dev/null
+NODES_RESP=$(curl -fsS "http://127.0.0.1:5172/api/cluster/nodes?context=$CURRENT_CTX")
+echo "$NODES_RESP" | jq -e 'has("nodes")' > /dev/null
+# Verify mixed node statuses derive correctly: Ready nodes and the NotReady node.
+echo "$NODES_RESP" | jq -e '[.nodes[] | select(.status == "Ready")] | length >= 2' > /dev/null
+echo "$NODES_RESP" | jq -e '.nodes[] | select(.name == "fake-node-notready") | .status == "NotReady"' > /dev/null
 echo "OK"
 
 echo "--- GET /api/namespaces ---"

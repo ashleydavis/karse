@@ -23,7 +23,12 @@ trap cleanup EXIT
 PREV_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "")
 
 echo "--- Creating kwok cluster 1 ($KWOK_CLUSTER_1) ---"
-kwokctl create cluster --name "$KWOK_CLUSTER_1" --runtime binary --wait 60s
+# kwok manages all nodes and keeps them Ready by default. Restrict management to
+# nodes carrying the kwok.x-k8s.io/node=fake annotation so a node without it can
+# stay genuinely NotReady (see node-notready below).
+kwokctl create cluster --name "$KWOK_CLUSTER_1" --runtime binary --wait 60s \
+    --extra-args=kwok-controller=manage-all-nodes=false \
+    --extra-args=kwok-controller=manage-nodes-with-annotation-selector=kwok.x-k8s.io/node=fake
 
 echo "--- Creating kwok cluster 2 ($KWOK_CLUSTER_2) ---"
 kwokctl create cluster --name "$KWOK_CLUSTER_2" --runtime binary --wait 60s
@@ -61,12 +66,15 @@ metadata:
   name: node-notready
   labels:
     kubernetes.io/hostname: node-notready
-  annotations:
-    kwok.x-k8s.io/node: fake
 spec: {}
 EOF
 
-kubectl wait --for=condition=Ready node/node-cp node/node-worker node/node-notready --timeout=30s
+kubectl wait --for=condition=Ready node/node-cp node/node-worker --timeout=30s
+
+# node-notready has no kwok annotation, so kwok does not manage it. Patch a
+# Ready=False condition that will stick, making the node genuinely NotReady.
+kubectl patch node node-notready --subresource=status --type=merge -p \
+  '{"status":{"conditions":[{"type":"Ready","status":"False","reason":"KubeletNotReady","message":"Simulated NotReady node","lastHeartbeatTime":"2024-01-01T00:00:00Z","lastTransitionTime":"2024-01-01T00:00:00Z"}],"nodeInfo":{"kubeletVersion":"fake"}}}'
 
 # ── Cluster 2 nodes ──────────────────────────────────────────────────────────
 echo "--- Populating cluster 2 ---"

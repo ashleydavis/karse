@@ -5,9 +5,6 @@ import { execSync } from "node:child_process";
 const CLUSTER_1 = process.env.KWOK_CLUSTER_1 ?? "kwok-karse-e2e-1";
 const CLUSTER_2 = process.env.KWOK_CLUSTER_2 ?? "kwok-karse-e2e-2";
 
-// Shape of the /api/cluster/nodes response body.
-type NodesBody = { nodes: Array<{ name: string; status: string; [key: string]: unknown }> };
-
 // Switch the active kubeconfig context so the backend reads the right cluster on the next request.
 function setContext(name: string): void {
     execSync(`kubectl config use-context ${name}`, { stdio: "ignore" });
@@ -59,26 +56,6 @@ test.describe("karse e2e", () => {
     // Return the text content of every node name cell currently rendered.
     async function getNodeNames(): Promise<string[]> {
         return page.locator("[data-test-id='node-row'] td:first-child").allTextContents();
-    }
-
-    // Intercept /api/cluster/nodes and force node-notready to have the given status.
-    // kwok manages all nodes and keeps them Ready; this lets status-chip tests work reliably.
-    async function interceptNotReadyStatus(): Promise<void> {
-        await page.route("**/api/cluster/nodes*", async route => {
-            const response = await route.fetch();
-            const body: NodesBody = await response.json();
-            const nodes = body.nodes.map(n =>
-                n.name === "node-notready" ? { ...n, status: "NotReady" } : n,
-            );
-            await route.fulfill({ json: { nodes } });
-        });
-    }
-
-    // Remove the nodes route override and reload with real cluster data.
-    async function clearNodeOverride(): Promise<void> {
-        await page.unroute("**/api/cluster/nodes*");
-        await page.reload({ waitUntil: "networkidle" });
-        await waitForNodeRows();
     }
 
     // ── Header ────────────────────────────────────────────────────────────────
@@ -184,17 +161,11 @@ test.describe("karse e2e", () => {
             await expect(row.locator(".MuiChip-label")).toHaveText("Ready");
         });
 
-        // kwok keeps all nodes Ready; intercept the API response to inject NotReady status
-        // and verify the chip renders correctly.
+        // node-notready is created without the kwok annotation, so kwok leaves its
+        // patched Ready=False status alone and it renders as genuinely NotReady.
         test("shows NotReady chip for node-notready", async () => {
-            await interceptNotReadyStatus();
-            await page.reload({ waitUntil: "networkidle" });
-            await waitForNodeRows();
-
             const row = page.locator("[data-test-id='node-row']").filter({ hasText: "node-notready" });
             await expect(row.locator(".MuiChip-label")).toHaveText("NotReady");
-
-            await clearNodeOverride();
         });
 
         test("shows Ready chip for node-worker", async () => {
@@ -245,13 +216,9 @@ test.describe("karse e2e", () => {
             expect(names).toEqual([...names].sort((a, b) => b.localeCompare(a)));
         });
 
-        // Navigate fresh with an intercepted NotReady node so the sort assertion can
-        // check Ready-before-NotReady ordering.
+        // node-notready is genuinely NotReady, so sorting by status should place the
+        // Ready rows ahead of the NotReady row.
         test("clicking Status header sorts Ready rows before NotReady", async () => {
-            await interceptNotReadyStatus();
-            await page.reload({ waitUntil: "networkidle" });
-            await waitForNodeRows();
-
             await page.locator("[data-test-id='nodes-table'] thead th").filter({ hasText: "Status" }).click();
 
             const statuses = await page.locator("[data-test-id='node-row'] .MuiChip-label").allTextContents();
@@ -260,8 +227,6 @@ test.describe("karse e2e", () => {
             expect(readyIdx).toBeGreaterThanOrEqual(0);
             expect(notReadyIdx).toBeGreaterThanOrEqual(0);
             expect(readyIdx).toBeLessThan(notReadyIdx);
-
-            await page.unroute("**/api/cluster/nodes*");
         });
     });
 
