@@ -1081,7 +1081,8 @@ test.describe("karse e2e", () => {
                     name: "nginx-abc",
                     namespace: "default",
                     phase: "Running",
-                    ready: "1/1",
+                    ready: "2/3",
+                    containerCount: 3,
                     restarts: 0,
                     createdAt: new Date().toISOString(),
                     node: "node-worker",
@@ -1091,6 +1092,7 @@ test.describe("karse e2e", () => {
                     namespace: "kube-system",
                     phase: "Pending",
                     ready: "0/1",
+                    containerCount: 1,
                     restarts: 2,
                     createdAt: new Date().toISOString(),
                     node: "node-cp",
@@ -1119,13 +1121,18 @@ test.describe("karse e2e", () => {
 
         test("has all column headers in all-namespaces view", async () => {
             const table = page.locator("[data-test-id='pods-table']");
-            for (const name of ["Name", "Namespace", "Status", "Ready", "Restarts", "Node", "Age"]) {
+            for (const name of ["Name", "Namespace", "Status", "Ready", "Containers", "Restarts", "Node", "Age"]) {
                 await expect(table.getByRole("columnheader", { name, exact: true })).toBeVisible();
             }
         });
 
         test("shows a row for each fake pod", async () => {
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
+        });
+
+        test("shows the container count for a multi-container pod", async () => {
+            const row = page.locator("[data-test-id='pod-row']").filter({ hasText: "nginx-abc" });
+            await expect(row.locator("[data-test-id='pod-container-count']")).toHaveText("3");
         });
 
         test("shows Running chip for nginx-abc", async () => {

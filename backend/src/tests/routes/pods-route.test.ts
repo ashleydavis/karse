@@ -37,7 +37,20 @@ const FAKE_POD = {
     namespace: "default",
     phase: "Running",
     ready: "1/1",
+    containerCount: 1,
     restarts: 0,
+    createdAt: "2024-06-01T00:00:00Z",
+    node: "node-worker",
+};
+
+// A multi-container pod fixture used to confirm container counts pass through the route.
+const FAKE_MULTI_CONTAINER_POD = {
+    name: "web-with-sidecar",
+    namespace: "default",
+    phase: "Running",
+    ready: "2/3",
+    containerCount: 3,
+    restarts: 4,
     createdAt: "2024-06-01T00:00:00Z",
     node: "node-worker",
 };
@@ -52,6 +65,16 @@ describe("GET /api/pods", () => {
             pods: [FAKE_POD],
         });
         expect(kubectlMocks.listPods).toHaveBeenCalledWith("my-ctx", undefined);
+    });
+
+    test("returns container counts for multi-container pods unchanged", async () => {
+        kubectlMocks.listPods.mockResolvedValue([FAKE_POD, FAKE_MULTI_CONTAINER_POD]);
+        const res = await fetch(`http://127.0.0.1:${port}/api/pods?context=my-ctx`);
+        const body: any = await res.json();
+        expect(res.status).toBe(200);
+        expect(body.pods).toHaveLength(2);
+        expect(body.pods[1].containerCount).toBe(3);
+        expect(body.pods[1].ready).toBe("2/3");
     });
 
     test("passes namespace query param to adapter when provided", async () => {

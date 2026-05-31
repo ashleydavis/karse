@@ -461,11 +461,21 @@ describe("listPods", () => {
         name?: string;
         namespace?: string;
         phase?: string;
+        containers?: any[];
         containerStatuses?: any[];
         initContainerStatuses?: any[];
         nodeName?: string;
         creationTimestamp?: string;
     } = {}): object {
+        const containerStatuses = overrides.containerStatuses ?? [
+            {
+                ready: true,
+                restartCount: 0,
+            },
+        ];
+        // Default the spec containers to one entry per status so containerCount
+        // matches the status count unless the test overrides it explicitly.
+        const containers = overrides.containers ?? containerStatuses.map((_, i) => ({ name: `c${i}` }));
         return {
             metadata: {
                 name: overrides.name ?? "my-pod",
@@ -474,15 +484,11 @@ describe("listPods", () => {
             },
             spec: {
                 nodeName: overrides.nodeName ?? "node-1",
+                containers,
             },
             status: {
                 phase: overrides.phase ?? "Running",
-                containerStatuses: overrides.containerStatuses ?? [
-                    {
-                        ready: true,
-                        restartCount: 0,
-                    },
-                ],
+                containerStatuses,
                 initContainerStatuses: overrides.initContainerStatuses ?? [],
             },
         };
@@ -538,10 +544,53 @@ describe("listPods", () => {
             namespace: "default",
             phase: "Running",
             ready: "1/2",
+            containerCount: 2,
             restarts: 3,
             node: "node-worker",
             createdAt: "2024-01-15T12:00:00Z",
         });
+    });
+
+    test("reports container count from spec.containers for a multi-container pod", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get pods -A -o json": () => ok(JSON.stringify({
+                items: [
+                    makePodItem({
+                        name: "sidecar-pod",
+                        containers: [
+                            { name: "app" },
+                            { name: "envoy" },
+                            { name: "log-shipper" },
+                        ],
+                        containerStatuses: [
+                            { ready: true, restartCount: 0 },
+                            { ready: true, restartCount: 0 },
+                            { ready: false, restartCount: 4 },
+                        ],
+                    }),
+                ],
+            })),
+        });
+        const result = await listPods("test-ctx");
+        expect(result[0]!.containerCount).toBe(3);
+        expect(result[0]!.ready).toBe("2/3");
+    });
+
+    test("falls back to status count for container count when spec.containers is absent", async () => {
+        const item = makePodItem({
+            containerStatuses: [
+                { ready: true, restartCount: 0 },
+                { ready: true, restartCount: 0 },
+            ],
+        });
+        (item as any).spec.containers = undefined;
+        setRunnerHandlers({
+            "--context test-ctx get pods -A -o json": () => ok(JSON.stringify({
+                items: [item],
+            })),
+        });
+        const result = await listPods("test-ctx");
+        expect(result[0]!.containerCount).toBe(2);
     });
 
     test("counts init container restarts in total restarts", async () => {

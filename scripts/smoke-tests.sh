@@ -64,6 +64,8 @@ spec:
   containers:
   - name: nginx
     image: nginx:latest
+  - name: sidecar
+    image: busybox:latest
 EOF
 
 echo "--- Starting backend ---"
@@ -108,6 +110,12 @@ curl -fsS "http://127.0.0.1:5172/api/pods?context=$CURRENT_CTX&namespace=default
     > /dev/null
 echo "OK"
 
+echo "--- GET /api/pods reports container count for multi-container pod ---"
+curl -fsS "http://127.0.0.1:5172/api/pods?context=$CURRENT_CTX&namespace=default" \
+    | jq -e '.pods[] | select(.name == "smoke-pod") | .containerCount == 2' \
+    > /dev/null
+echo "OK"
+
 echo "--- GET /api/deployments ---"
 curl -fsS "http://127.0.0.1:5172/api/deployments?context=$CURRENT_CTX" \
     | jq -e 'has("deployments")' \
@@ -137,9 +145,9 @@ else
     echo "SKIP (no nodes)"
 fi
 
-echo "--- GET /api/pods/:namespace/:name ---"
+echo "--- GET /api/pods/:namespace/:name (drill down into containers) ---"
 curl -fsS "http://127.0.0.1:5172/api/pods/default/smoke-pod?context=$CURRENT_CTX" \
-    | jq -e 'has("containers") and has("events")' \
+    | jq -e 'has("containers") and has("events") and (.containers | length == 2)' \
     > /dev/null
 echo "OK"
 

@@ -48,9 +48,10 @@ export type Pod = {
     name: string;
     namespace: string;
     phase: PodPhase;
-    ready: string;      // e.g. "2/3"
+    ready: string;          // e.g. "2/3"
+    containerCount: number; // number of (non-init) containers in the pod spec
     restarts: number;
-    createdAt: string;  // ISO timestamp
+    createdAt: string;      // ISO timestamp
     node: string;
 };
 
