@@ -27,6 +27,7 @@ import type { Deployment } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
 import { fetchDeployments } from "../lib/api-client";
+import { YamlButton } from "./yaml-dialog";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -57,6 +58,18 @@ const columns: ColumnDef<Deployment>[] = [
         cell: (info) => formatAge(info.getValue<string>()),
         sortingFn: (a, b) =>
             new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
+    },
+    {
+        id: "actions",
+        header: "",
+        enableSorting: false,
+        cell: (info) => (
+            <YamlButton
+                type="deployments"
+                name={info.row.original.name}
+                namespace={info.row.original.namespace}
+            />
+        ),
     },
 ];
 

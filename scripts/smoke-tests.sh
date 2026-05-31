@@ -150,6 +150,30 @@ echo "$LOGS_RESP" | jq -e 'has("logs") and (.logs | type == "string") and (.logs
 echo "$LOGS_RESP" | jq -r '.logs' | grep -q "kube-probe"
 echo "OK"
 
+echo "--- GET /api/yaml/pods/:name (namespaced) ---"
+YAML_RESP=$(curl -fsS "http://127.0.0.1:5172/api/yaml/pods/smoke-pod?context=$CURRENT_CTX&namespace=default")
+echo "$YAML_RESP" | jq -e 'has("yaml") and (.yaml | type == "string") and (.yaml | length > 0)' > /dev/null
+echo "$YAML_RESP" | jq -r '.yaml' | grep -q "kind: Pod"
+echo "OK"
+
+echo "--- GET /api/yaml/nodes/:name (cluster-scoped) ---"
+if [[ -n "$FIRST_NODE" && "$FIRST_NODE" != "null" ]]; then
+    curl -fsS "http://127.0.0.1:5172/api/yaml/nodes/$FIRST_NODE?context=$CURRENT_CTX" \
+        | jq -r '.yaml' | grep -q "kind: Node"
+    echo "OK"
+else
+    echo "SKIP (no nodes)"
+fi
+
+echo "--- GET /api/yaml/secrets/:name (unsupported type rejected) ---"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+    "http://127.0.0.1:5172/api/yaml/secrets/whatever?context=$CURRENT_CTX&namespace=default")
+if [[ "$HTTP_CODE" != "400" ]]; then
+    echo "Expected HTTP 400 for unsupported yaml type, got $HTTP_CODE" >&2
+    exit 1
+fi
+echo "OK"
+
 echo "--- POST /api/namespaces/default (set) ---"
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
     -H "Content-Type: application/json" \
