@@ -1,0 +1,41 @@
+# Git operations allowed only within this project (cwd at repo root or under it).
+bash:
+  git:
+    commit:
+      cwd-in:
+        - "./"
+        - "./**"
+      decide: allow
+      reason: Allow committing in this repo
+
+    merge:
+      cwd-in:
+        - "./"
+        - "./**"
+      decide: allow
+      reason: Allow merging in this repo
+
+    branch:
+      cwd-in:
+        - "./"
+        - "./**"
+      decide: allow
+      reason: Allow creating new branches in this repo
+
+    switch:
+      options:
+        - c
+      cwd-in:
+        - "./"
+        - "./**"
+      decide: allow
+      reason: Allow creating new branches (git switch -c) in this repo
+
+    checkout:
+      options:
+        - b
+      cwd-in:
+        - "./"
+        - "./**"
+      decide: allow
+      reason: Allow creating new branches (git checkout -b) in this repo
