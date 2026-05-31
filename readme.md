@@ -19,34 +19,13 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
 - For testing need to run be/fe on next random unallocated port to avoid conflicts.
 - setGlobalMutation seems like a kludge.
 - Each node should be able to show the pods running on it.
+- Fuzzy match would be good for searching pods and other resources.
 
 ## Requirements
 
-- `kubectl` available on your `PATH`, already configured against at least one kubeconfig context.
+- `kubectl` available on your `PATH`, already configured against at least one kubeconfig context. If you use [mise](https://mise.jdx.dev), `mise trust && mise install` at the repo root installs the pinned version.
 - [`bun`](https://bun.sh) installed and on your `PATH`. If you use [mise](https://mise.jdx.dev), `mise trust && mise install` at the repo root will install the pinned version.
-- At least one configured kubeconfig context (Karse reads `~/.kube/config`; it does not create clusters or credentials).
-
-## Installing kwok (for testing only)
-
-[kwok](https://kwok.sigs.k8s.io) is only needed to run the manual-testing scenarios under [`docs/manual-testing/`](docs/manual-testing/) and the e2e tests; Karse itself does not require it. A kwok release ships two binaries (`kwok` and `kwokctl`); the test scripts only use `kwokctl`.
-
-Install `kwokctl` manually (pinned to `v0.7.0`):
-
-```sh
-KWOK_VERSION=v0.7.0
-OS=$(uname | tr '[:upper:]' '[:lower:]')              # linux or darwin
-ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-curl -L -o kwokctl "https://github.com/kubernetes-sigs/kwok/releases/download/${KWOK_VERSION}/kwokctl-${OS}-${ARCH}"
-chmod +x kwokctl
-sudo mv kwokctl /usr/local/bin/kwokctl
-kwokctl --version
-```
-
-On macOS you can instead use Homebrew, which installs both binaries:
-
-```sh
-brew install kwok
-```
+- At least one configured kubeconfig context. Karse never reads your kubeconfig directly; it shells out to `kubectl`, which resolves the kubeconfig itself. Karse does not create clusters or credentials. Karse does not directly read your kubeconfig or credentials.
 
 ## Getting the code
 

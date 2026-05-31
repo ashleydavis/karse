@@ -5,9 +5,9 @@ This guide covers everything needed to develop, test, and contribute to Karse. F
 ## Prerequisites
 
 - **`bun`** on `PATH`. Install it however you prefer: the [official installer](https://bun.sh), Homebrew, mise, or your system package manager. See [Installing Bun via mise](#installing-bun-via-mise) below.
-- **`kubectl`** on `PATH`, configured against at least one kubeconfig context.
+- **`kubectl`** on `PATH`, configured against at least one kubeconfig context. The repo's `mise.toml` pins a `kubectl` version, so `mise install` provides it (see [Installing Bun via mise](#installing-bun-via-mise)).
 - **`jq`** and **`curl`** on `PATH` (required by `scripts/smoke-tests.sh`).
-- **`kwokctl`** and **`kubectl`** on `PATH` (required by `scripts/smoke-tests.sh` and `scripts/e2e-tests.sh` to spin up local fake clusters). Install kwokctl from the [kwok releases page](https://github.com/kubernetes-sigs/kwok/releases); kubectl is available via your system package manager or via the Kubernetes docs.
+- **`kwokctl`** and **`kubectl`** on `PATH` (required by `scripts/smoke-tests.sh` and `scripts/e2e-tests.sh` to spin up local fake clusters). See [Installing kwokctl](#installing-kwokctl) below; kubectl is available via your system package manager or via the Kubernetes docs.
 
 ### Installing Bun via mise
 
@@ -19,6 +19,28 @@ mise install # install the pinned Bun version
 ```
 
 `mise trust` is required because mise will not read a `mise.toml` from an untrusted directory. You only need to run it once per clone. After that, `mise install` (or any `bun` invocation in the repo) will use the pinned version automatically.
+
+### Installing kwokctl
+
+[kwok](https://kwok.sigs.k8s.io) is only needed to run the manual-testing scenarios under [`docs/manual-testing/`](docs/manual-testing/) and the smoke/e2e tests; Karse itself does not require it. A kwok release ships two binaries (`kwok` and `kwokctl`); the test scripts only use `kwokctl`.
+
+Install `kwokctl` manually (pinned to `v0.7.0`):
+
+```sh
+KWOK_VERSION=v0.7.0
+OS=$(uname | tr '[:upper:]' '[:lower:]')              # linux or darwin
+ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+curl -L -o kwokctl "https://github.com/kubernetes-sigs/kwok/releases/download/${KWOK_VERSION}/kwokctl-${OS}-${ARCH}"
+chmod +x kwokctl
+sudo mv kwokctl /usr/local/bin/kwokctl
+kwokctl --version
+```
+
+On macOS you can instead use Homebrew, which installs both binaries:
+
+```sh
+brew install kwok
+```
 
 ## Setting up
 
