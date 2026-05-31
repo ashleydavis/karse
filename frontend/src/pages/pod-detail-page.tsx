@@ -146,6 +146,17 @@ function LogViewer({ namespace, podName, containers }: {
         };
     }, [live, current, namespace, podName, selectedContainer, tail, containers.length]);
 
+    // When live is turned off, force a fresh snapshot fetch so the viewer shows
+    // current logs rather than whatever react-query cached before streaming began.
+    const wasLiveRef = useRef(false);
+    useEffect(() => {
+        if (wasLiveRef.current && !live)
+        {
+            refetch();
+        }
+        wasLiveRef.current = live;
+    }, [live, refetch]);
+
     // Auto-scrolls the viewer to the bottom as new live lines arrive.
     useEffect(() => {
         if (!live)
