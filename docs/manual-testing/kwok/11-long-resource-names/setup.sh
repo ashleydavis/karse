@@ -24,6 +24,10 @@ kubectl wait --for=condition=Ready \
 # Namespace name at the 63-char DNS label limit
 kubectl create namespace very-long-namespace-name-that-approaches-the-dns-limit-xx
 
+# kwok runs no service-account controller, so the default SA the pod references
+# is never auto-created and the apiserver rejects the pod. Create it ourselves.
+kubectl create serviceaccount default -n very-long-namespace-name-that-approaches-the-dns-limit-xx
+
 # Pod with a long name in the long namespace
 kubectl apply -f - <<'EOF'
 apiVersion: v1

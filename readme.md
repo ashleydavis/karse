@@ -4,6 +4,7 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
 
 ## Todo
 
+- Auto load logs when looking at a pod page.
 - Going to need breadcrumbs here as well.
 - Can we have the URL have all the details so users can share a link?
    - Context

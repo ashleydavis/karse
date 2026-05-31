@@ -4,7 +4,7 @@ A kubeconfig with no clusters or contexts configured. Verifies that Karse handle
 
 ## Prerequisites
 
-- Karse installed locally (`bun start` or `bun run dev` from the repo root).
+- Karse installed locally (`bun run dev:test` from the repo root).
 
 ## Setup
 
@@ -15,7 +15,7 @@ A kubeconfig with no clusters or contexts configured. Verifies that Karse handle
 The script writes an empty kubeconfig to `/tmp/karse-no-contexts.yaml` and prints the command to start Karse with it:
 
 ```sh
-KUBECONFIG=/tmp/karse-no-contexts.yaml bun start
+KUBECONFIG=/tmp/karse-no-contexts.yaml bun run dev:test
 ```
 
 ## What to check

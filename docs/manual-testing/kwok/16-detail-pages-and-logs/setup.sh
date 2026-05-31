@@ -18,6 +18,10 @@ EOF
 
 kubectl wait --for=condition=Ready node/fake-node-1 --timeout=30s
 
+# kwok runs no service-account controller, so the default SA the pod references
+# is never auto-created and the apiserver rejects the pod. Create it ourselves.
+kubectl create serviceaccount default -n default
+
 kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: Pod

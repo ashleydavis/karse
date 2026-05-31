@@ -5,7 +5,7 @@ An otherwise-empty cluster with two worker nodes. Useful as a baseline to confir
 ## Prerequisites
 
 - `kwokctl` and `kubectl` on `PATH`.
-- Karse running locally: `bun start` or `bun run dev` from the repo root.
+- Karse running locally: `bun run dev:test` from the repo root.
 
 ## Setup
 

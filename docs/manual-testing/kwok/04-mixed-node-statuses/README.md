@@ -5,7 +5,7 @@ A cluster with one Ready node and one NotReady node. Exercises the status chip c
 ## Prerequisites
 
 - `kwokctl` and `kubectl` on `PATH`.
-- Karse running locally: `bun start` or `bun run dev` from the repo root.
+- Karse running locally: `bun run dev:test` from the repo root.
 
 ## Setup
 

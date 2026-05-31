@@ -21,6 +21,11 @@ kubectl wait --for=condition=Ready node/fake-node-1 --timeout=30s
 kubectl create namespace namespace-a
 kubectl create namespace namespace-b
 
+# kwok runs no service-account controller, so the default SA each pod references
+# is never auto-created and the apiserver rejects the pods. Create it ourselves.
+kubectl create serviceaccount default -n namespace-a
+kubectl create serviceaccount default -n namespace-b
+
 kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: Pod

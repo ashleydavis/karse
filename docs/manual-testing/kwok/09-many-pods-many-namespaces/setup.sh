@@ -29,8 +29,11 @@ EOF
 
 kubectl wait --for=condition=Ready node/fake-node-1 node/fake-node-2 --timeout=30s
 
+# kwok runs no service-account controller, so the default SA each pod references
+# is never auto-created and the apiserver rejects the pods. Create it ourselves.
 for i in $(seq 1 5); do
     kubectl create namespace "team-$i"
+    kubectl create serviceaccount default -n "team-$i"
 done
 
 NODE=fake-node-1

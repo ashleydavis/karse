@@ -7,7 +7,7 @@ Cluster 1 (`kwok-karse-test-1`) has 2 nodes. Cluster 2 (`kwok-karse-test-2`) has
 ## Prerequisites
 
 - `kwokctl` and `kubectl` on `PATH`.
-- Karse running locally: `bun start` or `bun run dev` from the repo root.
+- Karse running locally: `bun run dev:test` from the repo root.
 
 ## Setup
 

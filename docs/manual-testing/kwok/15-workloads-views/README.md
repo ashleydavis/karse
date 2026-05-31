@@ -5,7 +5,7 @@ A cluster with one deployment, one stateful set, and one daemon set. Exercises t
 ## Prerequisites
 
 - `kwokctl` and `kubectl` on `PATH`.
-- Karse running locally: `bun start` or `bun run dev` from the repo root.
+- Karse running locally: `bun run dev:test` from the repo root.
 
 ## Setup
 
@@ -14,12 +14,6 @@ A cluster with one deployment, one stateful set, and one daemon set. Exercises t
 ```
 
 `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse.
-
-Start Karse with fake log mode enabled:
-
-```sh
-KARSE_FAKE_LOGS=1 bun start
-```
 
 ## What to check
 

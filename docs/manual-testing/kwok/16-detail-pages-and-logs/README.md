@@ -5,7 +5,7 @@ A cluster with one node and one multi-container pod. Exercises the node detail p
 ## Prerequisites
 
 - `kwokctl` and `kubectl` on `PATH`.
-- Karse running locally: `bun start` or `bun run dev` from the repo root.
+- Karse running locally: `bun run dev:test` from the repo root.
 
 ## Setup
 
@@ -14,12 +14,6 @@ A cluster with one node and one multi-container pod. Exercises the node detail p
 ```
 
 `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse.
-
-Start the backend with fake log mode enabled so the log viewer shows realistic simulated output:
-
-```sh
-KARSE_FAKE_LOGS=1 bun start
-```
 
 ## What to check
 
@@ -43,8 +37,6 @@ KARSE_FAKE_LOGS=1 bun start
 - The back arrow navigates back to `/pods`.
 
 ### Log viewer
-
-With `KARSE_FAKE_LOGS=1` set the backend returns realistic simulated log lines for every logs request, so the log viewer shows real-looking output even against a kwok cluster.
 
 - On the `web` pod detail page, click "Show logs". Confirm the log panel appears and shows nginx-format log lines including `kube-probe` health check entries and worker process notices.
 - A container selector dropdown is visible with `nginx` and `sidecar` options (two containers). Switching containers re-fetches logs and shows the same simulated content.

@@ -5,7 +5,7 @@ A cluster with 5 namespaces (`team-1` through `team-5`), each containing 4 pods,
 ## Prerequisites
 
 - `kwokctl` and `kubectl` on `PATH`.
-- Karse running locally: `bun start` or `bun run dev` from the repo root.
+- Karse running locally: `bun run dev:test` from the repo root.
 
 ## Setup
 
