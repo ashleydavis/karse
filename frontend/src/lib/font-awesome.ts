@@ -29,6 +29,8 @@ import {
     faTriangleExclamation,
     faFileCode,
     faXmark,
+    faCopy,
+    faCheck,
 } from "@fortawesome/free-solid-svg-icons";
 
 config.autoAddCss = false;
@@ -62,4 +64,6 @@ library.add(
     faTriangleExclamation,
     faFileCode,
     faXmark,
+    faCopy,
+    faCheck,
 );
