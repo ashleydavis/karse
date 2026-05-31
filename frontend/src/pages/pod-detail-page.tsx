@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
     Box,
     Typography,
@@ -25,6 +25,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useQuery } from "@tanstack/react-query";
 import type { PodPhase, ContainerState, KubeEvent } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
+import { useShareableNavigate } from "../lib/nav-state";
 import { fetchPodDetail, fetchPodLogs } from "../lib/api-client";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
@@ -170,7 +171,7 @@ function LogViewer({ namespace, podName, containers }: {
 export function PodDetailPage() {
     const { namespace, name } = useParams<{ namespace: string; name: string }>();
     const { current } = useKubeContext();
-    const navigate = useNavigate();
+    const navigate = useShareableNavigate();
     const [showLogs, setShowLogs] = useState(false);
 
     const { data, error, isLoading } = useQuery({

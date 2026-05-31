@@ -22,7 +22,7 @@ import {
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useShareableNavigate } from "../lib/nav-state";
 import type { DaemonSet } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
@@ -66,7 +66,7 @@ const columns: ColumnDef<DaemonSet>[] = [
 export function DaemonSetsTable() {
     const { current } = useKubeContext();
     const { namespace } = useKubeNamespace();
-    const navigate = useNavigate();
+    const navigate = useShareableNavigate();
 
     const { data, error, isLoading } = useQuery({
         queryKey: ["daemonsets", current, namespace],

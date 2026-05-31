@@ -26,7 +26,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { Pod, PodPhase } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
-import { useNavigate } from "react-router-dom";
+import { useShareableNavigate } from "../lib/nav-state";
 import { fetchPods } from "../lib/api-client";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
@@ -158,7 +158,7 @@ function buildColumns(): ColumnDef<Pod>[] {
 export function PodsTable() {
     const { current } = useKubeContext();
     const { namespace } = useKubeNamespace();
-    const navigate = useNavigate();
+    const navigate = useShareableNavigate();
 
     const { data, error, isLoading } = useQuery({
         queryKey: ["pods", current, namespace],

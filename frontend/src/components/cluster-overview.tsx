@@ -4,6 +4,7 @@ import type { IconProp } from "@fortawesome/fontawesome-svg-core";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useKubeContext } from "../lib/kube-context";
+import { useShareableTo } from "../lib/nav-state";
 import { fetchClusterOverview } from "../lib/api-client";
 
 type StatTileProps = {
@@ -18,6 +19,7 @@ type StatTileProps = {
 };
 
 function StatTile({ icon, label, value, sublabel, sublabelColor, color, to, testId }: StatTileProps) {
+    const buildTo = useShareableTo();
     const inner = (
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, py: "14px", px: 2 }}>
             <Box
@@ -53,7 +55,7 @@ function StatTile({ icon, label, value, sublabel, sublabelColor, color, to, test
     return (
         <Card data-test-id={testId} sx={{ height: "100%" }}>
             {to ? (
-                <CardActionArea component={Link} to={to} sx={{ height: "100%" }}>{inner}</CardActionArea>
+                <CardActionArea component={Link} to={buildTo(to)} sx={{ height: "100%" }}>{inner}</CardActionArea>
             ) : (
                 <CardContent sx={{ p: "0 !important", height: "100%" }}>{inner}</CardContent>
             )}

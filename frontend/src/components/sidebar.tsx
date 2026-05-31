@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Box, Typography, List, ListItemButton, ListItemIcon, ListItemText, Divider, Tooltip, IconButton } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link, useLocation } from "react-router-dom";
+import { useShareableTo } from "../lib/nav-state";
 
 const NAV_ITEMS = [
     { to: "/contexts",     icon: "link"         as const, label: "Contexts"     },
@@ -16,6 +17,7 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
     const { pathname } = useLocation();
+    const buildTo = useShareableTo();
     const [collapsed, setCollapsed] = useState(false);
 
     return (
@@ -42,7 +44,7 @@ export function Sidebar() {
                     <Typography
                         variant="subtitle1"
                         component={Link}
-                        to="/"
+                        to={buildTo("/")}
                         data-test-id="karse-title"
                         sx={{ fontWeight: 700, textDecoration: "none", color: "inherit", letterSpacing: "-0.02em" }}
                     >
@@ -60,7 +62,7 @@ export function Sidebar() {
                         <Tooltip key={to} title={collapsed ? label : ""} placement="right">
                             <ListItemButton
                                 component={Link}
-                                to={to}
+                                to={buildTo(to)}
                                 selected={active}
                                 aria-label={label.toLowerCase()}
                                 sx={{
