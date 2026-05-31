@@ -1319,4 +1319,125 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='yaml-dialog']")).not.toBeVisible();
         });
     });
+
+    // ── Pods page: phase filter ─────────────────────────────────────────────────
+
+    test.describe("pods page phase filter", () => {
+        // One pod per phase so each filter checkbox is independently observable.
+        const PHASE_PODS = {
+            pods: [
+                {
+                    name: "pod-running",
+                    namespace: "default",
+                    phase: "Running",
+                    ready: "1/1",
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                },
+                {
+                    name: "pod-pending",
+                    namespace: "default",
+                    phase: "Pending",
+                    ready: "0/1",
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                },
+                {
+                    name: "pod-succeeded",
+                    namespace: "default",
+                    phase: "Succeeded",
+                    ready: "0/1",
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                },
+                {
+                    name: "pod-failed",
+                    namespace: "default",
+                    phase: "Failed",
+                    ready: "0/1",
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                },
+                {
+                    name: "pod-unknown",
+                    namespace: "default",
+                    phase: "Unknown",
+                    ready: "0/1",
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                },
+            ],
+        };
+
+        // Install a route override that returns PHASE_PODS for every /api/pods request.
+        async function interceptPhasePods(): Promise<void> {
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: PHASE_PODS });
+            });
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await interceptPhasePods();
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+            setContext(CLUSTER_1);
+        });
+
+        test("shows all phases by default", async () => {
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(5);
+            await expect(page.locator("[data-test-id='pods-phase-filter-button']")).toHaveText("Phase: All");
+        });
+
+        test("deselecting a phase hides matching pods", async () => {
+            await page.locator("[data-test-id='pods-phase-filter-button']").click();
+            await page.locator("[data-test-id='pods-phase-filter-item-Pending']").click();
+            // Close the menu to read the table.
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(4);
+            await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-pending" })).toHaveCount(0);
+            await expect(page.locator("[data-test-id='pods-phase-filter-button']")).toHaveText("Phase: 4 selected");
+        });
+
+        test("selecting only one phase shows just those pods", async () => {
+            await page.locator("[data-test-id='pods-phase-filter-button']").click();
+            // Turn everything off, then turn Running back on.
+            for (const phase of ["Running", "Succeeded", "Failed", "Unknown"]) {
+                await page.locator(`[data-test-id='pods-phase-filter-item-${phase}']`).click();
+            }
+            // After the previous test Pending is already off; only Running remains off too, so re-enable Running.
+            await page.locator("[data-test-id='pods-phase-filter-item-Running']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("pod-running");
+            await expect(page.locator("[data-test-id='pods-phase-filter-button']")).toHaveText("Phase: 1 selected");
+        });
+
+        test("deselecting every phase shows the no-match message", async () => {
+            await page.locator("[data-test-id='pods-phase-filter-button']").click();
+            await page.locator("[data-test-id='pods-phase-filter-item-Running']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-pods-match']")).toBeVisible();
+        });
+
+        test("re-selecting phases restores matching pods", async () => {
+            await page.locator("[data-test-id='pods-phase-filter-button']").click();
+            for (const phase of ["Running", "Pending", "Succeeded", "Failed", "Unknown"]) {
+                await page.locator(`[data-test-id='pods-phase-filter-item-${phase}']`).click();
+            }
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(5);
+            await expect(page.locator("[data-test-id='pods-phase-filter-button']")).toHaveText("Phase: All");
+        });
+    });
 });

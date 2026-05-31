@@ -31,6 +31,7 @@ import {
     faXmark,
     faCopy,
     faCheck,
+    faFilter,
 } from "@fortawesome/free-solid-svg-icons";
 
 config.autoAddCss = false;
@@ -66,4 +67,5 @@ library.add(
     faXmark,
     faCopy,
     faCheck,
+    faFilter,
 );
