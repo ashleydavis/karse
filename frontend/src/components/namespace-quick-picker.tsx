@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-    Dialog,
-    DialogContent,
+    Popover,
     TextField,
     List,
     ListItemButton,
@@ -18,18 +17,23 @@ import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
 import { fetchNamespaces } from "../lib/api-client";
 
+// Dropdown picker for selecting a namespace, anchored to the header button.
 type Props = {
-    open: boolean;
+    anchorEl: HTMLElement | null;
     onClose: () => void;
 };
 
-export function NamespaceQuickPicker({ open, onClose }: Props) {
+// Renders the namespace picker as a nav-bar dropdown anchored to its trigger button.
+export function NamespaceQuickPicker({ anchorEl, onClose }: Props) {
     const { current: context } = useKubeContext();
     const { namespace: currentNamespace, setNamespace } = useKubeNamespace();
     const [query, setQuery] = useState("");
+    const open = anchorEl !== null;
 
     useEffect(() => {
-        if (open) setQuery("");
+        if (open) {
+            setQuery("");
+        }
     }, [open]);
 
     const { data, isLoading } = useQuery({
@@ -49,8 +53,15 @@ export function NamespaceQuickPicker({ open, onClose }: Props) {
     }
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth data-test-id="namespace-quick-picker-dialog">
-            <DialogContent sx={{ p: 0 }}>
+        <Popover
+            open={open}
+            anchorEl={anchorEl}
+            onClose={onClose}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            transformOrigin={{ vertical: "top", horizontal: "right" }}
+            slotProps={{ paper: { sx: { width: 360 } } }}
+        >
+            <Box data-test-id="namespace-quick-picker-dropdown">
                 <Box sx={{ p: 2 }}>
                     <TextField
                         autoFocus
@@ -114,7 +125,7 @@ export function NamespaceQuickPicker({ open, onClose }: Props) {
                         </List>
                     )}
                 </Box>
-            </DialogContent>
-        </Dialog>
+            </Box>
+        </Popover>
     );
 }

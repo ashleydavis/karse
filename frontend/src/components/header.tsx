@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppBar, Toolbar, IconButton, Alert, Tooltip, Box, Menu, MenuItem, ListItemIcon, ListItemText, Typography, Chip } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useQueryClient } from "@tanstack/react-query";
@@ -7,6 +7,8 @@ import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
 import { useConfig } from "../lib/config";
 import { ContextPicker } from "./context-picker";
+import { ContextQuickPicker } from "./context-quick-picker";
+import { NamespaceQuickPicker } from "./namespace-quick-picker";
 
 function getPageTitle(pathname: string): string {
     if (pathname === "/" || pathname === "/cluster") return "Cluster";
@@ -25,18 +27,33 @@ function getPageTitle(pathname: string): string {
     return "Karse";
 }
 
-type Props = {
-    onOpenContextPicker: () => void;
-    onOpenNamespacePicker: () => void;
-};
-
-export function Header({ onOpenContextPicker, onOpenNamespacePicker }: Props) {
+export function Header() {
     const { contexts, current, isLoading, error, switchTo } = useKubeContext();
     const { namespace } = useKubeNamespace();
     const { config: { colorMode }, setColorMode } = useConfig();
     const qc = useQueryClient();
     const { pathname } = useLocation();
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+    const [contextPickerAnchor, setContextPickerAnchor] = useState<HTMLElement | null>(null);
+    const [namespacePickerAnchor, setNamespacePickerAnchor] = useState<HTMLElement | null>(null);
+    const contextButtonRef = useRef<HTMLButtonElement | null>(null);
+    const namespaceButtonRef = useRef<HTMLButtonElement | null>(null);
+
+    // Keyboard shortcuts to open the pickers, anchored to their header buttons.
+    useEffect(() => {
+        function onKey(e: KeyboardEvent): void {
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "K") {
+                e.preventDefault();
+                setNamespacePickerAnchor(namespaceButtonRef.current);
+            }
+            else if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+                e.preventDefault();
+                setContextPickerAnchor(contextButtonRef.current);
+            }
+        }
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, []);
 
     const pageTitle = getPageTitle(pathname);
 
@@ -70,12 +87,22 @@ export function Header({ onOpenContextPicker, onOpenNamespacePicker }: Props) {
                     <Box sx={{ flexGrow: 1 }} />
                     <ContextPicker contexts={contexts} current={current} onSwitch={switchTo} />
                     <Tooltip title="Context picker (Ctrl+K)">
-                        <IconButton size="small" onClick={onOpenContextPicker} aria-label="context picker">
+                        <IconButton
+                            size="small"
+                            ref={contextButtonRef}
+                            onClick={(e) => setContextPickerAnchor(e.currentTarget)}
+                            aria-label="context picker"
+                        >
                             <FontAwesomeIcon icon={["fas", "link"]} />
                         </IconButton>
                     </Tooltip>
                     <Tooltip title="Namespace picker (Ctrl+Shift+K)">
-                        <IconButton size="small" onClick={onOpenNamespacePicker} aria-label="namespace picker">
+                        <IconButton
+                            size="small"
+                            ref={namespaceButtonRef}
+                            onClick={(e) => setNamespacePickerAnchor(e.currentTarget)}
+                            aria-label="namespace picker"
+                        >
                             <FontAwesomeIcon icon={["fas", "layer-group"]} />
                         </IconButton>
                     </Tooltip>
@@ -105,6 +132,14 @@ export function Header({ onOpenContextPicker, onOpenNamespacePicker }: Props) {
                     </Tooltip>
                 </Toolbar>
             </AppBar>
+            <ContextQuickPicker
+                anchorEl={contextPickerAnchor}
+                onClose={() => setContextPickerAnchor(null)}
+            />
+            <NamespaceQuickPicker
+                anchorEl={namespacePickerAnchor}
+                onClose={() => setNamespacePickerAnchor(null)}
+            />
             {error !== null && (
                 <Alert severity="error" sx={{ borderRadius: 0 }}>
                     {error.message}
