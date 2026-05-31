@@ -26,6 +26,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { PodPhase, ContainerState, KubeEvent } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
 import { fetchPodDetail, fetchPodLogs } from "../lib/api-client";
+import { CommandsDialog } from "../components/commands-dialog";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -172,6 +173,7 @@ export function PodDetailPage() {
     const { current } = useKubeContext();
     const navigate = useNavigate();
     const [showLogs, setShowLogs] = useState(false);
+    const [showCommands, setShowCommands] = useState(false);
 
     const { data, error, isLoading } = useQuery({
         queryKey: ["pod-detail", current, namespace, name],
@@ -204,7 +206,23 @@ export function PodDetailPage() {
                     {data.name}
                 </Typography>
                 <PhaseChip phase={data.phase} />
+                <Box sx={{ flexGrow: 1 }} />
+                <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<FontAwesomeIcon icon={["fas", "terminal"]} />}
+                    onClick={() => setShowCommands(true)}
+                    data-test-id="commands-button"
+                >
+                    Commands
+                </Button>
             </Box>
+
+            <CommandsDialog
+                open={showCommands}
+                onClose={() => setShowCommands(false)}
+                target={{ kind: "pod", name: data.name, namespace: data.namespace }}
+            />
 
             <Paper variant="outlined" sx={{ p: 2 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Details</Typography>

@@ -971,6 +971,27 @@ test.describe("karse e2e", () => {
             await page.locator("[data-test-id='log-refresh']").click();
             await requestPromise;
         });
+
+        test("commands button opens the guided commands dialog", async () => {
+            await page.locator("[data-test-id='commands-button']").click();
+            await expect(page.locator("[data-test-id='commands-dialog']")).toBeVisible();
+            await expect(page.locator("[data-test-id='commands-readonly-note']")).toBeVisible();
+        });
+
+        test("commands dialog lists kubectl suggestions for the pod", async () => {
+            const commands = await page.locator("[data-test-id='command-text']").allTextContents();
+            expect(commands).toContain("kubectl describe pod nginx-abc -n default");
+            expect(commands).toContain("kubectl logs nginx-abc -n default");
+            expect(commands).toContain("kubectl delete pod nginx-abc -n default");
+        });
+
+        test("commands dialog has a copy button per command", async () => {
+            const rowCount = await page.locator("[data-test-id='command-row']").count();
+            const copyCount = await page.locator("[data-test-id='command-copy']").count();
+            expect(rowCount).toBeGreaterThan(0);
+            expect(copyCount).toBe(rowCount);
+            await page.keyboard.press("Escape");
+        });
     });
 
     // ── Node detail page ──────────────────────────────────────────────────────
@@ -1068,6 +1089,16 @@ test.describe("karse e2e", () => {
             await page.locator("[data-test-id='node-pod-row']").click();
             await expect(page).toHaveURL(/\/pods\/kube-system\/coredns-abc/);
             await page.unroute("**/api/pods/kube-system/coredns-abc*");
+        });
+
+        test("commands button opens guided commands for the node", async () => {
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='commands-button']").click();
+            await expect(page.locator("[data-test-id='commands-dialog']")).toBeVisible();
+            const commands = await page.locator("[data-test-id='command-text']").allTextContents();
+            expect(commands).toContain("kubectl describe node node-cp");
+            expect(commands).toContain("kubectl drain node-cp --ignore-daemonsets --delete-emptydir-data");
+            await page.keyboard.press("Escape");
         });
     });
 

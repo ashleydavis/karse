@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
     Box,
@@ -13,12 +14,14 @@ import {
     TableContainer,
     IconButton,
     Tooltip,
+    Button,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useQuery } from "@tanstack/react-query";
 import type { NodeStatus, NodeCondition } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
 import { fetchNodeDetail } from "../lib/api-client";
+import { CommandsDialog } from "../components/commands-dialog";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -60,6 +63,7 @@ export function NodeDetailPage() {
     const { name } = useParams<{ name: string }>();
     const { current } = useKubeContext();
     const navigate = useNavigate();
+    const [showCommands, setShowCommands] = useState(false);
 
     const { data, error, isLoading } = useQuery({
         queryKey: ["node-detail", current, name],
@@ -87,7 +91,23 @@ export function NodeDetailPage() {
                     {data.name}
                 </Typography>
                 <StatusChip status={data.status} />
+                <Box sx={{ flexGrow: 1 }} />
+                <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<FontAwesomeIcon icon={["fas", "terminal"]} />}
+                    onClick={() => setShowCommands(true)}
+                    data-test-id="commands-button"
+                >
+                    Commands
+                </Button>
             </Box>
+
+            <CommandsDialog
+                open={showCommands}
+                onClose={() => setShowCommands(false)}
+                target={{ kind: "node", name: data.name }}
+            />
 
             <Paper variant="outlined" sx={{ p: 2 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Details</Typography>
