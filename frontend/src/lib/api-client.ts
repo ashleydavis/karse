@@ -108,6 +108,61 @@ export async function fetchPodLogs(
     return response.data;
 }
 
+// Handle for an open live log stream; call close() to stop streaming.
+export type LogStreamHandle = { close: () => void };
+
+// Callbacks delivering incremental output from a live log stream.
+export type LogStreamHandlers = {
+    onLine: (line: string) => void;
+    onError: (message: string) => void;
+};
+
+// Opens a live (follow) log stream for a pod container via Server-Sent Events.
+// Each incoming log line is delivered through onLine as it arrives; onError fires on
+// transport or kubectl failures. Returns a handle whose close() ends the stream and
+// closes the underlying connection (which the backend uses to stop `kubectl logs -f`).
+export function streamPodLogs(
+    context: string,
+    namespace: string,
+    name: string,
+    container: string | undefined,
+    tail: number,
+    handlers: LogStreamHandlers,
+): LogStreamHandle {
+    const params = new URLSearchParams({ context, tail: String(tail) });
+    if (container)
+    {
+        params.set("container", container);
+    }
+    const url = `/api/pods/${namespace}/${name}/logs/stream?${params.toString()}`;
+    const source = new EventSource(url);
+
+    source.onmessage = (event) => {
+        handlers.onLine(event.data);
+    };
+    source.addEventListener("error", (event) => {
+        const data = (event as MessageEvent).data;
+        if (typeof data === "string" && data !== "")
+        {
+            handlers.onError(data);
+        }
+        else if (source.readyState === EventSource.CLOSED)
+        {
+            handlers.onError("Log stream disconnected");
+        }
+        source.close();
+    });
+    source.addEventListener("end", () => {
+        source.close();
+    });
+
+    return {
+        close: () => {
+            source.close();
+        },
+    };
+}
+
 // Fetches the full detail for a single node including conditions, capacity, and scheduled pods.
 export async function fetchNodeDetail(context: string, name: string): Promise<NodeDetail> {
     const response = await http.get<NodeDetail>(`/nodes/${name}`, { params: { context } });

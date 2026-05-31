@@ -200,6 +200,15 @@ NO_MATCH=$(curl -fsS --max-time 5 -H "Accept: text/event-stream" \
 echo "$NO_MATCH" | grep -q "event: done"
 echo "OK"
 
+echo "--- GET /api/pods/:namespace/:name/logs/stream (single-pod live SSE) ---"
+# KARSE_FAKE_LOGS=1 streams fake log lines over Server-Sent Events one at a time.
+# Read the stream for a short window with --max-time; curl exits 28 on timeout, which
+# is expected for a follow stream, so the exit code is tolerated and the body inspected.
+STREAM_RESP=$(curl -sS --max-time 3 "http://127.0.0.1:5172/api/pods/default/smoke-pod/logs/stream?context=$CURRENT_CTX&container=nginx" || true)
+echo "$STREAM_RESP" | grep -q "^data: " || { echo "Expected SSE data lines from live log stream" >&2; exit 1; }
+echo "$STREAM_RESP" | grep -q "kube-probe"
+echo "OK"
+
 echo "--- POST /api/namespaces/default (set) ---"
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
     -H "Content-Type: application/json" \

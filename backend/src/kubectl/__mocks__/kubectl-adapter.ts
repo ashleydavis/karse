@@ -6,3 +6,5 @@ export const setContextNamespace = jest.fn();
 export const listNodes = jest.fn();
 export const getClusterOverview = jest.fn();
 export const listPods = jest.fn();
+export const getPodLogs = jest.fn();
+export const streamPodLogs = jest.fn();
