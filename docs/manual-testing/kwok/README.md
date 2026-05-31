@@ -33,3 +33,4 @@ To tear down every test cluster at once (handy after running several scenarios, 
 | [21](21-pod-phase-filter/) | Filter pods by phase using the dropdown checkboxes |
 | [22](22-breadcrumbs/) | Breadcrumb navigation: trail on list and detail pages, links back to lists |
 | [23](23-shareable-url-state/) | Shareable URL state: context and namespace in the URL query string |
+| [24](24-navbar-dropdown-pickers/) | Context and namespace pickers drop down from the nav bar |
