@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
     Box,
@@ -20,12 +20,14 @@ import {
     FormControl,
     InputLabel,
     Divider,
+    FormControlLabel,
+    Switch,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useQuery } from "@tanstack/react-query";
 import type { PodPhase, ContainerState, KubeEvent } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
-import { fetchPodDetail, fetchPodLogs } from "../lib/api-client";
+import { fetchPodDetail, fetchPodLogs, streamPodLogs } from "../lib/api-client";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -98,12 +100,69 @@ function LogViewer({ namespace, podName, containers }: {
     const { current } = useKubeContext();
     const [selectedContainer, setSelectedContainer] = useState(containers[0] ?? "");
     const [tail, setTail] = useState(100);
+    const [live, setLive] = useState(false);
+    const [liveLines, setLiveLines] = useState<string[]>([]);
+    const [liveError, setLiveError] = useState<string | null>(null);
+    const viewerRef = useRef<HTMLDivElement | null>(null);
 
     const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["logs", current, namespace, podName, selectedContainer, tail],
         queryFn: () => fetchPodLogs(current!, namespace, podName, selectedContainer || undefined, tail),
-        enabled: containers.length > 0,
+        // While live streaming is active the snapshot query is paused so the two
+        // sources do not fight over the viewer contents.
+        enabled: containers.length > 0 && !live,
     });
+
+    // Opens a live log stream while `live` is on and tears it down when toggled off
+    // or when the container/tail selection changes. Appends each incoming line and
+    // surfaces stream errors.
+    useEffect(() => {
+        if (!live || current === null || containers.length === 0)
+        {
+            return;
+        }
+        setLiveLines([]);
+        setLiveError(null);
+        const handle = streamPodLogs(
+            current,
+            namespace,
+            podName,
+            selectedContainer || undefined,
+            tail,
+            {
+                onLine: (line) =>
+                {
+                    setLiveLines((prev) => [...prev, line]);
+                },
+                onError: (message) =>
+                {
+                    setLiveError(message);
+                },
+            },
+        );
+        return () =>
+        {
+            handle.close();
+        };
+    }, [live, current, namespace, podName, selectedContainer, tail, containers.length]);
+
+    // Auto-scrolls the viewer to the bottom as new live lines arrive.
+    useEffect(() => {
+        if (!live)
+        {
+            return;
+        }
+        const el = viewerRef.current;
+        if (el !== null)
+        {
+            el.scrollTop = el.scrollHeight;
+        }
+    }, [liveLines, live]);
+
+    // Each streamed chunk already carries its own newlines, so they are concatenated as-is.
+    const liveContent = liveLines.length > 0 ? liveLines.join("") : "(waiting for logs...)";
+    const displayError = live ? liveError : (error ? (error as Error).message : null);
+    const displayContent = live ? liveContent : (isLoading ? "Loading..." : (data?.logs || "(no logs)"));
 
     return (
         <Box>
@@ -139,13 +198,26 @@ function LogViewer({ namespace, podName, containers }: {
                     </FormControl>
                 </div>
                 <Tooltip title="Refresh logs">
-                    <IconButton size="small" onClick={() => refetch()} disabled={isLoading} aria-label="refresh logs" data-test-id="log-refresh">
+                    <IconButton size="small" onClick={() => refetch()} disabled={isLoading || live} aria-label="refresh logs" data-test-id="log-refresh">
                         <FontAwesomeIcon icon={["fas", "rotate"]} />
                     </IconButton>
                 </Tooltip>
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={live}
+                            onChange={(e) => setLive(e.target.checked)}
+                            size="small"
+                            slotProps={{ input: { "aria-label": "live logs" } }}
+                        />
+                    }
+                    label="Live"
+                    data-test-id="log-live-toggle"
+                />
             </Box>
-            {error && <Alert severity="error">{(error as Error).message}</Alert>}
+            {displayError && <Alert severity="error">{displayError}</Alert>}
             <Paper
+                ref={viewerRef}
                 variant="outlined"
                 sx={{
                     p: 1.5,
@@ -160,7 +232,7 @@ function LogViewer({ namespace, podName, containers }: {
                 }}
                 data-test-id="log-viewer"
             >
-                {isLoading ? "Loading..." : (data?.logs || "(no logs)")}
+                {displayContent}
             </Paper>
         </Box>
     );

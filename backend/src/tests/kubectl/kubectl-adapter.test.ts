@@ -12,10 +12,11 @@ import {
     getClusterOverview,
     listPods,
     getPodLogs,
+    streamPodLogs,
 } from "../../kubectl/kubectl-adapter";
 
 // jest.requireMock returns any, so mock methods are accessible without casting.
-const { run } = jest.requireMock("../../command-runner");
+const { run, runStream } = jest.requireMock("../../command-runner");
 const { audit } = jest.requireMock("../../audit-log");
 
 // Builds a successful CommandResult with the given stdout.
@@ -54,6 +55,7 @@ function setRunnerHandlers(
 
 beforeEach(() => {
     run.mockReset();
+    runStream.mockReset();
     audit.mockReset().mockResolvedValue(undefined);
 });
 
@@ -717,5 +719,68 @@ describe("getPodLogs", () => {
             "--context ctx -n default logs my-pod --tail=100": () => fail("connection refused"),
         });
         await expect(getPodLogs("ctx", "default", "my-pod")).rejects.toThrow("connection refused");
+    });
+});
+
+describe("streamPodLogs", () => {
+    const noopHandlers = {
+        onData: jest.fn(),
+        onError: jest.fn(),
+        onClose: jest.fn(),
+    };
+
+    afterEach(() => {
+        delete process.env.KARSE_FAKE_LOGS;
+    });
+
+    beforeEach(() => {
+        noopHandlers.onData.mockReset();
+        noopHandlers.onError.mockReset();
+        noopHandlers.onClose.mockReset();
+    });
+
+    test("runs kubectl logs -f with context, namespace, and tail", () => {
+        runStream.mockReturnValue({ stop: jest.fn() });
+        streamPodLogs("ctx", "default", "my-pod", undefined, 100, noopHandlers);
+        expect(runStream).toHaveBeenCalledWith(
+            "kubectl",
+            ["--context", "ctx", "-n", "default", "logs", "my-pod", "-f", "--tail=100"],
+            noopHandlers
+        );
+    });
+
+    test("includes -c container flag when a container is given", () => {
+        runStream.mockReturnValue({ stop: jest.fn() });
+        streamPodLogs("ctx", "default", "my-pod", "nginx", 50, noopHandlers);
+        expect(runStream).toHaveBeenCalledWith(
+            "kubectl",
+            ["--context", "ctx", "-n", "default", "logs", "my-pod", "-c", "nginx", "-f", "--tail=50"],
+            noopHandlers
+        );
+    });
+
+    test("audits the streaming kubectl invocation", () => {
+        runStream.mockReturnValue({ stop: jest.fn() });
+        streamPodLogs("ctx", "default", "my-pod", undefined, 100, noopHandlers);
+        expect(audit).toHaveBeenCalledWith(
+            expect.any(String),
+            "kubectl",
+            ["--context", "ctx", "-n", "default", "logs", "my-pod", "-f", "--tail=100"],
+            expect.any(Date)
+        );
+    });
+
+    test("emits fake log lines on a timer when KARSE_FAKE_LOGS=1 without calling runStream", () => {
+        jest.useFakeTimers();
+        process.env.KARSE_FAKE_LOGS = "1";
+        const handle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, noopHandlers);
+        jest.advanceTimersByTime(2000);
+        expect(runStream).not.toHaveBeenCalled();
+        expect(noopHandlers.onData).toHaveBeenCalled();
+        const emitted = noopHandlers.onData.mock.calls.map((c: any[]) => c[0]).join("");
+        expect(emitted).toContain("start worker processes");
+        expect(emitted).toContain("kube-probe/1.29");
+        handle.stop();
+        jest.useRealTimers();
     });
 });

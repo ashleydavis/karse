@@ -1,4 +1,4 @@
-import { run, type CommandResult } from "../command-runner";
+import { run, runStream, type CommandResult, type StreamHandlers, type StreamHandle } from "../command-runner";
 import { audit, formatLocalISO } from "../audit-log";
 import type {
     Context, NodeStatus, Node, ClusterOverview, Namespace, Pod, PodPhase,
@@ -430,6 +430,55 @@ export async function getPodLogs(
         throw new Error(result.stderr);
     }
     return result.stdout;
+}
+
+// Individual fake log lines, used by the live (follow) streaming path so each line
+// can be emitted on a short interval to simulate real-time tailing without a cluster.
+const FAKE_LOG_LINE_LIST = FAKE_LOG_LINES.split("\n").filter((line) => line !== "");
+
+// Interval (ms) between emitted fake log lines when KARSE_FAKE_LOGS=1 is set.
+const FAKE_LOG_STREAM_INTERVAL_MS = 150;
+
+// Streams the live (follow) logs for a pod container via `kubectl logs -f`.
+// This is a READ-ONLY operation. Each stdout chunk is forwarded through handlers.onData
+// as it arrives; handlers.onError fires on failure and handlers.onClose when the stream
+// ends. Returns a StreamHandle whose stop() terminates the underlying kubectl process,
+// which the route layer calls when the client disconnects.
+// When KARSE_FAKE_LOGS=1 is set, pre-defined fake lines are emitted on a timer instead of
+// shelling out, so the live viewer can be exercised against clusters without real container
+// runtimes (e.g. kwok) and during e2e/smoke runs.
+export function streamPodLogs(
+    context: string,
+    namespace: string,
+    name: string,
+    container: string | undefined,
+    tail: number,
+    handlers: StreamHandlers,
+): StreamHandle {
+    if (process.env.KARSE_FAKE_LOGS === "1") {
+        let index = 0;
+        const timer = setInterval(() => {
+            if (index >= FAKE_LOG_LINE_LIST.length) {
+                return;
+            }
+            handlers.onData(FAKE_LOG_LINE_LIST[index] + "\n");
+            index += 1;
+        }, FAKE_LOG_STREAM_INTERVAL_MS);
+        return {
+            stop: () => {
+                clearInterval(timer);
+            },
+        };
+    }
+    const containerArgs = container ? ["-c", container] : [];
+    const args = [
+        "--context", context, "-n", namespace, "logs", name,
+        ...containerArgs, "-f", `--tail=${tail}`,
+    ];
+    const now = new Date();
+    void audit(LOGS_DIR, "kubectl", args, now);
+    console.log(formatLocalISO(now) + " kubectl " + args.join(" "));
+    return runStream("kubectl", args, handlers);
 }
 
 // Returns aggregate cluster statistics (version + node/namespace/pod counts).

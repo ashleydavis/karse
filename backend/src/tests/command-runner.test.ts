@@ -1,4 +1,4 @@
-import { run } from "../command-runner";
+import { run, runStream } from "../command-runner";
 
 describe("command-runner", () => {
   test("Case A: happy path", async () => {
@@ -40,5 +40,53 @@ describe("command-runner", () => {
   test("Case G: signal-killed", async () => {
     const result = await run("bash", ["-c", "kill -TERM $$"]);
     expect(result.exitCode).toBe(1);
+  });
+});
+
+describe("runStream", () => {
+  test("forwards stdout chunks then calls onClose on clean exit", async () => {
+    const chunks: string[] = [];
+    await new Promise<void>((resolve, reject) => {
+      runStream("bash", ["-c", "printf abc; sleep 0.05; printf def"], {
+        onData: (chunk) => { chunks.push(chunk); },
+        onError: (message) => { reject(new Error(message)); },
+        onClose: () => { resolve(); },
+      });
+    });
+    expect(chunks.join("")).toBe("abcdef");
+  });
+
+  test("calls onError with stderr on non-zero exit", async () => {
+    const message = await new Promise<string>((resolve) => {
+      runStream("bash", ["-c", "echo boom >&2; exit 2"], {
+        onData: () => {},
+        onError: (msg) => { resolve(msg); },
+        onClose: () => { resolve("CLOSED"); },
+      });
+    });
+    expect(message).toContain("boom");
+  });
+
+  test("calls onError when the binary cannot be spawned", async () => {
+    const message = await new Promise<string>((resolve) => {
+      runStream("definitely-not-a-binary-xyz", [], {
+        onData: () => {},
+        onError: (msg) => { resolve(msg); },
+        onClose: () => { resolve("CLOSED"); },
+      });
+    });
+    expect(message).not.toBe("CLOSED");
+  });
+
+  test("stop() terminates the process without firing onError", async () => {
+    let errored = false;
+    const handle = runStream("bash", ["-c", "sleep 5"], {
+      onData: () => {},
+      onError: () => { errored = true; },
+      onClose: () => {},
+    });
+    handle.stop();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(errored).toBe(false);
   });
 });

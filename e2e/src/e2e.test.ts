@@ -967,9 +967,25 @@ test.describe("karse e2e", () => {
         });
 
         test("refresh button fires a new logs request", async () => {
-            const requestPromise = page.waitForRequest((req) => req.url().includes("/logs"));
+            const requestPromise = page.waitForRequest((req) => req.url().includes("/logs") && !req.url().includes("/stream"));
             await page.locator("[data-test-id='log-refresh']").click();
             await requestPromise;
+        });
+
+        test("enabling live opens a streaming request and appends live log lines", async () => {
+            const streamRequest = page.waitForRequest((req) => req.url().includes("/logs/stream"));
+            await page.locator("[data-test-id='log-live-toggle'] input").check();
+            await streamRequest;
+            // The fake-logs backend streams realistic lines one at a time over SSE.
+            await expect(page.locator("[data-test-id='log-viewer']")).toContainText("start worker processes");
+            await expect(page.locator("[data-test-id='log-viewer']")).toContainText("kube-probe/1.29");
+        });
+
+        test("disabling live restores the snapshot log viewer", async () => {
+            const snapshotRequest = page.waitForRequest((req) => req.url().includes("/logs") && !req.url().includes("/stream"));
+            await page.locator("[data-test-id='log-live-toggle'] input").uncheck();
+            await snapshotRequest;
+            await expect(page.locator("[data-test-id='log-viewer']")).toBeVisible();
         });
     });
 

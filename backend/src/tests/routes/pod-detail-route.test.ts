@@ -1,6 +1,7 @@
 jest.mock("../../kubectl/kubectl-adapter", () => ({
     getPodDetail: jest.fn(),
     getPodLogs: jest.fn(),
+    streamPodLogs: jest.fn(),
     // The server mounts other routers too; stub their adapter functions so Express
     // route registration doesn't fail at import time.
     listPods: jest.fn(),
@@ -38,6 +39,7 @@ afterAll(async () => {
 beforeEach(() => {
     kubectlMocks.getPodDetail.mockReset();
     kubectlMocks.getPodLogs.mockReset();
+    kubectlMocks.streamPodLogs.mockReset();
 });
 
 // A minimal valid pod detail response returned by the mock adapter.
@@ -108,6 +110,64 @@ describe("GET /api/pods/:namespace/:name/logs", () => {
 
     test("missing context returns 400", async () => {
         const res = await fetch(`http://127.0.0.1:${port}/api/pods/default/nginx-abc/logs`);
+        expect(res.status).toBe(400);
+    });
+});
+
+describe("GET /api/pods/:namespace/:name/logs/stream", () => {
+    // Wires streamPodLogs to push the given lines, then close, via the route handlers.
+    function fakeStream(lines: string[]): void {
+        kubectlMocks.streamPodLogs.mockImplementation(
+            (_ctx: string, _ns: string, _name: string, _container: string | undefined, _tail: number, handlers: any) => {
+                for (const line of lines) {
+                    handlers.onData(line);
+                }
+                handlers.onClose();
+                return { stop: jest.fn() };
+            }
+        );
+    }
+
+    test("streams log lines as SSE data events then ends", async () => {
+        fakeStream(["hello\n", "world\n"]);
+        const res = await fetch(`http://127.0.0.1:${port}/api/pods/default/nginx-abc/logs/stream?context=my-ctx`);
+        expect(res.status).toBe(200);
+        expect(res.headers.get("content-type")).toContain("text/event-stream");
+        const body = await res.text();
+        expect(body).toContain("data: hello");
+        expect(body).toContain("data: world");
+        expect(body).toContain("event: end");
+        expect(kubectlMocks.streamPodLogs).toHaveBeenCalledWith(
+            "my-ctx", "default", "nginx-abc", undefined, 100, expect.any(Object)
+        );
+    });
+
+    test("passes container and tail params to the adapter", async () => {
+        fakeStream(["x\n"]);
+        const res = await fetch(
+            `http://127.0.0.1:${port}/api/pods/default/nginx-abc/logs/stream?context=my-ctx&container=nginx&tail=50`
+        );
+        await res.text();
+        expect(kubectlMocks.streamPodLogs).toHaveBeenCalledWith(
+            "my-ctx", "default", "nginx-abc", "nginx", 50, expect.any(Object)
+        );
+    });
+
+    test("emits an error event when the adapter reports a failure", async () => {
+        kubectlMocks.streamPodLogs.mockImplementation(
+            (_ctx: string, _ns: string, _name: string, _container: string | undefined, _tail: number, handlers: any) => {
+                handlers.onError("boom");
+                return { stop: jest.fn() };
+            }
+        );
+        const res = await fetch(`http://127.0.0.1:${port}/api/pods/default/nginx-abc/logs/stream?context=my-ctx`);
+        const body = await res.text();
+        expect(body).toContain("event: error");
+        expect(body).toContain("data: boom");
+    });
+
+    test("missing context returns 400", async () => {
+        const res = await fetch(`http://127.0.0.1:${port}/api/pods/default/nginx-abc/logs/stream`);
         expect(res.status).toBe(400);
     });
 });
