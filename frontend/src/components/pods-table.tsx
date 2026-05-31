@@ -7,6 +7,7 @@ import {
     flexRender,
     type ColumnDef,
     type SortingState,
+    type ColumnFiltersState,
 } from "@tanstack/react-table";
 import {
     Table,
@@ -180,6 +181,11 @@ function buildColumns(): ColumnDef<Pod>[] {
             cell: (info) => <PhaseChip phase={info.getValue<PodPhase>()} />,
             sortingFn: (a, b) =>
                 PHASE_ORDER[a.original.phase] - PHASE_ORDER[b.original.phase],
+            // Keeps a row only when its phase is in the selected set. "All phases" is
+            // represented by the absence of this filter (cleared in setSelectedPhases),
+            // so an empty selection here correctly matches no rows.
+            filterFn: (row, columnId, value: PodPhase[]) =>
+                value.includes(row.getValue<PodPhase>(columnId)),
         },
         {
             accessorKey: "ready",
@@ -241,21 +247,35 @@ export function PodsTable() {
 
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
-    const [selectedPhases, setSelectedPhases] = useState<PodPhase[]>(ALL_PHASES);
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
     const columns = buildColumns();
 
-    const phaseFilteredPods = (data?.pods ?? []).filter((pod) => selectedPhases.includes(pod.phase));
+    // The selected phases live in the table's "phase" column filter; an absent filter means "all".
+    const phaseFilter = columnFilters.find((f) => f.id === "phase");
+    const selectedPhases = phaseFilter ? (phaseFilter.value as PodPhase[]) : ALL_PHASES;
+
+    // Updates the phase column filter: a full selection clears the filter so every phase shows.
+    function setSelectedPhases(next: PodPhase[]): void {
+        if (next.length === ALL_PHASES.length) {
+            setColumnFilters((prev) => prev.filter((f) => f.id !== "phase"));
+        }
+        else {
+            setColumnFilters((prev) => [...prev.filter((f) => f.id !== "phase"), { id: "phase", value: next }]);
+        }
+    }
 
     const table = useReactTable({
-        data: phaseFilteredPods,
+        data: data?.pods ?? [],
         columns,
         state: {
             sorting,
             globalFilter,
+            columnFilters,
         },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
+        onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
