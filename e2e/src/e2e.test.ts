@@ -1208,4 +1208,70 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "redis-xyz" })).toHaveCount(0);
         });
     });
+
+    // ── YAML viewer ───────────────────────────────────────────────────────────
+
+    test.describe("yaml viewer", () => {
+        const FAKE_PODS = {
+            pods: [
+                {
+                    name: "nginx-abc",
+                    namespace: "default",
+                    phase: "Running",
+                    ready: "1/1",
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                },
+            ],
+        };
+
+        const FAKE_YAML = "apiVersion: v1\nkind: Pod\nmetadata:\n  name: nginx-abc\n  namespace: default\n";
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: FAKE_PODS });
+            });
+            await page.route("**/api/yaml/pods/nginx-abc*", async (route) => {
+                await route.fulfill({ json: { yaml: FAKE_YAML } });
+            });
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+            await page.unroute("**/api/yaml/pods/nginx-abc*");
+            setContext(CLUSTER_1);
+        });
+
+        test("each pod row has a YAML button", async () => {
+            const row = page.locator("[data-test-id='pod-row']").filter({ hasText: "nginx-abc" });
+            await expect(row.locator("[data-test-id='yaml-button']")).toBeVisible();
+        });
+
+        test("clicking the YAML button requests yaml with the namespace param", async () => {
+            const requestPromise = page.waitForRequest((req) =>
+                req.url().includes("/api/yaml/pods/nginx-abc") && req.url().includes("namespace=default"));
+            const row = page.locator("[data-test-id='pod-row']").filter({ hasText: "nginx-abc" });
+            await row.locator("[data-test-id='yaml-button']").click();
+            await requestPromise;
+        });
+
+        test("the dialog shows the raw yaml content", async () => {
+            await expect(page.locator("[data-test-id='yaml-dialog']")).toBeVisible();
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("kind: Pod");
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("name: nginx-abc");
+        });
+
+        test("clicking the YAML button does not navigate to the pod detail page", async () => {
+            await expect(page).toHaveURL(/\/pods$/);
+        });
+
+        test("the close button dismisses the dialog", async () => {
+            await page.locator("[data-test-id='yaml-close']").click();
+            await expect(page.locator("[data-test-id='yaml-dialog']")).not.toBeVisible();
+        });
+    });
 });

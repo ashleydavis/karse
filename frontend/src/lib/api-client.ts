@@ -2,7 +2,7 @@ import axios from "axios";
 import type {
     ContextsResponse, ClusterOverview, Node, NamespacesResponse, PodsResponse,
     DeploymentsResponse, StatefulSetsResponse, DaemonSetsResponse,
-    PodDetail, NodeDetail,
+    PodDetail, NodeDetail, YamlResourceType, YamlResponse,
 } from "karse-types";
 
 const http = axios.create({ baseURL: "/api", headers: { "Content-Type": "application/json" } });
@@ -110,5 +110,21 @@ export async function fetchPodLogs(
 // Fetches the full detail for a single node including conditions, capacity, and scheduled pods.
 export async function fetchNodeDetail(context: string, name: string): Promise<NodeDetail> {
     const response = await http.get<NodeDetail>(`/nodes/${name}`, { params: { context } });
+    return response.data;
+}
+
+// Fetches the raw YAML for a single resource. namespace is omitted for cluster-scoped
+// resources (nodes, namespaces) and supplied for namespaced ones.
+export async function fetchResourceYaml(
+    context: string,
+    type: YamlResourceType,
+    name: string,
+    namespace?: string,
+): Promise<YamlResponse> {
+    const params: Record<string, string> = { context };
+    if (namespace) {
+        params.namespace = namespace;
+    }
+    const response = await http.get<YamlResponse>(`/yaml/${type}/${name}`, { params });
     return response.data;
 }

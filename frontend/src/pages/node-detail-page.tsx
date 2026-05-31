@@ -19,6 +19,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { NodeStatus, NodeCondition } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
 import { fetchNodeDetail } from "../lib/api-client";
+import { YamlButton } from "../components/yaml-dialog";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -87,6 +88,8 @@ export function NodeDetailPage() {
                     {data.name}
                 </Typography>
                 <StatusChip status={data.status} />
+                <Box sx={{ flexGrow: 1 }} />
+                <YamlButton type="nodes" name={data.name} />
             </Box>
 
             <Paper variant="outlined" sx={{ p: 2 }}>

@@ -28,6 +28,7 @@ import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
 import { useNavigate } from "react-router-dom";
 import { fetchPods } from "../lib/api-client";
+import { YamlButton } from "./yaml-dialog";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -146,6 +147,18 @@ function buildColumns(): ColumnDef<Pod>[] {
             cell: (info) => formatAge(info.getValue<string>()),
             sortingFn: (a, b) =>
                 new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
+        },
+        {
+            id: "actions",
+            header: "",
+            enableSorting: false,
+            cell: (info) => (
+                <YamlButton
+                    type="pods"
+                    name={info.row.original.name}
+                    namespace={info.row.original.namespace}
+                />
+            ),
         },
     );
 

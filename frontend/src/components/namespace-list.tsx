@@ -25,6 +25,7 @@ import {
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { Namespace } from "karse-types";
+import { YamlButton } from "./yaml-dialog";
 
 type Props = {
     namespaces: Namespace[];
@@ -80,6 +81,7 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
                                 {name === terminalDefault ? "Clear default" : "Set as default"}
                             </Button>
                         )}
+                        <YamlButton type="namespaces" name={name} />
                     </span>
                 );
             },

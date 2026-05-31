@@ -26,6 +26,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { PodPhase, ContainerState, KubeEvent } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
 import { fetchPodDetail, fetchPodLogs } from "../lib/api-client";
+import { YamlButton } from "../components/yaml-dialog";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -204,6 +205,8 @@ export function PodDetailPage() {
                     {data.name}
                 </Typography>
                 <PhaseChip phase={data.phase} />
+                <Box sx={{ flexGrow: 1 }} />
+                <YamlButton type="pods" name={data.name} namespace={data.namespace} />
             </Box>
 
             <Paper variant="outlined" sx={{ p: 2 }}>

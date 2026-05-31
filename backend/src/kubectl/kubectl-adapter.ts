@@ -432,6 +432,46 @@ export async function getPodLogs(
     return result.stdout;
 }
 
+// The set of resource types whose raw YAML the dashboard is allowed to fetch.
+// Maps the URL/UI type token to the kubectl resource kind passed to "get".
+// Only types the dashboard can already view are permitted, so callers cannot
+// coerce the read-only adapter into reading arbitrary cluster resources.
+const YAML_RESOURCE_KINDS: Record<string, string> = {
+    nodes: "node",
+    pods: "pod",
+    deployments: "deployment",
+    daemonsets: "daemonset",
+    statefulsets: "statefulset",
+    namespaces: "namespace",
+};
+
+// Whether the given resource type token is one we permit raw-YAML fetches for.
+export function isYamlResourceType(type: string): boolean {
+    return Object.prototype.hasOwnProperty.call(YAML_RESOURCE_KINDS, type);
+}
+
+// Returns the raw YAML for a single resource via "kubectl get <kind> <name> -o yaml".
+// type must be one of the permitted YAML_RESOURCE_KINDS keys; passing anything else throws.
+// namespace is required for namespaced resources and ignored for cluster-scoped ones
+// (nodes, namespaces); the route layer decides which to pass.
+export async function getResourceYaml(
+    context: string,
+    type: string,
+    name: string,
+    namespace?: string,
+): Promise<string> {
+    const kind = YAML_RESOURCE_KINDS[type];
+    if (kind === undefined) {
+        throw new Error(`unsupported resource type: ${type}`);
+    }
+    const nsArgs = namespace ? ["-n", namespace] : [];
+    const result = await kubectl(["--context", context, ...nsArgs, "get", kind, name, "-o", "yaml"]);
+    if (result.exitCode !== 0) {
+        throw new Error(result.stderr);
+    }
+    return result.stdout;
+}
+
 // Returns aggregate cluster statistics (version + node/namespace/pod counts).
 // Runs four kubectl calls in parallel. The version branch tolerates failures
 // (returns null); the three count branches re-throw on any failure.

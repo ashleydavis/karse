@@ -175,3 +175,12 @@ export type NodeDetail = {
     labels: Record<string, string>;
     pods: Pod[];
 };
+
+// The resource types whose raw YAML can be viewed in the dashboard.
+export type YamlResourceType =
+    "nodes" | "pods" | "deployments" | "daemonsets" | "statefulsets" | "namespaces";
+
+// Response body for GET /api/yaml/:type/:name.
+export type YamlResponse = {
+    yaml: string;
+};

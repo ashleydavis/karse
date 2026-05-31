@@ -12,6 +12,8 @@ import {
     getClusterOverview,
     listPods,
     getPodLogs,
+    getResourceYaml,
+    isYamlResourceType,
 } from "../../kubectl/kubectl-adapter";
 
 // jest.requireMock returns any, so mock methods are accessible without casting.
@@ -717,5 +719,58 @@ describe("getPodLogs", () => {
             "--context ctx -n default logs my-pod --tail=100": () => fail("connection refused"),
         });
         await expect(getPodLogs("ctx", "default", "my-pod")).rejects.toThrow("connection refused");
+    });
+});
+
+describe("isYamlResourceType", () => {
+    test("accepts every viewable resource type", () => {
+        for (const type of ["nodes", "pods", "deployments", "daemonsets", "statefulsets", "namespaces"]) {
+            expect(isYamlResourceType(type)).toBe(true);
+        }
+    });
+
+    test("rejects types outside the whitelist", () => {
+        for (const type of ["secrets", "configmaps", "", "Pod", "__proto__"]) {
+            expect(isYamlResourceType(type)).toBe(false);
+        }
+    });
+});
+
+describe("getResourceYaml", () => {
+    test("issues get with -o yaml and a namespace for namespaced resources", async () => {
+        setRunnerHandlers({
+            "--context ctx -n default get pod nginx -o yaml": () => ok("apiVersion: v1\nkind: Pod\n"),
+        });
+        const yaml = await getResourceYaml("ctx", "pods", "nginx", "default");
+        expect(yaml).toBe("apiVersion: v1\nkind: Pod\n");
+    });
+
+    test("omits the namespace flag for cluster-scoped resources", async () => {
+        setRunnerHandlers({
+            "--context ctx get node node-1 -o yaml": () => ok("apiVersion: v1\nkind: Node\n"),
+        });
+        const yaml = await getResourceYaml("ctx", "nodes", "node-1");
+        expect(yaml).toBe("apiVersion: v1\nkind: Node\n");
+    });
+
+    test("maps the type token to the singular kubectl kind", async () => {
+        setRunnerHandlers({
+            "--context ctx -n default get statefulset postgres -o yaml": () => ok("kind: StatefulSet\n"),
+        });
+        const yaml = await getResourceYaml("ctx", "statefulsets", "postgres", "default");
+        expect(yaml).toBe("kind: StatefulSet\n");
+    });
+
+    test("throws for an unsupported type without invoking kubectl", async () => {
+        await expect(getResourceYaml("ctx", "secrets", "my-secret", "default"))
+            .rejects.toThrow("unsupported resource type: secrets");
+        expect(run).not.toHaveBeenCalled();
+    });
+
+    test("throws on non-zero exit", async () => {
+        setRunnerHandlers({
+            "--context ctx -n default get pod ghost -o yaml": () => fail("NotFound"),
+        });
+        await expect(getResourceYaml("ctx", "pods", "ghost", "default")).rejects.toThrow("NotFound");
     });
 });
