@@ -31,3 +31,4 @@ To tear down every test cluster at once (handy after running several scenarios, 
 | [19](19-multi-container-pods/) | Multi-container pods: container count column and per-container drill-down |
 | [20](20-pod-detail-tabs/) | Pod detail tabs: Detail / Status, Containers, Logs |
 | [21](21-pod-phase-filter/) | Filter pods by phase using the dropdown checkboxes |
+| [22](22-breadcrumbs/) | Breadcrumb navigation: trail on list and detail pages, links back to lists |

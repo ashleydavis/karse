@@ -3,6 +3,7 @@ import { Box } from "@mui/material";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Header } from "./header";
 import { Sidebar } from "./sidebar";
+import { Breadcrumbs } from "./breadcrumbs";
 import { ContextQuickPicker } from "./context-quick-picker";
 import { NamespaceQuickPicker } from "./namespace-quick-picker";
 import { useKubeContext } from "../lib/kube-context";
@@ -45,6 +46,9 @@ export function AppLayout() {
                     onOpenNamespacePicker={() => setNamespacePickerOpen(true)}
                 />
                 <Box component="main" sx={{ flex: 1, overflow: "auto", p: 3 }}>
+                    <Box sx={{ mb: 2 }}>
+                        <Breadcrumbs />
+                    </Box>
                     <Outlet />
                 </Box>
             </Box>
