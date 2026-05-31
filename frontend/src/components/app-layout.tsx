@@ -1,14 +1,26 @@
 import { useState, useEffect } from "react";
 import { Box } from "@mui/material";
-import { Outlet } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Header } from "./header";
 import { Sidebar } from "./sidebar";
 import { ContextQuickPicker } from "./context-quick-picker";
 import { NamespaceQuickPicker } from "./namespace-quick-picker";
+import { useKubeContext } from "../lib/kube-context";
 
+// Redirects to /contexts whenever no context is selected, so the user
+// immediately sees the contexts page and can pick one.
 export function AppLayout() {
     const [contextPickerOpen, setContextPickerOpen] = useState(false);
     const [namespacePickerOpen, setNamespacePickerOpen] = useState(false);
+    const { current, isLoading } = useKubeContext();
+    const navigate = useNavigate();
+    const { pathname } = useLocation();
+
+    useEffect(() => {
+        if (!isLoading && current === null && pathname !== "/contexts") {
+            navigate("/contexts", { replace: true });
+        }
+    }, [current, isLoading, pathname, navigate]);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent): void {

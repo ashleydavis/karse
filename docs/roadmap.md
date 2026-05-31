@@ -44,3 +44,9 @@ Karse currently ships a single cluster home page (overview tiles plus a read-onl
 ## Already shipped
 
 - **Cluster overview + nodes view**: the cluster home page combining four stat tiles (server version, node count, namespace count, pod count) and a read-only, sortable, searchable nodes table, with kubeconfig context switching in the header. Delivered by the scaffold-and-cluster-overview plan.
+- **Namespace selector**: scope views to a chosen namespace instead of cluster-wide reads only.
+- **Workloads views**: read-only tables for pods, deployments, statefulsets, and daemonsets.
+- **Clickable resource rows**: every resource table row links to a detail page for that resource.
+- **Pod detail page**: a `/pods/:namespace/:name` route showing containers, status, restarts, and events.
+- **Node detail page**: a `/nodes/:name` route with conditions, capacity/allocatable, and the pods scheduled on it.
+- **Log viewer**: stream a pod/container's logs read-only (`kubectl logs`), with container selector and tail-line controls.

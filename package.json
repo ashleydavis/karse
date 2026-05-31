@@ -3,19 +3,22 @@
   "private": true,
   "workspaces": ["backend", "frontend", "e2e", "packages/*"],
   "scripts": {
-    "dev":       "bun run --filter '*' dev",
-    "start":     "bun run --filter '*' start",
-    "compile":   "bun run --filter '*' compile",
-    "test":      "bun run --filter 'karse-backend' test",
+    "dev": "bun run --filter '*' dev",
+    "start": "bun run --filter '*' start",
+    "compile": "bun run --filter '*' compile",
+    "test": "bun run --filter 'karse-backend' test",
     "tests:all": "bun run compile && bun run test && bun run smoke && bun run e2e",
-    "smoke":     "bash scripts/smoke-tests.sh",
-    "e2e":       "bash scripts/e2e-tests.sh",
-    "e":  "bun run e2e",
-    "d":  "bun run dev",
-    "s":  "bun run start",
-    "c":  "bun run compile",
-    "t":  "bun run test",
+    "smoke": "bash scripts/smoke-tests.sh",
+    "e2e": "bash scripts/e2e-tests.sh",
+    "e": "bun run e2e",
+    "d": "bun run dev",
+    "s": "bun run start",
+    "c": "bun run compile",
+    "t": "bun run test",
     "ta": "bun run tests:all",
     "sm": "bun run smoke"
+  },
+  "devDependencies": {
+    "wait-on": "^9.0.10"
   }
 }

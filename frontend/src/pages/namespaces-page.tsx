@@ -1,4 +1,4 @@
-import { Box, Typography, Alert } from "@mui/material";
+import { Box, Alert } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
@@ -28,14 +28,6 @@ export function NamespacesPage() {
         },
     });
 
-    if (context === null) {
-        return (
-            <Typography color="text.secondary">
-                Select a context to view namespaces.
-            </Typography>
-        );
-    }
-
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
             {setGlobalMutation.isError && (
@@ -50,7 +42,7 @@ export function NamespacesPage() {
                 isLoading={isLoading}
                 error={(error as Error | null)}
                 onUse={setNamespace}
-                onSetDefault={(ns) => setGlobalMutation.mutate({ ctx: context, ns })}
+                onSetDefault={(ns) => setGlobalMutation.mutate({ ctx: context!, ns })}
             />
         </Box>
     );

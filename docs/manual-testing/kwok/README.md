@@ -18,3 +18,5 @@ Manual test scenarios that use KWOK to simulate Kubernetes clusters without a re
 | [12](12-no-contexts/) | No contexts configured in kubeconfig |
 | [13](13-two-contexts/) | Two contexts (two simultaneous KWOK clusters) |
 | [14](14-many-contexts/) | Many contexts (five simultaneous KWOK clusters) |
+| [15](15-workloads-views/) | Workloads views: deployments, stateful sets, daemon sets |
+| [16](16-detail-pages-and-logs/) | Detail pages and log viewer: node detail, pod detail, clickable rows |

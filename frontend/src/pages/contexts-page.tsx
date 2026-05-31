@@ -17,6 +17,9 @@ export function ContextsPage() {
 
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            {current === null && (
+                <Alert severity="info">No context is selected. Choose one below to get started.</Alert>
+            )}
             {setTerminalDefaultMutation.isError && (
                 <Alert severity="error">
                     {(setTerminalDefaultMutation.error as Error).message}

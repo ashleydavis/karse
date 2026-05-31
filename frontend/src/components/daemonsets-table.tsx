@@ -16,18 +16,17 @@ import {
     TableCell,
     TableContainer,
     Paper,
-    Chip,
     TextField,
     Typography,
     Alert,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useQuery } from "@tanstack/react-query";
-import type { Pod, PodPhase } from "karse-types";
+import { useNavigate } from "react-router-dom";
+import type { DaemonSet } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
-import { useNavigate } from "react-router-dom";
-import { fetchPods } from "../lib/api-client";
+import { fetchDaemonSets } from "../lib/api-client";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -44,135 +43,42 @@ function formatAge(createdAt: string): string {
     return `${minutes}m`;
 }
 
-// Renders a colored MUI Chip for a pod phase value.
-function PhaseChip({ phase }: { phase: PodPhase }) {
-    if (phase === "Running") {
-        return (
-            <Chip
-                icon={<FontAwesomeIcon icon={["fas", "circle-check"]} />}
-                label="Running"
-                color="success"
-                size="small"
-            />
-        );
-    }
-    if (phase === "Pending") {
-        return (
-            <Chip
-                icon={<FontAwesomeIcon icon={["fas", "circle-pause"]} />}
-                label="Pending"
-                color="warning"
-                size="small"
-            />
-        );
-    }
-    if (phase === "Succeeded") {
-        return (
-            <Chip
-                icon={<FontAwesomeIcon icon={["fas", "circle-check"]} />}
-                label="Succeeded"
-                color="info"
-                size="small"
-            />
-        );
-    }
-    if (phase === "Failed") {
-        return (
-            <Chip
-                icon={<FontAwesomeIcon icon={["fas", "circle-xmark"]} />}
-                label="Failed"
-                color="error"
-                size="small"
-            />
-        );
-    }
-    return (
-        <Chip
-            icon={<FontAwesomeIcon icon={["fas", "circle-question"]} />}
-            label="Unknown"
-            size="small"
-        />
-    );
-}
+// Column definitions for the daemon sets table.
+const columns: ColumnDef<DaemonSet>[] = [
+    { accessorKey: "name", header: "Name" },
+    { accessorKey: "namespace", header: "Namespace" },
+    { accessorKey: "desired", header: "Desired" },
+    { accessorKey: "current", header: "Current" },
+    { accessorKey: "ready", header: "Ready" },
+    { accessorKey: "upToDate", header: "Up-to-date" },
+    { accessorKey: "available", header: "Available" },
+    {
+        id: "age",
+        accessorKey: "createdAt",
+        header: "Age",
+        cell: (info) => formatAge(info.getValue<string>()),
+        sortingFn: (a, b) =>
+            new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
+    },
+];
 
-// Sort order for pod phases: Running first, Unknown last.
-const PHASE_ORDER: Record<PodPhase, number> = {
-    Running: 0,
-    Pending: 1,
-    Succeeded: 2,
-    Failed: 3,
-    Unknown: 4,
-};
-
-// Builds the column definitions for the pods table.
-function buildColumns(): ColumnDef<Pod>[] {
-    const cols: ColumnDef<Pod>[] = [];
-
-    cols.push(
-        {
-            accessorKey: "name",
-            header: "Name",
-        },
-        {
-            accessorKey: "namespace",
-            header: "Namespace",
-        },
-    );
-
-    cols.push(
-        {
-            accessorKey: "phase",
-            header: "Status",
-            cell: (info) => <PhaseChip phase={info.getValue<PodPhase>()} />,
-            sortingFn: (a, b) =>
-                PHASE_ORDER[a.original.phase] - PHASE_ORDER[b.original.phase],
-        },
-        {
-            accessorKey: "ready",
-            header: "Ready",
-        },
-        {
-            accessorKey: "restarts",
-            header: "Restarts",
-        },
-        {
-            accessorKey: "node",
-            header: "Node",
-        },
-        {
-            id: "age",
-            accessorKey: "createdAt",
-            header: "Age",
-            cell: (info) => formatAge(info.getValue<string>()),
-            sortingFn: (a, b) =>
-                new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
-        },
-    );
-
-    return cols;
-}
-
-// Sortable, filterable table of Kubernetes pods for the active context.
-// When a namespace is selected it scopes the query; otherwise shows all namespaces
-// and includes a Namespace column.
-export function PodsTable() {
+// Sortable, filterable table of Kubernetes daemon sets for the active context.
+export function DaemonSetsTable() {
     const { current } = useKubeContext();
     const { namespace } = useKubeNamespace();
     const navigate = useNavigate();
 
     const { data, error, isLoading } = useQuery({
-        queryKey: ["pods", current, namespace],
-        queryFn: () => fetchPods(current!, namespace ?? undefined),
+        queryKey: ["daemonsets", current, namespace],
+        queryFn: () => fetchDaemonSets(current!, namespace ?? undefined),
         enabled: current !== null,
     });
 
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
 
-    const columns = buildColumns();
-
     const table = useReactTable({
-        data: data?.pods ?? [],
+        data: data?.daemonSets ?? [],
         columns,
         state: {
             sorting,
@@ -195,8 +101,9 @@ export function PodsTable() {
     }
 
     const rows = table.getRowModel().rows;
-    const allPods = data?.pods ?? [];
+    const all = data?.daemonSets ?? [];
 
+    // Renders the appropriate sort direction icon for a column header.
     function SortIcon({ columnId }: { columnId: string }) {
         const col = table.getColumn(columnId);
         const sorted = col?.getIsSorted();
@@ -213,10 +120,10 @@ export function PodsTable() {
         <div className="flex flex-col gap-2">
             <TextField
                 size="small"
-                placeholder="Search pods..."
+                placeholder="Search daemon sets..."
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
-                data-test-id="pods-search"
+                data-test-id="daemonsets-search"
                 slotProps={{
                     input: {
                         startAdornment: (
@@ -225,7 +132,7 @@ export function PodsTable() {
                     },
                 }}
             />
-            <TableContainer component={Paper} data-test-id="pods-table">
+            <TableContainer component={Paper} data-test-id="daemonsets-table">
                 <Table size="small">
                     <TableHead>
                         {table.getHeaderGroups().map((hg) => (
@@ -249,25 +156,25 @@ export function PodsTable() {
                         ))}
                     </TableHead>
                     <TableBody>
-                        {rows.length === 0 && allPods.length === 0 && (
+                        {rows.length === 0 && all.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={columns.length}>
-                                    <Typography color="text.secondary" data-test-id="no-pods-empty">No pods.</Typography>
+                                    <Typography color="text.secondary" data-test-id="no-daemonsets-empty">No daemon sets.</Typography>
                                 </TableCell>
                             </TableRow>
                         )}
-                        {rows.length === 0 && allPods.length > 0 && (
+                        {rows.length === 0 && all.length > 0 && (
                             <TableRow>
                                 <TableCell colSpan={columns.length}>
-                                    <Typography color="text.secondary" data-test-id="no-pods-match">No pods match the search.</Typography>
+                                    <Typography color="text.secondary" data-test-id="no-daemonsets-match">No daemon sets match the search.</Typography>
                                 </TableCell>
                             </TableRow>
                         )}
                         {rows.map((row) => (
                             <TableRow
                                 key={row.id}
-                                data-test-id="pod-row"
-                                onClick={() => navigate(`/pods/${row.original.namespace}/${row.original.name}`)}
+                                data-test-id="daemonset-row"
+                                onClick={() => navigate(`/daemonsets/${row.original.namespace}/${row.original.name}`)}
                                 sx={{ cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}
                             >
                                 {row.getVisibleCells().map((cell) => (

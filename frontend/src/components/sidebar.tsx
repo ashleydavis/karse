@@ -4,11 +4,14 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link, useLocation } from "react-router-dom";
 
 const NAV_ITEMS = [
-    { to: "/contexts",   icon: "link"         as const, label: "Contexts"   },
-    { to: "/",           icon: "dharmachakra" as const, label: "Cluster"    },
-    { to: "/nodes",      icon: "server"       as const, label: "Nodes"      },
-    { to: "/namespaces", icon: "layer-group"  as const, label: "Namespaces" },
-    { to: "/pods",       icon: "cube"         as const, label: "Pods"       },
+    { to: "/contexts",     icon: "link"         as const, label: "Contexts"     },
+    { to: "/cluster",      icon: "dharmachakra" as const, label: "Cluster"      },
+    { to: "/nodes",        icon: "server"       as const, label: "Nodes"        },
+    { to: "/namespaces",   icon: "layer-group"  as const, label: "Namespaces"   },
+    { to: "/pods",         icon: "cube"         as const, label: "Pods"         },
+    { to: "/deployments",  icon: "cubes"        as const, label: "Deployments"  },
+    { to: "/statefulsets", icon: "database"     as const, label: "StatefulSets" },
+    { to: "/daemonsets",   icon: "sitemap"      as const, label: "DaemonSets"   },
 ];
 
 export function Sidebar() {
@@ -52,7 +55,7 @@ export function Sidebar() {
 
             <List sx={{ flex: 1, pt: 1, px: 0.75 }} disablePadding>
                 {NAV_ITEMS.map(({ to, icon, label }) => {
-                    const active = pathname === to;
+                    const active = pathname === to || pathname.startsWith(to + "/");
                     return (
                         <Tooltip key={to} title={collapsed ? label : ""} placement="right">
                             <ListItemButton

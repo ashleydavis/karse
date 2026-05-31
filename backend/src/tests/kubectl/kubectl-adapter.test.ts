@@ -11,6 +11,7 @@ import {
     listNodes,
     getClusterOverview,
     listPods,
+    getPodLogs,
 } from "../../kubectl/kubectl-adapter";
 
 // jest.requireMock returns any, so mock methods are accessible without casting.
@@ -670,5 +671,51 @@ describe("setContextNamespace", () => {
         await setContextNamespace("my-ctx", "");
         expect(run).toHaveBeenCalledTimes(1);
         expect(run).toHaveBeenCalledWith("kubectl", ["config", "unset", "contexts.my-ctx.namespace"]);
+    });
+});
+
+describe("getPodLogs", () => {
+    afterEach(() => {
+        delete process.env.KARSE_FAKE_LOGS;
+    });
+
+    test("returns fake log lines when KARSE_FAKE_LOGS=1 without calling kubectl", async () => {
+        process.env.KARSE_FAKE_LOGS = "1";
+        const logs = await getPodLogs("ctx", "default", "my-pod");
+        expect(logs).toContain("start worker processes");
+        expect(logs).toContain("kube-probe/1.29");
+        expect(run).not.toHaveBeenCalled();
+    });
+
+    test("returns stdout on success", async () => {
+        setRunnerHandlers({
+            "--context ctx -n default logs my-pod --tail=100": () => ok("line1\nline2\n"),
+        });
+        const logs = await getPodLogs("ctx", "default", "my-pod");
+        expect(logs).toBe("line1\nline2\n");
+    });
+
+    test("passes container flag when container is specified", async () => {
+        setRunnerHandlers({
+            "--context ctx -n default logs my-pod -c nginx --tail=50": () => ok("nginx log\n"),
+        });
+        const logs = await getPodLogs("ctx", "default", "my-pod", "nginx", 50);
+        expect(logs).toBe("nginx log\n");
+    });
+
+    test("returns empty string when kubectl reports no logs found", async () => {
+        setRunnerHandlers({
+            "--context ctx -n default logs my-pod --tail=100": () =>
+                fail('no logs found for container "my-pod" in pod "default/my-pod"'),
+        });
+        const logs = await getPodLogs("ctx", "default", "my-pod");
+        expect(logs).toBe("");
+    });
+
+    test("throws on other kubectl errors", async () => {
+        setRunnerHandlers({
+            "--context ctx -n default logs my-pod --tail=100": () => fail("connection refused"),
+        });
+        await expect(getPodLogs("ctx", "default", "my-pod")).rejects.toThrow("connection refused");
     });
 });

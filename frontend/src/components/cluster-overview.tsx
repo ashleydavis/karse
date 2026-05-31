@@ -107,14 +107,6 @@ export function ClusterOverview() {
         enabled: current !== null,
     });
 
-    if (current === null) {
-        return (
-            <Typography color="text.secondary" data-test-id="no-context-message">
-                Select a context to see cluster overview.
-            </Typography>
-        );
-    }
-
     if (error) {
         return <Alert severity="error">{(error as Error).message}</Alert>;
     }

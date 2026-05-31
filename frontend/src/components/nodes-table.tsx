@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
     useReactTable,
     getCoreRowModel,
@@ -110,6 +111,7 @@ const columns: ColumnDef<Node>[] = [
 
 export function NodesTable() {
     const { current } = useKubeContext();
+    const navigate = useNavigate();
     const { data, error, isLoading } = useQuery({
         queryKey: ["cluster", "nodes", current],
         queryFn: () => fetchNodes(current!),
@@ -130,8 +132,6 @@ export function NodesTable() {
         getFilteredRowModel: getFilteredRowModel(),
         globalFilterFn: "includesString",
     });
-
-    if (current === null) return null;
 
     if (error) {
         return <Alert severity="error">{(error as Error).message}</Alert>;
@@ -202,7 +202,12 @@ export function NodesTable() {
                             </TableRow>
                         )}
                         {rows.map((row) => (
-                            <TableRow key={row.id} data-test-id="node-row">
+                            <TableRow
+                                key={row.id}
+                                data-test-id="node-row"
+                                onClick={() => navigate(`/nodes/${row.original.name}`)}
+                                sx={{ cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}
+                            >
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell key={cell.id}>
                                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

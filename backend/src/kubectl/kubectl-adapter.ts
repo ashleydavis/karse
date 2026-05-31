@@ -1,6 +1,11 @@
 import { run, type CommandResult } from "../command-runner";
 import { audit, formatLocalISO } from "../audit-log";
-import type { Context, NodeStatus, Node, ClusterOverview, Namespace, Pod, PodPhase } from "karse-types";
+import type {
+    Context, NodeStatus, Node, ClusterOverview, Namespace, Pod, PodPhase,
+    Deployment, StatefulSet, DaemonSet,
+    ContainerInfo, ContainerState, KubeEvent, PodDetail,
+    NodeCondition, NodeAddress, ResourceAmounts, NodeDetail,
+} from "karse-types";
 
 // Base directory for the rolling audit log; overridable via KARSE_LOGS_DIR.
 const LOGS_DIR = process.env.KARSE_LOGS_DIR ?? "../logs";
@@ -141,6 +146,290 @@ export async function listPods(context: string, namespace?: string): Promise<Pod
             node: item.spec?.nodeName ?? "",
         };
     });
+}
+
+// Returns deployments for the given context, optionally scoped to a namespace.
+export async function listDeployments(context: string, namespace?: string): Promise<Deployment[]> {
+    const nsArgs = namespace ? ["-n", namespace] : ["-A"];
+    const result = await kubectl(["--context", context, "get", "deployments", ...nsArgs, "-o", "json"]);
+    if (result.exitCode !== 0) {
+        throw new Error(result.stderr);
+    }
+    const data = JSON.parse(result.stdout);
+    return (data.items as any[]).map((item) => {
+        const desired: number = item.spec?.replicas ?? 0;
+        const ready: number = item.status?.readyReplicas ?? 0;
+        return {
+            name: item.metadata.name,
+            namespace: item.metadata.namespace,
+            ready: `${ready}/${desired}`,
+            upToDate: item.status?.updatedReplicas ?? 0,
+            available: item.status?.availableReplicas ?? 0,
+            createdAt: item.metadata.creationTimestamp,
+        };
+    });
+}
+
+// Returns stateful sets for the given context, optionally scoped to a namespace.
+export async function listStatefulSets(context: string, namespace?: string): Promise<StatefulSet[]> {
+    const nsArgs = namespace ? ["-n", namespace] : ["-A"];
+    const result = await kubectl(["--context", context, "get", "statefulsets", ...nsArgs, "-o", "json"]);
+    if (result.exitCode !== 0) {
+        throw new Error(result.stderr);
+    }
+    const data = JSON.parse(result.stdout);
+    return (data.items as any[]).map((item) => {
+        const desired: number = item.spec?.replicas ?? 0;
+        const ready: number = item.status?.readyReplicas ?? 0;
+        return {
+            name: item.metadata.name,
+            namespace: item.metadata.namespace,
+            ready: `${ready}/${desired}`,
+            createdAt: item.metadata.creationTimestamp,
+        };
+    });
+}
+
+// Returns daemon sets for the given context, optionally scoped to a namespace.
+export async function listDaemonSets(context: string, namespace?: string): Promise<DaemonSet[]> {
+    const nsArgs = namespace ? ["-n", namespace] : ["-A"];
+    const result = await kubectl(["--context", context, "get", "daemonsets", ...nsArgs, "-o", "json"]);
+    if (result.exitCode !== 0) {
+        throw new Error(result.stderr);
+    }
+    const data = JSON.parse(result.stdout);
+    return (data.items as any[]).map((item) => ({
+        name: item.metadata.name,
+        namespace: item.metadata.namespace,
+        desired: item.status?.desiredNumberScheduled ?? 0,
+        current: item.status?.currentNumberScheduled ?? 0,
+        ready: item.status?.numberReady ?? 0,
+        upToDate: item.status?.updatedNumberScheduled ?? 0,
+        available: item.status?.numberAvailable ?? 0,
+        createdAt: item.metadata.creationTimestamp,
+    }));
+}
+
+// Maps a raw container status object from kubectl JSON output to a typed ContainerInfo.
+function parseContainerInfo(cs: any, spec: any): ContainerInfo {
+    let state: ContainerState = "Unknown";
+    let stateReason = "";
+    const st = cs.state ?? {};
+    if (st.running) {
+        state = "Running";
+    }
+    else if (st.waiting) {
+        state = "Waiting";
+        stateReason = st.waiting.reason ?? "";
+    }
+    else if (st.terminated) {
+        state = "Terminated";
+        stateReason = st.terminated.reason ?? "";
+    }
+    const image = spec?.image ?? cs.image ?? "";
+    return {
+        name: cs.name,
+        image,
+        ready: cs.ready === true,
+        restarts: cs.restartCount ?? 0,
+        state,
+        stateReason,
+    };
+}
+
+// Returns detailed information for a single pod, including events.
+export async function getPodDetail(context: string, namespace: string, name: string): Promise<PodDetail> {
+    const [podResult, eventsResult] = await Promise.all([
+        kubectl(["--context", context, "-n", namespace, "get", "pod", name, "-o", "json"]),
+        kubectl([
+            "--context", context, "-n", namespace, "get", "events",
+            `--field-selector=involvedObject.name=${name},involvedObject.namespace=${namespace}`,
+            "-o", "json",
+        ]),
+    ]);
+    if (podResult.exitCode !== 0) {
+        throw new Error(podResult.stderr);
+    }
+    const pod = JSON.parse(podResult.stdout);
+    const containerStatuses: any[] = pod.status?.containerStatuses ?? [];
+    const initStatuses: any[] = pod.status?.initContainerStatuses ?? [];
+    const containerSpecs: any[] = pod.spec?.containers ?? [];
+    const initSpecs: any[] = pod.spec?.initContainers ?? [];
+
+    const specByName = (specs: any[], name: string) => specs.find((s) => s.name === name);
+
+    const containers: ContainerInfo[] = containerStatuses.map((cs) =>
+        parseContainerInfo(cs, specByName(containerSpecs, cs.name))
+    );
+    const initContainers: ContainerInfo[] = initStatuses.map((cs) =>
+        parseContainerInfo(cs, specByName(initSpecs, cs.name))
+    );
+
+    let events: KubeEvent[] = [];
+    if (eventsResult.exitCode === 0) {
+        const evData = JSON.parse(eventsResult.stdout);
+        events = (evData.items as any[]).map((ev) => ({
+            type: ev.type as "Normal" | "Warning",
+            reason: ev.reason ?? "",
+            message: ev.message ?? "",
+            count: ev.count ?? 1,
+            lastSeen: ev.lastTimestamp ?? ev.eventTime ?? "",
+        }));
+    }
+
+    return {
+        name: pod.metadata.name,
+        namespace: pod.metadata.namespace,
+        phase: (pod.status?.phase as PodPhase) ?? "Unknown",
+        node: pod.spec?.nodeName ?? "",
+        podIP: pod.status?.podIP ?? "",
+        createdAt: pod.metadata.creationTimestamp,
+        labels: pod.metadata.labels ?? {},
+        containers,
+        initContainers,
+        events,
+    };
+}
+
+// Returns detailed information for a single node, including pods scheduled on it.
+export async function getNodeDetail(context: string, name: string): Promise<NodeDetail> {
+    const [nodeResult, podsResult] = await Promise.all([
+        kubectl(["--context", context, "get", "node", name, "-o", "json"]),
+        kubectl(["--context", context, "get", "pods", "-A", `--field-selector=spec.nodeName=${name}`, "-o", "json"]),
+    ]);
+    if (nodeResult.exitCode !== 0) {
+        throw new Error(nodeResult.stderr);
+    }
+    const item = JSON.parse(nodeResult.stdout);
+
+    const rolePattern = /^node-role\.kubernetes\.io\/(.+)$/;
+    let status: NodeStatus = "Unknown";
+    const conditions: NodeCondition[] = [];
+    for (const condition of item.status?.conditions ?? []) {
+        conditions.push({
+            type: condition.type,
+            status: condition.status as "True" | "False" | "Unknown",
+            message: condition.message ?? "",
+            lastTransition: condition.lastTransitionTime ?? "",
+        });
+        if (condition.type === "Ready") {
+            if (condition.status === "True") {
+                status = "Ready";
+            }
+            else if (condition.status === "False") {
+                status = "NotReady";
+            }
+        }
+    }
+    const roles: string[] = [];
+    for (const key of Object.keys(item.metadata?.labels ?? {})) {
+        const match = rolePattern.exec(key);
+        if (match !== null) {
+            roles.push(match[1]!);
+        }
+    }
+    roles.sort();
+
+    const cap = item.status?.capacity ?? {};
+    const alloc = item.status?.allocatable ?? {};
+    const capacity: ResourceAmounts = {
+        cpu: cap.cpu ?? "",
+        memory: cap.memory ?? "",
+        pods: cap.pods ?? "",
+    };
+    const allocatable: ResourceAmounts = {
+        cpu: alloc.cpu ?? "",
+        memory: alloc.memory ?? "",
+        pods: alloc.pods ?? "",
+    };
+
+    const addresses: NodeAddress[] = (item.status?.addresses ?? []).map((a: any) => ({
+        type: a.type,
+        address: a.address,
+    }));
+
+    let pods: Pod[] = [];
+    if (podsResult.exitCode === 0) {
+        const podsData = JSON.parse(podsResult.stdout);
+        pods = (podsData.items as any[]).map((p) => {
+            const phase: PodPhase = (p.status?.phase as PodPhase) ?? "Unknown";
+            const containerStatuses: any[] = p.status?.containerStatuses ?? [];
+            const initStatuses: any[] = p.status?.initContainerStatuses ?? [];
+            const allStatuses = [...containerStatuses, ...initStatuses];
+            const readyCount = containerStatuses.filter((cs) => cs.ready === true).length;
+            const totalCount = containerStatuses.length;
+            const restarts = allStatuses.reduce((sum, cs) => sum + (cs.restartCount ?? 0), 0);
+            return {
+                name: p.metadata.name,
+                namespace: p.metadata.namespace,
+                phase,
+                ready: `${readyCount}/${totalCount}`,
+                restarts,
+                createdAt: p.metadata.creationTimestamp,
+                node: p.spec?.nodeName ?? "",
+            };
+        });
+    }
+
+    return {
+        name: item.metadata.name,
+        status,
+        roles,
+        version: item.status?.nodeInfo?.kubeletVersion ?? "",
+        createdAt: item.metadata.creationTimestamp,
+        conditions,
+        capacity,
+        allocatable,
+        addresses,
+        labels: item.metadata?.labels ?? {},
+        pods,
+    };
+}
+
+// Realistic fake log lines returned when KARSE_FAKE_LOGS=1 is set.
+// Covers common Kubernetes workload log formats so the log viewer can be exercised
+// without a cluster that supports real container log streaming.
+const FAKE_LOG_LINES = [
+    "2024-01-01T00:00:00.000000000Z stdout F 2024/01/01 00:00:00 [notice] 1#1: using the \"epoll\" event method",
+    "2024-01-01T00:00:00.001000000Z stdout F 2024/01/01 00:00:00 [notice] 1#1: nginx/1.25.3",
+    "2024-01-01T00:00:00.002000000Z stdout F 2024/01/01 00:00:00 [notice] 1#1: built by gcc 12.2.0 (Debian 12.2.0-14)",
+    "2024-01-01T00:00:00.003000000Z stdout F 2024/01/01 00:00:00 [notice] 1#1: start worker processes",
+    "2024-01-01T00:00:00.004000000Z stdout F 2024/01/01 00:00:00 [notice] 1#1: start worker process 30",
+    "2024-01-01T00:00:01.000000000Z stdout F 10.244.0.1 - - [01/Jan/2024:00:00:01 +0000] \"GET / HTTP/1.1\" 200 615 \"-\" \"kube-probe/1.29\"",
+    "2024-01-01T00:00:06.000000000Z stdout F 10.244.0.1 - - [01/Jan/2024:00:00:06 +0000] \"GET /healthz HTTP/1.1\" 200 2 \"-\" \"kube-probe/1.29\"",
+    "2024-01-01T00:00:11.000000000Z stdout F 10.244.0.1 - - [01/Jan/2024:00:00:11 +0000] \"GET /readyz HTTP/1.1\" 200 2 \"-\" \"kube-probe/1.29\"",
+    "2024-01-01T00:00:20.000000000Z stdout F 10.244.0.2 - - [01/Jan/2024:00:00:20 +0000] \"GET / HTTP/1.1\" 200 615 \"-\" \"Mozilla/5.0 (X11; Linux x86_64)\"",
+    "2024-01-01T00:00:21.000000000Z stdout F 10.244.0.2 - - [01/Jan/2024:00:00:21 +0000] \"GET /static/main.css HTTP/1.1\" 200 1234 \"/\" \"Mozilla/5.0 (X11; Linux x86_64)\"",
+].join("\n") + "\n";
+
+// Returns the logs for a pod container. Defaults to the last 100 lines.
+// When KARSE_FAKE_LOGS=1 is set, returns pre-defined realistic fake log lines instead
+// of calling kubectl, so the log viewer can be exercised against clusters without
+// real container runtimes (e.g. kwok).
+// When the container has not yet produced any logs (kubectl returns "no logs found"),
+// an empty string is returned rather than throwing, since this is a valid initial state.
+export async function getPodLogs(
+    context: string,
+    namespace: string,
+    name: string,
+    container?: string,
+    tail: number = 100,
+): Promise<string> {
+    if (process.env.KARSE_FAKE_LOGS === "1") {
+        return FAKE_LOG_LINES;
+    }
+    const containerArgs = container ? ["-c", container] : [];
+    const result = await kubectl([
+        "--context", context, "-n", namespace, "logs", name,
+        ...containerArgs, `--tail=${tail}`,
+    ]);
+    if (result.exitCode !== 0) {
+        if (result.stderr.includes("no logs found for container")) {
+            return "";
+        }
+        throw new Error(result.stderr);
+    }
+    return result.stdout;
 }
 
 // Returns aggregate cluster statistics (version + node/namespace/pod counts).

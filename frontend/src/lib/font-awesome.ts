@@ -8,6 +8,9 @@ import {
     faServer,
     faLayerGroup,
     faCube,
+    faCubes,
+    faDatabase,
+    faSitemap,
     faDharmachakra,
     faRotate,
     faSort,
@@ -20,6 +23,10 @@ import {
     faChevronLeft,
     faChevronRight,
     faLink,
+    faArrowLeft,
+    faTerminal,
+    faTag,
+    faTriangleExclamation,
 } from "@fortawesome/free-solid-svg-icons";
 
 config.autoAddCss = false;
@@ -32,6 +39,9 @@ library.add(
     faServer,
     faLayerGroup,
     faCube,
+    faCubes,
+    faDatabase,
+    faSitemap,
     faDharmachakra,
     faRotate,
     faSort,
@@ -43,5 +53,9 @@ library.add(
     faCircleHalfStroke,
     faChevronLeft,
     faChevronRight,
-    faLink
+    faLink,
+    faArrowLeft,
+    faTerminal,
+    faTag,
+    faTriangleExclamation,
 );

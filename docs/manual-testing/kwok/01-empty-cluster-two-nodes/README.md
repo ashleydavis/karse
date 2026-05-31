@@ -18,7 +18,7 @@ An otherwise-empty cluster with two worker nodes. Useful as a baseline to confir
 ## What to check
 
 - **Overview tiles**: node count shows `2`, pod count and namespace count reflect only the system namespaces KWOK creates (typically `default`, `kube-system`, `kube-public`, `kube-node-lease`).
-- **Nodes table**: two rows, `fake-node-1` and `fake-node-2`, both with role `worker` and a green Ready chip.
+- **Nodes table**: two rows, `fake-node-1` and `fake-node-2`, both with role `worker` and a green Ready chip. Click either row to navigate to the node detail page; confirm the node name, Ready chip, capacity vs allocatable table, and conditions are shown.
 - **Namespaces**: the namespace picker lists the system namespaces only.
 - **Pods page**: no user pods; the empty state renders correctly.
 

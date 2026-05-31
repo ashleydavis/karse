@@ -1,5 +1,9 @@
 import axios from "axios";
-import type { ContextsResponse, ClusterOverview, Node, NamespacesResponse, PodsResponse } from "karse-types";
+import type {
+    ContextsResponse, ClusterOverview, Node, NamespacesResponse, PodsResponse,
+    DeploymentsResponse, StatefulSetsResponse, DaemonSetsResponse,
+    PodDetail, NodeDetail,
+} from "karse-types";
 
 const http = axios.create({ baseURL: "/api", headers: { "Content-Type": "application/json" } });
 
@@ -50,5 +54,61 @@ export async function fetchPods(context: string, namespace?: string): Promise<Po
         params.namespace = namespace;
     }
     const response = await http.get<PodsResponse>("/pods", { params });
+    return response.data;
+}
+
+// Fetches deployments for the given context, optionally scoped to a namespace.
+export async function fetchDeployments(context: string, namespace?: string): Promise<DeploymentsResponse> {
+    const params: Record<string, string> = { context };
+    if (namespace) {
+        params.namespace = namespace;
+    }
+    const response = await http.get<DeploymentsResponse>("/deployments", { params });
+    return response.data;
+}
+
+// Fetches stateful sets for the given context, optionally scoped to a namespace.
+export async function fetchStatefulSets(context: string, namespace?: string): Promise<StatefulSetsResponse> {
+    const params: Record<string, string> = { context };
+    if (namespace) {
+        params.namespace = namespace;
+    }
+    const response = await http.get<StatefulSetsResponse>("/statefulsets", { params });
+    return response.data;
+}
+
+// Fetches daemon sets for the given context, optionally scoped to a namespace.
+export async function fetchDaemonSets(context: string, namespace?: string): Promise<DaemonSetsResponse> {
+    const params: Record<string, string> = { context };
+    if (namespace) {
+        params.namespace = namespace;
+    }
+    const response = await http.get<DaemonSetsResponse>("/daemonsets", { params });
+    return response.data;
+}
+
+// Fetches the full detail for a single pod including containers and events.
+export async function fetchPodDetail(context: string, namespace: string, name: string): Promise<PodDetail> {
+    const response = await http.get<PodDetail>(`/pods/${namespace}/${name}`, { params: { context } });
+    return response.data;
+}
+
+// Fetches the tail of a pod container's logs. Defaults to the last 100 lines.
+export async function fetchPodLogs(
+    context: string,
+    namespace: string,
+    name: string,
+    container?: string,
+    tail: number = 100,
+): Promise<{ logs: string }> {
+    const params: Record<string, string | number> = { context, tail };
+    if (container) params.container = container;
+    const response = await http.get<{ logs: string }>(`/pods/${namespace}/${name}/logs`, { params });
+    return response.data;
+}
+
+// Fetches the full detail for a single node including conditions, capacity, and scheduled pods.
+export async function fetchNodeDetail(context: string, name: string): Promise<NodeDetail> {
+    const response = await http.get<NodeDetail>(`/nodes/${name}`, { params: { context } });
     return response.data;
 }

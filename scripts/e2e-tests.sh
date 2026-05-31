@@ -13,7 +13,7 @@ PREV_CONTEXT=""
 
 cleanup() {
     [[ -n "$FRONTEND_PID" ]] && kill "$FRONTEND_PID" 2>/dev/null || true
-    [[ -n "$BACKEND_PID" ]] && kill "$BACKEND_PID" 2>/dev/null || true
+    [[ -n "$BACKEND_PID" ]]  && kill "$BACKEND_PID"  2>/dev/null || true
     kwokctl delete cluster --name "$KWOK_CLUSTER_1" 2>/dev/null || true
     kwokctl delete cluster --name "$KWOK_CLUSTER_2" 2>/dev/null || true
     [[ -n "$PREV_CONTEXT" ]] && kubectl config use-context "$PREV_CONTEXT" 2>/dev/null || true
@@ -102,27 +102,15 @@ kubectl config use-context "kwok-$KWOK_CLUSTER_1"
 
 # ── Backend ───────────────────────────────────────────────────────────────────
 echo "--- Starting backend ---"
-(cd backend && bun src/index.ts) &
+(cd backend && KARSE_FAKE_LOGS=1 bun src/index.ts) 2>/dev/null &
 BACKEND_PID=$!
-
-TRIES=0
-until curl -fsS http://127.0.0.1:5172/api/contexts >/dev/null 2>&1; do
-    TRIES=$((TRIES+1))
-    [[ $TRIES -ge 100 ]] && { echo "Backend did not start within 10s" >&2; exit 1; }
-    sleep 0.1
-done
+bunx wait-on http://127.0.0.1:5172/api/contexts --timeout 10000
 
 # ── Frontend ──────────────────────────────────────────────────────────────────
 echo "--- Starting frontend dev server ---"
-(cd frontend && KARSE_NO_OPEN=1 bun run dev) &
+(cd frontend && KARSE_NO_OPEN=1 bun run dev) 2>/dev/null &
 FRONTEND_PID=$!
-
-TRIES=0
-until curl -fsS http://localhost:5173 >/dev/null 2>&1; do
-    TRIES=$((TRIES+1))
-    [[ $TRIES -ge 600 ]] && { echo "Frontend did not start within 60s" >&2; exit 1; }
-    sleep 0.1
-done
+bunx wait-on http://localhost:5173 --timeout 60000
 
 # ── E2E tests ─────────────────────────────────────────────────────────────────
 echo "--- Running e2e tests ---"

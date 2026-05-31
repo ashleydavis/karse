@@ -17,7 +17,7 @@ A cluster with one pod in `namespace-a` and one pod in `namespace-b`. Exercises 
 
 ## What to check
 
-- **Pods page with `namespace-a` selected**: only `pod-a` appears.
+- **Pods page with `namespace-a` selected**: only `pod-a` appears. Click the row to confirm navigation to the pod detail page at `/pods/namespace-a/pod-a`.
 - **Pods page with `namespace-b` selected**: only `pod-b` appears.
 - **Namespace picker**: `namespace-a` and `namespace-b` appear alongside the system namespaces.
 - **Overview tiles**: pod count shows `2`.

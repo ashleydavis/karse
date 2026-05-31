@@ -181,7 +181,7 @@ Font Awesome via `@fortawesome/react-fontawesome`. Register icons in `src/lib/fo
 
 Every backend non-React TypeScript module has unit tests under `backend/src/tests/` mirroring the source tree. The sole exception is `index.ts` (pure bootstrap wiring, covered by `scripts/smoke-tests.sh`).
 
-The frontend is not unit-tested at all per project policy, including `frontend/src/lib/*.ts` modules. Frontend behaviour is exercised by the Playwright e2e suite (`bun run e2e`) and by `scripts/smoke-tests.sh`. The manual checklist in [docs/e2e-testing.md](docs/e2e-testing.md) remains useful for exploratory testing.
+The frontend is not unit-tested at all per project policy, including `frontend/src/lib/*.ts` modules. Frontend behaviour is exercised by the Playwright e2e suite (`bun run e2e`) and by `scripts/smoke-tests.sh`. The manual testing scenarios under `docs/manual-testing/` are useful for exploratory testing.
 
 Tests must:
 
@@ -218,6 +218,6 @@ Every kubectl call is logged to `logs/<YYYY>/<MM>/<DD>/<HH>.log` at the repo roo
 
 - [docs/architecture.md](docs/architecture.md): system layers, module seams, local-only threat model.
 - [docs/api.md](docs/api.md): every HTTP endpoint with request/response shapes and curl examples.
-- [docs/e2e-testing.md](docs/e2e-testing.md): manual end-to-end test checklist and companion to `scripts/smoke-tests.sh`.
+- [docs/manual-testing/](docs/manual-testing/): manual testing scenarios using KWOK to simulate clusters.
 - [docs/audit-log.md](docs/audit-log.md): audit log format, path, and retention.
 - [docs/roadmap.md](docs/roadmap.md): upcoming features and what has shipped.

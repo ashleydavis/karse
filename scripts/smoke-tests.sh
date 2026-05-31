@@ -46,19 +46,31 @@ EOF
 
 kubectl wait --for=condition=Ready node/fake-node-1 node/fake-node-2 --timeout=30s
 
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: default
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: smoke-pod
+  namespace: default
+spec:
+  nodeName: fake-node-1
+  automountServiceAccountToken: false
+  containers:
+  - name: nginx
+    image: nginx:latest
+EOF
+
 echo "--- Starting backend ---"
-(cd backend && bun src/index.ts) &
+(cd backend && KARSE_FAKE_LOGS=1 bun src/index.ts) &
 BACKEND_PID=$!
 
-TRIES=0
-until curl -fsS http://127.0.0.1:5172/api/contexts >/dev/null 2>&1; do
-    TRIES=$((TRIES + 1))
-    if [[ $TRIES -ge 50 ]]; then
-        echo "Backend did not start within 5 seconds" >&2
-        exit 1
-    fi
-    sleep 0.1
-done
+bunx wait-on http://127.0.0.1:5172/api/contexts --timeout 10000
 
 echo "--- GET /api/contexts ---"
 CONTEXTS_RESP=$(curl -fsS http://127.0.0.1:5172/api/contexts)
@@ -94,6 +106,48 @@ echo "--- GET /api/pods (namespace scoped) ---"
 curl -fsS "http://127.0.0.1:5172/api/pods?context=$CURRENT_CTX&namespace=default" \
     | jq -e 'has("pods")' \
     > /dev/null
+echo "OK"
+
+echo "--- GET /api/deployments ---"
+curl -fsS "http://127.0.0.1:5172/api/deployments?context=$CURRENT_CTX" \
+    | jq -e 'has("deployments")' \
+    > /dev/null
+echo "OK"
+
+echo "--- GET /api/statefulsets ---"
+curl -fsS "http://127.0.0.1:5172/api/statefulsets?context=$CURRENT_CTX" \
+    | jq -e 'has("statefulSets")' \
+    > /dev/null
+echo "OK"
+
+echo "--- GET /api/daemonsets ---"
+curl -fsS "http://127.0.0.1:5172/api/daemonsets?context=$CURRENT_CTX" \
+    | jq -e 'has("daemonSets")' \
+    > /dev/null
+echo "OK"
+
+echo "--- GET /api/nodes/:name ---"
+FIRST_NODE=$(curl -fsS "http://127.0.0.1:5172/api/cluster/nodes?context=$CURRENT_CTX" | jq -r '.nodes[0].name')
+if [[ -n "$FIRST_NODE" && "$FIRST_NODE" != "null" ]]; then
+    curl -fsS "http://127.0.0.1:5172/api/nodes/$FIRST_NODE?context=$CURRENT_CTX" \
+        | jq -e 'has("name") and has("conditions") and has("capacity")' \
+        > /dev/null
+    echo "OK"
+else
+    echo "SKIP (no nodes)"
+fi
+
+echo "--- GET /api/pods/:namespace/:name ---"
+curl -fsS "http://127.0.0.1:5172/api/pods/default/smoke-pod?context=$CURRENT_CTX" \
+    | jq -e 'has("containers") and has("events")' \
+    > /dev/null
+echo "OK"
+
+echo "--- GET /api/pods/:namespace/:name/logs ---"
+# KARSE_FAKE_LOGS=1 is set, so the backend returns realistic fake log lines.
+LOGS_RESP=$(curl -fsS "http://127.0.0.1:5172/api/pods/default/smoke-pod/logs?context=$CURRENT_CTX&container=nginx")
+echo "$LOGS_RESP" | jq -e 'has("logs") and (.logs | type == "string") and (.logs | length > 0)' > /dev/null
+echo "$LOGS_RESP" | jq -r '.logs' | grep -q "kube-probe"
 echo "OK"
 
 echo "--- POST /api/namespaces/default (set) ---"

@@ -8,14 +8,22 @@ import { useKubeNamespace } from "../lib/kube-namespace";
 import { useConfig } from "../lib/config";
 import { ContextPicker } from "./context-picker";
 
-// Maps route paths to their display titles shown in the header.
-const PAGE_TITLES: Record<string, string> = {
-    "/": "Cluster",
-    "/nodes": "Nodes",
-    "/pods": "Pods",
-    "/namespaces": "Namespaces",
-    "/contexts": "Contexts",
-};
+function getPageTitle(pathname: string): string {
+    if (pathname === "/" || pathname === "/cluster") return "Cluster";
+    if (pathname === "/nodes") return "Nodes";
+    if (pathname.startsWith("/nodes/")) return "Node";
+    if (pathname === "/pods") return "Pods";
+    if (pathname.startsWith("/pods/")) return "Pod";
+    if (pathname === "/namespaces") return "Namespaces";
+    if (pathname === "/contexts") return "Contexts";
+    if (pathname === "/deployments") return "Deployments";
+    if (pathname.startsWith("/deployments/")) return "Deployment";
+    if (pathname === "/statefulsets") return "StatefulSets";
+    if (pathname.startsWith("/statefulsets/")) return "StatefulSet";
+    if (pathname === "/daemonsets") return "DaemonSets";
+    if (pathname.startsWith("/daemonsets/")) return "DaemonSet";
+    return "Karse";
+}
 
 type Props = {
     onOpenContextPicker: () => void;
@@ -30,7 +38,7 @@ export function Header({ onOpenContextPicker, onOpenNamespacePicker }: Props) {
     const { pathname } = useLocation();
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
 
-    const pageTitle = PAGE_TITLES[pathname] ?? "Karse";
+    const pageTitle = getPageTitle(pathname);
 
     const colorModeIcon = colorMode === "dark" ? "sun" : colorMode === "light" ? "moon" : "circle-half-stroke";
 

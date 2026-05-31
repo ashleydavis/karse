@@ -11,6 +11,13 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
    - Page
    - Resource
    - etc
+- The pickers should drop down from the nav bar rather than being modals.
+- Live Logs for all pods like stern. Type a filter to restrict logs to pods matching a wild card. Drop down to select namespaces, pods, deployments, etc to stream logs from.
+- Why do the tables in some pages have the hover effect but not others? It's not consistent UX.
+- Live pod logs
+- Needs an event log
+- For testing need to run be/fe on next random unallocated port to avoid conflicts.
+- setGlobalMutation seems like a kludge.
 
 ## Requirements
 
@@ -50,7 +57,6 @@ The guide files under `docs/`:
 
 - [`architecture.md`](docs/architecture.md): system layers, the read-only kubectl invariant, the local-only threat model, and how failures surface.
 - [`api.md`](docs/api.md): every HTTP endpoint with request/response types, status codes, and curl examples.
-- [`e2e-testing.md`](docs/e2e-testing.md): manual end-to-end test guide and companion to `scripts/smoke-tests.sh`.
 - [`user-guide.md`](docs/user-guide.md): end-user tour of the cluster home page.
 - [`audit-log.md`](docs/audit-log.md): what Karse logs, where, in what format, and for how long.
 - [`security.md`](docs/security.md): safety and security Q&A (read-only invariant, network exposure, accepted risks).

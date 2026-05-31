@@ -37,7 +37,7 @@ test.describe("karse e2e", () => {
 
     // Navigate and wait for the initial network activity to settle.
     async function navigateTo(): Promise<void> {
-        await page.goto("/", { waitUntil: "networkidle" });
+        await page.goto("/cluster", { waitUntil: "networkidle" });
     }
 
     // Navigate to the nodes page and wait for at least one row to appear.
@@ -364,12 +364,13 @@ test.describe("karse e2e", () => {
             setContext(CLUSTER_1);
         });
 
-        test("shows 'Select a context to see cluster overview' message", async () => {
-            await expect(page.locator("[data-test-id='no-context-message']")).toContainText("Select a context");
+        test("redirects to /contexts when no context is selected", async () => {
+            await expect(page).toHaveURL(/\/contexts/);
         });
 
-        test("nodes table is not rendered when there is no current context", async () => {
-            await expect(page.locator("[data-test-id='nodes-table']")).toHaveCount(0);
+        test("contexts page shows no active context chip", async () => {
+            const activeChips = page.locator(".MuiChip-root", { hasText: "active" });
+            await expect(activeChips).toHaveCount(0);
         });
     });
 
@@ -400,7 +401,7 @@ test.describe("karse e2e", () => {
 
         test("karse title link navigates back to home", async () => {
             await page.locator("[data-test-id='karse-title']").click();
-            await expect(page).toHaveURL(/\/$/);
+            await expect(page).toHaveURL(/\/cluster/);
             await expect(page.locator("[data-test-id='stat-tiles']")).toBeVisible();
         });
 
@@ -412,7 +413,7 @@ test.describe("karse e2e", () => {
             await page.locator("[aria-label='pods']").click();
             await expect(page).toHaveURL(/\/pods/);
             await page.locator("[data-test-id='karse-title']").click();
-            await expect(page).toHaveURL(/\/$/);
+            await expect(page).toHaveURL(/\/cluster/);
         });
     });
 
@@ -530,10 +531,10 @@ test.describe("karse e2e", () => {
             await expect(list.locator("button", { hasText: "Clear default" }).first()).toBeVisible();
         });
 
-        test("namespaces page shows prompt when no context is selected", async () => {
+        test("namespaces page redirects to /contexts when no context is selected", async () => {
             unsetContext();
             await page.goto("/namespaces", { waitUntil: "networkidle" });
-            await expect(page.locator("text=Select a context to view namespaces")).toBeVisible();
+            await expect(page).toHaveURL(/\/contexts/);
             setContext(CLUSTER_1);
         });
     });
@@ -668,6 +669,408 @@ test.describe("karse e2e", () => {
 
     });
 
+    // ── Workloads pages ───────────────────────────────────────────────────────
+
+    test.describe("deployments page", () => {
+        const FAKE_DEPLOYMENTS = {
+            deployments: [
+                {
+                    name: "nginx",
+                    namespace: "default",
+                    ready: "2/2",
+                    upToDate: 2,
+                    available: 2,
+                    createdAt: new Date().toISOString(),
+                },
+            ],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/deployments*", async (route) => {
+                await route.fulfill({
+                json: FAKE_DEPLOYMENTS,
+            });
+            });
+            await page.goto("/deployments", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='deployments-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/deployments*");
+        });
+
+        test("shows page title Deployments", async () => {
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Deployments");
+        });
+
+        test("has column headers Name, Namespace, Ready, Up-to-date, Available, Age", async () => {
+            const table = page.locator("[data-test-id='deployments-table']");
+            for (const col of ["Name", "Namespace", "Ready", "Up-to-date", "Available", "Age"]) {
+                await expect(table.getByRole("columnheader", { name: col, exact: true })).toBeVisible();
+            }
+        });
+
+        test("shows a row for the fake deployment", async () => {
+            await expect(page.locator("[data-test-id='deployment-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='deployment-row'] td:first-child")).toHaveText("nginx");
+        });
+
+        test("search filters deployment rows", async () => {
+            await page.locator("[data-test-id='deployments-search'] input").fill("zzznotfound");
+            await expect(page.locator("[data-test-id='no-deployments-match']")).toBeVisible();
+            await page.locator("[data-test-id='deployments-search'] input").fill("");
+        });
+
+        test("clicking a deployment row navigates to its detail URL", async () => {
+            await page.locator("[data-test-id='deployment-row']").click();
+            await expect(page).toHaveURL(/\/deployments\/default\/nginx/);
+            await page.goto("/deployments", { waitUntil: "networkidle" });
+        });
+    });
+
+    test.describe("stateful sets page", () => {
+        const FAKE_STATEFULSETS = {
+            statefulSets: [
+                {
+                    name: "postgres",
+                    namespace: "default",
+                    ready: "1/1",
+                    createdAt: new Date().toISOString(),
+                },
+            ],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/statefulsets*", async (route) => {
+                await route.fulfill({
+                json: FAKE_STATEFULSETS,
+            });
+            });
+            await page.goto("/statefulsets", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='statefulsets-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/statefulsets*");
+        });
+
+        test("shows page title StatefulSets", async () => {
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("StatefulSets");
+        });
+
+        test("shows a row for the fake stateful set", async () => {
+            await expect(page.locator("[data-test-id='statefulset-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='statefulset-row'] td:first-child")).toHaveText("postgres");
+        });
+
+        test("clicking a stateful set row navigates to its detail URL", async () => {
+            await page.locator("[data-test-id='statefulset-row']").click();
+            await expect(page).toHaveURL(/\/statefulsets\/default\/postgres/);
+            await page.goto("/statefulsets", { waitUntil: "networkidle" });
+        });
+    });
+
+    test.describe("daemon sets page", () => {
+        const FAKE_DAEMONSETS = {
+            daemonSets: [
+                {
+                    name: "fluentd",
+                    namespace: "kube-system",
+                    desired: 2,
+                    current: 2,
+                    ready: 2,
+                    upToDate: 2,
+                    available: 2,
+                    createdAt: new Date().toISOString(),
+                },
+            ],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/daemonsets*", async (route) => {
+                await route.fulfill({
+                json: FAKE_DAEMONSETS,
+            });
+            });
+            await page.goto("/daemonsets", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='daemonsets-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/daemonsets*");
+        });
+
+        test("shows page title DaemonSets", async () => {
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("DaemonSets");
+        });
+
+        test("shows a row for the fake daemon set", async () => {
+            await expect(page.locator("[data-test-id='daemonset-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='daemonset-row'] td:first-child")).toHaveText("fluentd");
+        });
+
+        test("clicking a daemon set row navigates to its detail URL", async () => {
+            await page.locator("[data-test-id='daemonset-row']").click();
+            await expect(page).toHaveURL(/\/daemonsets\/kube-system\/fluentd/);
+            await page.goto("/daemonsets", { waitUntil: "networkidle" });
+        });
+    });
+
+    // ── Clickable rows ────────────────────────────────────────────────────────
+
+    test.describe("clickable node rows", () => {
+        const FAKE_NODE_DETAIL = {
+            name: "node-cp",
+            status: "Ready",
+            roles: ["control-plane"],
+            version: "v1.29.0",
+            createdAt: new Date().toISOString(),
+            conditions: [],
+            capacity: { cpu: "4", memory: "8Gi", pods: "110" },
+            allocatable: { cpu: "3900m", memory: "7Gi", pods: "110" },
+            addresses: [],
+            labels: {},
+            pods: [],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/nodes/node-cp*", async (route) => {
+                await route.fulfill({
+                json: FAKE_NODE_DETAIL,
+            });
+            });
+            await page.goto("/nodes", { waitUntil: "networkidle" });
+            await waitForNodeRows();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/nodes/node-cp*");
+        });
+
+        test("clicking a node row navigates to its detail page", async () => {
+            await page.locator("[data-test-id='node-row']").filter({ hasText: "node-cp" }).click();
+            await expect(page).toHaveURL(/\/nodes\/node-cp/);
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Node");
+        });
+    });
+
+    // ── Pod detail page ───────────────────────────────────────────────────────
+
+    test.describe("pod detail page", () => {
+        const FAKE_POD_DETAIL = {
+            name: "nginx-abc",
+            namespace: "default",
+            phase: "Running",
+            node: "node-worker",
+            podIP: "10.0.0.1",
+            createdAt: new Date().toISOString(),
+            labels: { app: "nginx" },
+            containers: [
+                {
+                    name: "nginx",
+                    image: "nginx:latest",
+                    ready: true,
+                    restarts: 0,
+                    state: "Running",
+                    stateReason: "",
+                },
+                {
+                    name: "sidecar",
+                    image: "busybox:latest",
+                    ready: true,
+                    restarts: 0,
+                    state: "Running",
+                    stateReason: "",
+                },
+            ],
+            initContainers: [],
+            events: [
+                {
+                    type: "Normal",
+                    reason: "Pulled",
+                    message: "Successfully pulled image",
+                    count: 1,
+                    lastSeen: new Date().toISOString(),
+                },
+            ],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods/default/nginx-abc*", async (route) => {
+                await route.fulfill({
+                    json: FAKE_POD_DETAIL,
+                });
+            });
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods/default/nginx-abc*");
+        });
+
+        test("shows page title Pod", async () => {
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Pod");
+        });
+
+        test("shows the pod name as heading", async () => {
+            await expect(page.getByRole("heading", { name: "nginx-abc" })).toBeVisible();
+        });
+
+        test("shows Running status chip", async () => {
+            await expect(page.locator(".MuiChip-label", { hasText: "Running" }).first()).toBeVisible();
+        });
+
+        test("shows both containers in the containers table", async () => {
+            const names = await page.locator("[data-test-id='container-row'] td:first-child").allTextContents();
+            expect(names).toContain("nginx");
+            expect(names).toContain("sidecar");
+        });
+
+        test("shows the event in the events table", async () => {
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(1);
+        });
+
+        test("show logs button reveals the log viewer with realistic log content", async () => {
+            await page.locator("button", { hasText: "Show logs" }).click();
+            await expect(page.locator("[data-test-id='log-viewer']")).toBeVisible();
+            await expect(page.locator("[data-test-id='log-viewer']")).toContainText("kube-probe/1.29");
+            await expect(page.locator("[data-test-id='log-viewer']")).toContainText("start worker processes");
+        });
+
+        test("container selector is visible and lists both containers", async () => {
+            await expect(page.locator("[data-test-id='log-viewer']")).toBeVisible();
+            await expect(page.locator("[data-test-id='log-container-select']")).toBeVisible();
+            await page.locator("[data-test-id='log-container-select'] [role='combobox']").click();
+            const options = await page.locator("[data-test-id='log-container-option']").allTextContents();
+            expect(options).toContain("nginx");
+            expect(options).toContain("sidecar");
+            await page.keyboard.press("Escape");
+        });
+
+        test("switching container fires a new logs request with the correct container param", async () => {
+            const requestPromise = page.waitForRequest((req) => req.url().includes("/logs") && req.url().includes("container=sidecar"));
+            await page.locator("[data-test-id='log-container-select'] [role='combobox']").click();
+            await page.locator("[data-test-id='log-container-option']").filter({ hasText: "sidecar" }).click();
+            await requestPromise;
+        });
+
+        test("changing tail lines fires a new logs request with the correct tail param", async () => {
+            const requestPromise = page.waitForRequest((req) => req.url().includes("/logs") && req.url().includes("tail=50"));
+            await page.locator("[data-test-id='log-tail-select'] [role='combobox']").click();
+            await page.locator("[data-test-id='log-tail-option']").filter({ hasText: /^50$/ }).click();
+            await requestPromise;
+        });
+
+        test("refresh button fires a new logs request", async () => {
+            const requestPromise = page.waitForRequest((req) => req.url().includes("/logs"));
+            await page.locator("[data-test-id='log-refresh']").click();
+            await requestPromise;
+        });
+    });
+
+    // ── Node detail page ──────────────────────────────────────────────────────
+
+    test.describe("node detail page", () => {
+        const FAKE_NODE_DETAIL = {
+            name: "node-cp",
+            status: "Ready",
+            roles: ["control-plane"],
+            version: "v1.29.0",
+            createdAt: new Date().toISOString(),
+            conditions: [
+                {
+                    type: "Ready",
+                    status: "True",
+                    message: "kubelet is posting ready status",
+                    lastTransition: new Date().toISOString(),
+                },
+            ],
+            capacity: { cpu: "4", memory: "8Gi", pods: "110" },
+            allocatable: { cpu: "3900m", memory: "7Gi", pods: "110" },
+            addresses: [{ type: "InternalIP", address: "192.168.1.1" }],
+            labels: { "kubernetes.io/hostname": "node-cp" },
+            pods: [
+                {
+                    name: "coredns-abc",
+                    namespace: "kube-system",
+                    phase: "Running",
+                    ready: "1/1",
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-cp",
+                },
+            ],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/nodes/node-cp*", async (route) => {
+                await route.fulfill({
+                json: FAKE_NODE_DETAIL,
+            });
+            });
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/nodes/node-cp*");
+        });
+
+        test("shows page title Node", async () => {
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Node");
+        });
+
+        test("shows the node name as heading", async () => {
+            await expect(page.getByRole("heading", { name: "node-cp" })).toBeVisible();
+        });
+
+        test("shows Ready status chip", async () => {
+            await expect(page.locator(".MuiChip-label", { hasText: "Ready" }).first()).toBeVisible();
+        });
+
+        test("shows the Ready condition in the conditions table", async () => {
+            await expect(page.locator("[data-test-id='condition-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='condition-row'] td:first-child")).toHaveText("Ready");
+        });
+
+        test("shows cpu, memory, pods rows in capacity table", async () => {
+            await expect(page.getByRole("cell", { name: "cpu" })).toBeVisible();
+            await expect(page.getByRole("cell", { name: "memory" })).toBeVisible();
+            await expect(page.getByRole("cell", { name: "pods" })).toBeVisible();
+        });
+
+        test("shows the scheduled pod in the pods table", async () => {
+            await expect(page.locator("[data-test-id='node-pod-row'] td:first-child")).toHaveText("coredns-abc");
+        });
+
+        test("clicking a pod row in node detail navigates to pod detail", async () => {
+            await page.route("**/api/pods/kube-system/coredns-abc*", async (route) => {
+                await route.fulfill({
+                    json: {
+                        name: "coredns-abc",
+                        namespace: "kube-system",
+                        phase: "Running",
+                        node: "node-cp",
+                        podIP: "10.0.0.2",
+                        createdAt: new Date().toISOString(),
+                        labels: {},
+                        containers: [],
+                        initContainers: [],
+                        events: [],
+                    },
+                });
+            });
+            await page.locator("[data-test-id='node-pod-row']").click();
+            await expect(page).toHaveURL(/\/pods\/kube-system\/coredns-abc/);
+            await page.unroute("**/api/pods/kube-system/coredns-abc*");
+        });
+    });
+
     // ── Pods page ─────────────────────────────────────────────────────────────
 
     test.describe("pods page", () => {
@@ -751,10 +1154,10 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
         });
 
-        test("shows prompt when no context is selected", async () => {
+        test("redirects to /contexts when no context is selected", async () => {
             unsetContext();
             await page.goto("/pods", { waitUntil: "networkidle" });
-            await expect(page.locator("text=Select a context to view pods")).toBeVisible();
+            await expect(page).toHaveURL(/\/contexts/);
             setContext(CLUSTER_1);
             await interceptPods();
             await page.goto("/pods", { waitUntil: "networkidle" });

@@ -1,5 +1,7 @@
 # Karse project guidance
 
+- **Every commit in this repo was made by Claude.** Do not disclaim ownership of any code in this repo. If something is wrong, broken, or poorly written, own it and fix it.
+
 - **Important: Prefer official scripts defined in the root `package.json`.** Never use a raw command (e.g. `tsc`, `jest`, `npx`, `vite`, `playwright`) when an official script already covers that task. If no official script exists for a task, other commands are acceptable.
 
 - **Purpose**: a local-only Kubernetes dashboard wrapping the locally-installed `kubectl` binary. Read-only cluster information plus context switching. Never deployed.
@@ -68,7 +70,7 @@
 
 ## Testing requirement
 
-- **For every new feature or code change, you must: add or update backend unit tests (Jest), add or update smoke tests (`scripts/smoke-tests.sh`), add or update e2e tests (`e2e/src/e2e.test.ts`), update the e2e testing manual (`docs/e2e-testing.md`), and update any affected manual testing scenario READMEs under `docs/manual-testing/`.** No feature is considered done until all five are addressed.
+- For every new feature or code change, you must: add or update backend unit tests (Jest), add or update smoke tests (`scripts/smoke-tests.sh`), add or update e2e tests (`e2e/src/e2e.test.ts`), add to or update the e2e testing manual `docs/manual-testing/`. No feature is done until these tests and documentation have been updated/extended.
 
 ## Testing discipline
 
