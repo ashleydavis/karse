@@ -4,13 +4,13 @@ Each Todo item from `readme.md` was resolved on its own branch by a dedicated su
 
 ## Items and branches
 
-| # | Todo item | Branch | Gates |
-|---|-----------|--------|-------|
+| # | Todo item | Branch | Gates | Status |
+|---|-----------|--------|-------|--------|
 | 1 | See raw YAML for every viewable resource | `feature/raw-yaml-view` | compile/test/smoke green |
 | 2 | Guided commands ("delete this pod" style guidance) | `feature/guided-commands` | compile/test/smoke green |
 | 3 | Multi-container pods (count in list + drill-down) | `feature/multi-container-pods` | compile/test/smoke green |
 | 4 | Pod detail tabs (Detail/Status, Containers, Logs) | `feature/pod-detail-tabs` | compile/test/smoke green |
-| 5 | Auto-load logs on the pod page | `feature/pod-auto-load-logs` | compile/test/smoke green |
+| 5 | Auto-load logs on the pod page | `feature/pod-auto-load-logs` | compile/test/smoke green | Failed |
 | 6 | Filter pods by phase (dropdown with checkboxes) | `feature/pod-phase-filter` | compile/test/smoke green |
 | 7 | Breadcrumbs | `feature/breadcrumbs` | compile/test/smoke green |
 | 8 | Shareable URL state (context/namespace/page/resource) | `feature/shareable-url-state` | compile/test/smoke green |
