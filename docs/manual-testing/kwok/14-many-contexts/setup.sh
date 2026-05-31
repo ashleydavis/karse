@@ -4,7 +4,7 @@ set -euo pipefail
 for i in $(seq 1 5); do
     kwokctl create cluster --name "karse-test-$i" --runtime binary --wait 60s
 
-    KUBECONFIG="$HOME/.kwok/clusters/karse-test-$i/kubeconfig" kubectl apply -f - <<EOF
+    kwokctl --name "karse-test-$i" kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Node
 metadata:

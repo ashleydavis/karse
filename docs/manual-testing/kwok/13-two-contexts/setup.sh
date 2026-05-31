@@ -5,7 +5,7 @@ kwokctl create cluster --name karse-test-1 --runtime binary --wait 60s
 kwokctl create cluster --name karse-test-2 --runtime binary --wait 60s
 
 # Add two nodes to cluster 1
-KUBECONFIG="$HOME/.kwok/clusters/karse-test-1/kubeconfig" kubectl apply -f - <<'EOF'
+kwokctl --name karse-test-1 kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: Node
 metadata:
@@ -30,7 +30,7 @@ spec: {}
 EOF
 
 # Add one node to cluster 2 (distinct shape so the switch is visible)
-KUBECONFIG="$HOME/.kwok/clusters/karse-test-2/kubeconfig" kubectl apply -f - <<'EOF'
+kwokctl --name karse-test-2 kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: Node
 metadata:

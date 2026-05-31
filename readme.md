@@ -4,6 +4,15 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
 
 ## Todo
 
+- Need to see the raw yaml for every resource that can be viewed.
+- It would be great to view commands like "delete this pod".  It can guide the user to do common operations.
+- How does it handler pods with multiple containers?
+   - The pod list should show how many containers the pod has.
+   - Need to be able to drill down into each container.
+- I think each pod will need multiple tabs.
+   - Detail / Status
+   - Containers
+   - Logs
 - Auto load logs when looking at a pod page.
 - Be able to filter pods in the pods list by phase. Drop down with checkboxes.
 - Going to need breadcrumbs here as well.

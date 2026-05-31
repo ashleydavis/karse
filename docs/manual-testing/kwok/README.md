@@ -2,6 +2,12 @@
 
 Manual test scenarios that use KWOK to simulate Kubernetes clusters without a real one. Each scenario has a `setup.sh` and `teardown.sh`.
 
+To tear down every test cluster at once (handy after running several scenarios, or to clean up leftover clusters from an interrupted run), use [`teardown-all.sh`](teardown-all.sh), which deletes all `karse-test*` clusters:
+
+```sh
+./docs/manual-testing/kwok/teardown-all.sh
+```
+
 | # | Scenario |
 |---|----------|
 | [01](01-empty-cluster-two-nodes/) | Empty cluster with two worker nodes |

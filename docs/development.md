@@ -42,6 +42,12 @@ On macOS you can instead use Homebrew, which installs both binaries:
 brew install kwok
 ```
 
+To remove every test cluster at once (after running scenarios, or to clean up leftovers from an interrupted run), use [`docs/manual-testing/kwok/teardown-all.sh`](docs/manual-testing/kwok/teardown-all.sh), which deletes all `karse-test*` clusters:
+
+```sh
+./docs/manual-testing/kwok/teardown-all.sh
+```
+
 ## Setting up
 
 Install all workspace dependencies from the repo root:
