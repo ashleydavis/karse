@@ -17,9 +17,11 @@ This takes a moment as it starts five clusters in sequence.
 
 ## What to check
 
-- **Context picker**: lists all five `kwok-karse-test-N` contexts (plus any pre-existing contexts in your kubeconfig).
-- **Switching**: select each context in turn and confirm the tiles and nodes table update to show that cluster's data.
-- **Picker UX**: with a long list, confirm the picker is still usable (scrollable, searchable, or otherwise navigable).
+- **Contexts page** (`/contexts`): all five `kwok-karse-test-N` contexts appear as rows (plus any pre-existing contexts).
+- **Context quick picker** (link icon or Ctrl+K): all five contexts listed. Type a partial name to filter and confirm only matching rows appear.
+- **Switching**: use the quick picker or Contexts page to select each context in turn. Confirm the overview tiles and nodes table update to show that cluster's data.
+- **Sidebar collapsed**: collapse the sidebar to icon-only mode using the chevron at the bottom. Confirm navigation still works via icon tooltips.
+- **active vs default**: switch active context in the tab to `kwok-karse-test-3` while keeping the terminal default on `kwok-karse-test-1`. Confirm the `active` and `default` chips are on different rows.
 
 ## Teardown
 

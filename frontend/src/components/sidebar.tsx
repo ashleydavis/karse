@@ -40,6 +40,7 @@ export function Sidebar() {
                         variant="subtitle1"
                         component={Link}
                         to="/"
+                        data-test-id="karse-title"
                         sx={{ fontWeight: 700, textDecoration: "none", color: "inherit", letterSpacing: "-0.02em" }}
                     >
                         Karse
@@ -58,6 +59,7 @@ export function Sidebar() {
                                 component={Link}
                                 to={to}
                                 selected={active}
+                                aria-label={label.toLowerCase()}
                                 sx={{
                                     borderRadius: 1.5,
                                     mb: 0.25,

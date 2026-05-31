@@ -114,7 +114,7 @@ done
 
 # ── Frontend ──────────────────────────────────────────────────────────────────
 echo "--- Starting frontend dev server ---"
-(cd frontend && bun run dev) &
+(cd frontend && KARSE_NO_OPEN=1 bun run dev) &
 FRONTEND_PID=$!
 
 TRIES=0

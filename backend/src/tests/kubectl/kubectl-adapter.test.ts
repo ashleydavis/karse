@@ -376,9 +376,14 @@ describe("getClusterOverview", () => {
         const result = await getClusterOverview("test-ctx");
         expect(result).toEqual({
             serverVersion: "v1.30.0",
+            clientVersion: null,
             nodeCount: 3,
+            readyNodeCount: 0,
             namespaceCount: 4,
             podCount: 15,
+            runningPodCount: 0,
+            pendingPodCount: 0,
+            failedPodCount: 0,
         });
     });
 
@@ -656,5 +661,14 @@ describe("setContextNamespace", () => {
             "config set-context ghost --namespace=ns1": () => fail("no such context"),
         });
         await expect(setContextNamespace("ghost", "ns1")).rejects.toThrow("no such context");
+    });
+
+    test("empty namespace runs config unset instead of set-context", async () => {
+        setRunnerHandlers({
+            "config unset contexts.my-ctx.namespace": () => ok(""),
+        });
+        await setContextNamespace("my-ctx", "");
+        expect(run).toHaveBeenCalledTimes(1);
+        expect(run).toHaveBeenCalledWith("kubectl", ["config", "unset", "contexts.my-ctx.namespace"]);
     });
 });

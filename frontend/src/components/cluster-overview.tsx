@@ -38,7 +38,7 @@ function StatTile({ icon, label, value, sublabel, sublabelColor, color, to, test
             </Box>
             <Box sx={{ minWidth: 0 }}>
                 <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1 }}>{value}</Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                <Typography component="p" variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
                     {label}
                 </Typography>
                 {sublabel && (
@@ -129,7 +129,7 @@ export function ClusterOverview() {
 
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <Grid container spacing={2} alignItems="stretch" data-test-id="stat-tiles">
+            <Grid container spacing={2} data-test-id="stat-tiles">
                 <Grid size={3}>
                     <StatTile
                         icon={["fas", "server"]}

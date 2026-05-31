@@ -135,18 +135,18 @@ describe("POST /api/namespaces/default", () => {
         const body = await res.json();
         expect(res.status).toBe(400);
         expect(body).toEqual({
-            error: "namespace must be a non-empty string",
+            error: "namespace must be a string",
         });
         expect(kubectlMocks.setContextNamespace).not.toHaveBeenCalled();
     });
 
-    test("empty namespace returns 400", async () => {
+    test("empty namespace clears the default and returns 200", async () => {
         const res = await post({
             context: "my-ctx",
             namespace: "",
         });
-        expect(res.status).toBe(400);
-        expect(kubectlMocks.setContextNamespace).not.toHaveBeenCalled();
+        expect(res.status).toBe(200);
+        expect(kubectlMocks.setContextNamespace).toHaveBeenCalledWith("my-ctx", "");
     });
 
     test("non-string context returns 400", async () => {

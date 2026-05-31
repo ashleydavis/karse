@@ -84,6 +84,28 @@ curl -fsS "http://127.0.0.1:5172/api/namespaces?context=$CURRENT_CTX" \
     > /dev/null
 echo "OK"
 
+echo "--- POST /api/namespaces/default (set) ---"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+    -H "Content-Type: application/json" \
+    -d "{\"context\": \"$CURRENT_CTX\", \"namespace\": \"default\"}" \
+    http://127.0.0.1:5172/api/namespaces/default)
+if [[ "$HTTP_CODE" != "200" ]]; then
+    echo "Expected HTTP 200 for set namespace, got $HTTP_CODE" >&2
+    exit 1
+fi
+echo "OK"
+
+echo "--- POST /api/namespaces/default (clear) ---"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+    -H "Content-Type: application/json" \
+    -d "{\"context\": \"$CURRENT_CTX\", \"namespace\": \"\"}" \
+    http://127.0.0.1:5172/api/namespaces/default)
+if [[ "$HTTP_CODE" != "200" ]]; then
+    echo "Expected HTTP 200 for clear namespace, got $HTTP_CODE" >&2
+    exit 1
+fi
+echo "OK"
+
 echo "--- POST /api/contexts/current ---"
 CONTEXT_COUNT=$(echo "$CONTEXTS_RESP" | jq '.contexts | length')
 if [[ "$CONTEXT_COUNT" -ge 1 ]]; then
@@ -110,7 +132,9 @@ else
     echo "Empty context name returns 400: OK"
 fi
 
-kill "$BACKEND_PID"
+if [[ -n "$BACKEND_PID" ]] && kill -0 "$BACKEND_PID" 2>/dev/null; then
+    kill "$BACKEND_PID"
+fi
 BACKEND_PID=""
 
 echo "--- Frontend build ---"

@@ -80,9 +80,14 @@ curl -fsS http://127.0.0.1:5172/api/cluster/overview
 ```json
 {
   "serverVersion": "v1.30.0",
+  "clientVersion": "v1.30.0",
   "nodeCount": 3,
+  "readyNodeCount": 2,
   "namespaceCount": 4,
-  "podCount": 15
+  "podCount": 15,
+  "runningPodCount": 12,
+  "pendingPodCount": 1,
+  "failedPodCount": 0
 }
 ```
 
@@ -107,6 +112,83 @@ curl -fsS http://127.0.0.1:5172/api/cluster/nodes
       "roles": ["control-plane"],
       "version": "v1.30.0",
       "createdAt": "2024-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+## GET /api/namespaces
+
+Lists all namespaces in the cluster for the given context.
+
+- **Request query**: `context` (required) — the kubeconfig context name.
+- **Response 200**: `NamespacesResponse` — `{ "namespaces": Namespace[] }`.
+- **Response 400**: `{ "error": "context query parameter is required" }` when `context` is missing or blank.
+- **Response 500**: `{ "error": "<kubectl stderr>" }` when listing namespaces fails.
+
+```sh
+curl -fsS 'http://127.0.0.1:5172/api/namespaces?context=my-ctx'
+```
+
+```json
+{
+  "namespaces": [
+    { "name": "default" },
+    { "name": "kube-system" }
+  ]
+}
+```
+
+## POST /api/namespaces/default
+
+Sets or clears the default namespace for the given context in the local kubeconfig (`kubectl config set-context --namespace=<ns>` or `kubectl config unset contexts.<ctx>.namespace` for empty).
+
+- **Request body**: `{ "context": string, "namespace": string }`. Pass an empty string for `namespace` to clear the default.
+- **Response 200**: `{ "ok": true }`.
+- **Response 400**: `{ "error": "context must be a non-empty string" }` when `context` is missing or blank.
+- **Response 400**: `{ "error": "namespace must be a string" }` when `namespace` is not a string.
+- **Response 500**: `{ "error": "<kubectl stderr>" }` on kubectl failure.
+
+```sh
+# Set default namespace:
+curl -fsS -X POST http://127.0.0.1:5172/api/namespaces/default \
+  -H 'Content-Type: application/json' \
+  -d '{"context":"my-ctx","namespace":"production"}'
+
+# Clear default namespace:
+curl -fsS -X POST http://127.0.0.1:5172/api/namespaces/default \
+  -H 'Content-Type: application/json' \
+  -d '{"context":"my-ctx","namespace":""}'
+```
+
+## GET /api/pods
+
+Lists pods for the given context, optionally scoped to a namespace.
+
+- **Request query**: `context` (required), `namespace` (optional — omit or leave blank for all namespaces).
+- **Response 200**: `PodsResponse` — `{ "pods": Pod[] }`.
+- **Response 400**: `{ "error": "context query parameter is required" }` when `context` is missing or blank.
+- **Response 500**: `{ "error": "<kubectl stderr>" }` when listing pods fails.
+
+```sh
+# All namespaces:
+curl -fsS 'http://127.0.0.1:5172/api/pods?context=my-ctx'
+
+# Scoped to a namespace:
+curl -fsS 'http://127.0.0.1:5172/api/pods?context=my-ctx&namespace=default'
+```
+
+```json
+{
+  "pods": [
+    {
+      "name": "nginx-abc",
+      "namespace": "default",
+      "phase": "Running",
+      "ready": "1/1",
+      "restarts": 0,
+      "createdAt": "2024-01-01T00:00:00Z",
+      "node": "ctrl-0"
     }
   ]
 }

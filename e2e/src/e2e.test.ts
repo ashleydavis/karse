@@ -40,6 +40,12 @@ test.describe("karse e2e", () => {
         await page.goto("/", { waitUntil: "networkidle" });
     }
 
+    // Navigate to the nodes page and wait for at least one row to appear.
+    async function navigateToNodes(): Promise<void> {
+        await page.goto("/nodes", { waitUntil: "networkidle" });
+        await waitForNodeRows();
+    }
+
     // Block until the stat tiles area is populated with data.
     async function waitForStatTiles(): Promise<void> {
         await expect(page.locator("[data-test-id='stat-server-version']")).toBeVisible();
@@ -71,7 +77,7 @@ test.describe("karse e2e", () => {
     // Remove the nodes route override and reload with real cluster data.
     async function clearNodeOverride(): Promise<void> {
         await page.unroute("**/api/cluster/nodes*");
-        await navigateTo();
+        await page.reload({ waitUntil: "networkidle" });
         await waitForNodeRows();
     }
 
@@ -131,8 +137,7 @@ test.describe("karse e2e", () => {
     test.describe("nodes table", () => {
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
-            await navigateTo();
-            await waitForNodeRows();
+            await navigateToNodes();
         });
 
         test("has all five column headers", async () => {
@@ -158,7 +163,7 @@ test.describe("karse e2e", () => {
         // and verify the chip renders correctly.
         test("shows NotReady chip for node-notready", async () => {
             await interceptNotReadyStatus();
-            await navigateTo();
+            await page.reload({ waitUntil: "networkidle" });
             await waitForNodeRows();
 
             const row = page.locator("[data-test-id='node-row']").filter({ hasText: "node-notready" });
@@ -200,8 +205,7 @@ test.describe("karse e2e", () => {
     test.describe("sort", () => {
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
-            await navigateTo();
-            await waitForNodeRows();
+            await navigateToNodes();
         });
 
         test("clicking Name header once sorts rows ascending", async () => {
@@ -220,7 +224,7 @@ test.describe("karse e2e", () => {
         // check Ready-before-NotReady ordering.
         test("clicking Status header sorts Ready rows before NotReady", async () => {
             await interceptNotReadyStatus();
-            await navigateTo();
+            await page.reload({ waitUntil: "networkidle" });
             await waitForNodeRows();
 
             await page.locator("[data-test-id='nodes-table'] thead th").filter({ hasText: "Status" }).click();
@@ -241,8 +245,7 @@ test.describe("karse e2e", () => {
     test.describe("search / filter", () => {
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
-            await navigateTo();
-            await waitForNodeRows();
+            await navigateToNodes();
         });
 
         test("filters rows to those matching the search query", async () => {
@@ -278,6 +281,7 @@ test.describe("karse e2e", () => {
         });
 
         test("clicking refresh triggers a new fetch of nodes", async () => {
+            await navigateToNodes();
             const responsePromise = page.waitForResponse(res => res.url().includes("/api/cluster/nodes"));
             await page.locator("[aria-label='refresh']").click();
             await responsePromise;
@@ -289,8 +293,7 @@ test.describe("karse e2e", () => {
     test.describe("context switch", () => {
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
-            await navigateTo();
-            await waitForNodeRows();
+            await navigateToNodes();
         });
 
         test.afterAll(() => {
@@ -308,10 +311,13 @@ test.describe("karse e2e", () => {
         });
 
         test("stat tiles update to reflect cluster 2 node count of 2", async () => {
+            await page.locator("[data-test-id='karse-title']").click();
+            await waitForStatTiles();
             await expect(page.locator("[data-test-id='stat-nodes'] h5")).toHaveText("2");
         });
 
         test("switching back to cluster 1 restores its nodes", async () => {
+            await page.locator("nav a[href='/nodes']").click();
             await page.locator("[aria-haspopup='listbox']").click();
             await page.locator(`[data-value="${CLUSTER_1}"]`).click();
             await expect(page.locator("[data-test-id='node-row']").filter({ hasText: "node-cp" })).toBeVisible();
@@ -385,6 +391,52 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Contexts page ─────────────────────────────────────────────────────────
+
+    test.describe("contexts page", () => {
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.goto("/contexts", { waitUntil: "networkidle" });
+        });
+
+        test("shows a row for each configured context", async () => {
+            const rows = page.locator("[data-test-id='context-row']");
+            await expect(rows.filter({ hasText: CLUSTER_1 })).toBeVisible();
+            await expect(rows.filter({ hasText: CLUSTER_2 })).toBeVisible();
+        });
+
+        test("shows active chip on the current context", async () => {
+            const activeRow = page.locator("[data-test-id='context-row']").filter({ hasText: CLUSTER_1 });
+            await expect(activeRow.locator(".MuiChip-root", { hasText: "active" })).toBeVisible();
+        });
+
+        test("shows default chip on the terminal default context", async () => {
+            const defaultRow = page.locator("[data-test-id='context-row']").filter({ hasText: CLUSTER_1 });
+            await expect(defaultRow.locator(".MuiChip-root", { hasText: "default" })).toBeVisible();
+        });
+
+        test("Set as active button is disabled for the active context", async () => {
+            const activeRow = page.locator("[data-test-id='context-row']").filter({ hasText: CLUSTER_1 });
+            await expect(activeRow.locator("button", { hasText: "Set as active" })).toBeDisabled();
+        });
+
+        test("Set as active switches the active context", async () => {
+            const cluster2Row = page.locator("[data-test-id='context-row']").filter({ hasText: CLUSTER_2 });
+            await cluster2Row.locator("button", { hasText: "Set as active" }).click();
+            await expect(cluster2Row.locator(".MuiChip-root", { hasText: "active" })).toBeVisible();
+            // Switch back for subsequent tests.
+            const cluster1Row = page.locator("[data-test-id='context-row']").filter({ hasText: CLUSTER_1 });
+            await cluster1Row.locator("button", { hasText: "Set as active" }).click();
+        });
+
+        test("search filters context rows", async () => {
+            await page.locator("[data-test-id='contexts-search'] input").fill(CLUSTER_1);
+            await expect(page.locator("[data-test-id='context-row']").filter({ hasText: CLUSTER_1 })).toBeVisible();
+            await expect(page.locator("[data-test-id='context-row']").filter({ hasText: CLUSTER_2 })).toHaveCount(0);
+            await page.locator("[data-test-id='contexts-search'] input").fill("");
+        });
+    });
+
     // ── Namespaces page ───────────────────────────────────────────────────────
 
     test.describe("namespaces page", () => {
@@ -407,56 +459,50 @@ test.describe("karse e2e", () => {
 
         test("filtering narrows the list to matching namespaces", async () => {
             await page.locator("[data-test-id='namespaces-filter'] input").fill("kube");
-            const names = await page.locator("[data-test-id='namespace-row']").allTextContents();
+            const names = await page.locator("[data-test-id='namespace-row'] td:first-child").allTextContents();
             expect(names.every((n) => n.toLowerCase().includes("kube"))).toBe(true);
-            expect(names.some((n) => n.includes("default"))).toBe(false);
+            expect(names.some((n) => /^default/.test(n))).toBe(false);
         });
 
-        test("shows no-namespaces-found message when filter has no results", async () => {
+        test("shows no-namespaces-match message when filter has no results", async () => {
             await page.locator("[data-test-id='namespaces-filter'] input").fill("zzznotfound");
-            await expect(page.locator("[data-test-id='no-namespaces-found']")).toBeVisible();
+            await expect(page.locator("[data-test-id='no-namespaces-match']")).toBeVisible();
         });
 
         test("clearing the filter restores all namespaces", async () => {
             await page.locator("[data-test-id='namespaces-filter'] input").fill("");
-            await expect(page.locator("[data-test-id='no-namespaces-found']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-namespaces-match']")).toHaveCount(0);
             const count = await page.locator("[data-test-id='namespace-row']").count();
             expect(count).toBeGreaterThan(0);
         });
 
-        test("Z-A sort puts kube-system before default", async () => {
-            await page.locator("text=Z-A").click();
-            const names = await page.locator("[data-test-id='namespace-row']").allTextContents();
-            const defaultIdx = names.findIndex((n) => n.includes("default"));
-            const systemIdx = names.findIndex((n) => n.includes("kube-system"));
-            expect(systemIdx).toBeGreaterThanOrEqual(0);
-            expect(defaultIdx).toBeGreaterThanOrEqual(0);
-            expect(systemIdx).toBeLessThan(defaultIdx);
-        });
-
-        test("A-Z sort puts default before kube-system", async () => {
-            await page.locator("text=A-Z").click();
-            const names = await page.locator("[data-test-id='namespace-row']").allTextContents();
-            const defaultIdx = names.findIndex((n) => n.includes("default"));
+        test("clicking Name header sorts A-Z (default before kube-system)", async () => {
+            await page.locator("[data-test-id='namespaces-list'] thead th").filter({ hasText: "Name" }).click();
+            const names = await page.locator("[data-test-id='namespace-row'] td:first-child").allTextContents();
+            const defaultIdx = names.findIndex((n) => /^default/.test(n));
             const systemIdx = names.findIndex((n) => n.includes("kube-system"));
             expect(defaultIdx).toBeLessThan(systemIdx);
         });
 
-        test("clicking a namespace marks it as the tab-local selection", async () => {
+        test("clicking Name header again sorts Z-A (kube-system before default)", async () => {
+            await page.locator("[data-test-id='namespaces-list'] thead th").filter({ hasText: "Name" }).click();
+            const names = await page.locator("[data-test-id='namespace-row'] td:first-child").allTextContents();
+            const defaultIdx = names.findIndex((n) => /^default/.test(n));
+            const systemIdx = names.findIndex((n) => n.includes("kube-system"));
+            expect(systemIdx).toBeLessThan(defaultIdx);
+        });
+
+        test("Set as active button activates a namespace", async () => {
             const defaultRow = page.locator("[data-test-id='namespace-row']").filter({ hasText: /^default/ });
-            await defaultRow.click();
-            await expect(defaultRow).toHaveClass(/Mui-selected/);
+            await defaultRow.locator("button", { hasText: "Set as active" }).click();
+            await expect(defaultRow.locator(".MuiChip-root", { hasText: "active" })).toBeVisible();
         });
 
-        test("Set terminal default button is shown for each namespace", async () => {
-            await expect(page.locator("[data-test-id='namespaces-list'] button", { hasText: "Set terminal default" }).first()).toBeVisible();
-        });
-
-        test("clicking Set terminal default changes the button label to Terminal default", async () => {
+        test("Set as default button changes to Clear default after clicking", async () => {
             const list = page.locator("[data-test-id='namespaces-list']");
-            const btn = list.locator("button", { hasText: "Set terminal default" }).first();
+            const btn = list.locator("button", { hasText: "Set as default" }).first();
             await btn.click();
-            await expect(list.locator("button", { hasText: "Terminal default" }).first()).toBeVisible();
+            await expect(list.locator("button", { hasText: "Clear default" }).first()).toBeVisible();
         });
 
         test("namespaces page shows prompt when no context is selected", async () => {
