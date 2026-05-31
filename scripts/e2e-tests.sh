@@ -132,7 +132,7 @@ FRONTEND_PID=$!
 
 FRONTEND_PORT=""
 for _ in $(seq 1 600); do
-    FRONTEND_PORT="$(grep -oE 'localhost:[0-9]+' "$FRONTEND_LOG" | head -n1 | cut -d: -f2)"
+    FRONTEND_PORT="$(grep -oE 'localhost:[0-9]+' "$FRONTEND_LOG" | head -n1 | cut -d: -f2 || true)"
     [[ -n "$FRONTEND_PORT" ]] && break
     sleep 0.1
 done
