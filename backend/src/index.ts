@@ -1,12 +1,12 @@
 import { createServer } from "./server";
 import { pruneOldLogs } from "./audit-log";
+import { resolveRequestedPort, listen, reportPort } from "./listen-server";
 
-const port = process.env.KARSE_PORT ?? "5172";
+const requestedPort = resolveRequestedPort();
 const logsDir = process.env.KARSE_LOGS_DIR ?? "../logs";
 
 await pruneOldLogs(logsDir);
 
 const app = createServer();
-app.listen(Number(port), "127.0.0.1", () => {
-    console.log("Karse backend listening on http://127.0.0.1:" + port);
-});
+const { port } = await listen(app, requestedPort, "127.0.0.1");
+await reportPort(port);
