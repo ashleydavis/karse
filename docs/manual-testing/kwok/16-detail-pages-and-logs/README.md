@@ -24,7 +24,7 @@ A cluster with one node and one multi-container pod. Exercises the node detail p
 - The Details card shows roles, version, and age.
 - The Capacity vs Allocatable table shows rows for cpu, memory, and pods.
 - The Conditions table shows at least the Ready condition with a True status.
-- The Pods section lists the `web` pod. Click the pod row and confirm navigation to the pod detail page.
+- The Pods section header shows a count and the table lists only the pods scheduled on this node (the `web` pod), with Name, Namespace, Status, Ready, and Restarts columns. Pods on other nodes must not appear. Click the pod row and confirm navigation to the pod detail page.
 - The back arrow navigates back to `/nodes`.
 
 ### Pod detail page

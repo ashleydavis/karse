@@ -9,6 +9,7 @@ import {
     listNamespaces,
     setContextNamespace,
     listNodes,
+    getNodeDetail,
     getClusterOverview,
     listPods,
     getPodLogs,
@@ -338,6 +339,153 @@ describe("listNodes", () => {
             "--context test-ctx get nodes -o json": () => fail("denied"),
         });
         await expect(listNodes("test-ctx")).rejects.toThrow("denied");
+    });
+});
+
+describe("getNodeDetail", () => {
+    // Argv key for the single-node fetch.
+    const NODE_KEY = "--context test-ctx get node node-1 -o json";
+    // Argv key for the field-selector pod fetch scoped to node-1.
+    const PODS_KEY = "--context test-ctx get pods -A --field-selector=spec.nodeName=node-1 -o json";
+
+    // A minimal node item shape with the fields getNodeDetail reads.
+    function makeNodeItem(): object {
+        return {
+            metadata: {
+                name: "node-1",
+                creationTimestamp: "2024-01-01T00:00:00Z",
+                labels: {
+                    "node-role.kubernetes.io/control-plane": "",
+                    "kubernetes.io/hostname": "node-1",
+                },
+            },
+            status: {
+                conditions: [
+                    {
+                        type: "Ready",
+                        status: "True",
+                        message: "kubelet is posting ready status",
+                        lastTransitionTime: "2024-01-02T00:00:00Z",
+                    },
+                ],
+                capacity: { cpu: "4", memory: "8Gi", pods: "110" },
+                allocatable: { cpu: "3900m", memory: "7Gi", pods: "110" },
+                addresses: [{ type: "InternalIP", address: "192.168.1.1" }],
+                nodeInfo: { kubeletVersion: "v1.29.0" },
+            },
+        };
+    }
+
+    // A minimal pod item shape as returned by the field-selector query.
+    function makePodItem(name: string, namespace: string, nodeName: string): object {
+        return {
+            metadata: {
+                name,
+                namespace,
+                creationTimestamp: "2024-06-01T00:00:00Z",
+            },
+            spec: {
+                nodeName,
+            },
+            status: {
+                phase: "Running",
+                containerStatuses: [
+                    {
+                        ready: true,
+                        restartCount: 0,
+                    },
+                ],
+                initContainerStatuses: [],
+            },
+        };
+    }
+
+    test("uses a field selector scoped to the node when fetching pods", async () => {
+        setRunnerHandlers({
+            [NODE_KEY]: () => ok(JSON.stringify(makeNodeItem())),
+            [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
+        });
+        await getNodeDetail("test-ctx", "node-1");
+        // setRunnerHandlers throws on any unmocked argv, so reaching here proves
+        // the exact field-selector argv was used.
+        expect(run).toHaveBeenCalledWith(
+            "kubectl",
+            ["--context", "test-ctx", "get", "pods", "-A", "--field-selector=spec.nodeName=node-1", "-o", "json"],
+        );
+    });
+
+    test("parses node fields and maps the scheduled pods", async () => {
+        setRunnerHandlers({
+            [NODE_KEY]: () => ok(JSON.stringify(makeNodeItem())),
+            [PODS_KEY]: () => ok(JSON.stringify({
+                items: [
+                    makePodItem("coredns-abc", "kube-system", "node-1"),
+                    makePodItem("web", "default", "node-1"),
+                ],
+            })),
+        });
+        const result = await getNodeDetail("test-ctx", "node-1");
+        expect(result.name).toBe("node-1");
+        expect(result.status).toBe("Ready");
+        expect(result.roles).toEqual(["control-plane"]);
+        expect(result.version).toBe("v1.29.0");
+        expect(result.capacity).toEqual({ cpu: "4", memory: "8Gi", pods: "110" });
+        expect(result.allocatable).toEqual({ cpu: "3900m", memory: "7Gi", pods: "110" });
+        expect(result.conditions).toEqual([
+            {
+                type: "Ready",
+                status: "True",
+                message: "kubelet is posting ready status",
+                lastTransition: "2024-01-02T00:00:00Z",
+            },
+        ]);
+        expect(result.pods).toEqual([
+            {
+                name: "coredns-abc",
+                namespace: "kube-system",
+                phase: "Running",
+                ready: "1/1",
+                restarts: 0,
+                createdAt: "2024-06-01T00:00:00Z",
+                node: "node-1",
+            },
+            {
+                name: "web",
+                namespace: "default",
+                phase: "Running",
+                ready: "1/1",
+                restarts: 0,
+                createdAt: "2024-06-01T00:00:00Z",
+                node: "node-1",
+            },
+        ]);
+    });
+
+    test("returns an empty pods array when no pods are scheduled on the node", async () => {
+        setRunnerHandlers({
+            [NODE_KEY]: () => ok(JSON.stringify(makeNodeItem())),
+            [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
+        });
+        const result = await getNodeDetail("test-ctx", "node-1");
+        expect(result.pods).toEqual([]);
+    });
+
+    test("tolerates the pods call failing and still returns node detail", async () => {
+        setRunnerHandlers({
+            [NODE_KEY]: () => ok(JSON.stringify(makeNodeItem())),
+            [PODS_KEY]: () => fail("forbidden"),
+        });
+        const result = await getNodeDetail("test-ctx", "node-1");
+        expect(result.name).toBe("node-1");
+        expect(result.pods).toEqual([]);
+    });
+
+    test("throws when the node call fails", async () => {
+        setRunnerHandlers({
+            [NODE_KEY]: () => fail("not found"),
+            [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
+        });
+        await expect(getNodeDetail("test-ctx", "node-1")).rejects.toThrow("not found");
     });
 });
 

@@ -130,12 +130,19 @@ echo "--- GET /api/nodes/:name ---"
 FIRST_NODE=$(curl -fsS "http://127.0.0.1:5172/api/cluster/nodes?context=$CURRENT_CTX" | jq -r '.nodes[0].name')
 if [[ -n "$FIRST_NODE" && "$FIRST_NODE" != "null" ]]; then
     curl -fsS "http://127.0.0.1:5172/api/nodes/$FIRST_NODE?context=$CURRENT_CTX" \
-        | jq -e 'has("name") and has("conditions") and has("capacity")' \
+        | jq -e 'has("name") and has("conditions") and has("capacity") and has("pods")' \
         > /dev/null
     echo "OK"
 else
     echo "SKIP (no nodes)"
 fi
+
+echo "--- GET /api/nodes/:name lists pods scheduled on the node ---"
+# smoke-pod is pinned to fake-node-1, so its node detail must list it.
+curl -fsS "http://127.0.0.1:5172/api/nodes/fake-node-1?context=$CURRENT_CTX" \
+    | jq -e '.pods | any(.name == "smoke-pod" and .namespace == "default")' \
+    > /dev/null
+echo "OK"
 
 echo "--- GET /api/pods/:namespace/:name ---"
 curl -fsS "http://127.0.0.1:5172/api/pods/default/smoke-pod?context=$CURRENT_CTX" \
