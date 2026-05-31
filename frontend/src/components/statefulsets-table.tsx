@@ -27,6 +27,7 @@ import type { StatefulSet } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
 import { fetchStatefulSets } from "../lib/api-client";
+import { fuzzyGlobalFilter } from "../lib/fuzzy-filter";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -85,7 +86,7 @@ export function StatefulSetsTable() {
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
-        globalFilterFn: "includesString",
+        globalFilterFn: fuzzyGlobalFilter,
     });
 
     if (error) {

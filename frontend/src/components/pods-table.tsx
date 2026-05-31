@@ -28,6 +28,7 @@ import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
 import { useNavigate } from "react-router-dom";
 import { fetchPods } from "../lib/api-client";
+import { fuzzyGlobalFilter } from "../lib/fuzzy-filter";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -183,7 +184,7 @@ export function PodsTable() {
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
-        globalFilterFn: "includesString",
+        globalFilterFn: fuzzyGlobalFilter,
     });
 
     if (error) {

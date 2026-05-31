@@ -27,6 +27,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { Node, NodeStatus } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
 import { fetchNodes } from "../lib/api-client";
+import { fuzzyGlobalFilter } from "../lib/fuzzy-filter";
 
 function formatAge(createdAt: string): string {
     const ms = Date.now() - new Date(createdAt).getTime();
@@ -130,7 +131,7 @@ export function NodesTable() {
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
-        globalFilterFn: "includesString",
+        globalFilterFn: fuzzyGlobalFilter,
     });
 
     if (error) {
