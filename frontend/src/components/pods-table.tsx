@@ -104,21 +104,19 @@ const PHASE_ORDER: Record<PodPhase, number> = {
 };
 
 // Builds the column definitions for the pods table.
-// Includes the Namespace column only when showNamespace is true (all-namespaces view).
-function buildColumns(showNamespace: boolean): ColumnDef<Pod>[] {
+function buildColumns(): ColumnDef<Pod>[] {
     const cols: ColumnDef<Pod>[] = [];
 
-    cols.push({
-        accessorKey: "name",
-        header: "Name",
-    });
-
-    if (showNamespace) {
-        cols.push({
+    cols.push(
+        {
+            accessorKey: "name",
+            header: "Name",
+        },
+        {
             accessorKey: "namespace",
             header: "Namespace",
-        });
-    }
+        },
+    );
 
     cols.push(
         {
@@ -169,8 +167,7 @@ export function PodsTable() {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
 
-    const showNamespace = namespace === null;
-    const columns = buildColumns(showNamespace);
+    const columns = buildColumns();
 
     const table = useReactTable({
         data: data?.pods ?? [],

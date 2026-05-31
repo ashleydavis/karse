@@ -1,5 +1,7 @@
 # Karse project guidance
 
+- **Important: Prefer official scripts defined in the root `package.json`.** Never use a raw command (e.g. `tsc`, `jest`, `npx`, `vite`, `playwright`) when an official script already covers that task. If no official script exists for a task, other commands are acceptable.
+
 - **Purpose**: a local-only Kubernetes dashboard wrapping the locally-installed `kubectl` binary. Read-only cluster information plus context switching. Never deployed.
 - **Stack**: backend is Bun + TypeScript + Express 5; frontend is Vite + React 19 + React Router 7 + MUI 7 + Tailwind 4, with axios, TanStack Query, TanStack Table, and Font Awesome. Backend tests use Jest (via `@swc/jest`). E2E tests use Playwright (`@playwright/test`).
 - **Repo layout**: root `package.json` (bun workspaces), `backend/` (Express app and kubectl adapter), `frontend/` (React app), `e2e/` (Playwright e2e tests), `docs/` (guides and plans), `scripts/` (smoke tests and e2e runner).
@@ -66,7 +68,7 @@
 
 ## Testing requirement
 
-- **For every new feature or code change, you must: add or update backend unit tests (Jest), add or update smoke tests (`scripts/smoke-tests.sh`), add or update e2e tests (`e2e/src/e2e.test.ts`), and update the e2e testing manual (`docs/e2e-testing.md`).** No feature is considered done until all four are addressed.
+- **For every new feature or code change, you must: add or update backend unit tests (Jest), add or update smoke tests (`scripts/smoke-tests.sh`), add or update e2e tests (`e2e/src/e2e.test.ts`), update the e2e testing manual (`docs/e2e-testing.md`), and update any affected manual testing scenario READMEs under `docs/manual-testing/`.** No feature is considered done until all five are addressed.
 
 ## Testing discipline
 
@@ -80,7 +82,7 @@
 - Tests **always** use `describe` and `test`, never `it`.
 - Tests must not be fudged: each assertion checks a specific value, fixtures use realistic shapes (the structurally significant fields the real tool would return), and fakes are not asserted against themselves. Inject collaborators (e.g. a fake `run`) rather than mocking the module under test.
 - Where mocking a module is required, prefer Jest's `__mocks__` directory adjacent to the module being mocked.
-- After every code-delivering step, run **both** `bun run compile` (`tsc --noEmit`) and `bun run test` from `backend/` and confirm both are green. `@swc/jest` transpiles without type-checking, so the type check is not deferred to the final verify.
+- After every code-delivering step, run `bun run tests:all` from the **repo root** and confirm it is green. This runs compile, unit tests, smoke tests, and e2e tests in sequence. When asked to run tests or told tests are failing, always run `bun run tests:all` and gather the full results before responding — never run a subset and ask follow-up questions.
 
 ## Run
 

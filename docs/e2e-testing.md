@@ -29,6 +29,7 @@ Open http://localhost:5173.
 1. **Header**: the app bar shows the current page title on the left (e.g. "Cluster", "Nodes", "Pods"), followed by a namespace chip when a namespace is active. On the right: a context picker, context/namespace quick-picker buttons, color mode menu, and refresh button.
 2. **Stat tiles**: four cards render: server version, node count, namespace count, pod count. The version cell shows `-` if the server version is unavailable.
 3. **Nodes table**: a table lists nodes with columns Name, Status, Roles, Version, Age. Status is a coloured chip (green Ready, red NotReady, default Unknown). Roles show a comma-joined list or `<none>`. Age shows the largest non-zero unit (e.g. `12d`, `5h`, `3m`).
+4. **Pods table**: navigate to `/pods`. A table lists pods with columns Name, Namespace, Status, Ready, Restarts, Node, Age. Status is a coloured chip (green Running, yellow Pending, blue Succeeded, red Failed, default Unknown).
 
 ## Interaction checks
 
@@ -63,6 +64,15 @@ Navigate between sidebar links (Cluster, Nodes, Pods, Namespaces, Contexts) and 
 3. Navigate to a different page and confirm the chip persists.
 4. Re-open the namespace picker, choose "All namespaces", and confirm the chip disappears.
 
+### Namespace-scoped pods view
+
+1. Navigate to `/pods` with no namespace selected (all namespaces). Confirm the table has a **Namespace** column.
+2. Open the namespace picker (layer-group icon or Ctrl+Shift+K) and select `default`.
+3. Confirm the header shows a "default" chip.
+4. Confirm the **Namespace** column is still visible.
+5. Confirm the pods shown are only those in the `default` namespace (spot-check names/namespaces if you have pods running).
+6. Open the namespace picker and choose "All namespaces". Confirm the header chip disappears and pods from all namespaces are shown.
+
 ### Other interactions
 
 - **Sort**: click a nodes-table column header and confirm the rows reorder and an up/down chevron appears; click again to reverse.
@@ -71,13 +81,16 @@ Navigate between sidebar links (Cluster, Nodes, Pods, Namespaces, Contexts) and 
 
 ## Backend-only curl checks
 
-With the backend running:
+With the backend running (replace `my-ctx` with an actual context name from `kubectl config get-contexts`):
 
 ```sh
 curl -fsS http://127.0.0.1:5172/api/contexts | jq '.contexts, .current'
-curl -fsS http://127.0.0.1:5172/api/cluster/overview \
+curl -fsS 'http://127.0.0.1:5172/api/cluster/overview?context=my-ctx' \
   | jq -e 'has("serverVersion") and has("nodeCount") and has("namespaceCount") and has("podCount")'
-curl -fsS http://127.0.0.1:5172/api/cluster/nodes | jq -e 'has("nodes")'
+curl -fsS 'http://127.0.0.1:5172/api/cluster/nodes?context=my-ctx' | jq -e 'has("nodes")'
+curl -fsS 'http://127.0.0.1:5172/api/namespaces?context=my-ctx' | jq -e 'has("namespaces")'
+curl -fsS 'http://127.0.0.1:5172/api/pods?context=my-ctx' | jq -e 'has("pods")'
+curl -fsS 'http://127.0.0.1:5172/api/pods?context=my-ctx&namespace=default' | jq -e 'has("pods")'
 ```
 
 ## Triage when something fails

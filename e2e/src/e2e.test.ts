@@ -769,17 +769,40 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='header-namespace-chip']")).toHaveText("default");
         });
 
-        test("hides Namespace column when scoped to a namespace", async () => {
-            const headers = page.locator("[data-test-id='pods-table'] thead th");
-            await expect(headers.filter({ hasText: "Namespace" })).toHaveCount(0);
-        });
-
-        test("shows Namespace column when all-namespaces is selected", async () => {
-            // Clear namespace via namespace picker.
-            await page.locator("[aria-label='namespace picker']").click();
-            await page.locator("[data-test-id='namespace-quick-picker-all']").click();
+        test("Namespace column is always visible regardless of namespace selection", async () => {
             const headers = page.locator("[data-test-id='pods-table'] thead th");
             await expect(headers.filter({ hasText: "Namespace" })).toBeVisible();
+            // Clear namespace and confirm column remains.
+            await page.locator("[aria-label='namespace picker']").click();
+            await page.locator("[data-test-id='namespace-quick-picker-all']").click();
+            await expect(headers.filter({ hasText: "Namespace" })).toBeVisible();
+        });
+
+        test("sends namespace query param to API when namespace is selected", async () => {
+            // Replace the catch-all interceptor with one that filters by namespace.
+            await page.unroute("**/api/pods*");
+            await page.route("**/api/pods*", async (route) => {
+                const ns = new URL(route.request().url()).searchParams.get("namespace");
+                const pods = ns !== null && ns !== ""
+                    ? FAKE_PODS.pods.filter((p) => p.namespace === ns)
+                    : FAKE_PODS.pods;
+                await route.fulfill({ json: { pods } });
+            });
+            // Navigate fresh to clear the React Query cache so the next namespace
+            // change definitely triggers a new HTTP request.
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            // Set up the request waiter after page settles, then change namespace.
+            const requestPromise = page.waitForRequest("**/api/pods*");
+            await page.locator("[aria-label='namespace picker']").click();
+            await page.locator("[data-test-id='namespace-quick-picker-row']").filter({ hasText: /^default/ }).click();
+            const request = await requestPromise;
+            expect(new URL(request.url()).searchParams.get("namespace")).toBe("default");
+        });
+
+        test("shows only pods from the selected namespace", async () => {
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "nginx-abc" })).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "redis-xyz" })).toHaveCount(0);
         });
     });
 });

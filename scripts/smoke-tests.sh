@@ -84,6 +84,18 @@ curl -fsS "http://127.0.0.1:5172/api/namespaces?context=$CURRENT_CTX" \
     > /dev/null
 echo "OK"
 
+echo "--- GET /api/pods (all namespaces) ---"
+curl -fsS "http://127.0.0.1:5172/api/pods?context=$CURRENT_CTX" \
+    | jq -e 'has("pods")' \
+    > /dev/null
+echo "OK"
+
+echo "--- GET /api/pods (namespace scoped) ---"
+curl -fsS "http://127.0.0.1:5172/api/pods?context=$CURRENT_CTX&namespace=default" \
+    | jq -e 'has("pods")' \
+    > /dev/null
+echo "OK"
+
 echo "--- POST /api/namespaces/default (set) ---"
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
     -H "Content-Type: application/json" \

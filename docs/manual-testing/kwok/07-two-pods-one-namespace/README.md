@@ -18,7 +18,7 @@ A cluster with two pods both in the `default` namespace. Exercises the pods page
 ## What to check
 
 - **Pods page**: two rows visible with no namespace selected (all-namespaces view). Both pods show a Running phase chip and the Namespace column shows `default`.
-- **Namespace scoping**: open the namespace picker (layers icon or Ctrl+Shift+K), select `default`. The Namespace column disappears and both pods are still shown. Select a different namespace — the empty state appears.
+- **Namespace scoping**: open the namespace picker (layers icon or Ctrl+Shift+K), select `default`. Both pods are still shown and the Namespace column remains visible. Select a different namespace. The empty state appears.
 - **Namespaces page**: navigate to `/namespaces`, click "Set as active" on `default`. Confirm the `active` chip appears and the Pods page scopes to that namespace.
 - **Overview tiles**: pod count shows `2`.
 
