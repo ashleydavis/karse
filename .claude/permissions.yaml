@@ -1,6 +1,10 @@
 # Git operations allowed only within this project (cwd at repo root or under it).
 bash:
   git:
+    add:
+      decide: allow
+      reason: Allow staging files in this repo
+
     commit:
       cwd-in:
         - "./"
@@ -32,10 +36,26 @@ bash:
       reason: Allow creating new branches (git switch -c) in this repo
 
     checkout:
-      options:
-        - b
       cwd-in:
         - "./"
         - "./**"
       decide: allow
       reason: Allow creating new branches (git checkout -b) in this repo
+
+  chmod:
+    cmd: "${{PROJECT_DIR}}/**/*.sh"
+    decide: allow
+    reason: Allow chmod on shell scripts in this repo
+
+  bash:
+    cmd: "${{PROJECT_DIR}}/**/*.sh"
+    decide: allow
+    reason: Allow running shell scripts (bash *.sh) in this repo
+
+Read:
+  not:
+    cmd-in:
+      - "${{PROJECT_DIR}}"
+      - "${{PROJECT_DIR}}/**"
+  decide: deny
+  reason: Deny reading files outside this repo
