@@ -1,16 +1,15 @@
 import { Box, Alert } from "@mui/material";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
-import { fetchNamespaces, setGlobalNamespace } from "../lib/api-client";
+import { fetchNamespaces } from "../lib/api-client";
 import { NamespaceList } from "../components/namespace-list";
 
 // Full-page view listing namespaces for the active context with filter, sort,
 // tab-local selection, and optional terminal-default controls.
 export function NamespacesPage() {
-    const { current: context, contexts } = useKubeContext();
+    const { current: context, contexts, setDefaultNamespace } = useKubeContext();
     const { namespace, setNamespace } = useKubeNamespace();
-    const qc = useQueryClient();
 
     const currentCtx = contexts.find((c) => c.name === context);
     const globalDefault = currentCtx?.namespace ?? null;
@@ -21,18 +20,11 @@ export function NamespacesPage() {
         enabled: context !== null,
     });
 
-    const setGlobalMutation = useMutation({
-        mutationFn: ({ ctx, ns }: { ctx: string; ns: string | null }) => setGlobalNamespace(ctx, ns),
-        onSuccess: () => {
-            void qc.invalidateQueries({ queryKey: ["contexts"] });
-        },
-    });
-
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            {setGlobalMutation.isError && (
+            {setDefaultNamespace.isError && (
                 <Alert severity="error">
-                    {(setGlobalMutation.error as Error).message}
+                    {setDefaultNamespace.error.message}
                 </Alert>
             )}
             <NamespaceList
@@ -42,7 +34,7 @@ export function NamespacesPage() {
                 isLoading={isLoading}
                 error={(error as Error | null)}
                 onUse={setNamespace}
-                onSetDefault={(ns) => setGlobalMutation.mutate({ ctx: context!, ns })}
+                onSetDefault={(ns) => setDefaultNamespace.mutate({ context: context!, namespace: ns })}
             />
         </Box>
     );

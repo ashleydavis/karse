@@ -1,28 +1,18 @@
 import { Box, Alert } from "@mui/material";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useKubeContext } from "../lib/kube-context";
-import { switchContext } from "../lib/api-client";
 import { ContextsTable } from "../components/contexts-table";
 
 export function ContextsPage() {
-    const { contexts, current, terminalDefault, switchTo } = useKubeContext();
-    const qc = useQueryClient();
-
-    const setTerminalDefaultMutation = useMutation({
-        mutationFn: (name: string) => switchContext(name),
-        onSuccess: () => {
-            void qc.invalidateQueries({ queryKey: ["contexts"] });
-        },
-    });
+    const { contexts, current, terminalDefault, switchTo, setTerminalDefaultContext } = useKubeContext();
 
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
             {current === null && (
                 <Alert severity="info">No context is selected. Choose one below to get started.</Alert>
             )}
-            {setTerminalDefaultMutation.isError && (
+            {setTerminalDefaultContext.isError && (
                 <Alert severity="error">
-                    {(setTerminalDefaultMutation.error as Error).message}
+                    {setTerminalDefaultContext.error.message}
                 </Alert>
             )}
             <ContextsTable
@@ -30,7 +20,7 @@ export function ContextsPage() {
                 active={current}
                 terminalDefault={terminalDefault}
                 onUse={switchTo}
-                onSetDefault={(name) => setTerminalDefaultMutation.mutate(name)}
+                onSetDefault={(name) => setTerminalDefaultContext.mutate(name)}
             />
         </Box>
     );
