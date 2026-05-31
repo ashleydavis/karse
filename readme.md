@@ -20,6 +20,7 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
 - setGlobalMutation seems like a kludge.
 - Each node should be able to show the pods running on it.
 - Fuzzy match would be good for searching pods and other resources.
+- The mixed node status test doesn't work. Might be too hard to emulate this with kwok.
 
 ## Requirements
 
