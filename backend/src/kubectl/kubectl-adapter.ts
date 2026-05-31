@@ -5,6 +5,7 @@ import type {
     Deployment, StatefulSet, DaemonSet,
     ContainerInfo, ContainerState, KubeEvent, PodDetail,
     NodeCondition, NodeAddress, ResourceAmounts, NodeDetail,
+    ClusterEvent,
 } from "karse-types";
 
 // Base directory for the rolling audit log; overridable via KARSE_LOGS_DIR.
@@ -208,6 +209,34 @@ export async function listDaemonSets(context: string, namespace?: string): Promi
         available: item.status?.numberAvailable ?? 0,
         createdAt: item.metadata.creationTimestamp,
     }));
+}
+
+// Returns Kubernetes events for the given context, optionally scoped to a namespace.
+// Pass namespace=undefined (or omit) to fetch events across all namespaces.
+// Events are sorted newest-first by last-seen timestamp.
+export async function listEvents(context: string, namespace?: string): Promise<ClusterEvent[]> {
+    const nsArgs = namespace ? ["-n", namespace] : ["-A"];
+    const result = await kubectl(["--context", context, "get", "events", ...nsArgs, "-o", "json"]);
+    if (result.exitCode !== 0) {
+        throw new Error(result.stderr);
+    }
+    const data = JSON.parse(result.stdout);
+    const events: ClusterEvent[] = (data.items as any[]).map((ev) => {
+        const involved = ev.involvedObject ?? {};
+        const lastSeen = ev.lastTimestamp ?? ev.eventTime ?? ev.firstTimestamp ?? "";
+        return {
+            type: (ev.type as "Normal" | "Warning") ?? "Normal",
+            reason: ev.reason ?? "",
+            message: ev.message ?? "",
+            count: ev.count ?? 1,
+            lastSeen,
+            namespace: ev.metadata?.namespace ?? involved.namespace ?? "",
+            objectKind: involved.kind ?? "",
+            objectName: involved.name ?? "",
+        };
+    });
+    events.sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime());
+    return events;
 }
 
 // Maps a raw container status object from kubectl JSON output to a typed ContainerInfo.

@@ -22,6 +22,7 @@ function getPageTitle(pathname: string): string {
     if (pathname.startsWith("/statefulsets/")) return "StatefulSet";
     if (pathname === "/daemonsets") return "DaemonSets";
     if (pathname.startsWith("/daemonsets/")) return "DaemonSet";
+    if (pathname === "/events") return "Events";
     return "Karse";
 }
 

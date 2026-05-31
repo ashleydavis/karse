@@ -12,6 +12,7 @@ const NAV_ITEMS = [
     { to: "/deployments",  icon: "cubes"        as const, label: "Deployments"  },
     { to: "/statefulsets", icon: "database"     as const, label: "StatefulSets" },
     { to: "/daemonsets",   icon: "sitemap"      as const, label: "DaemonSets"   },
+    { to: "/events",       icon: "bell"         as const, label: "Events"       },
 ];
 
 export function Sidebar() {

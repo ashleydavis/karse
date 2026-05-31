@@ -27,6 +27,8 @@ import {
     faTerminal,
     faTag,
     faTriangleExclamation,
+    faBell,
+    faCircleInfo,
 } from "@fortawesome/free-solid-svg-icons";
 
 config.autoAddCss = false;
@@ -58,4 +60,6 @@ library.add(
     faTerminal,
     faTag,
     faTriangleExclamation,
+    faBell,
+    faCircleInfo,
 );

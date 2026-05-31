@@ -8,6 +8,7 @@ import { PodsPage } from "./pages/pods-page";
 import { DeploymentsPage } from "./pages/deployments-page";
 import { StatefulSetsPage } from "./pages/statefulsets-page";
 import { DaemonSetsPage } from "./pages/daemonsets-page";
+import { EventsPage } from "./pages/events-page";
 import { PodDetailPage } from "./pages/pod-detail-page";
 import { NodeDetailPage } from "./pages/node-detail-page";
 
@@ -27,6 +28,7 @@ export function App() {
                     <Route path="deployments" element={<DeploymentsPage />} />
                     <Route path="statefulsets" element={<StatefulSetsPage />} />
                     <Route path="daemonsets" element={<DaemonSetsPage />} />
+                    <Route path="events" element={<EventsPage />} />
                 </Route>
             </Routes>
         </BrowserRouter>
