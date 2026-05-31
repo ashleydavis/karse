@@ -35,6 +35,7 @@ import { useKubeNamespace } from "../lib/kube-namespace";
 import { useShareableNavigate } from "../lib/nav-state";
 import { fetchPods } from "../lib/api-client";
 import { YamlButton } from "./yaml-dialog";
+import { tableRowSx } from "../lib/table-row-style";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -367,7 +368,7 @@ export function PodsTable() {
                                 key={row.id}
                                 data-test-id="pod-row"
                                 onClick={() => navigate(`/pods/${row.original.namespace}/${row.original.name}`)}
-                                sx={{ cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}
+                                sx={tableRowSx(true)}
                             >
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell key={cell.id}>

@@ -11,6 +11,7 @@ import {
     TableContainer,
 } from "@mui/material";
 import type { ContainerState, ContainerInfo } from "karse-types";
+import { tableRowSx } from "../lib/table-row-style";
 
 // Renders a colored chip describing a container's current state.
 function ContainerStateChip({ state, reason }: { state: ContainerState; reason: string }) {
@@ -47,7 +48,7 @@ function ContainerTable({ containers, rowTestId, emptyAllowed }: {
                 </TableHead>
                 <TableBody>
                     {containers.map((c) => (
-                        <TableRow key={c.name} data-test-id={rowTestId}>
+                        <TableRow key={c.name} data-test-id={rowTestId} sx={tableRowSx(false)}>
                             <TableCell sx={{ fontFamily: "monospace" }}>{c.name}</TableCell>
                             <TableCell sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}>{c.image}</TableCell>
                             <TableCell><ContainerStateChip state={c.state} reason={c.stateReason} /></TableCell>

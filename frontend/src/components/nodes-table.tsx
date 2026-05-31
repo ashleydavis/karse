@@ -28,6 +28,7 @@ import type { Node, NodeStatus } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
 import { fetchNodes } from "../lib/api-client";
 import { YamlButton } from "./yaml-dialog";
+import { tableRowSx } from "../lib/table-row-style";
 
 function formatAge(createdAt: string): string {
     const ms = Date.now() - new Date(createdAt).getTime();
@@ -215,7 +216,7 @@ export function NodesTable() {
                                 key={row.id}
                                 data-test-id="node-row"
                                 onClick={() => navigate(`/nodes/${row.original.name}`)}
-                                sx={{ cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}
+                                sx={tableRowSx(true)}
                             >
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell key={cell.id}>

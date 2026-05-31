@@ -35,3 +35,4 @@ To tear down every test cluster at once (handy after running several scenarios, 
 | [23](23-shareable-url-state/) | Shareable URL state: context and namespace in the URL query string |
 | [24](24-navbar-dropdown-pickers/) | Context and namespace pickers drop down from the nav bar |
 | [25](25-live-logs/) | Live logs: stern-style multi-pod streaming with namespace/pod scoping and wildcard filter |
+| [26](26-table-row-hover/) | Consistent table row hover across all tables |
