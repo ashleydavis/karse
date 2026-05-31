@@ -134,6 +134,18 @@ curl -fsS "http://127.0.0.1:5172/api/daemonsets?context=$CURRENT_CTX" \
     > /dev/null
 echo "OK"
 
+echo "--- GET /api/events (all namespaces) ---"
+curl -fsS "http://127.0.0.1:5172/api/events?context=$CURRENT_CTX" \
+    | jq -e 'has("events")' \
+    > /dev/null
+echo "OK"
+
+echo "--- GET /api/events (namespace scoped) ---"
+curl -fsS "http://127.0.0.1:5172/api/events?context=$CURRENT_CTX&namespace=default" \
+    | jq -e 'has("events")' \
+    > /dev/null
+echo "OK"
+
 echo "--- GET /api/nodes/:name ---"
 FIRST_NODE=$(curl -fsS "http://127.0.0.1:5172/api/cluster/nodes?context=$CURRENT_CTX" | jq -r '.nodes[0].name')
 if [[ -n "$FIRST_NODE" && "$FIRST_NODE" != "null" ]]; then

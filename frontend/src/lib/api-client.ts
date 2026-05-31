@@ -3,7 +3,7 @@ import type {
     ContextsResponse, ClusterOverview, Node, NamespacesResponse, PodsResponse,
     DeploymentsResponse, StatefulSetsResponse, DaemonSetsResponse,
     PodDetail, NodeDetail, YamlResourceType, YamlResponse,
-    LogStreamLine, LogStreamStarted,
+    LogStreamLine, LogStreamStarted, EventsResponse,
 } from "karse-types";
 
 const http = axios.create({ baseURL: "/api", headers: { "Content-Type": "application/json" } });
@@ -85,6 +85,17 @@ export async function fetchDaemonSets(context: string, namespace?: string): Prom
         params.namespace = namespace;
     }
     const response = await http.get<DaemonSetsResponse>("/daemonsets", { params });
+    return response.data;
+}
+
+// Fetches Kubernetes events for the given context. Pass namespace to scope to one
+// namespace, or omit to fetch events across all namespaces.
+export async function fetchEvents(context: string, namespace?: string): Promise<EventsResponse> {
+    const params: Record<string, string> = { context };
+    if (namespace) {
+        params.namespace = namespace;
+    }
+    const response = await http.get<EventsResponse>("/events", { params });
     return response.data;
 }
 

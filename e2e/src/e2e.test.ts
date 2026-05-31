@@ -1816,4 +1816,121 @@ test.describe("karse e2e", () => {
             expect(nodeHover).toBe(contextHover);
         });
     });
+
+    // ── Events page ─────────────────────────────────────────────────────────────
+
+    test.describe("events page", () => {
+        // Predictable event data injected via route interception.
+        const FAKE_EVENTS = {
+            events: [
+                {
+                    type: "Warning",
+                    reason: "BackOff",
+                    message: "Back-off restarting failed container",
+                    count: 5,
+                    lastSeen: new Date().toISOString(),
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "nginx-abc",
+                },
+                {
+                    type: "Normal",
+                    reason: "Scheduled",
+                    message: "Successfully assigned kube-system/redis-xyz to node-cp",
+                    count: 1,
+                    lastSeen: new Date().toISOString(),
+                    namespace: "kube-system",
+                    objectKind: "Pod",
+                    objectName: "redis-xyz",
+                },
+            ],
+        };
+
+        // Install a route override that returns FAKE_EVENTS for every /api/events request.
+        async function interceptEvents(): Promise<void> {
+            await page.route("**/api/events*", async (route) => {
+                await route.fulfill({ json: FAKE_EVENTS });
+            });
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await interceptEvents();
+            await page.goto("/events", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='events-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/events*");
+            setContext(CLUSTER_1);
+        });
+
+        test("shows page title Events", async () => {
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Events");
+        });
+
+        test("has all column headers", async () => {
+            const table = page.locator("[data-test-id='events-table']");
+            for (const name of ["Last seen", "Type", "Reason", "Object", "Message", "Count", "Namespace"]) {
+                await expect(table.getByRole("columnheader", { name, exact: true })).toBeVisible();
+            }
+        });
+
+        test("shows a row for each fake event", async () => {
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(2);
+        });
+
+        test("shows Warning chip for the BackOff event", async () => {
+            const row = page.locator("[data-test-id='event-row']").filter({ hasText: "BackOff" });
+            await expect(row.locator(".MuiChip-label")).toHaveText("Warning");
+        });
+
+        test("shows Normal chip for the Scheduled event", async () => {
+            const row = page.locator("[data-test-id='event-row']").filter({ hasText: "Scheduled" });
+            await expect(row.locator(".MuiChip-label")).toHaveText("Normal");
+        });
+
+        test("renders the involved object as kind/name", async () => {
+            const row = page.locator("[data-test-id='event-row']").filter({ hasText: "BackOff" });
+            await expect(row).toContainText("Pod/nginx-abc");
+        });
+
+        test("search filters events by reason", async () => {
+            await page.locator("[data-test-id='events-search'] input").fill("BackOff");
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(1);
+        });
+
+        test("shows no-events-match message when search has no results", async () => {
+            await page.locator("[data-test-id='events-search'] input").fill("zzznotfound");
+            await expect(page.locator("[data-test-id='no-events-match']")).toBeVisible();
+        });
+
+        test("clearing search restores all events", async () => {
+            await page.locator("[data-test-id='events-search'] input").fill("");
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(2);
+        });
+
+        test("sends namespace query param to API when namespace is selected", async () => {
+            await page.unroute("**/api/events*");
+            await page.route("**/api/events*", async (route) => {
+                const ns = new URL(route.request().url()).searchParams.get("namespace");
+                const events = ns !== null && ns !== ""
+                    ? FAKE_EVENTS.events.filter((e) => e.namespace === ns)
+                    : FAKE_EVENTS.events;
+                await route.fulfill({ json: { events } });
+            });
+            await page.goto("/events", { waitUntil: "networkidle" });
+            const requestPromise = page.waitForRequest("**/api/events*");
+            await page.locator("[aria-label='namespace picker']").click();
+            await page.locator("[data-test-id='namespace-quick-picker-row']").filter({ hasText: /^default/ }).click();
+            const request = await requestPromise;
+            expect(new URL(request.url()).searchParams.get("namespace")).toBe("default");
+        });
+
+        test("shows only events from the selected namespace", async () => {
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "nginx-abc" })).toBeVisible();
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "redis-xyz" })).toHaveCount(0);
+        });
+    });
 });

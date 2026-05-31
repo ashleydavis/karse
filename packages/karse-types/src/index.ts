@@ -127,6 +127,25 @@ export type KubeEvent = {
     lastSeen: string;
 };
 
+// A cluster- or namespace-wide Kubernetes event, returned by GET /api/events.
+// Richer than KubeEvent: includes the involved object and namespace so events
+// from many resources can be displayed together in a single table.
+export type ClusterEvent = {
+    type: "Normal" | "Warning";
+    reason: string;
+    message: string;
+    count: number;
+    lastSeen: string;       // ISO timestamp; UI computes age
+    namespace: string;
+    objectKind: string;     // involvedObject.kind, e.g. "Pod"
+    objectName: string;     // involvedObject.name
+};
+
+// Response body for GET /api/events.
+export type EventsResponse = {
+    events: ClusterEvent[];
+};
+
 // Detailed view of a single pod, returned by GET /api/pods/:namespace/:name.
 export type PodDetail = {
     name: string;

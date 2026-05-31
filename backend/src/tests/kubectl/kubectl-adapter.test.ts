@@ -11,6 +11,7 @@ import {
     listNodes,
     getClusterOverview,
     listPods,
+    listEvents,
     getPodLogs,
     getResourceYaml,
     isYamlResourceType,
@@ -697,6 +698,132 @@ describe("listNamespaces", () => {
             "--context test-ctx get namespaces -o json": () => fail("denied"),
         });
         await expect(listNamespaces("test-ctx")).rejects.toThrow("denied");
+    });
+});
+
+describe("listEvents", () => {
+    // Minimal event item shape with the fields listEvents reads, mirroring
+    // the structurally significant fields kubectl returns for core/v1 Events.
+    function makeEventItem(overrides: {
+        type?: string;
+        reason?: string;
+        message?: string;
+        count?: number;
+        lastTimestamp?: string;
+        eventTime?: string;
+        namespace?: string;
+        objectKind?: string;
+        objectName?: string;
+        objectNamespace?: string;
+    } = {}): object {
+        return {
+            metadata: {
+                name: "evt-1.abc",
+                namespace: overrides.namespace ?? "default",
+            },
+            involvedObject: {
+                kind: overrides.objectKind ?? "Pod",
+                name: overrides.objectName ?? "nginx-abc",
+                namespace: overrides.objectNamespace ?? "default",
+            },
+            reason: overrides.reason ?? "Scheduled",
+            message: overrides.message ?? "Successfully assigned default/nginx-abc to node-1",
+            type: overrides.type ?? "Normal",
+            count: overrides.count ?? 1,
+            lastTimestamp: overrides.lastTimestamp,
+            eventTime: overrides.eventTime,
+        };
+    }
+
+    test("uses -A flag when no namespace is given", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get events -A -o json": () => ok(JSON.stringify({
+                items: [makeEventItem({ lastTimestamp: "2024-06-01T00:00:00Z" })],
+            })),
+        });
+        const result = await listEvents("test-ctx");
+        expect(result).toHaveLength(1);
+    });
+
+    test("uses -n flag when namespace is given", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get events -n my-ns -o json": () => ok(JSON.stringify({
+                items: [makeEventItem({ namespace: "my-ns", lastTimestamp: "2024-06-01T00:00:00Z" })],
+            })),
+        });
+        const result = await listEvents("test-ctx", "my-ns");
+        expect(result).toHaveLength(1);
+    });
+
+    test("maps all fields from a Warning event correctly", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get events -A -o json": () => ok(JSON.stringify({
+                items: [
+                    makeEventItem({
+                        type: "Warning",
+                        reason: "BackOff",
+                        message: "Back-off restarting failed container",
+                        count: 7,
+                        lastTimestamp: "2024-01-15T12:00:00Z",
+                        namespace: "prod",
+                        objectKind: "Pod",
+                        objectName: "api-xyz",
+                    }),
+                ],
+            })),
+        });
+        const result = await listEvents("test-ctx");
+        expect(result[0]).toEqual({
+            type: "Warning",
+            reason: "BackOff",
+            message: "Back-off restarting failed container",
+            count: 7,
+            lastSeen: "2024-01-15T12:00:00Z",
+            namespace: "prod",
+            objectKind: "Pod",
+            objectName: "api-xyz",
+        });
+    });
+
+    test("falls back to eventTime when lastTimestamp is absent", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get events -A -o json": () => ok(JSON.stringify({
+                items: [makeEventItem({ lastTimestamp: undefined, eventTime: "2024-03-03T03:03:03Z" })],
+            })),
+        });
+        const result = await listEvents("test-ctx");
+        expect(result[0]!.lastSeen).toBe("2024-03-03T03:03:03Z");
+    });
+
+    test("sorts events newest-first by lastSeen", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get events -A -o json": () => ok(JSON.stringify({
+                items: [
+                    makeEventItem({ objectName: "older", lastTimestamp: "2024-01-01T00:00:00Z" }),
+                    makeEventItem({ objectName: "newer", lastTimestamp: "2024-06-01T00:00:00Z" }),
+                ],
+            })),
+        });
+        const result = await listEvents("test-ctx");
+        expect(result[0]!.objectName).toBe("newer");
+        expect(result[1]!.objectName).toBe("older");
+    });
+
+    test("returns [] when items is empty", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get events -A -o json": () => ok(JSON.stringify({
+                items: [],
+            })),
+        });
+        const result = await listEvents("test-ctx");
+        expect(result.length).toBe(0);
+    });
+
+    test("throws on non-zero exit", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get events -A -o json": () => fail("forbidden"),
+        });
+        await expect(listEvents("test-ctx")).rejects.toThrow("forbidden");
     });
 });
 
