@@ -32,3 +32,4 @@ To tear down every test cluster at once (handy after running several scenarios, 
 | [20](20-pod-detail-tabs/) | Pod detail tabs: Detail / Status, Containers, Logs |
 | [21](21-pod-phase-filter/) | Filter pods by phase using the dropdown checkboxes |
 | [22](22-breadcrumbs/) | Breadcrumb navigation: trail on list and detail pages, links back to lists |
+| [23](23-shareable-url-state/) | Shareable URL state: context and namespace in the URL query string |

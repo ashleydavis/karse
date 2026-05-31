@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useShareableNavigate } from "../lib/nav-state";
 import {
     useReactTable,
     getCoreRowModel,
@@ -120,7 +120,7 @@ const columns: ColumnDef<Node>[] = [
 
 export function NodesTable() {
     const { current } = useKubeContext();
-    const navigate = useNavigate();
+    const navigate = useShareableNavigate();
     const { data, error, isLoading } = useQuery({
         queryKey: ["cluster", "nodes", current],
         queryFn: () => fetchNodes(current!),

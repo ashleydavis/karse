@@ -32,6 +32,7 @@ import {
     faCopy,
     faCheck,
     faFilter,
+    faShareNodes,
 } from "@fortawesome/free-solid-svg-icons";
 
 config.autoAddCss = false;
@@ -68,4 +69,5 @@ library.add(
     faCopy,
     faCheck,
     faFilter,
+    faShareNodes,
 );

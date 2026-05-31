@@ -1,5 +1,6 @@
 import { StrictMode, useMemo } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider, CssBaseline, createTheme } from "@mui/material";
 import "./index.css";
@@ -113,13 +114,15 @@ const root = document.getElementById("root")!;
 createRoot(root).render(
     <StrictMode>
         <QueryClientProvider client={queryClient}>
-            <KubeContextProvider>
-                <KubeNamespaceProvider>
-                    <ConfigProvider>
-                        <Root />
-                    </ConfigProvider>
-                </KubeNamespaceProvider>
-            </KubeContextProvider>
+            <BrowserRouter>
+                <KubeContextProvider>
+                    <KubeNamespaceProvider>
+                        <ConfigProvider>
+                            <Root />
+                        </ConfigProvider>
+                    </KubeNamespaceProvider>
+                </KubeContextProvider>
+            </BrowserRouter>
         </QueryClientProvider>
     </StrictMode>
 );

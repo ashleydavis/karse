@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
     Box,
     Typography,
@@ -20,6 +20,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useQuery } from "@tanstack/react-query";
 import type { NodeStatus, NodeCondition } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
+import { useShareableNavigate } from "../lib/nav-state";
 import { fetchNodeDetail } from "../lib/api-client";
 import { YamlButton } from "../components/yaml-dialog";
 import { CommandsDialog } from "../components/commands-dialog";
@@ -63,7 +64,7 @@ function ConditionStatusChip({ condition }: { condition: NodeCondition }) {
 export function NodeDetailPage() {
     const { name } = useParams<{ name: string }>();
     const { current } = useKubeContext();
-    const navigate = useNavigate();
+    const navigate = useShareableNavigate();
     const [showCommands, setShowCommands] = useState(false);
 
     const { data, error, isLoading } = useQuery({

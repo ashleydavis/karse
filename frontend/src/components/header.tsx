@@ -37,6 +37,7 @@ export function Header({ onOpenContextPicker, onOpenNamespacePicker }: Props) {
     const qc = useQueryClient();
     const { pathname } = useLocation();
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+    const [copied, setCopied] = useState(false);
 
     const pageTitle = getPageTitle(pathname);
 
@@ -46,6 +47,13 @@ export function Header({ onOpenContextPicker, onOpenNamespacePicker }: Props) {
         await qc.invalidateQueries({ queryKey: ["contexts"] });
         await qc.invalidateQueries({ queryKey: ["cluster"] });
         await qc.invalidateQueries({ queryKey: ["namespaces"] });
+    }
+
+    // Copy the current page URL (page, resource, context, and namespace) to the clipboard so it can be shared.
+    async function handleShare(): Promise<void> {
+        await navigator.clipboard.writeText(window.location.href);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1500);
     }
 
     return (
@@ -98,6 +106,11 @@ export function Header({ onOpenContextPicker, onOpenNamespacePicker }: Props) {
                             </MenuItem>
                         ))}
                     </Menu>
+                    <Tooltip title={copied ? "Link copied" : "Copy a shareable link to this view"}>
+                        <IconButton size="small" onClick={handleShare} aria-label="share link" data-test-id="share-button">
+                            <FontAwesomeIcon icon={["fas", copied ? "check" : "share-nodes"]} />
+                        </IconButton>
+                    </Tooltip>
                     <Tooltip title="Refresh">
                         <IconButton size="small" onClick={handleRefresh} disabled={isLoading} aria-label="refresh">
                             <FontAwesomeIcon icon={["fas", "rotate"]} />

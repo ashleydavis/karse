@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
     Box,
     Typography,
@@ -22,6 +22,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useQuery } from "@tanstack/react-query";
 import type { PodPhase, KubeEvent } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
+import { useShareableNavigate } from "../lib/nav-state";
 import { fetchPodDetail } from "../lib/api-client";
 import { YamlButton } from "../components/yaml-dialog";
 import { CommandsDialog } from "../components/commands-dialog";
@@ -82,7 +83,7 @@ type PodDetailTab = "detail" | "containers" | "logs";
 export function PodDetailPage() {
     const { namespace, name } = useParams<{ namespace: string; name: string }>();
     const { current } = useKubeContext();
-    const navigate = useNavigate();
+    const navigate = useShareableNavigate();
     const [activeTab, setActiveTab] = useState<PodDetailTab>("detail");
     const [showCommands, setShowCommands] = useState(false);
 
