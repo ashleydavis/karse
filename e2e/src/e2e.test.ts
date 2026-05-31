@@ -1208,4 +1208,85 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "redis-xyz" })).toHaveCount(0);
         });
     });
+
+    // ── Breadcrumbs ─────────────────────────────────────────────────────────────
+
+    test.describe("breadcrumbs", () => {
+        const FAKE_POD_DETAIL = {
+            name: "nginx-abc",
+            namespace: "default",
+            phase: "Running",
+            node: "node-worker",
+            podIP: "10.0.0.1",
+            createdAt: new Date().toISOString(),
+            labels: { app: "nginx" },
+            containers: [],
+            initContainers: [],
+            events: [],
+        };
+
+        const FAKE_NODE_DETAIL = {
+            name: "node-cp",
+            status: "Ready",
+            roles: ["control-plane"],
+            version: "v1.29.0",
+            createdAt: new Date().toISOString(),
+            conditions: [],
+            capacity: { cpu: "4", memory: "8Gi", pods: "110" },
+            allocatable: { cpu: "3900m", memory: "7Gi", pods: "110" },
+            addresses: [],
+            labels: {},
+            pods: [],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods/default/nginx-abc*", async (route) => {
+                await route.fulfill({ json: FAKE_POD_DETAIL });
+            });
+            await page.route("**/api/nodes/node-cp*", async (route) => {
+                await route.fulfill({ json: FAKE_NODE_DETAIL });
+            });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods/default/nginx-abc*");
+            await page.unroute("**/api/nodes/node-cp*");
+        });
+
+        test("renders breadcrumbs on a list page", async () => {
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='breadcrumbs']")).toBeVisible();
+            const items = await page.locator("[data-test-id='breadcrumb-item']").allTextContents();
+            expect(items).toEqual(["Pods"]);
+        });
+
+        test("renders the full trail on the pod detail page", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='breadcrumbs']")).toBeVisible();
+            const items = await page.locator("[data-test-id='breadcrumb-item']").allTextContents();
+            expect(items).toEqual(["Pods", "default", "nginx-abc"]);
+        });
+
+        test("clicking the Pods breadcrumb navigates back to the pods list", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='breadcrumb-item']").filter({ hasText: "Pods" }).click();
+            await expect(page).toHaveURL(/\/pods$/);
+            await expect(page.locator("[data-test-id='breadcrumb-item']")).toHaveCount(1);
+        });
+
+        test("renders the full trail on the node detail page", async () => {
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='breadcrumbs']")).toBeVisible();
+            const items = await page.locator("[data-test-id='breadcrumb-item']").allTextContents();
+            expect(items).toEqual(["Nodes", "node-cp"]);
+        });
+
+        test("clicking the Nodes breadcrumb navigates back to the nodes list", async () => {
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='breadcrumb-item']").filter({ hasText: "Nodes" }).click();
+            await expect(page).toHaveURL(/\/nodes$/);
+            await expect(page.locator("[data-test-id='breadcrumb-item']")).toHaveCount(1);
+        });
+    });
 });
