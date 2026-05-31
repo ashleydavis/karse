@@ -141,6 +141,19 @@ export type PodDetail = {
     events: KubeEvent[];
 };
 
+// A single aggregated log line streamed from the multi-pod live logs endpoint.
+// Carried by the "line" Server-Sent Event from GET /api/logs/stream.
+export type LogStreamLine = {
+    namespace: string;
+    pod: string;
+    line: string;
+};
+
+// The set of pods a live log stream attached to, carried by the "started" event.
+export type LogStreamStarted = {
+    pods: Array<{ namespace: string; name: string }>;
+};
+
 // A single condition reported by a node's status.
 export type NodeCondition = {
     type: string;

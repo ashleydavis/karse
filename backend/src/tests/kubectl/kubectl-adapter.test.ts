@@ -14,10 +14,11 @@ import {
     getPodLogs,
     getResourceYaml,
     isYamlResourceType,
+    streamPodLogs,
 } from "../../kubectl/kubectl-adapter";
 
 // jest.requireMock returns any, so mock methods are accessible without casting.
-const { run } = jest.requireMock("../../command-runner");
+const { run, stream } = jest.requireMock("../../command-runner");
 const { audit } = jest.requireMock("../../audit-log");
 
 // Builds a successful CommandResult with the given stdout.
@@ -56,6 +57,7 @@ function setRunnerHandlers(
 
 beforeEach(() => {
     run.mockReset();
+    stream.mockReset();
     audit.mockReset().mockResolvedValue(undefined);
 });
 
@@ -821,5 +823,122 @@ describe("getResourceYaml", () => {
             "--context ctx -n default get pod ghost -o yaml": () => fail("NotFound"),
         });
         await expect(getResourceYaml("ctx", "pods", "ghost", "default")).rejects.toThrow("NotFound");
+    });
+});
+
+describe("streamPodLogs", () => {
+    afterEach(() => {
+        delete process.env.KARSE_FAKE_LOGS;
+    });
+
+    // Captures the StreamHandlers passed to the mocked command-runner stream() so
+    // tests can drive stdout/close callbacks as a real spawned process would.
+    function captureStream(): { handlers: any; kill: jest.Mock } {
+        const kill = jest.fn();
+        let captured: any = null;
+        stream.mockImplementation((_binary: string, _args: readonly string[], handlers: any) => {
+            captured = handlers;
+            return { kill };
+        });
+        return {
+            get handlers() {
+                return captured;
+            },
+            kill,
+        };
+    }
+
+    test("invokes kubectl logs -f with follow flag and tail", () => {
+        captureStream();
+        streamPodLogs("ctx", "default", "my-pod", undefined, 50, {
+            onLine: jest.fn(),
+            onError: jest.fn(),
+            onClose: jest.fn(),
+        });
+        expect(stream).toHaveBeenCalledWith(
+            "kubectl",
+            ["--context", "ctx", "-n", "default", "logs", "-f", "my-pod", "--tail=50"],
+            expect.any(Object)
+        );
+    });
+
+    test("passes container flag when a container is specified", () => {
+        captureStream();
+        streamPodLogs("ctx", "default", "my-pod", "nginx", 100, {
+            onLine: jest.fn(),
+            onError: jest.fn(),
+            onClose: jest.fn(),
+        });
+        expect(stream).toHaveBeenCalledWith(
+            "kubectl",
+            ["--context", "ctx", "-n", "default", "logs", "-f", "my-pod", "-c", "nginx", "--tail=100"],
+            expect.any(Object)
+        );
+    });
+
+    test("splits streamed chunks into complete lines", () => {
+        const cap = captureStream();
+        const onLine = jest.fn();
+        streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
+            onLine,
+            onError: jest.fn(),
+            onClose: jest.fn(),
+        });
+        cap.handlers.onStdout("line one\nline two\npart");
+        expect(onLine).toHaveBeenCalledTimes(2);
+        expect(onLine).toHaveBeenNthCalledWith(1, "line one");
+        expect(onLine).toHaveBeenNthCalledWith(2, "line two");
+    });
+
+    test("flushes a trailing partial line on close", () => {
+        const cap = captureStream();
+        const onLine = jest.fn();
+        const onClose = jest.fn();
+        streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
+            onLine,
+            onError: jest.fn(),
+            onClose,
+        });
+        cap.handlers.onStdout("complete\ntrailing");
+        cap.handlers.onClose(0);
+        expect(onLine).toHaveBeenCalledWith("trailing");
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    test("forwards stream errors", () => {
+        const cap = captureStream();
+        const onError = jest.fn();
+        streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
+            onLine: jest.fn(),
+            onError,
+            onClose: jest.fn(),
+        });
+        cap.handlers.onError(new Error("spawn failed"));
+        expect(onError).toHaveBeenCalledWith(new Error("spawn failed"));
+    });
+
+    test("stop() kills the underlying process", () => {
+        const cap = captureStream();
+        const handle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
+            onLine: jest.fn(),
+            onError: jest.fn(),
+            onClose: jest.fn(),
+        });
+        handle.stop();
+        expect(cap.kill).toHaveBeenCalled();
+    });
+
+    test("emits fake log lines without spawning when KARSE_FAKE_LOGS=1", () => {
+        process.env.KARSE_FAKE_LOGS = "1";
+        const onLine = jest.fn();
+        streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
+            onLine,
+            onError: jest.fn(),
+            onClose: jest.fn(),
+        });
+        expect(stream).not.toHaveBeenCalled();
+        const emitted = onLine.mock.calls.map((c: any[]) => c[0]).join("\n");
+        expect(emitted).toContain("start worker processes");
+        expect(emitted).toContain("kube-probe/1.29");
     });
 });

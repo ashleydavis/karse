@@ -33,6 +33,9 @@ import {
     faCheck,
     faFilter,
     faShareNodes,
+    faStream,
+    faPlay,
+    faStop,
 } from "@fortawesome/free-solid-svg-icons";
 
 config.autoAddCss = false;
@@ -70,4 +73,7 @@ library.add(
     faCheck,
     faFilter,
     faShareNodes,
+    faStream,
+    faPlay,
+    faStop,
 );

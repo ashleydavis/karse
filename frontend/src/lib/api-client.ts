@@ -3,6 +3,7 @@ import type {
     ContextsResponse, ClusterOverview, Node, NamespacesResponse, PodsResponse,
     DeploymentsResponse, StatefulSetsResponse, DaemonSetsResponse,
     PodDetail, NodeDetail, YamlResourceType, YamlResponse,
+    LogStreamLine, LogStreamStarted,
 } from "karse-types";
 
 const http = axios.create({ baseURL: "/api", headers: { "Content-Type": "application/json" } });
@@ -127,4 +128,48 @@ export async function fetchResourceYaml(
     }
     const response = await http.get<YamlResponse>(`/yaml/${type}/${name}`, { params });
     return response.data;
+}
+
+// Callbacks for the multi-pod live log stream consumed via Server-Sent Events.
+export type LogStreamCallbacks = {
+    onStarted: (started: LogStreamStarted) => void;
+    onLine: (line: LogStreamLine) => void;
+    onError: (message: string) => void;
+};
+
+// Opens a Server-Sent Events connection to GET /api/logs/stream and dispatches
+// each event to the callbacks. Streams pod-prefixed live logs from every pod in
+// the given context that matches the namespace scope and wildcard/substring
+// filter. Returns a function that closes the stream (terminating the backend
+// kubectl processes via the request-close handler).
+export function openLogStream(
+    context: string,
+    namespace: string | undefined,
+    filter: string,
+    tail: number,
+    callbacks: LogStreamCallbacks,
+): () => void {
+    const params = new URLSearchParams({ context, filter, tail: String(tail) });
+    if (namespace) {
+        params.set("namespace", namespace);
+    }
+    const source = new EventSource(`/api/logs/stream?${params.toString()}`);
+
+    source.addEventListener("started", (e: MessageEvent) => {
+        callbacks.onStarted(JSON.parse(e.data));
+    });
+    source.addEventListener("line", (e: MessageEvent) => {
+        callbacks.onLine(JSON.parse(e.data));
+    });
+    source.addEventListener("error", (e: MessageEvent) => {
+        const data = e.data;
+        if (typeof data === "string" && data !== "") {
+            const parsed = JSON.parse(data);
+            callbacks.onError(parsed.message ?? "stream error");
+        }
+    });
+
+    return () => {
+        source.close();
+    };
 }

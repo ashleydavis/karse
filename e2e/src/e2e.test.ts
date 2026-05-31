@@ -1642,4 +1642,94 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='breadcrumb-item']")).toHaveCount(1);
         });
     });
+
+    // ── Live logs page (stern-style multi-pod streaming) ──────────────────────
+
+    test.describe("live logs page", () => {
+        // Two fake pods used to populate the pod dropdown and drive the stream.
+        const FAKE_PODS = {
+            pods: [
+                { name: "nginx-abc", namespace: "default", phase: "Running", ready: "1/1", restarts: 0, createdAt: new Date().toISOString(), node: "node-1" },
+                { name: "redis-xyz", namespace: "default", phase: "Running", ready: "1/1", restarts: 0, createdAt: new Date().toISOString(), node: "node-1" },
+            ],
+        };
+
+        // Builds a Server-Sent Events body that announces the matched pods then
+        // emits one prefixed log line per pod, mirroring the real endpoint shape.
+        function buildSseBody(podNames: string[]): string {
+            const started = `event: started\ndata: ${JSON.stringify({ pods: podNames.map((n) => ({ namespace: "default", name: n })) })}\n\n`;
+            const lines = podNames
+                .map((n) => `event: line\ndata: ${JSON.stringify({ namespace: "default", pod: n, line: `log line from ${n}` })}\n\n`)
+                .join("");
+            return started + lines;
+        }
+
+        // Intercepts the SSE stream and returns a canned body for the pods whose
+        // names match the request's filter (substring), like the backend does.
+        async function interceptStream(): Promise<void> {
+            await page.route("**/api/logs/stream*", async (route) => {
+                const filter = new URL(route.request().url()).searchParams.get("filter") ?? "";
+                const matched = FAKE_PODS.pods
+                    .map((p) => p.name)
+                    .filter((name) => filter === "" || name.toLowerCase().includes(filter.toLowerCase()));
+                await route.fulfill({
+                    headers: { "Content-Type": "text/event-stream" },
+                    body: buildSseBody(matched),
+                });
+            });
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: FAKE_PODS });
+            });
+            await interceptStream();
+            await page.goto("/logs", { waitUntil: "networkidle" });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+            await page.unroute("**/api/logs/stream*");
+            setContext(CLUSTER_1);
+        });
+
+        test("shows page title Live Logs", async () => {
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Live Logs");
+        });
+
+        test("renders namespace, pod, and filter controls", async () => {
+            await expect(page.locator("[data-test-id='live-logs-namespace-select']")).toBeVisible();
+            await expect(page.locator("[data-test-id='live-logs-pod-select']")).toBeVisible();
+            await expect(page.locator("[data-test-id='live-logs-filter']")).toBeVisible();
+        });
+
+        test("streaming all pods shows a prefixed line per pod", async () => {
+            await page.locator("[data-test-id='live-logs-start']").click();
+            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='live-logs-viewer']")).toContainText("default/nginx-abc");
+            await expect(page.locator("[data-test-id='live-logs-viewer']")).toContainText("default/redis-xyz");
+            await expect(page.locator("[data-test-id='live-logs-viewer']")).toContainText("log line from nginx-abc");
+        });
+
+        test("matched pod chips list every streamed pod", async () => {
+            await expect(page.locator("[data-test-id='live-logs-matched-pod']")).toHaveCount(2);
+        });
+
+        test("Stop button replaces Stream while streaming", async () => {
+            await expect(page.locator("[data-test-id='live-logs-stop']")).toBeVisible();
+            await page.locator("[data-test-id='live-logs-stop']").click();
+            await expect(page.locator("[data-test-id='live-logs-start']")).toBeVisible();
+        });
+
+        test("wildcard filter sends the filter param and restricts the streamed pods", async () => {
+            await page.locator("[data-test-id='live-logs-filter'] input").fill("nginx");
+            const requestPromise = page.waitForRequest((req) => req.url().includes("/api/logs/stream") && req.url().includes("filter=nginx"));
+            await page.locator("[data-test-id='live-logs-start']").click();
+            await requestPromise;
+            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='live-logs-viewer']")).toContainText("default/nginx-abc");
+            await expect(page.locator("[data-test-id='live-logs-viewer']")).not.toContainText("redis-xyz");
+        });
+    });
 });
