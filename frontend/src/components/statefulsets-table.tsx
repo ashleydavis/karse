@@ -27,6 +27,7 @@ import type { StatefulSet } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
 import { fetchStatefulSets } from "../lib/api-client";
+import { tableRowSx } from "../lib/table-row-style";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -171,7 +172,7 @@ export function StatefulSetsTable() {
                                 key={row.id}
                                 data-test-id="statefulset-row"
                                 onClick={() => navigate(`/statefulsets/${row.original.namespace}/${row.original.name}`)}
-                                sx={{ cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}
+                                sx={tableRowSx(true)}
                             >
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell key={cell.id}>

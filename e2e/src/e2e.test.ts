@@ -1208,4 +1208,69 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "redis-xyz" })).toHaveCount(0);
         });
     });
+
+    // ── Table row hover consistency ─────────────────────────────────────────────
+    // Every data table in Karse applies the same row hover treatment via the
+    // shared tableRowSx() helper: hovering any data row highlights it with the
+    // MUI "action.hover" background. Clickable rows (which navigate to a detail
+    // page) additionally show a pointer cursor; static rows keep the default
+    // cursor. These tests assert the highlight is applied consistently and that
+    // the cursor matches the clickable / static distinction.
+
+    test.describe("table row hover consistency", () => {
+        test.beforeAll(() => {
+            setContext(CLUSTER_1);
+        });
+
+        // Return the computed background-color of a row before and after hovering it.
+        async function hoverBackgrounds(rowSelector: string): Promise<{ before: string; after: string }> {
+            const row = page.locator(rowSelector).first();
+            await expect(row).toBeVisible();
+            const before = await row.evaluate((el) => getComputedStyle(el).backgroundColor);
+            await row.hover();
+            const after = await row.evaluate((el) => getComputedStyle(el).backgroundColor);
+            return { before, after };
+        }
+
+        // Return the computed cursor of the first matching row.
+        async function rowCursor(rowSelector: string): Promise<string> {
+            const row = page.locator(rowSelector).first();
+            await expect(row).toBeVisible();
+            return row.evaluate((el) => getComputedStyle(el).cursor);
+        }
+
+        test("clickable node rows highlight on hover and show a pointer cursor", async () => {
+            await page.goto("/nodes", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='node-row']").first()).toBeVisible();
+            const { before, after } = await hoverBackgrounds("[data-test-id='node-row']");
+            expect(after).not.toBe(before);
+            expect(await rowCursor("[data-test-id='node-row']")).toBe("pointer");
+        });
+
+        test("static context rows highlight on hover with the default cursor", async () => {
+            await page.goto("/contexts", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='context-row']").first()).toBeVisible();
+            const { before, after } = await hoverBackgrounds("[data-test-id='context-row']");
+            expect(after).not.toBe(before);
+            expect(await rowCursor("[data-test-id='context-row']")).toBe("default");
+        });
+
+        test("static namespace rows highlight on hover with the default cursor", async () => {
+            await page.goto("/namespaces", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='namespace-row']").first()).toBeVisible();
+            const { before, after } = await hoverBackgrounds("[data-test-id='namespace-row']");
+            expect(after).not.toBe(before);
+            expect(await rowCursor("[data-test-id='namespace-row']")).toBe("default");
+        });
+
+        test("node and context rows share the same hover background color", async () => {
+            await page.goto("/nodes", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='node-row']").first()).toBeVisible();
+            const nodeHover = (await hoverBackgrounds("[data-test-id='node-row']")).after;
+            await page.goto("/contexts", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='context-row']").first()).toBeVisible();
+            const contextHover = (await hoverBackgrounds("[data-test-id='context-row']")).after;
+            expect(nodeHover).toBe(contextHover);
+        });
+    });
 });

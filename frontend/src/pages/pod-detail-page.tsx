@@ -26,6 +26,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { PodPhase, ContainerState, KubeEvent } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
 import { fetchPodDetail, fetchPodLogs } from "../lib/api-client";
+import { tableRowSx } from "../lib/table-row-style";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -255,7 +256,7 @@ export function PodDetailPage() {
                         </TableHead>
                         <TableBody>
                             {data.containers.map((c) => (
-                                <TableRow key={c.name} data-test-id="container-row">
+                                <TableRow key={c.name} data-test-id="container-row" sx={tableRowSx(false)}>
                                     <TableCell sx={{ fontFamily: "monospace" }}>{c.name}</TableCell>
                                     <TableCell sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}>{c.image}</TableCell>
                                     <TableCell><ContainerStateChip state={c.state} reason={c.stateReason} /></TableCell>
@@ -291,7 +292,7 @@ export function PodDetailPage() {
                             </TableHead>
                             <TableBody>
                                 {data.initContainers.map((c) => (
-                                    <TableRow key={c.name} data-test-id="init-container-row">
+                                    <TableRow key={c.name} data-test-id="init-container-row" sx={tableRowSx(false)}>
                                         <TableCell sx={{ fontFamily: "monospace" }}>{c.name}</TableCell>
                                         <TableCell sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}>{c.image}</TableCell>
                                         <TableCell><ContainerStateChip state={c.state} reason={c.stateReason} /></TableCell>
@@ -347,7 +348,7 @@ export function PodDetailPage() {
                             </TableHead>
                             <TableBody>
                                 {data.events.map((ev, i) => (
-                                    <TableRow key={i} data-test-id="event-row">
+                                    <TableRow key={i} data-test-id="event-row" sx={tableRowSx(false)}>
                                         <TableCell><EventTypeChip type={ev.type} /></TableCell>
                                         <TableCell>{ev.reason}</TableCell>
                                         <TableCell sx={{ maxWidth: 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.message}</TableCell>

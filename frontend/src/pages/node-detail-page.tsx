@@ -19,6 +19,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { NodeStatus, NodeCondition } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
 import { fetchNodeDetail } from "../lib/api-client";
+import { tableRowSx } from "../lib/table-row-style";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -132,7 +133,7 @@ export function NodeDetailPage() {
                         </TableHead>
                         <TableBody>
                             {(["cpu", "memory", "pods"] as const).map((r) => (
-                                <TableRow key={r}>
+                                <TableRow key={r} sx={tableRowSx(false)}>
                                     <TableCell>{r}</TableCell>
                                     <TableCell sx={{ fontFamily: "monospace" }}>{data.capacity[r]}</TableCell>
                                     <TableCell sx={{ fontFamily: "monospace" }}>{data.allocatable[r]}</TableCell>
@@ -157,7 +158,7 @@ export function NodeDetailPage() {
                         </TableHead>
                         <TableBody>
                             {data.conditions.map((cond) => (
-                                <TableRow key={cond.type} data-test-id="condition-row">
+                                <TableRow key={cond.type} data-test-id="condition-row" sx={tableRowSx(false)}>
                                     <TableCell>{cond.type}</TableCell>
                                     <TableCell><ConditionStatusChip condition={cond} /></TableCell>
                                     <TableCell sx={{ maxWidth: 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cond.message}</TableCell>
@@ -195,7 +196,7 @@ export function NodeDetailPage() {
                                             key={pod.namespace + "/" + pod.name}
                                             data-test-id="node-pod-row"
                                             onClick={() => navigate(`/pods/${pod.namespace}/${pod.name}`)}
-                                            sx={{ cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}
+                                            sx={tableRowSx(true)}
                                         >
                                             <TableCell sx={{ fontFamily: "monospace" }}>{pod.name}</TableCell>
                                             <TableCell>{pod.namespace}</TableCell>

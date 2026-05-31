@@ -23,6 +23,7 @@ import {
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { Context } from "karse-types";
+import { tableRowSx } from "../lib/table-row-style";
 
 type Props = {
     contexts: Context[];
@@ -166,7 +167,7 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
                             </TableRow>
                         )}
                         {rows.map((row) => (
-                            <TableRow key={row.id} data-test-id="context-row">
+                            <TableRow key={row.id} data-test-id="context-row" sx={tableRowSx(false)}>
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell key={cell.id}>
                                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

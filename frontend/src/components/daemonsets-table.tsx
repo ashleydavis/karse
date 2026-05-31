@@ -27,6 +27,7 @@ import type { DaemonSet } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
 import { fetchDaemonSets } from "../lib/api-client";
+import { tableRowSx } from "../lib/table-row-style";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -175,7 +176,7 @@ export function DaemonSetsTable() {
                                 key={row.id}
                                 data-test-id="daemonset-row"
                                 onClick={() => navigate(`/daemonsets/${row.original.namespace}/${row.original.name}`)}
-                                sx={{ cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}
+                                sx={tableRowSx(true)}
                             >
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell key={cell.id}>

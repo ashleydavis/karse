@@ -25,6 +25,7 @@ import {
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { Namespace } from "karse-types";
+import { tableRowSx } from "../lib/table-row-style";
 
 type Props = {
     namespaces: Namespace[];
@@ -172,7 +173,7 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
                             </TableRow>
                         )}
                         {rows.map((row) => (
-                            <TableRow key={row.id} data-test-id="namespace-row">
+                            <TableRow key={row.id} data-test-id="namespace-row" sx={tableRowSx(false)}>
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell key={cell.id}>
                                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

@@ -26,3 +26,4 @@ To tear down every test cluster at once (handy after running several scenarios, 
 | [14](14-many-contexts/) | Many contexts (five simultaneous KWOK clusters) |
 | [15](15-workloads-views/) | Workloads views: deployments, stateful sets, daemon sets |
 | [16](16-detail-pages-and-logs/) | Detail pages and log viewer: node detail, pod detail, clickable rows |
+| [17](17-table-row-hover/) | Consistent table row hover across all tables |
