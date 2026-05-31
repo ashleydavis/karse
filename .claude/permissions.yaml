@@ -36,8 +36,6 @@ bash:
       reason: Allow creating new branches (git switch -c) in this repo
 
     checkout:
-      options:
-        - b
       cwd-in:
         - "./"
         - "./**"
