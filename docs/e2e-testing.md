@@ -26,7 +26,7 @@ Open http://localhost:5173.
 
 ## Smoke checks (visual)
 
-1. **Header**: the app bar shows the Karse name and dharmachakra icon, a context chip showing the current context (or "no context"), and a refresh button.
+1. **Header**: the app bar shows the current page title on the left (e.g. "Cluster", "Nodes", "Pods"), followed by a namespace chip when a namespace is active. On the right: a context picker, context/namespace quick-picker buttons, color mode menu, and refresh button.
 2. **Stat tiles**: four cards render: server version, node count, namespace count, pod count. The version cell shows `-` if the server version is unavailable.
 3. **Nodes table**: a table lists nodes with columns Name, Status, Roles, Version, Age. Status is a coloured chip (green Ready, red NotReady, default Unknown). Roles show a comma-joined list or `<none>`. Age shows the largest non-zero unit (e.g. `12d`, `5h`, `3m`).
 
@@ -51,6 +51,17 @@ This exercises `switchTo` invalidating both the `["contexts"]` and `["cluster"]`
 3. Confirm the overview shows the "Select a context to see cluster overview." message, and the nodes table does **not** fire a request (no `/api/cluster/nodes` call appears in the network panel).
 
 This exercises `enabled: current !== null` on both the overview and nodes queries. Restore your context afterwards with `kubectl config use-context <name>`.
+
+### Page title in header
+
+Navigate between sidebar links (Cluster, Nodes, Pods, Namespaces, Contexts) and confirm the page title in the header updates to match the current page on every navigation.
+
+### Namespace chip in header
+
+1. Click the namespace picker button (layer-group icon) and select a namespace.
+2. Confirm a chip with the selected namespace name appears in the header, next to the page title.
+3. Navigate to a different page and confirm the chip persists.
+4. Re-open the namespace picker, choose "All namespaces", and confirm the chip disappears.
 
 ### Other interactions
 

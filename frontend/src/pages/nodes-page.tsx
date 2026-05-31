@@ -1,4 +1,4 @@
-import { Box, Typography } from "@mui/material";
+import { Typography } from "@mui/material";
 import { useKubeContext } from "../lib/kube-context";
 import { NodesTable } from "../components/nodes-table";
 
@@ -13,10 +13,5 @@ export function NodesPage() {
         );
     }
 
-    return (
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            <Typography variant="h5">Nodes</Typography>
-            <NodesTable />
-        </Box>
-    );
+    return <NodesTable />;
 }

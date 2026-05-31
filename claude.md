@@ -64,6 +64,10 @@
 - No Bun-specific APIs in backend source (no `Bun.spawn`, `Bun.which`, `Bun.file`, etc.). Use Node-style APIs (`node:child_process`, `node:fs/promises`, etc.).
 - No synchronous Node APIs (no `*Sync` calls, no `fs.readFileSync`, no `spawnSync`). Async everywhere.
 
+## Testing requirement
+
+- **For every new feature or code change, you must: add or update backend unit tests (Jest), add or update smoke tests (`scripts/smoke-tests.sh`), add or update e2e tests (`e2e/src/e2e.test.ts`), and update the e2e testing manual (`docs/e2e-testing.md`).** No feature is considered done until all four are addressed.
+
 ## Testing discipline
 
 - The two testing frameworks for this project are **Jest** (backend unit tests) and **Playwright** (e2e tests). No other test runners are used.

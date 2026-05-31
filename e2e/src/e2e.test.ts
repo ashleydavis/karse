@@ -93,7 +93,32 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='karse-title']")).toHaveText("Karse");
         });
 
+        test("shows page title for cluster home", async () => {
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Cluster");
+        });
+
+        test("updates page title when navigating to nodes", async () => {
+            await page.goto("/nodes", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Nodes");
+        });
+
+        test("updates page title when navigating to pods", async () => {
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Pods");
+        });
+
+        test("updates page title when navigating to namespaces", async () => {
+            await page.goto("/namespaces", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Namespaces");
+        });
+
+        test("updates page title when navigating to contexts", async () => {
+            await page.goto("/contexts", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Contexts");
+        });
+
         test("shows context picker dropdown when two clusters are configured", async () => {
+            await navigateTo();
             await expect(page.locator("[aria-haspopup='listbox']")).toBeVisible();
         });
 
@@ -736,12 +761,12 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
         });
 
-        test("shows namespace chip when scoped to a namespace", async () => {
+        test("shows namespace chip in header when scoped to a namespace", async () => {
             // Select a namespace via namespace picker then navigate to pods page.
             await page.locator("[aria-label='namespace picker']").click();
             await page.locator("[data-test-id='namespace-quick-picker-row']").filter({ hasText: /^default/ }).click();
             await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
-            await expect(page.locator(".MuiChip-root", { hasText: "default" })).toBeVisible();
+            await expect(page.locator("[data-test-id='header-namespace-chip']")).toHaveText("default");
         });
 
         test("hides Namespace column when scoped to a namespace", async () => {

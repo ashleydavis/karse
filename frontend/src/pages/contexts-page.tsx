@@ -1,4 +1,4 @@
-import { Box, Typography, Alert } from "@mui/material";
+import { Box, Alert } from "@mui/material";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useKubeContext } from "../lib/kube-context";
 import { switchContext } from "../lib/api-client";
@@ -17,7 +17,6 @@ export function ContextsPage() {
 
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            <Typography variant="h5">Contexts</Typography>
             {setTerminalDefaultMutation.isError && (
                 <Alert severity="error">
                     {(setTerminalDefaultMutation.error as Error).message}

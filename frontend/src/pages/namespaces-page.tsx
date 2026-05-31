@@ -38,7 +38,6 @@ export function NamespacesPage() {
 
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            <Typography variant="h5">Namespaces</Typography>
             {setGlobalMutation.isError && (
                 <Alert severity="error">
                     {(setGlobalMutation.error as Error).message}
