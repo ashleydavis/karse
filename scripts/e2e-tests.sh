@@ -10,10 +10,13 @@ FRONTEND_PID=""
 KWOK_CLUSTER_1="karse-e2e-1"
 KWOK_CLUSTER_2="karse-e2e-2"
 PREV_CONTEXT=""
+PORT_FILE="$(mktemp)"
+FRONTEND_LOG="$(mktemp)"
 
 cleanup() {
     [[ -n "$FRONTEND_PID" ]] && kill "$FRONTEND_PID" 2>/dev/null || true
     [[ -n "$BACKEND_PID" ]]  && kill "$BACKEND_PID"  2>/dev/null || true
+    rm -f "$PORT_FILE" "$FRONTEND_LOG"
     kwokctl delete cluster --name "$KWOK_CLUSTER_1" 2>/dev/null || true
     kwokctl delete cluster --name "$KWOK_CLUSTER_2" 2>/dev/null || true
     [[ -n "$PREV_CONTEXT" ]] && kubectl config use-context "$PREV_CONTEXT" 2>/dev/null || true
@@ -101,22 +104,52 @@ kubectl wait --context "kwok-$KWOK_CLUSTER_2" \
 kubectl config use-context "kwok-$KWOK_CLUSTER_1"
 
 # ── Backend ───────────────────────────────────────────────────────────────────
-echo "--- Starting backend ---"
-(cd backend && KARSE_FAKE_LOGS=1 bun src/index.ts) 2>/dev/null &
+# KARSE_PORT=0 asks the OS for a free port; the backend writes it to KARSE_PORT_FILE.
+echo "--- Starting backend (OS-assigned free port) ---"
+: > "$PORT_FILE"
+(cd backend && KARSE_FAKE_LOGS=1 KARSE_PORT=0 KARSE_PORT_FILE="$PORT_FILE" bun src/index.ts) 2>/dev/null &
 BACKEND_PID=$!
-bunx wait-on http://127.0.0.1:5172/api/contexts --timeout 10000
+
+for _ in $(seq 1 100); do
+    BACKEND_PORT="$(cat "$PORT_FILE")"
+    [[ -n "$BACKEND_PORT" ]] && break
+    sleep 0.1
+done
+if [[ -z "$BACKEND_PORT" ]]; then
+    echo "Backend did not report its port within timeout" >&2
+    exit 1
+fi
+echo "Backend bound to port $BACKEND_PORT"
+bunx wait-on "http://127.0.0.1:$BACKEND_PORT/api/contexts" --timeout 10000
 
 # ── Frontend ──────────────────────────────────────────────────────────────────
-echo "--- Starting frontend dev server ---"
-(cd frontend && KARSE_NO_OPEN=1 bun run dev) 2>/dev/null &
+# KARSE_FRONTEND_PORT=0 lets Vite pick a free port; KARSE_PORT points the /api
+# proxy at the backend's dynamic port. The chosen frontend port is scraped from
+# Vite's "Local:" output line.
+echo "--- Starting frontend dev server (OS-assigned free port) ---"
+(cd frontend && KARSE_NO_OPEN=1 KARSE_FRONTEND_PORT=0 KARSE_PORT="$BACKEND_PORT" bun run dev) > "$FRONTEND_LOG" 2>&1 &
 FRONTEND_PID=$!
-bunx wait-on http://localhost:5173 --timeout 60000
+
+FRONTEND_PORT=""
+for _ in $(seq 1 600); do
+    FRONTEND_PORT="$(grep -oE 'localhost:[0-9]+' "$FRONTEND_LOG" | head -n1 | cut -d: -f2)"
+    [[ -n "$FRONTEND_PORT" ]] && break
+    sleep 0.1
+done
+if [[ -z "$FRONTEND_PORT" ]]; then
+    echo "Frontend dev server did not report its port within timeout" >&2
+    cat "$FRONTEND_LOG" >&2
+    exit 1
+fi
+echo "Frontend bound to port $FRONTEND_PORT"
+bunx wait-on "http://localhost:$FRONTEND_PORT" --timeout 60000
 
 # ── E2E tests ─────────────────────────────────────────────────────────────────
 echo "--- Running e2e tests ---"
 (
     export KWOK_CLUSTER_1="kwok-$KWOK_CLUSTER_1"
     export KWOK_CLUSTER_2="kwok-$KWOK_CLUSTER_2"
+    export KARSE_E2E_URL="http://localhost:$FRONTEND_PORT"
     cd e2e && bunx playwright test
 )
 

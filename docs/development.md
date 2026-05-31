@@ -145,6 +145,16 @@ bun run e2e
 
 Runs the full Playwright e2e suite. `scripts/e2e-tests.sh` creates two kwok clusters, starts the backend and Vite dev server, then runs 30 browser-based tests covering every frontend feature: header, stat tiles, nodes table (status chips, roles, age), sort, search, refresh, context switching, and the no-context gate. Requires `kwokctl` on `PATH`.
 
+### Dynamic ports in tests
+
+Normal `bun run dev` / `bun run start` keep the fixed defaults (backend `5172`, frontend `5173`). The test harness instead runs on OS-assigned free ports so it never conflicts with an already-running instance:
+
+- The backend honors `KARSE_PORT`. Setting `KARSE_PORT=0` asks the OS for the next free unallocated port. The backend reports the concrete bound port on stdout and, when `KARSE_PORT_FILE` is set, writes the port number to that file so scripts can read it without scraping stdout.
+- `scripts/smoke-tests.sh` and `scripts/e2e-tests.sh` start the backend with `KARSE_PORT=0` plus a `KARSE_PORT_FILE`, poll the file for the chosen port, and build all request URLs from it.
+- For e2e, the Vite dev server is started with `KARSE_FRONTEND_PORT=0` (free port) and `KARSE_PORT` pointing at the discovered backend port so the `/api` proxy follows it. The script scrapes Vite's `localhost:<port>` line for the chosen frontend port and passes it to Playwright via `KARSE_E2E_URL`, which the Playwright `baseURL` honors.
+
+Port resolution and reporting live in `backend/src/listen-server.ts` (unit-tested in `backend/src/tests/listen-server.test.ts`); the bound port is read back asynchronously via `server.address()`, with no synchronous calls.
+
 ## Code conventions
 
 ### File naming

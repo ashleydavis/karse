@@ -7,11 +7,13 @@ done
 
 BACKEND_PID=""
 KWOK_CLUSTER="karse-smoke"
+PORT_FILE="$(mktemp)"
 
 cleanup() {
     if [[ -n "$BACKEND_PID" ]] && kill -0 "$BACKEND_PID" 2>/dev/null; then
         kill "$BACKEND_PID"
     fi
+    rm -f "$PORT_FILE"
     kwokctl delete cluster --name "$KWOK_CLUSTER" 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -66,70 +68,86 @@ spec:
     image: nginx:latest
 EOF
 
-echo "--- Starting backend ---"
-(cd backend && KARSE_FAKE_LOGS=1 bun src/index.ts) &
+echo "--- Starting backend (OS-assigned free port) ---"
+# KARSE_PORT=0 asks the OS for the next free port, avoiding conflicts with any
+# already-running instance. The backend writes the chosen port to KARSE_PORT_FILE.
+: > "$PORT_FILE"
+(cd backend && KARSE_FAKE_LOGS=1 KARSE_PORT=0 KARSE_PORT_FILE="$PORT_FILE" bun src/index.ts) &
 BACKEND_PID=$!
 
-bunx wait-on http://127.0.0.1:5172/api/contexts --timeout 10000
+# Wait for the backend to write its actual port, then build the base URL.
+for _ in $(seq 1 100); do
+    PORT="$(cat "$PORT_FILE")"
+    [[ -n "$PORT" ]] && break
+    sleep 0.1
+done
+if [[ -z "$PORT" ]]; then
+    echo "Backend did not report its port within timeout" >&2
+    exit 1
+fi
+BASE="http://127.0.0.1:$PORT"
+echo "Backend bound to port $PORT"
+
+bunx wait-on "$BASE/api/contexts" --timeout 10000
 
 echo "--- GET /api/contexts ---"
-CONTEXTS_RESP=$(curl -fsS http://127.0.0.1:5172/api/contexts)
+CONTEXTS_RESP=$(curl -fsS $BASE/api/contexts)
 echo "$CONTEXTS_RESP" | jq '.contexts, .current'
 
 CURRENT_CTX=$(echo "$CONTEXTS_RESP" | jq -r '.current')
 
 echo "--- GET /api/cluster/overview ---"
-curl -fsS "http://127.0.0.1:5172/api/cluster/overview?context=$CURRENT_CTX" \
+curl -fsS "$BASE/api/cluster/overview?context=$CURRENT_CTX" \
     | jq -e 'has("serverVersion") and has("nodeCount") and has("namespaceCount") and has("podCount")' \
     > /dev/null
 echo "OK"
 
 echo "--- GET /api/cluster/nodes ---"
-curl -fsS "http://127.0.0.1:5172/api/cluster/nodes?context=$CURRENT_CTX" \
+curl -fsS "$BASE/api/cluster/nodes?context=$CURRENT_CTX" \
     | jq -e 'has("nodes")' \
     > /dev/null
 echo "OK"
 
 echo "--- GET /api/namespaces ---"
-curl -fsS "http://127.0.0.1:5172/api/namespaces?context=$CURRENT_CTX" \
+curl -fsS "$BASE/api/namespaces?context=$CURRENT_CTX" \
     | jq -e 'has("namespaces")' \
     > /dev/null
 echo "OK"
 
 echo "--- GET /api/pods (all namespaces) ---"
-curl -fsS "http://127.0.0.1:5172/api/pods?context=$CURRENT_CTX" \
+curl -fsS "$BASE/api/pods?context=$CURRENT_CTX" \
     | jq -e 'has("pods")' \
     > /dev/null
 echo "OK"
 
 echo "--- GET /api/pods (namespace scoped) ---"
-curl -fsS "http://127.0.0.1:5172/api/pods?context=$CURRENT_CTX&namespace=default" \
+curl -fsS "$BASE/api/pods?context=$CURRENT_CTX&namespace=default" \
     | jq -e 'has("pods")' \
     > /dev/null
 echo "OK"
 
 echo "--- GET /api/deployments ---"
-curl -fsS "http://127.0.0.1:5172/api/deployments?context=$CURRENT_CTX" \
+curl -fsS "$BASE/api/deployments?context=$CURRENT_CTX" \
     | jq -e 'has("deployments")' \
     > /dev/null
 echo "OK"
 
 echo "--- GET /api/statefulsets ---"
-curl -fsS "http://127.0.0.1:5172/api/statefulsets?context=$CURRENT_CTX" \
+curl -fsS "$BASE/api/statefulsets?context=$CURRENT_CTX" \
     | jq -e 'has("statefulSets")' \
     > /dev/null
 echo "OK"
 
 echo "--- GET /api/daemonsets ---"
-curl -fsS "http://127.0.0.1:5172/api/daemonsets?context=$CURRENT_CTX" \
+curl -fsS "$BASE/api/daemonsets?context=$CURRENT_CTX" \
     | jq -e 'has("daemonSets")' \
     > /dev/null
 echo "OK"
 
 echo "--- GET /api/nodes/:name ---"
-FIRST_NODE=$(curl -fsS "http://127.0.0.1:5172/api/cluster/nodes?context=$CURRENT_CTX" | jq -r '.nodes[0].name')
+FIRST_NODE=$(curl -fsS "$BASE/api/cluster/nodes?context=$CURRENT_CTX" | jq -r '.nodes[0].name')
 if [[ -n "$FIRST_NODE" && "$FIRST_NODE" != "null" ]]; then
-    curl -fsS "http://127.0.0.1:5172/api/nodes/$FIRST_NODE?context=$CURRENT_CTX" \
+    curl -fsS "$BASE/api/nodes/$FIRST_NODE?context=$CURRENT_CTX" \
         | jq -e 'has("name") and has("conditions") and has("capacity")' \
         > /dev/null
     echo "OK"
@@ -138,14 +156,14 @@ else
 fi
 
 echo "--- GET /api/pods/:namespace/:name ---"
-curl -fsS "http://127.0.0.1:5172/api/pods/default/smoke-pod?context=$CURRENT_CTX" \
+curl -fsS "$BASE/api/pods/default/smoke-pod?context=$CURRENT_CTX" \
     | jq -e 'has("containers") and has("events")' \
     > /dev/null
 echo "OK"
 
 echo "--- GET /api/pods/:namespace/:name/logs ---"
 # KARSE_FAKE_LOGS=1 is set, so the backend returns realistic fake log lines.
-LOGS_RESP=$(curl -fsS "http://127.0.0.1:5172/api/pods/default/smoke-pod/logs?context=$CURRENT_CTX&container=nginx")
+LOGS_RESP=$(curl -fsS "$BASE/api/pods/default/smoke-pod/logs?context=$CURRENT_CTX&container=nginx")
 echo "$LOGS_RESP" | jq -e 'has("logs") and (.logs | type == "string") and (.logs | length > 0)' > /dev/null
 echo "$LOGS_RESP" | jq -r '.logs' | grep -q "kube-probe"
 echo "OK"
@@ -154,7 +172,7 @@ echo "--- POST /api/namespaces/default (set) ---"
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
     -H "Content-Type: application/json" \
     -d "{\"context\": \"$CURRENT_CTX\", \"namespace\": \"default\"}" \
-    http://127.0.0.1:5172/api/namespaces/default)
+    $BASE/api/namespaces/default)
 if [[ "$HTTP_CODE" != "200" ]]; then
     echo "Expected HTTP 200 for set namespace, got $HTTP_CODE" >&2
     exit 1
@@ -165,7 +183,7 @@ echo "--- POST /api/namespaces/default (clear) ---"
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
     -H "Content-Type: application/json" \
     -d "{\"context\": \"$CURRENT_CTX\", \"namespace\": \"\"}" \
-    http://127.0.0.1:5172/api/namespaces/default)
+    $BASE/api/namespaces/default)
 if [[ "$HTTP_CODE" != "200" ]]; then
     echo "Expected HTTP 200 for clear namespace, got $HTTP_CODE" >&2
     exit 1
@@ -179,7 +197,7 @@ if [[ "$CONTEXT_COUNT" -ge 1 ]]; then
     SWITCH_RESP=$(curl -fsS -X POST \
         -H "Content-Type: application/json" \
         -d "{\"name\": \"$FIRST_NAME\"}" \
-        http://127.0.0.1:5172/api/contexts/current)
+        $BASE/api/contexts/current)
     ACTUAL=$(echo "$SWITCH_RESP" | jq -r '.current')
     if [[ "$ACTUAL" != "$FIRST_NAME" ]]; then
         echo "Expected current='$FIRST_NAME', got '$ACTUAL'" >&2
@@ -190,7 +208,7 @@ else
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
         -H "Content-Type: application/json" \
         -d '{"name": ""}' \
-        http://127.0.0.1:5172/api/contexts/current)
+        $BASE/api/contexts/current)
     if [[ "$HTTP_CODE" != "400" ]]; then
         echo "Expected HTTP 400 for empty context name, got $HTTP_CODE" >&2
         exit 1

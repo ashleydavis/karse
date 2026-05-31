@@ -2,6 +2,11 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
+// Vite dev server configuration.
+// KARSE_FRONTEND_PORT sets the dev server port; "0" asks the OS for a free port
+// (used by the test harness to avoid conflicts). KARSE_PORT is the backend port
+// the /api proxy targets; the test harness sets it to the dynamically chosen
+// backend port so the proxy follows the backend onto a free port.
 export default defineConfig({
     plugins: [react(), tailwindcss()],
     server: {
