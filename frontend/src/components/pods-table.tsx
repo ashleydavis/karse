@@ -20,6 +20,11 @@ import {
     TextField,
     Typography,
     Alert,
+    Button,
+    Menu,
+    MenuItem,
+    Checkbox,
+    ListItemText,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useQuery } from "@tanstack/react-query";
@@ -104,6 +109,54 @@ const PHASE_ORDER: Record<PodPhase, number> = {
     Unknown: 4,
 };
 
+// All selectable pod phases, in display order, for the phase filter dropdown.
+const ALL_PHASES: PodPhase[] = ["Running", "Pending", "Succeeded", "Failed", "Unknown"];
+
+// Dropdown of phase checkboxes that controls which pod phases are visible.
+// Multi-select; defaults to all phases selected. Calls onChange with the new selection.
+function PhaseFilter({ selected, onChange }: { selected: PodPhase[]; onChange: (next: PodPhase[]) => void }) {
+    const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+    const open = anchorEl !== null;
+
+    function toggle(phase: PodPhase) {
+        if (selected.includes(phase)) {
+            onChange(selected.filter((p) => p !== phase));
+        }
+        else {
+            onChange([...selected, phase]);
+        }
+    }
+
+    const allSelected = selected.length === ALL_PHASES.length;
+    const label = allSelected ? "Phase: All" : `Phase: ${selected.length} selected`;
+
+    return (
+        <div>
+            <Button
+                variant="outlined"
+                size="small"
+                onClick={(e) => setAnchorEl(e.currentTarget)}
+                startIcon={<FontAwesomeIcon icon={["fas", "filter"]} />}
+                data-test-id="pods-phase-filter-button"
+            >
+                {label}
+            </Button>
+            <Menu anchorEl={anchorEl} open={open} onClose={() => setAnchorEl(null)} data-test-id="pods-phase-filter-menu">
+                {ALL_PHASES.map((phase) => (
+                    <MenuItem
+                        key={phase}
+                        onClick={() => toggle(phase)}
+                        data-test-id={`pods-phase-filter-item-${phase}`}
+                    >
+                        <Checkbox checked={selected.includes(phase)} size="small" />
+                        <ListItemText primary={phase} />
+                    </MenuItem>
+                ))}
+            </Menu>
+        </div>
+    );
+}
+
 // Builds the column definitions for the pods table.
 function buildColumns(): ColumnDef<Pod>[] {
     const cols: ColumnDef<Pod>[] = [];
@@ -168,11 +221,14 @@ export function PodsTable() {
 
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
+    const [selectedPhases, setSelectedPhases] = useState<PodPhase[]>(ALL_PHASES);
 
     const columns = buildColumns();
 
+    const phaseFilteredPods = (data?.pods ?? []).filter((pod) => selectedPhases.includes(pod.phase));
+
     const table = useReactTable({
-        data: data?.pods ?? [],
+        data: phaseFilteredPods,
         columns,
         state: {
             sorting,
@@ -211,20 +267,23 @@ export function PodsTable() {
 
     return (
         <div className="flex flex-col gap-2">
-            <TextField
-                size="small"
-                placeholder="Search pods..."
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                data-test-id="pods-search"
-                slotProps={{
-                    input: {
-                        startAdornment: (
-                            <FontAwesomeIcon icon={["fas", "magnifying-glass"]} style={{ marginRight: 8 }} />
-                        ),
-                    },
-                }}
-            />
+            <div className="flex flex-row gap-2 items-center">
+                <TextField
+                    size="small"
+                    placeholder="Search pods..."
+                    value={globalFilter}
+                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    data-test-id="pods-search"
+                    slotProps={{
+                        input: {
+                            startAdornment: (
+                                <FontAwesomeIcon icon={["fas", "magnifying-glass"]} style={{ marginRight: 8 }} />
+                            ),
+                        },
+                    }}
+                />
+                <PhaseFilter selected={selectedPhases} onChange={setSelectedPhases} />
+            </div>
             <TableContainer component={Paper} data-test-id="pods-table">
                 <Table size="small">
                     <TableHead>
