@@ -925,18 +925,25 @@ test.describe("karse e2e", () => {
             await expect(page.locator(".MuiChip-label", { hasText: "Running" }).first()).toBeVisible();
         });
 
-        test("shows both containers in the containers table", async () => {
+        test("defaults to the Detail / Status tab showing the events table", async () => {
+            await expect(page.locator("[data-test-id='pod-panel-detail']")).toBeVisible();
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-panel-containers']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='pod-panel-logs']")).toHaveCount(0);
+        });
+
+        test("clicking the Containers tab shows both containers in the containers table", async () => {
+            await page.locator("[data-test-id='pod-tab-containers']").click();
+            await expect(page.locator("[data-test-id='pod-panel-containers']")).toBeVisible();
             const names = await page.locator("[data-test-id='container-row'] td:first-child").allTextContents();
             expect(names).toContain("nginx");
             expect(names).toContain("sidecar");
+            await expect(page.locator("[data-test-id='pod-panel-detail']")).toHaveCount(0);
         });
 
-        test("shows the event in the events table", async () => {
-            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(1);
-        });
-
-        test("show logs button reveals the log viewer with realistic log content", async () => {
-            await page.locator("button", { hasText: "Show logs" }).click();
+        test("clicking the Logs tab reveals the log viewer with realistic log content", async () => {
+            await page.locator("[data-test-id='pod-tab-logs']").click();
+            await expect(page.locator("[data-test-id='pod-panel-logs']")).toBeVisible();
             await expect(page.locator("[data-test-id='log-viewer']")).toBeVisible();
             await expect(page.locator("[data-test-id='log-viewer']")).toContainText("kube-probe/1.29");
             await expect(page.locator("[data-test-id='log-viewer']")).toContainText("start worker processes");
