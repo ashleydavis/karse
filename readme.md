@@ -18,6 +18,7 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
 - Needs an event log
 - For testing need to run be/fe on next random unallocated port to avoid conflicts.
 - setGlobalMutation seems like a kludge.
+- Each node should be able to show the pods running on it.
 
 ## Requirements
 
