@@ -9,6 +9,11 @@
 - **Repo layout**: root `package.json` (bun workspaces), `backend/` (Express app and kubectl adapter), `frontend/` (React app), `e2e/` (Playwright e2e tests), `docs/` (guides and plans), `scripts/` (smoke tests and e2e runner).
 - **Documentation**: see `docs/`.
 
+## Versioning
+
+- **Never pin versions to `"latest"` (or any floating range) anywhere.** Tools (`mise.toml`), dependencies (`package.json`), Docker base images, CI actions, and any other versioned reference must use a concrete, exact version. Floating versions make builds non-reproducible.
+- **When adding a new version pin, pin to the latest version released at that time.** Look up the newest available release and pin to that exact version, rather than guessing or carrying over an older one.
+
 ## File naming
 
 - Filenames are kebab-case (lowercase with hyphens): `cluster-overview.tsx`, `kubectl-adapter.ts`.
