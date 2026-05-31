@@ -27,6 +27,9 @@ import {
     faTerminal,
     faTag,
     faTriangleExclamation,
+    faStream,
+    faPlay,
+    faStop,
 } from "@fortawesome/free-solid-svg-icons";
 
 config.autoAddCss = false;
@@ -58,4 +61,7 @@ library.add(
     faTerminal,
     faTag,
     faTriangleExclamation,
+    faStream,
+    faPlay,
+    faStop,
 );

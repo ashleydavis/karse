@@ -1,4 +1,4 @@
-import { run, type CommandResult } from "../command-runner";
+import { run, stream, type CommandResult, type StreamHandle } from "../command-runner";
 import { audit, formatLocalISO } from "../audit-log";
 import type {
     Context, NodeStatus, Node, ClusterOverview, Namespace, Pod, PodPhase,
@@ -430,6 +430,98 @@ export async function getPodLogs(
         throw new Error(result.stderr);
     }
     return result.stdout;
+}
+
+// Callbacks for a live (follow-mode) log stream from a single pod container.
+// onLine receives one complete log line at a time (newlines stripped); onError
+// receives a spawn/runtime failure; onClose fires once when the stream ends.
+export type LogStreamHandlers = {
+    onLine: (line: string) => void;
+    onError: (err: Error) => void;
+    onClose: () => void;
+};
+
+// A handle to a live log stream, exposing only a stop operation.
+export type LogStreamHandle = { stop: () => void };
+
+// Splits an incoming text chunk into complete lines, retaining any trailing
+// partial line in `carry` for the next chunk. Returns the new carry value.
+function emitLines(buffer: string, carry: string, onLine: (line: string) => void): string {
+    const combined = carry + buffer;
+    const parts = combined.split("\n");
+    const remainder = parts.pop() ?? "";
+    for (const part of parts) {
+        onLine(part);
+    }
+    return remainder;
+}
+
+// Streams live logs (`kubectl logs -f`) from a single pod, emitting each line via
+// the handlers as it arrives. This is a READ-ONLY follow operation. The optional
+// container scopes the stream to one container; tail bounds the initial backlog.
+// When KARSE_FAKE_LOGS=1 is set, emits the canned FAKE_LOG_LINES (one per line)
+// then closes, so the live log viewer can be exercised without a real cluster.
+// Returns a handle the caller uses to terminate the underlying kubectl process.
+export function streamPodLogs(
+    context: string,
+    namespace: string,
+    name: string,
+    container: string | undefined,
+    tail: number,
+    handlers: LogStreamHandlers,
+): LogStreamHandle {
+    if (process.env.KARSE_FAKE_LOGS === "1") {
+        let cancelled = false;
+        for (const line of FAKE_LOG_LINES.split("\n")) {
+            if (line !== "") {
+                handlers.onLine(line);
+            }
+        }
+        // Defer the close so callers can wire up listeners synchronously first.
+        setTimeout(() => {
+            if (!cancelled) {
+                handlers.onClose();
+            }
+        }, 0);
+        return {
+            stop: () => {
+                cancelled = true;
+            },
+        };
+    }
+
+    const containerArgs = container ? ["-c", container] : [];
+    const args = [
+        "--context", context, "-n", namespace, "logs", "-f", name,
+        ...containerArgs, `--tail=${tail}`,
+    ];
+    const now = new Date();
+    // Audit-log the streamed command exactly like the buffered kubectl() helper.
+    void audit(LOGS_DIR, "kubectl", args, now);
+    console.log(formatLocalISO(now) + " kubectl " + args.join(" "));
+
+    let carry = "";
+    const handle: StreamHandle = stream("kubectl", args, {
+        onStdout: (chunk) => {
+            carry = emitLines(chunk, carry, handlers.onLine);
+        },
+        onError: (err) => {
+            handlers.onError(err);
+        },
+        onClose: () => {
+            if (carry !== "") {
+                handlers.onLine(carry);
+                carry = "";
+            }
+            handlers.onClose();
+        },
+    });
+
+    return {
+        stop: () => {
+            handle.kill();
+        },
+    };
 }
 
 // Returns aggregate cluster statistics (version + node/namespace/pod counts).

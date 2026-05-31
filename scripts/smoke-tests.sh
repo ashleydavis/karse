@@ -150,6 +150,24 @@ echo "$LOGS_RESP" | jq -e 'has("logs") and (.logs | type == "string") and (.logs
 echo "$LOGS_RESP" | jq -r '.logs' | grep -q "kube-probe"
 echo "OK"
 
+echo "--- GET /api/logs/stream (SSE multi-pod live logs) ---"
+# KARSE_FAKE_LOGS=1 is set, so each matched pod's stream emits canned fake log
+# lines as SSE "line" events. The connection stays open (follow mode), so cap the
+# read with --max-time and confirm we received a started event and prefixed lines.
+LOGS_STREAM=$(curl -fsS --max-time 5 -H "Accept: text/event-stream" \
+    "http://127.0.0.1:5172/api/logs/stream?context=$CURRENT_CTX&namespace=default&filter=smoke" || true)
+echo "$LOGS_STREAM" | grep -q "event: started"
+echo "$LOGS_STREAM" | grep -q "event: line"
+echo "$LOGS_STREAM" | grep -q '"pod":"smoke-pod"'
+echo "$LOGS_STREAM" | grep -q "kube-probe"
+echo "OK"
+
+echo "--- GET /api/logs/stream (no pods match) ---"
+NO_MATCH=$(curl -fsS --max-time 5 -H "Accept: text/event-stream" \
+    "http://127.0.0.1:5172/api/logs/stream?context=$CURRENT_CTX&filter=does-not-exist-xyz" || true)
+echo "$NO_MATCH" | grep -q "event: done"
+echo "OK"
+
 echo "--- POST /api/namespaces/default (set) ---"
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
     -H "Content-Type: application/json" \

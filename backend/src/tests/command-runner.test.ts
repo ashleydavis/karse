@@ -1,4 +1,4 @@
-import { run } from "../command-runner";
+import { run, stream } from "../command-runner";
 
 describe("command-runner", () => {
   test("Case A: happy path", async () => {
@@ -40,5 +40,56 @@ describe("command-runner", () => {
   test("Case G: signal-killed", async () => {
     const result = await run("bash", ["-c", "kill -TERM $$"]);
     expect(result.exitCode).toBe(1);
+  });
+});
+
+describe("command-runner stream", () => {
+  test("streams stdout chunks and reports exit code on close", async () => {
+    const chunks: string[] = [];
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      stream("bash", ["-c", "echo one; echo two"], {
+        onStdout: (chunk) => chunks.push(chunk),
+        onError: reject,
+        onClose: resolve,
+      });
+    });
+    expect(exitCode).toBe(0);
+    expect(chunks.join("")).toBe("one\ntwo\n");
+  });
+
+  test("surfaces stderr through onStdout", async () => {
+    const chunks: string[] = [];
+    await new Promise<number>((resolve, reject) => {
+      stream("bash", ["-c", "echo boom >&2"], {
+        onStdout: (chunk) => chunks.push(chunk),
+        onError: reject,
+        onClose: resolve,
+      });
+    });
+    expect(chunks.join("")).toBe("boom\n");
+  });
+
+  test("kill() terminates a long-running follow process", async () => {
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      const handle = stream("bash", ["-c", "sleep 30"], {
+        onStdout: () => {},
+        onError: reject,
+        onClose: resolve,
+      });
+      setTimeout(() => handle.kill(), 20);
+    });
+    expect(exitCode).toBe(1);
+  });
+
+  test("onError fires when the binary does not exist", async () => {
+    await expect(
+      new Promise<number>((resolve, reject) => {
+        stream("definitely-not-a-binary-xyz", [], {
+          onStdout: () => {},
+          onError: reject,
+          onClose: resolve,
+        });
+      })
+    ).rejects.toThrow();
   });
 });

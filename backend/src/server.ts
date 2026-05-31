@@ -7,6 +7,7 @@ import { podsRouter } from "./routes/pods-route";
 import { podDetailRouter } from "./routes/pod-detail-route";
 import { nodeDetailRouter } from "./routes/node-detail-route";
 import { workloadsRouter } from "./routes/workloads-route";
+import { logsStreamRouter } from "./routes/logs-stream-route";
 
 // Builds and returns the configured Express application.
 // Applies JSON body parsing, mounts both API routers, and installs the
@@ -22,6 +23,7 @@ export function createServer(): express.Express {
     app.use("/api", podsRouter);
     app.use("/api", nodeDetailRouter);
     app.use("/api", workloadsRouter);
+    app.use("/api", logsStreamRouter);
     const errorHandler: ErrorRequestHandler = (err: Error, _req, res, _next) => {
         res.status(500).json({
             error: err.message,

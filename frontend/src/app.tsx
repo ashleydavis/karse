@@ -10,6 +10,7 @@ import { StatefulSetsPage } from "./pages/statefulsets-page";
 import { DaemonSetsPage } from "./pages/daemonsets-page";
 import { PodDetailPage } from "./pages/pod-detail-page";
 import { NodeDetailPage } from "./pages/node-detail-page";
+import { LiveLogsPage } from "./pages/live-logs-page";
 
 export function App() {
     return (
@@ -27,6 +28,7 @@ export function App() {
                     <Route path="deployments" element={<DeploymentsPage />} />
                     <Route path="statefulsets" element={<StatefulSetsPage />} />
                     <Route path="daemonsets" element={<DaemonSetsPage />} />
+                    <Route path="logs" element={<LiveLogsPage />} />
                 </Route>
             </Routes>
         </BrowserRouter>
