@@ -8,7 +8,7 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
 - Drilling down into a Deployment, Statefulset, or Daemonset shows a blank page. Drilling down into Pods is ok.
 - Maybe separate tabs under Pods for Containers and Init Containers.
 - Be sure that the fake pod logs still work for testing when enabled.
-- Components for each page should be under a subdirectory for that page. Restructure to colocate a page and its components to be together. Eg pages/pod/index.tsx && pages/pod/components/...
+- Components for each page should be under a subdirectory for that page. Restructure to colocate a page and its components to be together. Eg pages/pod/index.tsx && pages/pod/components/... IMPORTANT: implement this on its own, NOT in parallel with any other todo items. A previous attempt was developed alongside other changes and went stale (it missed pages that were added by the other work and left the colocation partial and inconsistent). Do it as a standalone change against the current code so every page is covered.
 - Automatic updating pod logs didn't work.
 - Breadcrumbs need to be in the navbar. Make sure they include the current tag under Pods (and other resources that have sub tabs).
    - The main page should be indicated with bit (title sized) text. Sub pages in the breadcrumbs can be the regular size for breadcrumbs.
