@@ -1,11 +1,14 @@
 import { type FilterFn, type Row } from "@tanstack/react-table";
 
-// Returns true when every character of `query` appears in `text` in order
-// (a subsequence match), allowing typo/gap-tolerant matching such as "ngnx"
-// or "ng-x" matching "nginx-deployment". Matching is case-insensitive.
+// Returns true when every meaningful character of `query` appears in `text` in
+// order (a subsequence match), allowing typo/gap-tolerant matching such as
+// "ngnx" or "ng-x" matching "nginx-deployment". Separator characters (anything
+// that is not a letter or digit, e.g. "-" or " ") are ignored in the query so
+// they act as gaps rather than literal characters to match. Matching is
+// case-insensitive.
 export function fuzzyMatch(text: string, query: string): boolean {
     const haystack = text.toLowerCase();
-    const needle = query.toLowerCase();
+    const needle = query.toLowerCase().replace(/[^a-z0-9]/g, "");
     if (needle.length === 0)
     {
         return true;
@@ -36,21 +39,22 @@ function cellToString(value: any): string {
     return String(value);
 }
 
-// Builds one searchable string from every visible/leaf column value of a row.
-function rowToString<T>(row: Row<T>): string {
-    return row.getAllCells()
-        .map((cell) => cellToString(cell.getValue()))
-        .join(" ");
+// Returns the searchable string for every column value of a row, one entry per
+// cell. Matching per cell (rather than against the whole concatenated row)
+// keeps the subsequence match scoped to a single value so a query cannot span
+// across unrelated columns.
+function rowCellStrings<T>(row: Row<T>): string[] {
+    return row.getAllCells().map((cell) => cellToString(cell.getValue()));
 }
 
-// Tanstack global filter function that fuzzy-matches the query against the
-// concatenated cell values of each row. Shared across all searchable tables so
-// they behave identically.
+// Tanstack global filter function that fuzzy-matches the query against each
+// cell value of a row, keeping the row when any single cell matches. Shared
+// across all searchable tables so they behave identically.
 export const fuzzyGlobalFilter: FilterFn<any> = (row, _columnId, filterValue) => {
     const query = typeof filterValue === "string" ? filterValue : "";
     if (query.trim().length === 0)
     {
         return true;
     }
-    return fuzzyMatch(rowToString(row), query);
+    return rowCellStrings(row).some((cellValue) => fuzzyMatch(cellValue, query));
 };
