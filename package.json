@@ -21,6 +21,6 @@
     "sm": "bun run smoke"
   },
   "devDependencies": {
-    "wait-on": "^9.0.10"
+    "wait-on": "9.0.10"
   }
 }
