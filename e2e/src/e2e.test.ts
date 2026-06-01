@@ -1163,7 +1163,16 @@ test.describe("karse e2e", () => {
                     stateReason: "",
                 },
             ],
-            initContainers: [],
+            initContainers: [
+                {
+                    name: "init-setup",
+                    image: "busybox:1.36",
+                    ready: true,
+                    restarts: 0,
+                    state: "Terminated",
+                    stateReason: "Completed",
+                },
+            ],
             events: [
                 {
                     type: "Normal",
@@ -1205,16 +1214,29 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-panel-detail']")).toBeVisible();
             await expect(page.locator("[data-test-id='event-row']")).toHaveCount(1);
             await expect(page.locator("[data-test-id='pod-panel-containers']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='pod-panel-init-containers']")).toHaveCount(0);
             await expect(page.locator("[data-test-id='pod-panel-logs']")).toHaveCount(0);
         });
 
-        test("clicking the Containers tab shows both containers in the containers table", async () => {
+        test("clicking the Containers tab shows only the regular containers", async () => {
             await page.locator("[data-test-id='pod-tab-containers']").click();
             await expect(page.locator("[data-test-id='pod-panel-containers']")).toBeVisible();
             const names = await page.locator("[data-test-id='container-row'] td:first-child").allTextContents();
             expect(names).toContain("nginx");
             expect(names).toContain("sidecar");
+            expect(names).not.toContain("init-setup");
+            // Init containers live on their own separate tab/panel.
+            await expect(page.locator("[data-test-id='pod-panel-init-containers']")).toHaveCount(0);
             await expect(page.locator("[data-test-id='pod-panel-detail']")).toHaveCount(0);
+        });
+
+        test("clicking the Init Containers tab shows only the init containers", async () => {
+            await page.locator("[data-test-id='pod-tab-init-containers']").click();
+            await expect(page.locator("[data-test-id='pod-panel-init-containers']")).toBeVisible();
+            const names = await page.locator("[data-test-id='init-container-row'] td:first-child").allTextContents();
+            expect(names).toEqual(["init-setup"]);
+            await expect(page.locator("[data-test-id='container-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='pod-panel-containers']")).toHaveCount(0);
         });
 
         test("clicking the Logs tab reveals the log viewer with realistic log content", async () => {
@@ -1290,6 +1312,59 @@ test.describe("karse e2e", () => {
             expect(rowCount).toBeGreaterThan(0);
             expect(copyCount).toBe(rowCount);
             await page.keyboard.press("Escape");
+        });
+    });
+
+    // ── Pod detail page without init containers ─────────────────────────────────
+
+    test.describe("pod detail page without init containers", () => {
+        const FAKE_POD_DETAIL_NO_INIT = {
+            name: "redis-xyz",
+            namespace: "default",
+            phase: "Running",
+            node: "node-worker",
+            podIP: "10.0.0.2",
+            createdAt: new Date().toISOString(),
+            labels: { app: "redis" },
+            containers: [
+                {
+                    name: "redis",
+                    image: "redis:7",
+                    ready: true,
+                    restarts: 0,
+                    state: "Running",
+                    stateReason: "",
+                },
+            ],
+            initContainers: [],
+            events: [],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods/default/redis-xyz*", async (route) => {
+                await route.fulfill({
+                    json: FAKE_POD_DETAIL_NO_INIT,
+                });
+            });
+            await page.goto("/pods/default/redis-xyz", { waitUntil: "networkidle" });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods/default/redis-xyz*");
+        });
+
+        test("hides the Init Containers tab when the pod has no init containers", async () => {
+            await expect(page.locator("[data-test-id='pod-tab-containers']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-tab-init-containers']")).toHaveCount(0);
+        });
+
+        test("still shows the regular containers on the Containers tab", async () => {
+            await page.locator("[data-test-id='pod-tab-containers']").click();
+            await expect(page.locator("[data-test-id='pod-panel-containers']")).toBeVisible();
+            const names = await page.locator("[data-test-id='container-row'] td:first-child").allTextContents();
+            expect(names).toEqual(["redis"]);
+            await expect(page.locator("[data-test-id='pod-panel-init-containers']")).toHaveCount(0);
         });
     });
 

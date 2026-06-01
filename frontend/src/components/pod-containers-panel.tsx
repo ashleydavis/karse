@@ -29,10 +29,10 @@ function ContainerStateChip({ state, reason }: { state: ContainerState; reason: 
 }
 
 // Renders a single table of containers with their image, state, readiness and restarts.
-function ContainerTable({ containers, rowTestId, emptyAllowed }: {
+function ContainerTable({ containers, rowTestId, emptyMessage }: {
     containers: ContainerInfo[];
     rowTestId: string;
-    emptyAllowed: boolean;
+    emptyMessage: string;
 }) {
     return (
         <TableContainer>
@@ -56,10 +56,10 @@ function ContainerTable({ containers, rowTestId, emptyAllowed }: {
                             <TableCell>{c.restarts}</TableCell>
                         </TableRow>
                     ))}
-                    {emptyAllowed && containers.length === 0 && (
+                    {containers.length === 0 && (
                         <TableRow>
                             <TableCell colSpan={5}>
-                                <Typography color="text.secondary">No containers.</Typography>
+                                <Typography color="text.secondary">{emptyMessage}</Typography>
                             </TableCell>
                         </TableRow>
                     )}
@@ -69,24 +69,26 @@ function ContainerTable({ containers, rowTestId, emptyAllowed }: {
     );
 }
 
-// Displays a pod's containers and, when present, its init containers.
-export function PodContainersPanel({ containers, initContainers }: {
-    containers: ContainerInfo[];
-    initContainers: ContainerInfo[];
-}) {
+// Displays a pod's regular (non-init) containers in a table.
+export function PodContainersPanel({ containers }: { containers: ContainerInfo[] }) {
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
             <Paper variant="outlined" sx={{ p: 2 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Containers</Typography>
-                <ContainerTable containers={containers} rowTestId="container-row" emptyAllowed={true} />
+                <ContainerTable containers={containers} rowTestId="container-row" emptyMessage="No containers." />
             </Paper>
+        </Box>
+    );
+}
 
-            {initContainers.length > 0 && (
-                <Paper variant="outlined" sx={{ p: 2 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Init Containers</Typography>
-                    <ContainerTable containers={initContainers} rowTestId="init-container-row" emptyAllowed={false} />
-                </Paper>
-            )}
+// Displays a pod's init containers in a table.
+export function PodInitContainersPanel({ initContainers }: { initContainers: ContainerInfo[] }) {
+    return (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Init Containers</Typography>
+                <ContainerTable containers={initContainers} rowTestId="init-container-row" emptyMessage="No init containers." />
+            </Paper>
         </Box>
     );
 }

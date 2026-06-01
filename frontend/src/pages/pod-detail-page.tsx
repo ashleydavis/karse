@@ -26,7 +26,7 @@ import { useShareableNavigate } from "../lib/nav-state";
 import { fetchPodDetail } from "../lib/api-client";
 import { YamlButton } from "../components/yaml-dialog";
 import { CommandsDialog } from "../components/commands-dialog";
-import { PodContainersPanel } from "../components/pod-containers-panel";
+import { PodContainersPanel, PodInitContainersPanel } from "../components/pod-containers-panel";
 import { PodLogsPanel } from "../components/pod-logs-panel";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
@@ -77,7 +77,7 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
 }
 
 // The set of tabs available on the pod detail page.
-type PodDetailTab = "detail" | "containers" | "logs";
+type PodDetailTab = "detail" | "containers" | "init-containers" | "logs";
 
 // Detail page for a single pod, organizing its content into Detail/Status, Containers, and Logs tabs.
 export function PodDetailPage() {
@@ -105,6 +105,12 @@ export function PodDetailPage() {
         ...data.containers.map((c) => c.name),
         ...data.initContainers.map((c) => c.name),
     ];
+
+    const hasInitContainers = data.initContainers.length > 0;
+    // The Init Containers tab is hidden when there are none, so fall back to
+    // Containers if we were left pointing at a now-absent tab.
+    const effectiveTab =
+        activeTab === "init-containers" && !hasInitContainers ? "containers" : activeTab;
 
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -139,17 +145,24 @@ export function PodDetailPage() {
 
             <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
                 <Tabs
-                    value={activeTab}
+                    value={effectiveTab}
                     onChange={(_, value) => setActiveTab(value)}
                     data-test-id="pod-detail-tabs"
                 >
                     <Tab label="Detail / Status" value="detail" data-test-id="pod-tab-detail" />
                     <Tab label="Containers" value="containers" data-test-id="pod-tab-containers" />
+                    {hasInitContainers && (
+                        <Tab
+                            label="Init Containers"
+                            value="init-containers"
+                            data-test-id="pod-tab-init-containers"
+                        />
+                    )}
                     <Tab label="Logs" value="logs" data-test-id="pod-tab-logs" />
                 </Tabs>
             </Box>
 
-            {activeTab === "detail" && (
+            {effectiveTab === "detail" && (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }} data-test-id="pod-panel-detail">
                     <Paper variant="outlined" sx={{ p: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Details</Typography>
@@ -217,13 +230,19 @@ export function PodDetailPage() {
                 </Box>
             )}
 
-            {activeTab === "containers" && (
+            {effectiveTab === "containers" && (
                 <Box data-test-id="pod-panel-containers">
-                    <PodContainersPanel containers={data.containers} initContainers={data.initContainers} />
+                    <PodContainersPanel containers={data.containers} />
                 </Box>
             )}
 
-            {activeTab === "logs" && (
+            {effectiveTab === "init-containers" && (
+                <Box data-test-id="pod-panel-init-containers">
+                    <PodInitContainersPanel initContainers={data.initContainers} />
+                </Box>
+            )}
+
+            {effectiveTab === "logs" && (
                 <Box data-test-id="pod-panel-logs">
                     <PodLogsPanel
                         namespace={data.namespace}
