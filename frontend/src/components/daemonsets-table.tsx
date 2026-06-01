@@ -29,6 +29,7 @@ import { useKubeNamespace } from "../lib/kube-namespace";
 import { fetchDaemonSets } from "../lib/api-client";
 import { YamlButton } from "./yaml-dialog";
 import { tableRowSx } from "../lib/table-row-style";
+import { fuzzyGlobalFilter } from "../lib/fuzzy-filter";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -103,7 +104,7 @@ export function DaemonSetsTable() {
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
-        globalFilterFn: "includesString",
+        globalFilterFn: fuzzyGlobalFilter,
     });
 
     if (error) {

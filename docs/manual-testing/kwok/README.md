@@ -38,3 +38,4 @@ To tear down every test cluster at once (handy after running several scenarios, 
 | [26](26-table-row-hover/) | Consistent table row hover across all tables |
 | [27](27-live-pod-logs/) | Live (follow) pod logs: streaming log tail via the Live toggle on the pod detail page |
 | [28](28-events-view/) | Events view: cluster- and namespace-wide Kubernetes events |
+| [29](29-fuzzy-search/) | Fuzzy search: typo-tolerant, non-contiguous matching in table search boxes |

@@ -24,6 +24,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { Context } from "karse-types";
 import { tableRowSx } from "../lib/table-row-style";
+import { fuzzyGlobalFilter } from "../lib/fuzzy-filter";
 
 type Props = {
     contexts: Context[];
@@ -98,7 +99,7 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
-        globalFilterFn: "includesString",
+        globalFilterFn: fuzzyGlobalFilter,
     });
 
     const rows = table.getRowModel().rows;

@@ -290,6 +290,78 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Fuzzy search ───────────────────────────────────────────────────────────
+
+    test.describe("fuzzy search", () => {
+        // Deterministic pod list so fuzzy-match assertions are stable.
+        const FAKE_PODS = {
+            pods: [
+                { name: "nginx-deployment-abc", namespace: "default", phase: "Running", ready: "1/1", restarts: 0, node: "node-worker", createdAt: new Date().toISOString() },
+                { name: "redis-cache-xyz", namespace: "default", phase: "Running", ready: "1/1", restarts: 0, node: "node-worker", createdAt: new Date().toISOString() },
+            ],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: FAKE_PODS });
+            });
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']").first()).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+        });
+
+        test("a typo query (ngnx) still matches nginx-deployment-abc", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("ngnx");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("nginx-deployment-abc");
+        });
+
+        test("a non-contiguous query (ng-x) still matches nginx-deployment-abc", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("ng-x");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("nginx-deployment-abc");
+        });
+
+        test("a clearly non-matching query filters out all rows", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("zzzqqq");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-pods-match']")).toBeVisible();
+        });
+
+        test("clearing the query restores all pod rows", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
+        });
+    });
+
+    // ── Fuzzy search on the nodes table ────────────────────────────────────────
+
+    test.describe("fuzzy search (nodes table)", () => {
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await navigateToNodes();
+        });
+
+        test.afterAll(async () => {
+            await page.locator("[data-test-id='nodes-search'] input").fill("");
+        });
+
+        test("a non-contiguous query (nwk) fuzzy-matches node-worker", async () => {
+            await page.locator("[data-test-id='nodes-search'] input").fill("nwk");
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='node-row'] td:first-child")).toHaveText("node-worker");
+        });
+
+        test("a clearly non-matching query filters out all node rows", async () => {
+            await page.locator("[data-test-id='nodes-search'] input").fill("zzzqqq");
+            await expect(page.locator("[data-test-id='no-nodes-match']")).toBeVisible();
+        });
+    });
+
     // ── Refresh ───────────────────────────────────────────────────────────────
 
     test.describe("refresh button", () => {

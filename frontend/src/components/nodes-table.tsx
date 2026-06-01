@@ -29,6 +29,7 @@ import { useKubeContext } from "../lib/kube-context";
 import { fetchNodes } from "../lib/api-client";
 import { YamlButton } from "./yaml-dialog";
 import { tableRowSx } from "../lib/table-row-style";
+import { fuzzyGlobalFilter } from "../lib/fuzzy-filter";
 
 function formatAge(createdAt: string): string {
     const ms = Date.now() - new Date(createdAt).getTime();
@@ -140,7 +141,7 @@ export function NodesTable() {
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
-        globalFilterFn: "includesString",
+        globalFilterFn: fuzzyGlobalFilter,
     });
 
     if (error) {

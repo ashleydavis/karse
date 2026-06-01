@@ -36,6 +36,7 @@ import { useShareableNavigate } from "../lib/nav-state";
 import { fetchPods } from "../lib/api-client";
 import { YamlButton } from "./yaml-dialog";
 import { tableRowSx } from "../lib/table-row-style";
+import { fuzzyGlobalFilter } from "../lib/fuzzy-filter";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -280,7 +281,7 @@ export function PodsTable() {
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
-        globalFilterFn: "includesString",
+        globalFilterFn: fuzzyGlobalFilter,
     });
 
     if (error) {

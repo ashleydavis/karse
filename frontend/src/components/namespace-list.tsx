@@ -27,6 +27,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { Namespace } from "karse-types";
 import { YamlButton } from "./yaml-dialog";
 import { tableRowSx } from "../lib/table-row-style";
+import { fuzzyGlobalFilter } from "../lib/fuzzy-filter";
 
 type Props = {
     namespaces: Namespace[];
@@ -98,7 +99,7 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
-        globalFilterFn: "includesString",
+        globalFilterFn: fuzzyGlobalFilter,
     });
 
     if (isLoading) {
