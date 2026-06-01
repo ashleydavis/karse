@@ -444,6 +444,8 @@ describe("getNodeDetail", () => {
     const NODE_KEY = "--context test-ctx get node node-1 -o json";
     // Argv key for the field-selector pod fetch scoped to node-1.
     const PODS_KEY = "--context test-ctx get pods -A --field-selector=spec.nodeName=node-1 -o json";
+    // Argv key for the field-selector event fetch scoped to node-1.
+    const EVENTS_KEY = "--context test-ctx get events -A --field-selector=involvedObject.kind=Node,involvedObject.name=node-1 -o json";
 
     // A minimal node item shape with the fields getNodeDetail reads.
     function makeNodeItem(): object {
@@ -497,10 +499,26 @@ describe("getNodeDetail", () => {
         };
     }
 
+    // A minimal event item shape as returned by the node-scoped event query.
+    function makeEventItem(reason: string, type: "Normal" | "Warning"): object {
+        return {
+            type,
+            reason,
+            message: `${reason} happened`,
+            count: 2,
+            lastTimestamp: "2024-06-01T01:00:00Z",
+            involvedObject: {
+                kind: "Node",
+                name: "node-1",
+            },
+        };
+    }
+
     test("uses a field selector scoped to the node when fetching pods", async () => {
         setRunnerHandlers({
             [NODE_KEY]: () => ok(JSON.stringify(makeNodeItem())),
             [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [EVENTS_KEY]: () => ok(JSON.stringify({ items: [] })),
         });
         await getNodeDetail("test-ctx", "node-1");
         // setRunnerHandlers throws on any unmocked argv, so reaching here proves
@@ -509,6 +527,64 @@ describe("getNodeDetail", () => {
             "kubectl",
             ["--context", "test-ctx", "get", "pods", "-A", "--field-selector=spec.nodeName=node-1", "-o", "json"],
         );
+    });
+
+    test("uses a field selector scoped to the node when fetching events", async () => {
+        setRunnerHandlers({
+            [NODE_KEY]: () => ok(JSON.stringify(makeNodeItem())),
+            [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [EVENTS_KEY]: () => ok(JSON.stringify({ items: [] })),
+        });
+        await getNodeDetail("test-ctx", "node-1");
+        expect(run).toHaveBeenCalledWith(
+            "kubectl",
+            [
+                "--context", "test-ctx", "get", "events", "-A",
+                "--field-selector=involvedObject.kind=Node,involvedObject.name=node-1",
+                "-o", "json",
+            ],
+        );
+    });
+
+    test("parses node events", async () => {
+        setRunnerHandlers({
+            [NODE_KEY]: () => ok(JSON.stringify(makeNodeItem())),
+            [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [EVENTS_KEY]: () => ok(JSON.stringify({
+                items: [
+                    makeEventItem("NodeReady", "Normal"),
+                    makeEventItem("NodeNotReady", "Warning"),
+                ],
+            })),
+        });
+        const result = await getNodeDetail("test-ctx", "node-1");
+        expect(result.events).toEqual([
+            {
+                type: "Normal",
+                reason: "NodeReady",
+                message: "NodeReady happened",
+                count: 2,
+                lastSeen: "2024-06-01T01:00:00Z",
+            },
+            {
+                type: "Warning",
+                reason: "NodeNotReady",
+                message: "NodeNotReady happened",
+                count: 2,
+                lastSeen: "2024-06-01T01:00:00Z",
+            },
+        ]);
+    });
+
+    test("tolerates the events call failing and still returns node detail", async () => {
+        setRunnerHandlers({
+            [NODE_KEY]: () => ok(JSON.stringify(makeNodeItem())),
+            [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [EVENTS_KEY]: () => fail("forbidden"),
+        });
+        const result = await getNodeDetail("test-ctx", "node-1");
+        expect(result.name).toBe("node-1");
+        expect(result.events).toEqual([]);
     });
 
     test("parses node fields and maps the scheduled pods", async () => {
@@ -520,9 +596,11 @@ describe("getNodeDetail", () => {
                     makePodItem("web", "default", "node-1"),
                 ],
             })),
+            [EVENTS_KEY]: () => ok(JSON.stringify({ items: [] })),
         });
         const result = await getNodeDetail("test-ctx", "node-1");
         expect(result.name).toBe("node-1");
+        expect(result.events).toEqual([]);
         expect(result.status).toBe("Ready");
         expect(result.roles).toEqual(["control-plane"]);
         expect(result.version).toBe("v1.29.0");
@@ -564,6 +642,7 @@ describe("getNodeDetail", () => {
         setRunnerHandlers({
             [NODE_KEY]: () => ok(JSON.stringify(makeNodeItem())),
             [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [EVENTS_KEY]: () => ok(JSON.stringify({ items: [] })),
         });
         const result = await getNodeDetail("test-ctx", "node-1");
         expect(result.pods).toEqual([]);
@@ -573,6 +652,7 @@ describe("getNodeDetail", () => {
         setRunnerHandlers({
             [NODE_KEY]: () => ok(JSON.stringify(makeNodeItem())),
             [PODS_KEY]: () => fail("forbidden"),
+            [EVENTS_KEY]: () => ok(JSON.stringify({ items: [] })),
         });
         const result = await getNodeDetail("test-ctx", "node-1");
         expect(result.name).toBe("node-1");
@@ -583,6 +663,7 @@ describe("getNodeDetail", () => {
         setRunnerHandlers({
             [NODE_KEY]: () => fail("not found"),
             [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [EVENTS_KEY]: () => ok(JSON.stringify({ items: [] })),
         });
         await expect(getNodeDetail("test-ctx", "node-1")).rejects.toThrow("not found");
     });

@@ -1109,6 +1109,7 @@ test.describe("karse e2e", () => {
             addresses: [],
             labels: {},
             pods: [],
+            events: [],
         };
 
         test.beforeAll(async () => {
@@ -1324,6 +1325,15 @@ test.describe("karse e2e", () => {
                     node: "node-cp",
                 },
             ],
+            events: [
+                {
+                    type: "Warning",
+                    reason: "NodeNotReady",
+                    message: "Node node-cp status is now: NodeNotReady",
+                    count: 3,
+                    lastSeen: new Date().toISOString(),
+                },
+            ],
         };
 
         test.beforeAll(async () => {
@@ -1333,6 +1343,11 @@ test.describe("karse e2e", () => {
                 json: FAKE_NODE_DETAIL,
             });
             });
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+        });
+
+        test.beforeEach(async () => {
+            // Reset to the default Status / Details tab between tests.
             await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
         });
 
@@ -1363,8 +1378,26 @@ test.describe("karse e2e", () => {
             await expect(page.getByRole("cell", { name: "pods" })).toBeVisible();
         });
 
-        test("shows the scheduled pod in the pods table", async () => {
+        test("shows the three tabs and defaults to Status / Details", async () => {
+            await expect(page.locator("[data-test-id='node-tab-detail']")).toBeVisible();
+            await expect(page.locator("[data-test-id='node-tab-pods']")).toBeVisible();
+            await expect(page.locator("[data-test-id='node-tab-events']")).toBeVisible();
+            await expect(page.locator("[data-test-id='node-panel-detail']")).toBeVisible();
+            await expect(page.locator("[data-test-id='node-panel-pods']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='node-panel-events']")).toHaveCount(0);
+        });
+
+        test("shows the scheduled pod in the pods table on the Pods tab", async () => {
+            await page.locator("[data-test-id='node-tab-pods']").click();
+            await expect(page.locator("[data-test-id='node-panel-pods']")).toBeVisible();
             await expect(page.locator("[data-test-id='node-pod-row'] td:first-child")).toHaveText("coredns-abc");
+        });
+
+        test("shows node events on the Events tab", async () => {
+            await page.locator("[data-test-id='node-tab-events']").click();
+            await expect(page.locator("[data-test-id='node-panel-events']")).toBeVisible();
+            await expect(page.locator("[data-test-id='node-event-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='node-event-row'] td:nth-child(2)")).toHaveText("NodeNotReady");
         });
 
         test("clicking a pod row in node detail navigates to pod detail", async () => {
@@ -1384,13 +1417,13 @@ test.describe("karse e2e", () => {
                     },
                 });
             });
+            await page.locator("[data-test-id='node-tab-pods']").click();
             await page.locator("[data-test-id='node-pod-row']").click();
             await expect(page).toHaveURL(/\/pods\/kube-system\/coredns-abc/);
             await page.unroute("**/api/pods/kube-system/coredns-abc*");
         });
 
         test("commands button opens guided commands for the node", async () => {
-            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='commands-button']").click();
             await expect(page.locator("[data-test-id='commands-dialog']")).toBeVisible();
             const commands = await page.locator("[data-test-id='command-text']").allTextContents();
@@ -1760,6 +1793,7 @@ test.describe("karse e2e", () => {
             addresses: [],
             labels: {},
             pods: [],
+            events: [],
         };
 
         test.beforeAll(async () => {

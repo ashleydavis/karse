@@ -207,6 +207,7 @@ export type NodeDetail = {
     addresses: NodeAddress[];
     labels: Record<string, string>;
     pods: Pod[];
+    events: KubeEvent[];
 };
 
 // The workload kinds that have a drill-down detail page.

@@ -214,7 +214,7 @@ echo "--- GET /api/nodes/:name ---"
 FIRST_NODE=$(curl -fsS "$BASE/api/cluster/nodes?context=$CURRENT_CTX" | jq -r '.nodes[0].name')
 if [[ -n "$FIRST_NODE" && "$FIRST_NODE" != "null" ]]; then
     curl -fsS "$BASE/api/nodes/$FIRST_NODE?context=$CURRENT_CTX" \
-        | jq -e 'has("name") and has("conditions") and has("capacity") and has("pods")' \
+        | jq -e 'has("name") and has("conditions") and has("capacity") and has("pods") and (.events | type == "array")' \
         > /dev/null
     echo "OK"
 else

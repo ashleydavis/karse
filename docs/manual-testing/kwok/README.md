@@ -40,3 +40,4 @@ To tear down every test cluster at once (handy after running several scenarios, 
 | [28](28-events-view/) | Events view: cluster- and namespace-wide Kubernetes events |
 | [29](29-fuzzy-search/) | Fuzzy search: typo-tolerant, non-contiguous matching in table search boxes |
 | [30](30-workload-detail-pages/) | Workload detail pages: drilling into a deployment, stateful set, or daemon set |
+| [31](31-node-detail-tabs/) | Node detail tabs: Status / Details, Pods, Events |

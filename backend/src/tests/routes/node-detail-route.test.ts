@@ -52,6 +52,9 @@ const FAKE_NODE_DETAIL = {
     addresses: [{ type: "InternalIP", address: "192.168.1.1" }],
     labels: { "kubernetes.io/hostname": "node-1" },
     pods: [],
+    events: [
+        { type: "Normal", reason: "NodeReady", message: "Node node-1 status is now: NodeReady", count: 1, lastSeen: "2024-01-01T00:05:00Z" },
+    ],
 };
 
 describe("GET /api/nodes/:name", () => {

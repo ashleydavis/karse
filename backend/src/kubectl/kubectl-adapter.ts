@@ -331,9 +331,14 @@ export async function getPodDetail(context: string, namespace: string, name: str
 
 // Returns detailed information for a single node, including pods scheduled on it.
 export async function getNodeDetail(context: string, name: string): Promise<NodeDetail> {
-    const [nodeResult, podsResult] = await Promise.all([
+    const [nodeResult, podsResult, eventsResult] = await Promise.all([
         kubectl(["--context", context, "get", "node", name, "-o", "json"]),
         kubectl(["--context", context, "get", "pods", "-A", `--field-selector=spec.nodeName=${name}`, "-o", "json"]),
+        kubectl([
+            "--context", context, "get", "events", "-A",
+            `--field-selector=involvedObject.kind=Node,involvedObject.name=${name}`,
+            "-o", "json",
+        ]),
     ]);
     if (nodeResult.exitCode !== 0) {
         throw new Error(nodeResult.stderr);
@@ -392,6 +397,18 @@ export async function getNodeDetail(context: string, name: string): Promise<Node
         pods = (podsData.items as any[]).map((p) => mapPodListItem(p));
     }
 
+    let events: KubeEvent[] = [];
+    if (eventsResult.exitCode === 0) {
+        const evData = JSON.parse(eventsResult.stdout);
+        events = (evData.items as any[]).map((ev) => ({
+            type: (ev.type as "Normal" | "Warning") ?? "Normal",
+            reason: ev.reason ?? "",
+            message: ev.message ?? "",
+            count: ev.count ?? 1,
+            lastSeen: ev.lastTimestamp ?? ev.eventTime ?? "",
+        }));
+    }
+
     return {
         name: item.metadata.name,
         status,
@@ -404,6 +421,7 @@ export async function getNodeDetail(context: string, name: string): Promise<Node
         addresses,
         labels: item.metadata?.labels ?? {},
         pods,
+        events,
     };
 }
 
