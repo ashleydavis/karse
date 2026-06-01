@@ -87,8 +87,8 @@ karse/
 │       └── __mocks__/
 ├── frontend/
 │   └── src/
-│       ├── pages/
-│       ├── components/
+│       ├── pages/        one dir per page: <page>/index.tsx + <page>/components/ for page-only parts
+│       ├── components/   components shared across multiple pages (app shell, pickers, dialogs)
 │       └── lib/          api-client, query-client, kube-context, etc.
 ├── e2e/
 │   ├── playwright.config.ts
@@ -209,7 +209,7 @@ State that lives above the pages (currently the selected kubectl context) is own
 
 ### Routing
 
-React Router 7. Routes are declared centrally in `src/app.tsx`. Route-level components go under `src/pages/`. Reusable visual parts go under `src/components/`.
+React Router 7. Routes are declared centrally in `src/app.tsx`. Each page is colocated with its page-only components in its own directory: `src/pages/<page>/index.tsx` for the route-level component plus `src/pages/<page>/components/` for components used only by that page. Components shared across multiple pages (the app shell, header, sidebar, breadcrumbs, context/namespace pickers, and the YAML and commands dialogs) live under `src/components/`.
 
 ### Icons
 
@@ -239,7 +239,7 @@ Mock modules using Jest `__mocks__` directories adjacent to the module being moc
 3. If the feature requires a new kubectl command, add it as a named function to `kubectl/kubectl-adapter.ts`. It must go through the private `kubectl(args)` helper so it is audited. **Never add create/write/edit kubectl commands** (`apply`, `create`, `delete`, `edit`, `patch`, `replace`, `scale`, `rollout`, etc.). Karse is read-only; it must not mutate cluster state.
 4. Add or update Express routes in `backend/src/routes/`. Validate all user-supplied input at the HTTP boundary. Handlers are plain `async` functions; Express 5 forwards rejected promises to the error middleware natively.
 5. Add the corresponding `api-client.ts` function on the frontend.
-6. Add the page or component under `src/pages/` or `src/components/`. Use `useQuery`/`useMutation` via the api-client function, not raw axios.
+6. Add the page under `src/pages/<page>/index.tsx`, with any page-only components under `src/pages/<page>/components/`. Components shared across multiple pages go under `src/components/`. Use `useQuery`/`useMutation` via the api-client function, not raw axios.
 7. Run `bun run compile` and `bun run test` from `backend/` after every code step.
 8. Run `bun run smoke` and `bun run e2e` before considering the feature complete. Add or update Playwright tests in `e2e/src/e2e.test.ts` if the change affects any frontend behaviour.
 9. Update [docs/api.md](docs/api.md) for any new or changed endpoints, [docs/architecture.md](docs/architecture.md) if the system topology changes, and [docs/roadmap.md](docs/roadmap.md) to move completed items to "Already shipped".

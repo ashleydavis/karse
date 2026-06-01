@@ -6,6 +6,8 @@
 
 - **Never permanently switch directories.** Do not run a bare `cd` that persists across commands. The working directory is the repo root and must stay there. Always use absolute paths, or scope a directory change to a single command with a subshell (e.g. `(cd e2e && bunx playwright test)`). Persisting a `cd` repeatedly causes later relative-path commands to run in the wrong place.
 
+- **Never use `/tmp`.** Do not read from or write to `/tmp` (no redirecting command output there, no scratch files, no logs). Background commands already capture their own output, so there is no need. If a scratch file is genuinely required, keep it inside the repo (e.g. a git-ignored path) rather than `/tmp`.
+
 - **Never claim a root cause is "confirmed" until it is proven by running tests.** Reading code and reasoning about a failure produces a *hypothesis*, not a confirmation. Say "I suspect" or "my hypothesis is" until you have reproduced the failure and verified the fix by actually running the relevant tests (with kwok where applicable). Do not state or imply that a cause is confirmed, or that a fix works, on the basis of static analysis alone.
 
 - **Purpose**: a local-only Kubernetes dashboard wrapping the locally-installed `kubectl` binary. Read-only cluster information plus context switching. Never deployed.
@@ -27,7 +29,7 @@
 
 - Every source file lives under its package's `src/` (`backend/src/` or `frontend/src/`). No source files sit directly in the package root.
 - Backend tests live under `backend/src/tests/`, mirroring the source directory tree. Tests are **not** co-located with the modules they cover.
-- The frontend splits its `src/` into `pages/` (route-level), `components/` (reusable visual parts), and `lib/` (non-UI code).
+- The frontend splits its `src/` into `pages/` (route-level), `components/` (visual parts shared across multiple pages), and `lib/` (non-UI code). Each page lives in its own directory as `pages/<page>/index.tsx`, with components used only by that page colocated under `pages/<page>/components/`. A component moves to `components/` only once more than one page needs it.
 - The backend has `src/lib/` for reusable server-side code shared across routes and modules.
 
 ## Code style
@@ -66,7 +68,7 @@
 
 ## Routing
 
-- React Router 7. Routes are declared centrally in `src/app.tsx`. Pages live under `src/pages/`, reusable visual parts under `src/components/`.
+- React Router 7. Routes are declared centrally in `src/app.tsx`. Each page is colocated with its own components: `src/pages/<page>/index.tsx` is the route-level component and `src/pages/<page>/components/` holds components used only by that page. Visual parts shared across multiple pages live under `src/components/`.
 
 ## Icons
 
@@ -94,6 +96,7 @@
 - Tests must not be fudged: each assertion checks a specific value, fixtures use realistic shapes (the structurally significant fields the real tool would return), and fakes are not asserted against themselves. Inject collaborators (e.g. a fake `run`) rather than mocking the module under test.
 - Where mocking a module is required, prefer Jest's `__mocks__` directory adjacent to the module being mocked.
 - After every code-delivering step, run `bun run tests:all` from the **repo root** and confirm it is green. This runs compile, unit tests, smoke tests, and e2e tests in sequence. When asked to run tests or told tests are failing, always run `bun run tests:all` and gather the full results before responding — never run a subset and ask follow-up questions.
+- **Run test commands verbatim. Never wrap them.** Do not prefix with `timeout` (it can kill the suite mid-run — kwok clusters plus the full stack plus Playwright take a while — and report a false failure that is yours, not the code's). Do not pipe to `tail`, `head`, `grep`, or anything that truncates output (you cannot "gather the full results" from a truncated stream). Run `bun run tests:all` exactly as written and read all of its output. If the run is long, run it in the background and read the complete log, but never cap or filter it.
 
 ## Run
 

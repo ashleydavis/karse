@@ -1,20 +1,20 @@
 import { Route, Routes, Navigate, useLocation } from "react-router-dom";
 import { AppLayout } from "./components/app-layout";
-import { ClusterHomePage } from "./pages/cluster-home-page";
-import { ContextsPage } from "./pages/contexts-page";
-import { NamespacesPage } from "./pages/namespaces-page";
-import { NodesPage } from "./pages/nodes-page";
-import { PodsPage } from "./pages/pods-page";
-import { DeploymentsPage } from "./pages/deployments-page";
-import { StatefulSetsPage } from "./pages/statefulsets-page";
-import { DaemonSetsPage } from "./pages/daemonsets-page";
-import { EventsPage } from "./pages/events-page";
-import { ErrorsPage } from "./pages/errors-page";
-import { PodDetailPage } from "./pages/pod-detail-page";
-import { NodeDetailPage } from "./pages/node-detail-page";
-import { WorkloadDetailPage } from "./pages/workload-detail-page";
-import { LiveLogsPage } from "./pages/live-logs-page";
-import { SternPage } from "./pages/stern-page";
+import { ClusterHomePage } from "./pages/cluster-home";
+import { ContextsPage } from "./pages/contexts";
+import { NamespacesPage } from "./pages/namespaces";
+import { NodesPage } from "./pages/nodes";
+import { PodsPage } from "./pages/pods";
+import { DeploymentsPage } from "./pages/deployments";
+import { StatefulSetsPage } from "./pages/statefulsets";
+import { DaemonSetsPage } from "./pages/daemonsets";
+import { EventsPage } from "./pages/events";
+import { ErrorsPage } from "./pages/errors";
+import { PodDetailPage } from "./pages/pod-detail";
+import { NodeDetailPage } from "./pages/node-detail";
+import { WorkloadDetailPage } from "./pages/workload-detail";
+import { LiveLogsPage } from "./pages/live-logs";
+import { SternPage } from "./pages/stern";
 
 // Redirects the index route to the cluster home while preserving the shareable query string (context, namespace) so a link to the bare root stays shareable.
 function IndexRedirect() {

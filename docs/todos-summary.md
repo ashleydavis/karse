@@ -63,9 +63,8 @@ merge order will matter and some manual conflict resolution is expected.
 
 ## 6. Colocate page components
 **Item:** "Components for each page should be under a subdirectory for that page... Eg pages/pod/index.tsx && pages/pod/components/..."
-**Done:** Restructured `frontend/src/pages/` so each page is `pages/<page>/index.tsx` with a local `components/` subdir for page-only components (23 `git mv` moves, history preserved). Genuinely shared components (`yaml-dialog`, `commands-dialog`, layout components) kept in `frontend/src/components/`. All imports updated; `tsc` clean; e2e green.
-**Branch:** `colocate-page-components`
-**Caveats:** This is a large structural move that will conflict with most other frontend branches. Recommend merging this either first (and rebasing the others) or last (and resolving moves). Behavior unchanged.
+**Done:** Restructured `frontend/src/pages/` so each page is `pages/<page>/index.tsx` with a local `components/` subdir for page-only components (every page covered: cluster-home, contexts, daemonsets, deployments, errors, events, live-logs, namespaces, node-detail, nodes, pod-detail, pods, statefulsets, stern, workload-detail). 15 page moves plus 12 page-only component moves, all via `git mv` so history is preserved. Components shared across multiple pages (the app shell, header, sidebar, breadcrumbs, context/namespace pickers, and the `yaml-dialog` and `commands-dialog`) kept in `frontend/src/components/`. All imports updated; `tsc` clean; full suite green. Done as a standalone change against the current code so no page was left partial or inconsistent.
+**Caveats:** Behavior unchanged (pure refactor).
 
 ## 7. Fix automatic updating of pod logs
 **Item:** "Automatic updating pod logs didn't work."
