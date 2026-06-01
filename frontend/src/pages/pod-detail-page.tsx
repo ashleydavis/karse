@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
     Box,
     Typography,
@@ -79,13 +79,33 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
 // The set of tabs available on the pod detail page.
 type PodDetailTab = "detail" | "containers" | "init-containers" | "logs";
 
+// Reads the active tab from the URL, falling back to the Detail tab for any
+// missing or unrecognized value so the page always has a valid selection.
+function parseTab(value: string | null): PodDetailTab {
+    if (value === "containers" || value === "logs") {
+        return value;
+    }
+    return "detail";
+}
+
 // Detail page for a single pod, organizing its content into Detail/Status, Containers, and Logs tabs.
 export function PodDetailPage() {
     const { namespace, name } = useParams<{ namespace: string; name: string }>();
     const { current } = useKubeContext();
     const navigate = useShareableNavigate();
-    const [activeTab, setActiveTab] = useState<PodDetailTab>("detail");
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = parseTab(searchParams.get("tab"));
     const [showCommands, setShowCommands] = useState(false);
+
+    // Persists the active tab in the URL so the breadcrumb can show it and the
+    // view stays shareable.
+    function selectTab(tab: PodDetailTab): void {
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.set("tab", tab);
+            return next;
+        }, { replace: true });
+    }
 
     const { data, error, isLoading } = useQuery({
         queryKey: ["pod-detail", current, namespace, name],
@@ -146,7 +166,7 @@ export function PodDetailPage() {
             <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
                 <Tabs
                     value={effectiveTab}
-                    onChange={(_, value) => setActiveTab(value)}
+                    onChange={(_, value) => selectTab(value)}
                     data-test-id="pod-detail-tabs"
                 >
                     <Tab label="Detail / Status" value="detail" data-test-id="pod-tab-detail" />

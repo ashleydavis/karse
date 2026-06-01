@@ -1,7 +1,9 @@
 # Scenario 22: Breadcrumb navigation
 
-A cluster with one node and one pod. Exercises the breadcrumb trail shown above
-every page and confirms breadcrumb links navigate back to list pages.
+A cluster with one node and one pod. Exercises the breadcrumb trail shown in the
+top navbar and confirms breadcrumb links navigate back to list pages. The first
+crumb (the main page) is shown in large, title-sized text; the remaining
+sub-page crumbs use the regular breadcrumb size.
 
 ## Prerequisites
 
@@ -20,13 +22,14 @@ every page and confirms breadcrumb links navigate back to list pages.
 
 ### List pages
 
-- Navigate to `/pods`. Confirm a breadcrumb bar appears below the header showing a single crumb "Pods".
+- Navigate to `/pods`. Confirm the breadcrumb trail appears in the top navbar showing a single, title-sized crumb "Pods".
 - Navigate to `/nodes`, `/deployments`, `/statefulsets`, `/daemonsets`, `/namespaces`, `/contexts`, and `/cluster`. Confirm each shows a single crumb matching the page (Nodes, Deployments, StatefulSets, DaemonSets, Namespaces, Contexts, Cluster).
 
 ### Pod detail page
 
-- Navigate to `/pods` and click the `web` row. Confirm the breadcrumb trail shows "Pods > default > web".
-- Confirm the namespace ("default") and pod name ("web") crumbs are the current (non-linked) tail, and "Pods" is a clickable link.
+- Navigate to `/pods` and click the `web` row. Confirm the breadcrumb trail shows "Pods > default > web > Detail / Status", with "Pods" in large title-sized text.
+- Switch to the Containers and Logs tabs. Confirm the last crumb updates to "Containers" then "Logs", matching the selected sub tab.
+- Confirm "Pods" and the pod name ("web") are clickable links, while the namespace ("default") and the current sub-tab crumbs are not links.
 - Click the "Pods" breadcrumb. Confirm the browser navigates back to `/pods` and the trail collapses to a single "Pods" crumb.
 
 ### Node detail page

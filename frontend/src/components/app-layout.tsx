@@ -3,7 +3,6 @@ import { Box } from "@mui/material";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Header } from "./header";
 import { Sidebar } from "./sidebar";
-import { Breadcrumbs } from "./breadcrumbs";
 import { useKubeContext } from "../lib/kube-context";
 
 // Redirects to /contexts whenever no context is selected, so the user
@@ -25,9 +24,6 @@ export function AppLayout() {
             <Box sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                 <Header />
                 <Box component="main" sx={{ flex: 1, overflow: "auto", p: 3 }}>
-                    <Box sx={{ mb: 2 }}>
-                        <Breadcrumbs />
-                    </Box>
                     <Outlet />
                 </Box>
             </Box>

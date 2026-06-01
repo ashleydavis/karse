@@ -71,27 +71,27 @@ test.describe("karse e2e", () => {
         });
 
         test("shows page title for cluster home", async () => {
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Cluster");
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Cluster");
         });
 
         test("updates page title when navigating to nodes", async () => {
             await page.goto("/nodes", { waitUntil: "networkidle" });
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Nodes");
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Nodes");
         });
 
         test("updates page title when navigating to pods", async () => {
             await page.goto("/pods", { waitUntil: "networkidle" });
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Pods");
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Pods");
         });
 
         test("updates page title when navigating to namespaces", async () => {
             await page.goto("/namespaces", { waitUntil: "networkidle" });
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Namespaces");
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Namespaces");
         });
 
         test("updates page title when navigating to contexts", async () => {
             await page.goto("/contexts", { waitUntil: "networkidle" });
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Contexts");
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Contexts");
         });
 
         test("shows context picker dropdown when two clusters are configured", async () => {
@@ -892,7 +892,7 @@ test.describe("karse e2e", () => {
         });
 
         test("shows page title Deployments", async () => {
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Deployments");
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Deployments");
         });
 
         test("has column headers Name, Namespace, Ready, Up-to-date, Available, Age", async () => {
@@ -921,7 +921,7 @@ test.describe("karse e2e", () => {
 
         test("the deployment detail page renders content and is not blank", async () => {
             await page.goto("/deployments/default/nginx", { waitUntil: "networkidle" });
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Deployment");
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Deployments");
             await expect(page.locator("[data-test-id='workload-detail']")).toBeVisible();
             await expect(page.locator("[data-test-id='workload-stat']").filter({ hasText: "Ready" })).toContainText("2/2");
             await page.goto("/deployments", { waitUntil: "networkidle" });
@@ -992,7 +992,7 @@ test.describe("karse e2e", () => {
         });
 
         test("shows page title StatefulSets", async () => {
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("StatefulSets");
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("StatefulSets");
         });
 
         test("shows a row for the fake stateful set", async () => {
@@ -1008,7 +1008,7 @@ test.describe("karse e2e", () => {
 
         test("the stateful set detail page renders content and is not blank", async () => {
             await page.goto("/statefulsets/default/postgres", { waitUntil: "networkidle" });
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("StatefulSet");
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("StatefulSets");
             await expect(page.locator("[data-test-id='workload-detail']")).toBeVisible();
             await expect(page.locator("[data-test-id='workload-stat']").filter({ hasText: "Ready" })).toContainText("1/1");
             await page.goto("/statefulsets", { waitUntil: "networkidle" });
@@ -1071,7 +1071,7 @@ test.describe("karse e2e", () => {
         });
 
         test("shows page title DaemonSets", async () => {
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("DaemonSets");
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("DaemonSets");
         });
 
         test("shows a row for the fake daemon set", async () => {
@@ -1087,7 +1087,7 @@ test.describe("karse e2e", () => {
 
         test("the daemon set detail page renders content and is not blank", async () => {
             await page.goto("/daemonsets/kube-system/fluentd", { waitUntil: "networkidle" });
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("DaemonSet");
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("DaemonSets");
             await expect(page.locator("[data-test-id='workload-detail']")).toBeVisible();
             await expect(page.locator("[data-test-id='workload-stat']").filter({ hasText: "Desired" })).toContainText("2");
             await page.goto("/daemonsets", { waitUntil: "networkidle" });
@@ -1130,7 +1130,7 @@ test.describe("karse e2e", () => {
         test("clicking a node row navigates to its detail page", async () => {
             await page.locator("[data-test-id='node-row']").filter({ hasText: "node-cp" }).click();
             await expect(page).toHaveURL(/\/nodes\/node-cp/);
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Node");
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Nodes");
         });
     });
 
@@ -1198,8 +1198,8 @@ test.describe("karse e2e", () => {
             await page.unroute("**/api/pods/default/nginx-abc*");
         });
 
-        test("shows page title Pod", async () => {
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Pod");
+        test("shows page title Pods", async () => {
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Pods");
         });
 
         test("shows the pod name as heading", async () => {
@@ -1430,8 +1430,8 @@ test.describe("karse e2e", () => {
             await page.unroute("**/api/nodes/node-cp*");
         });
 
-        test("shows page title Node", async () => {
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Node");
+        test("shows page title Nodes", async () => {
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Nodes");
         });
 
         test("shows the node name as heading", async () => {
@@ -1893,11 +1893,20 @@ test.describe("karse e2e", () => {
             expect(items).toEqual(["Pods"]);
         });
 
-        test("renders the full trail on the pod detail page", async () => {
+        test("renders the full trail on the pod detail page including the active sub tab", async () => {
             await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
             await expect(page.locator("[data-test-id='breadcrumbs']")).toBeVisible();
             const items = await page.locator("[data-test-id='breadcrumb-item']").allTextContents();
-            expect(items).toEqual(["Pods", "default", "nginx-abc"]);
+            expect(items).toEqual(["Pods", "default", "nginx-abc", "Detail / Status"]);
+        });
+
+        test("updates the sub-tab breadcrumb when switching pod tabs", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-logs']").click();
+            await expect(page).toHaveURL(/tab=logs/);
+            await expect(page.locator("[data-test-id='breadcrumb-item']").last()).toHaveText("Logs");
+            const items = await page.locator("[data-test-id='breadcrumb-item']").allTextContents();
+            expect(items).toEqual(["Pods", "default", "nginx-abc", "Logs"]);
         });
 
         test("clicking the Pods breadcrumb navigates back to the pods list", async () => {
@@ -1974,7 +1983,7 @@ test.describe("karse e2e", () => {
         });
 
         test("shows page title Logs", async () => {
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Logs");
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Logs");
         });
 
         test("renders namespace, pod, and filter controls", async () => {
@@ -2059,7 +2068,7 @@ test.describe("karse e2e", () => {
         });
 
         test("shows page title Stern", async () => {
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Stern");
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Stern");
         });
 
         test("renders namespace and query controls", async () => {
@@ -2217,7 +2226,7 @@ test.describe("karse e2e", () => {
         });
 
         test("shows page title Events", async () => {
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Events");
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Events");
         });
 
         test("has all column headers", async () => {
@@ -2335,7 +2344,7 @@ test.describe("karse e2e", () => {
         });
 
         test("shows page title Errors", async () => {
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Errors");
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Errors");
         });
 
         test("has all column headers", async () => {
@@ -2399,7 +2408,7 @@ test.describe("karse e2e", () => {
                 await route.fulfill({ json: { errors: [] } });
             });
             await page.locator("[data-test-id='sidebar-bottom-nav'] [aria-label='errors']").click();
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Errors");
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Errors");
             await expect(page.locator("[data-test-id='no-errors-empty']")).toBeVisible();
             await page.unroute("**/api/errors*");
         });

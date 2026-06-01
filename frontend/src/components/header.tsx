@@ -1,76 +1,20 @@
 import { useState, useEffect, useRef } from "react";
-import { AppBar, Toolbar, IconButton, Alert, Tooltip, Box, Menu, MenuItem, ListItemIcon, ListItemText, Typography, Chip } from "@mui/material";
+import { AppBar, Toolbar, IconButton, Alert, Tooltip, Box, Menu, MenuItem, ListItemIcon, ListItemText, Chip } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "react-router-dom";
 import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
 import { useConfig } from "../lib/config";
 import { ContextPicker } from "./context-picker";
 import { ContextQuickPicker } from "./context-quick-picker";
 import { NamespaceQuickPicker } from "./namespace-quick-picker";
-
-function getPageTitle(pathname: string): string {
-    if (pathname === "/" || pathname === "/cluster") {
-        return "Cluster";
-    }
-    if (pathname === "/nodes") {
-        return "Nodes";
-    }
-    if (pathname.startsWith("/nodes/")) {
-        return "Node";
-    }
-    if (pathname === "/pods") {
-        return "Pods";
-    }
-    if (pathname.startsWith("/pods/")) {
-        return "Pod";
-    }
-    if (pathname === "/namespaces") {
-        return "Namespaces";
-    }
-    if (pathname === "/contexts") {
-        return "Contexts";
-    }
-    if (pathname === "/deployments") {
-        return "Deployments";
-    }
-    if (pathname.startsWith("/deployments/")) {
-        return "Deployment";
-    }
-    if (pathname === "/statefulsets") {
-        return "StatefulSets";
-    }
-    if (pathname.startsWith("/statefulsets/")) {
-        return "StatefulSet";
-    }
-    if (pathname === "/daemonsets") {
-        return "DaemonSets";
-    }
-    if (pathname.startsWith("/daemonsets/")) {
-        return "DaemonSet";
-    }
-    if (pathname === "/logs") {
-        return "Logs";
-    }
-    if (pathname === "/stern") {
-        return "Stern";
-    }
-    if (pathname === "/events") {
-        return "Events";
-    }
-    if (pathname === "/errors") {
-        return "Errors";
-    }
-    return "Karse";
-}
+import { Breadcrumbs } from "./breadcrumbs";
 
 export function Header() {
     const { contexts, current, isLoading, error, switchTo } = useKubeContext();
     const { namespace } = useKubeNamespace();
     const { config: { colorMode }, setColorMode } = useConfig();
     const qc = useQueryClient();
-    const { pathname } = useLocation();
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
     const [copied, setCopied] = useState(false);
     const [contextPickerAnchor, setContextPickerAnchor] = useState<HTMLElement | null>(null);
@@ -94,8 +38,6 @@ export function Header() {
         return () => window.removeEventListener("keydown", onKey);
     }, []);
 
-    const pageTitle = getPageTitle(pathname);
-
     const colorModeIcon = colorMode === "dark" ? "sun" : colorMode === "light" ? "moon" : "circle-half-stroke";
 
     async function handleRefresh(): Promise<void> {
@@ -114,14 +56,8 @@ export function Header() {
     return (
         <>
             <AppBar position="static" color="default" elevation={0}>
-                <Toolbar variant="dense" sx={{ gap: 0.5, minHeight: 48 }}>
-                    <Typography
-                        variant="subtitle1"
-                        data-test-id="page-title"
-                        sx={{ fontWeight: 600, mr: 1 }}
-                    >
-                        {pageTitle}
-                    </Typography>
+                <Toolbar variant="dense" sx={{ gap: 1, minHeight: 56 }}>
+                    <Breadcrumbs />
                     {namespace !== null && (
                         <Chip
                             label={namespace}

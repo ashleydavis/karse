@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams, type To } from "react-router-dom";
 
 // Query-param keys that carry shareable UI state and must survive navigation
 // between pages so a copied link reproduces the same view.
-const SHAREABLE_PARAMS = ["context", "namespace"];
+const SHAREABLE_PARAMS = ["context", "namespace", "tab"];
 
 // Builds a query string containing only the shareable params present in the
 // given search params, preserving the selected context and namespace.

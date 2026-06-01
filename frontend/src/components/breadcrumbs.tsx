@@ -1,6 +1,6 @@
 import { Breadcrumbs as MuiBreadcrumbs, Link as MuiLink, Typography } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 
 // One entry in the breadcrumb trail; a missing "to" marks the current (non-linked) page.
 type Crumb = {
@@ -18,10 +18,27 @@ const LIST_LABELS: Record<string, string> = {
     deployments: "Deployments",
     statefulsets: "StatefulSets",
     daemonsets: "DaemonSets",
+    logs: "Logs",
+    stern: "Stern",
+    events: "Events",
+    errors: "Errors",
 };
 
-// Builds the breadcrumb trail from the current pathname and route params.
-function buildCrumbs(pathname: string, params: Record<string, string | undefined>): Crumb[] {
+// Maps a pod detail tab value (from the "tab" query param) to its display label,
+// so the breadcrumb trail reflects the currently selected sub tab.
+const POD_TAB_LABELS: Record<string, string> = {
+    detail: "Detail / Status",
+    containers: "Containers",
+    logs: "Logs",
+};
+
+// Builds the breadcrumb trail from the current pathname, route params, and the
+// active sub tab (the "tab" query param, used by resources that have sub tabs).
+function buildCrumbs(
+    pathname: string,
+    params: Record<string, string | undefined>,
+    tab: string | null,
+): Crumb[] {
     const segments = pathname.split("/").filter((s) => s.length > 0);
     if (segments.length === 0)
     {
@@ -31,13 +48,15 @@ function buildCrumbs(pathname: string, params: Record<string, string | undefined
     const root = segments[0];
     const listLabel = LIST_LABELS[root] ?? root;
 
-    // Pod detail: /pods/:namespace/:name -> Pods > <namespace> > <name>
+    // Pod detail: /pods/:namespace/:name -> Pods > <namespace> > <name> > <tab>
     if (root === "pods" && params.namespace && params.name)
     {
+        const tabLabel = POD_TAB_LABELS[tab ?? "detail"] ?? POD_TAB_LABELS.detail;
         return [
             { label: "Pods", to: "/pods" },
             { label: params.namespace },
-            { label: params.name },
+            { label: params.name, to: `/pods/${params.namespace}/${params.name}` },
+            { label: tabLabel },
         ];
     }
 
@@ -54,21 +73,28 @@ function buildCrumbs(pathname: string, params: Record<string, string | undefined
     return [{ label: listLabel }];
 }
 
-// Renders a breadcrumb trail derived from the current route, linking back to list pages.
+// Renders a breadcrumb trail derived from the current route, linking back to
+// list pages. The first crumb (the main page) is rendered in large, title-sized
+// text; the remaining sub-page crumbs use the regular breadcrumb size.
 export function Breadcrumbs() {
     const { pathname } = useLocation();
     const params = useParams();
-    const crumbs = buildCrumbs(pathname, params);
+    const [searchParams] = useSearchParams();
+    const crumbs = buildCrumbs(pathname, params, searchParams.get("tab"));
 
     return (
         <MuiBreadcrumbs
             data-test-id="breadcrumbs"
             aria-label="breadcrumb"
-            separator={<FontAwesomeIcon icon={["fas", "chevron-right"]} style={{ fontSize: "0.6rem" }} />}
-            sx={{ fontSize: "0.875rem" }}
+            separator={<FontAwesomeIcon icon={["fas", "chevron-right"]} style={{ fontSize: "0.7rem" }} />}
+            sx={{ "& .MuiBreadcrumbs-li": { display: "flex", alignItems: "center" } }}
         >
             {crumbs.map((crumb, index) => {
                 const isLast = index === crumbs.length - 1;
+                const isFirst = index === 0;
+                // The first crumb is the main page and is shown title-sized; the
+                // rest use the regular breadcrumb size.
+                const fontSize = isFirst ? "1.25rem" : "0.875rem";
                 if (crumb.to && !isLast)
                 {
                     return (
@@ -79,7 +105,7 @@ export function Breadcrumbs() {
                             underline="hover"
                             color="inherit"
                             data-test-id="breadcrumb-item"
-                            sx={{ fontSize: "0.875rem" }}
+                            sx={{ fontSize, fontWeight: 600 }}
                         >
                             {crumb.label}
                         </MuiLink>
@@ -90,7 +116,7 @@ export function Breadcrumbs() {
                         key={crumb.label + index}
                         color="text.primary"
                         data-test-id="breadcrumb-item"
-                        sx={{ fontSize: "0.875rem", fontWeight: 600 }}
+                        sx={{ fontSize, fontWeight: 600 }}
                     >
                         {crumb.label}
                     </Typography>
