@@ -5,27 +5,12 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
 ## Todo
 
 - Move the resource YAML onto a sub tab of each resource's detail page, for every resource that exposes YAML (pods, nodes, deployments, statefulsets, daemonsets, namespaces, etc.). The existing YAML modal/dialog must be removed ENTIRELY: delete yaml-dialog.tsx along with the per-row "YAML" button that opens the popup, so there is no YAML dialog/modal left anywhere in the app. YAML must be reachable only via the detail-page sub tab. A previous attempt failed because it added a YAML tab but left yaml-dialog.tsx and the button in place alongside it, so the dialog still existed. (This consolidates two duplicate todo items.)
-- Drilling down into a Deployment, Statefulset, or Daemonset shows a blank page. Drilling down into Pods is ok.
-- Maybe separate tabs under Pods for Containers and Init Containers.
-- Be sure that the fake pod logs still work for testing when enabled.
 - Components for each page should be under a subdirectory for that page. Restructure to colocate a page and its components to be together. Eg pages/pod/index.tsx && pages/pod/components/... IMPORTANT: implement this on its own, NOT in parallel with any other todo items. A previous attempt was developed alongside other changes and went stale (it missed pages that were added by the other work and left the colocation partial and inconsistent). Do it as a standalone change against the current code so every page is covered.
 - Automatic updating pod logs didn't work.
-- Breadcrumbs need to be in the navbar. Make sure they include the current tag under Pods (and other resources that have sub tabs).
-   - The main page should be indicated with bit (title sized) text. Sub pages in the breadcrumbs can be the regular size for breadcrumbs.
-- Why does every icon need to go through the font-awesome file? Replace the central library file (lib/font-awesome.ts with its `library.add(...)`) by importing icon objects directly where they are used, then delete that file. IMPORTANT: do this standalone, NOT in parallel with any other todo items (a previous attempt went stale and missed icons in pages added by other work). Convert EVERY icon usage, including the dynamic ones (the NAV_ITEMS icon strings in sidebar.tsx, the colorModeIcon variable, and ternary icon choices in header/errors-table), and verify the icons render correctly by eye, because a wrong icon mapping still compiles and still passes the tests.
 - Be nice if the dropdown pickers had an arrow pointing at the button. This must be implemented using a built-in MUI component (not custom UI/CSS code). A previous attempt hand-rolled a CSS beak and looked bad. Note MUI's Popover/Menu have no native arrow, so this likely means switching the picker to a MUI component that does (or reusing MUI's Tooltip arrow styling) rather than writing custom markup.
 - There should only ever be ONE test cluster at a time. Each scenario's setup script must first tear down the existing test cluster, then build the new one. Do NOT build a registry that accumulates multiple clusters (a previous attempt over-engineered it that way). Keep it simple: setup = teardown-then-build, plus one teardown script that removes the single cluster.
 - Need to confirm that live logs works with a real cluster.
-- The coding style hasn't been followed in header.tsx. If statement body is on one line after the curly brackets.
 - Auto load logs when looking at logs. Remove the button to load/stream logs. Logs should automatically display. Have a refresh button to refresh the. By default logs should automatically update as new logs are produced from the cluster.
-- It would be good to add a new page called Stern and actually use `stern` to show live logs (with filters/wildcards like the Logs page).
-   - If `stern` isn't installed show the user how to install it.
-- Make sure the Node page has tabs:
-  - Status / Details
-  - Pods
-  - Events
-- I need to have an Errors page linked from the bottom of the left sidebar. This should show errors occurring in the cluster.
-- No unit tests appear to have been created for fuzzy-filter.ts. Check all other TS files for functions that can be unit tested but are not, then write unit tests for them.
 
 ## Requirements
 
