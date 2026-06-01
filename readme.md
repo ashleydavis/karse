@@ -4,34 +4,33 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
 
 ## Todo
 
-- Need to see the raw yaml for every resource that can be viewed.
-- It would be great to view commands like "delete this pod".  It can guide the user to do common operations.
-- How does it handler pods with multiple containers?
-   - The pod list should show how many containers the pod has.
-   - Need to be able to drill down into each container.
-- I think each pod will need multiple tabs.
-   - Detail / Status
-   - Containers
-   - Logs
-- Auto load logs when looking at a pod page.
-- Be able to filter pods in the pods list by phase. Drop down with checkboxes.
-- Going to need breadcrumbs here as well.
-- Can we have the URL have all the details so users can share a link?
-   - Context
-   - Namespace
-   - Page
-   - Resource
-   - etc
-- The pickers should drop down from the nav bar rather than being modals.
-- Live Logs for all pods like stern. Type a filter to restrict logs to pods matching a wild card. Drop down to select namespaces, pods, deployments, etc to stream logs from.
-- Why do the tables in some pages have the hover effect but not others? It's not consistent UX.
-- Live pod logs
-- Needs an event log
-- For testing need to run be/fe on next random unallocated port to avoid conflicts.
-- setGlobalMutation seems like a kludge.
-- Each node should be able to show the pods running on it.
-- Fuzzy match would be good for searching pods and other resources.
-- The mixed node status test doesn't work. Might be too hard to emulate this with kwok.
+- Make sure the docs in the manual testing guide are numbered sequentially.
+- Yaml should be displayed on a sub tab of the resource page.
+- Drilling down into a Deployment, Statefulset, or Daemonset shows a blank page. Drilling down into Pods is ok.
+- Maybe separate tabs under Pods for Containers and Init Containers.
+- Be sure that the fake pod logs still work for testing when enabled.
+- Components for each page should be under a subdirectory for that page. Restructure to colocate a page and its components to be together. Eg pages/pod/index.tsx && pages/pod/components/...
+- Automatic updating pod logs didn't work.
+- Breadcrumbs need to be in the navbar. Make sure they include the current tag under Pods (and other resources that have sub tabs).
+   - The main page should be indicated with bit (title sized) text. Sub pages in the breadcrumbs can be the regular size for breadcrumbs.
+- Why does every icon need to go through the font-awesome file?
+- Really need to choose random ports for be/fe when testing.
+- The Yaml needs to be on a separate tab, rather than having a button.
+- Be nice if the dropdown pickers had an arrow pointing at the button.
+- The manual testing guide needs a way to register what clusters were created so that we can have one script to tear down any testing setup.
+  - Also it's annoying that we have to tear down before we can do another setup. Tear down should be an automatic first step in setup.
+- Live Logs can just be called logs.
+- Need to confirm that live logs works with a real cluster.
+- The coding style hasn't been followed in header.tsx. If statement body is on one line after the curly brackets.
+- Auto load logs when looking at logs. Remove the button to load/stream logs. Logs should automatically display. Have a refresh button to refresh the. By default logs should automatically update as new logs are produced from the cluster.
+- It would be good to add a new page called Stern and actually use `stern` to show live logs (with filters/wildcards like the Live Logs page).
+   - If `stern` isn't installed show the user how to install it.
+- Make sure the Node page has tabs:
+  - Status / Details
+  - Pods
+  - Events
+- I need to have an Errors page linked from the bottom of the left sidebar. This should show errors occurring in the cluster.
+- No unit tests appear to have been created for fuzzy-filter.ts. Check all other TS files for functions that can be unit tested but are not, then write unit tests for them.
 
 ## Requirements
 
