@@ -13,7 +13,6 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
 - Breadcrumbs need to be in the navbar. Make sure they include the current tag under Pods (and other resources that have sub tabs).
    - The main page should be indicated with bit (title sized) text. Sub pages in the breadcrumbs can be the regular size for breadcrumbs.
 - Why does every icon need to go through the font-awesome file?
-- Really need to choose random ports for be/fe when testing.
 - The Yaml needs to be on a separate tab, rather than having a button.
 - Be nice if the dropdown pickers had an arrow pointing at the button. This must be implemented using a built-in MUI component (not custom UI/CSS code). A previous attempt hand-rolled a CSS beak and looked bad. Note MUI's Popover/Menu have no native arrow, so this likely means switching the picker to a MUI component that does (or reusing MUI's Tooltip arrow styling) rather than writing custom markup.
 - The manual testing guide needs a way to register what clusters were created so that we can have one script to tear down any testing setup.
