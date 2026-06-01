@@ -11,6 +11,7 @@ import { DaemonSetsPage } from "./pages/daemonsets-page";
 import { EventsPage } from "./pages/events-page";
 import { PodDetailPage } from "./pages/pod-detail-page";
 import { NodeDetailPage } from "./pages/node-detail-page";
+import { WorkloadDetailPage } from "./pages/workload-detail-page";
 import { LiveLogsPage } from "./pages/live-logs-page";
 
 // Redirects the index route to the cluster home while preserving the shareable query string (context, namespace) so a link to the bare root stays shareable.
@@ -32,8 +33,11 @@ export function App() {
                 <Route path="pods" element={<PodsPage />} />
                 <Route path="pods/:namespace/:name" element={<PodDetailPage />} />
                 <Route path="deployments" element={<DeploymentsPage />} />
+                <Route path="deployments/:namespace/:name" element={<WorkloadDetailPage kind="deployments" />} />
                 <Route path="statefulsets" element={<StatefulSetsPage />} />
+                <Route path="statefulsets/:namespace/:name" element={<WorkloadDetailPage kind="statefulsets" />} />
                 <Route path="daemonsets" element={<DaemonSetsPage />} />
+                <Route path="daemonsets/:namespace/:name" element={<WorkloadDetailPage kind="daemonsets" />} />
                 <Route path="events" element={<EventsPage />} />
                 <Route path="logs" element={<LiveLogsPage />} />
             </Route>

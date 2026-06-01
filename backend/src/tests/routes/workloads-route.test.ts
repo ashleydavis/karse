@@ -2,6 +2,7 @@ jest.mock("../../kubectl/kubectl-adapter", () => ({
     listDeployments: jest.fn(),
     listStatefulSets: jest.fn(),
     listDaemonSets: jest.fn(),
+    getWorkloadDetail: jest.fn(),
 }));
 
 import type { Server } from "node:http";
@@ -32,6 +33,7 @@ beforeEach(() => {
     kubectlMocks.listDeployments.mockReset();
     kubectlMocks.listStatefulSets.mockReset();
     kubectlMocks.listDaemonSets.mockReset();
+    kubectlMocks.getWorkloadDetail.mockReset();
 });
 
 // A minimal valid deployment returned by the mock adapter.
@@ -137,6 +139,76 @@ describe("GET /api/daemonsets", () => {
 
     test("missing context returns 400", async () => {
         const res = await fetch(`http://127.0.0.1:${port}/api/daemonsets`);
+        expect(res.status).toBe(400);
+    });
+});
+
+// A minimal valid workload detail returned by the mock adapter.
+const FAKE_WORKLOAD_DETAIL = {
+    kind: "deployments",
+    name: "nginx",
+    namespace: "default",
+    createdAt: "2024-06-01T00:00:00Z",
+    labels: { app: "nginx" },
+    selector: { app: "nginx" },
+    stats: [
+        {
+            label: "Ready",
+            value: "2/2",
+        },
+    ],
+    pods: [],
+    events: [],
+};
+
+describe("GET /api/deployments/:namespace/:name", () => {
+    test("returns deployment detail for a context", async () => {
+        kubectlMocks.getWorkloadDetail.mockResolvedValue(FAKE_WORKLOAD_DETAIL);
+        const res = await fetch(`http://127.0.0.1:${port}/api/deployments/default/nginx?context=my-ctx`);
+        const body = await res.json();
+        expect(res.status).toBe(200);
+        expect(body).toEqual(FAKE_WORKLOAD_DETAIL);
+        expect(kubectlMocks.getWorkloadDetail).toHaveBeenCalledWith("my-ctx", "deployments", "default", "nginx");
+    });
+
+    test("missing context returns 400", async () => {
+        const res = await fetch(`http://127.0.0.1:${port}/api/deployments/default/nginx`);
+        const body = await res.json();
+        expect(res.status).toBe(400);
+        expect(body).toEqual({ error: "context query parameter is required" });
+    });
+
+    test("adapter throws returns 500", async () => {
+        kubectlMocks.getWorkloadDetail.mockRejectedValue(new Error("not found"));
+        const res = await fetch(`http://127.0.0.1:${port}/api/deployments/default/nginx?context=my-ctx`);
+        expect(res.status).toBe(500);
+    });
+});
+
+describe("GET /api/statefulsets/:namespace/:name", () => {
+    test("passes the statefulsets kind to the adapter", async () => {
+        kubectlMocks.getWorkloadDetail.mockResolvedValue(FAKE_WORKLOAD_DETAIL);
+        const res = await fetch(`http://127.0.0.1:${port}/api/statefulsets/default/postgres?context=my-ctx`);
+        expect(res.status).toBe(200);
+        expect(kubectlMocks.getWorkloadDetail).toHaveBeenCalledWith("my-ctx", "statefulsets", "default", "postgres");
+    });
+
+    test("missing context returns 400", async () => {
+        const res = await fetch(`http://127.0.0.1:${port}/api/statefulsets/default/postgres`);
+        expect(res.status).toBe(400);
+    });
+});
+
+describe("GET /api/daemonsets/:namespace/:name", () => {
+    test("passes the daemonsets kind to the adapter", async () => {
+        kubectlMocks.getWorkloadDetail.mockResolvedValue(FAKE_WORKLOAD_DETAIL);
+        const res = await fetch(`http://127.0.0.1:${port}/api/daemonsets/kube-system/fluentd?context=my-ctx`);
+        expect(res.status).toBe(200);
+        expect(kubectlMocks.getWorkloadDetail).toHaveBeenCalledWith("my-ctx", "daemonsets", "kube-system", "fluentd");
+    });
+
+    test("missing context returns 400", async () => {
+        const res = await fetch(`http://127.0.0.1:${port}/api/daemonsets/kube-system/fluentd`);
         expect(res.status).toBe(400);
     });
 });

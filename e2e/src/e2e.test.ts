@@ -843,8 +843,40 @@ test.describe("karse e2e", () => {
             ],
         };
 
+        const FAKE_DEPLOYMENT_DETAIL = {
+            kind: "deployments",
+            name: "nginx",
+            namespace: "default",
+            createdAt: new Date().toISOString(),
+            labels: { app: "nginx" },
+            selector: { app: "nginx" },
+            stats: [
+                { label: "Ready", value: "2/2" },
+                { label: "Up-to-date", value: "2" },
+                { label: "Available", value: "2" },
+            ],
+            pods: [
+                {
+                    name: "nginx-abc",
+                    namespace: "default",
+                    phase: "Running",
+                    ready: "1/1",
+                    containerCount: 1,
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                },
+            ],
+            events: [],
+        };
+
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
+            await page.route("**/api/deployments/default/nginx*", async (route) => {
+                await route.fulfill({
+                    json: FAKE_DEPLOYMENT_DETAIL,
+                });
+            });
             await page.route("**/api/deployments*", async (route) => {
                 await route.fulfill({
                 json: FAKE_DEPLOYMENTS,
@@ -856,6 +888,7 @@ test.describe("karse e2e", () => {
 
         test.afterAll(async () => {
             await page.unroute("**/api/deployments*");
+            await page.unroute("**/api/deployments/default/nginx*");
         });
 
         test("shows page title Deployments", async () => {
@@ -885,6 +918,28 @@ test.describe("karse e2e", () => {
             await expect(page).toHaveURL(/\/deployments\/default\/nginx/);
             await page.goto("/deployments", { waitUntil: "networkidle" });
         });
+
+        test("the deployment detail page renders content and is not blank", async () => {
+            await page.goto("/deployments/default/nginx", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Deployment");
+            await expect(page.locator("[data-test-id='workload-detail']")).toBeVisible();
+            await expect(page.locator("[data-test-id='workload-stat']").filter({ hasText: "Ready" })).toContainText("2/2");
+            await page.goto("/deployments", { waitUntil: "networkidle" });
+        });
+
+        test("the deployment detail page lists its selected pods", async () => {
+            await page.goto("/deployments/default/nginx", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='workload-pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='workload-pod-row'] td:first-child")).toHaveText("nginx-abc");
+            await page.goto("/deployments", { waitUntil: "networkidle" });
+        });
+
+        test("clicking a pod row on the deployment detail navigates to the pod detail", async () => {
+            await page.goto("/deployments/default/nginx", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='workload-pod-row']").click();
+            await expect(page).toHaveURL(/\/pods\/default\/nginx-abc/);
+            await page.goto("/deployments", { waitUntil: "networkidle" });
+        });
     });
 
     test.describe("stateful sets page", () => {
@@ -899,8 +954,29 @@ test.describe("karse e2e", () => {
             ],
         };
 
+        const FAKE_STATEFULSET_DETAIL = {
+            kind: "statefulsets",
+            name: "postgres",
+            namespace: "default",
+            createdAt: new Date().toISOString(),
+            labels: { app: "postgres" },
+            selector: { app: "postgres" },
+            stats: [
+                { label: "Ready", value: "1/1" },
+                { label: "Current", value: "1" },
+                { label: "Updated", value: "1" },
+            ],
+            pods: [],
+            events: [],
+        };
+
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
+            await page.route("**/api/statefulsets/default/postgres*", async (route) => {
+                await route.fulfill({
+                    json: FAKE_STATEFULSET_DETAIL,
+                });
+            });
             await page.route("**/api/statefulsets*", async (route) => {
                 await route.fulfill({
                 json: FAKE_STATEFULSETS,
@@ -912,6 +988,7 @@ test.describe("karse e2e", () => {
 
         test.afterAll(async () => {
             await page.unroute("**/api/statefulsets*");
+            await page.unroute("**/api/statefulsets/default/postgres*");
         });
 
         test("shows page title StatefulSets", async () => {
@@ -926,6 +1003,14 @@ test.describe("karse e2e", () => {
         test("clicking a stateful set row navigates to its detail URL", async () => {
             await page.locator("[data-test-id='statefulset-row']").click();
             await expect(page).toHaveURL(/\/statefulsets\/default\/postgres/);
+            await page.goto("/statefulsets", { waitUntil: "networkidle" });
+        });
+
+        test("the stateful set detail page renders content and is not blank", async () => {
+            await page.goto("/statefulsets/default/postgres", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("StatefulSet");
+            await expect(page.locator("[data-test-id='workload-detail']")).toBeVisible();
+            await expect(page.locator("[data-test-id='workload-stat']").filter({ hasText: "Ready" })).toContainText("1/1");
             await page.goto("/statefulsets", { waitUntil: "networkidle" });
         });
     });
@@ -946,8 +1031,31 @@ test.describe("karse e2e", () => {
             ],
         };
 
+        const FAKE_DAEMONSET_DETAIL = {
+            kind: "daemonsets",
+            name: "fluentd",
+            namespace: "kube-system",
+            createdAt: new Date().toISOString(),
+            labels: { app: "fluentd" },
+            selector: { app: "fluentd" },
+            stats: [
+                { label: "Desired", value: "2" },
+                { label: "Current", value: "2" },
+                { label: "Ready", value: "2" },
+                { label: "Up-to-date", value: "2" },
+                { label: "Available", value: "2" },
+            ],
+            pods: [],
+            events: [],
+        };
+
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
+            await page.route("**/api/daemonsets/kube-system/fluentd*", async (route) => {
+                await route.fulfill({
+                    json: FAKE_DAEMONSET_DETAIL,
+                });
+            });
             await page.route("**/api/daemonsets*", async (route) => {
                 await route.fulfill({
                 json: FAKE_DAEMONSETS,
@@ -959,6 +1067,7 @@ test.describe("karse e2e", () => {
 
         test.afterAll(async () => {
             await page.unroute("**/api/daemonsets*");
+            await page.unroute("**/api/daemonsets/kube-system/fluentd*");
         });
 
         test("shows page title DaemonSets", async () => {
@@ -973,6 +1082,14 @@ test.describe("karse e2e", () => {
         test("clicking a daemon set row navigates to its detail URL", async () => {
             await page.locator("[data-test-id='daemonset-row']").click();
             await expect(page).toHaveURL(/\/daemonsets\/kube-system\/fluentd/);
+            await page.goto("/daemonsets", { waitUntil: "networkidle" });
+        });
+
+        test("the daemon set detail page renders content and is not blank", async () => {
+            await page.goto("/daemonsets/kube-system/fluentd", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("DaemonSet");
+            await expect(page.locator("[data-test-id='workload-detail']")).toBeVisible();
+            await expect(page.locator("[data-test-id='workload-stat']").filter({ hasText: "Desired" })).toContainText("2");
             await page.goto("/daemonsets", { waitUntil: "networkidle" });
         });
     });

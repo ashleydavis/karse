@@ -209,6 +209,32 @@ export type NodeDetail = {
     pods: Pod[];
 };
 
+// The workload kinds that have a drill-down detail page.
+// Matches the URL/UI type tokens used for routing and YAML fetches.
+export type WorkloadKind = "deployments" | "statefulsets" | "daemonsets";
+
+// A single named status counter shown on a workload detail page (e.g. "Ready" -> "2/3").
+export type WorkloadStat = {
+    label: string;
+    value: string;
+};
+
+// Detailed view of a single deployment, stateful set, or daemon set,
+// returned by GET /api/:kind/:namespace/:name (kind one of WorkloadKind).
+// Holds the common metadata plus a kind-specific set of status counters and
+// the pods selected by the workload, so the detail page can render uniformly.
+export type WorkloadDetail = {
+    kind: WorkloadKind;
+    name: string;
+    namespace: string;
+    createdAt: string;
+    labels: Record<string, string>;
+    selector: Record<string, string>;
+    stats: WorkloadStat[];
+    pods: Pod[];
+    events: KubeEvent[];
+};
+
 // The resource types whose raw YAML can be viewed in the dashboard.
 export type YamlResourceType =
     "nodes" | "pods" | "deployments" | "daemonsets" | "statefulsets" | "namespaces";

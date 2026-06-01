@@ -86,6 +86,26 @@ spec:
     image: nginx:latest
   - name: sidecar
     image: busybox:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smoke-deploy
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: smoke-deploy
+  template:
+    metadata:
+      labels:
+        app: smoke-deploy
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: nginx
+        image: nginx:latest
 EOF
 
 echo "--- Starting backend (OS-assigned free port) ---"
@@ -157,6 +177,12 @@ echo "OK"
 echo "--- GET /api/deployments ---"
 curl -fsS "$BASE/api/deployments?context=$CURRENT_CTX" \
     | jq -e 'has("deployments")' \
+    > /dev/null
+echo "OK"
+
+echo "--- GET /api/deployments/:namespace/:name (drill down into a deployment) ---"
+curl -fsS "$BASE/api/deployments/default/smoke-deploy?context=$CURRENT_CTX" \
+    | jq -e '.kind == "deployments" and .name == "smoke-deploy" and (.stats | length > 0) and has("selector") and has("pods") and has("events")' \
     > /dev/null
 echo "OK"
 

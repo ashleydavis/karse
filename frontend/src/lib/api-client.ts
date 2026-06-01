@@ -2,6 +2,7 @@ import axios from "axios";
 import type {
     ContextsResponse, ClusterOverview, Node, NamespacesResponse, PodsResponse,
     DeploymentsResponse, StatefulSetsResponse, DaemonSetsResponse,
+    WorkloadKind, WorkloadDetail,
     PodDetail, NodeDetail, YamlResourceType, YamlResponse,
     LogStreamLine, LogStreamStarted, EventsResponse,
 } from "karse-types";
@@ -177,6 +178,13 @@ export function streamPodLogs(
 // Fetches the full detail for a single node including conditions, capacity, and scheduled pods.
 export async function fetchNodeDetail(context: string, name: string): Promise<NodeDetail> {
     const response = await http.get<NodeDetail>(`/nodes/${name}`, { params: { context } });
+    return response.data;
+}
+
+// Fetches the full detail for a single deployment, stateful set, or daemon set,
+// including its status counters, selected pods, and events.
+export async function fetchWorkloadDetail(context: string, kind: WorkloadKind, namespace: string, name: string): Promise<WorkloadDetail> {
+    const response = await http.get<WorkloadDetail>(`/${kind}/${namespace}/${name}`, { params: { context } });
     return response.data;
 }
 

@@ -5,7 +5,7 @@ import type {
     Deployment, StatefulSet, DaemonSet,
     ContainerInfo, ContainerState, KubeEvent, PodDetail,
     NodeCondition, NodeAddress, ResourceAmounts, NodeDetail,
-    ClusterEvent,
+    ClusterEvent, WorkloadKind, WorkloadStat, WorkloadDetail,
 } from "karse-types";
 
 // Base directory for the rolling audit log; overridable via KARSE_LOGS_DIR.
@@ -404,6 +404,150 @@ export async function getNodeDetail(context: string, name: string): Promise<Node
         addresses,
         labels: item.metadata?.labels ?? {},
         pods,
+    };
+}
+
+// Maps a WorkloadKind token to the kubectl resource kind passed to "get".
+const WORKLOAD_KINDS: Record<WorkloadKind, string> = {
+    deployments: "deployment",
+    statefulsets: "statefulset",
+    daemonsets: "daemonset",
+};
+
+// Whether the given type token names a workload kind that has a detail page.
+export function isWorkloadKind(type: string): type is WorkloadKind {
+    return Object.prototype.hasOwnProperty.call(WORKLOAD_KINDS, type);
+}
+
+// Builds the kind-specific list of status counters shown on a workload detail page.
+// Each kind reports slightly different numbers in its status, so they are normalized
+// here into a uniform list of labelled values the UI can render without branching.
+function workloadStats(kind: WorkloadKind, item: any): WorkloadStat[] {
+    const status = item.status ?? {};
+    if (kind === "deployments") {
+        const desired: number = item.spec?.replicas ?? 0;
+        const ready: number = status.readyReplicas ?? 0;
+        return [
+            {
+                label: "Ready",
+                value: `${ready}/${desired}`,
+            },
+            {
+                label: "Up-to-date",
+                value: `${status.updatedReplicas ?? 0}`,
+            },
+            {
+                label: "Available",
+                value: `${status.availableReplicas ?? 0}`,
+            },
+        ];
+    }
+    if (kind === "statefulsets") {
+        const desired: number = item.spec?.replicas ?? 0;
+        const ready: number = status.readyReplicas ?? 0;
+        return [
+            {
+                label: "Ready",
+                value: `${ready}/${desired}`,
+            },
+            {
+                label: "Current",
+                value: `${status.currentReplicas ?? 0}`,
+            },
+            {
+                label: "Updated",
+                value: `${status.updatedReplicas ?? 0}`,
+            },
+        ];
+    }
+    return [
+        {
+            label: "Desired",
+            value: `${status.desiredNumberScheduled ?? 0}`,
+        },
+        {
+            label: "Current",
+            value: `${status.currentNumberScheduled ?? 0}`,
+        },
+        {
+            label: "Ready",
+            value: `${status.numberReady ?? 0}`,
+        },
+        {
+            label: "Up-to-date",
+            value: `${status.updatedNumberScheduled ?? 0}`,
+        },
+        {
+            label: "Available",
+            value: `${status.numberAvailable ?? 0}`,
+        },
+    ];
+}
+
+// Returns detailed information for a single deployment, stateful set, or daemon set:
+// its metadata, kind-specific status counters, the pods it selects, and its events.
+// kind must be one of WORKLOAD_KINDS; passing anything else throws. READ-ONLY.
+export async function getWorkloadDetail(
+    context: string,
+    kind: WorkloadKind,
+    namespace: string,
+    name: string,
+): Promise<WorkloadDetail> {
+    const resourceKind = WORKLOAD_KINDS[kind];
+    if (resourceKind === undefined) {
+        throw new Error(`unsupported workload kind: ${kind}`);
+    }
+    const [workloadResult, eventsResult] = await Promise.all([
+        kubectl(["--context", context, "-n", namespace, "get", resourceKind, name, "-o", "json"]),
+        kubectl([
+            "--context", context, "-n", namespace, "get", "events",
+            `--field-selector=involvedObject.name=${name},involvedObject.namespace=${namespace}`,
+            "-o", "json",
+        ]),
+    ]);
+    if (workloadResult.exitCode !== 0) {
+        throw new Error(workloadResult.stderr);
+    }
+    const item = JSON.parse(workloadResult.stdout);
+    const selector: Record<string, string> = item.spec?.selector?.matchLabels ?? {};
+
+    // Fetch the pods the workload selects so the detail page can list them. When the
+    // workload has no match labels we skip the query rather than fetch every pod.
+    let pods: Pod[] = [];
+    const selectorParts = Object.entries(selector).map(([key, value]) => `${key}=${value}`);
+    if (selectorParts.length > 0) {
+        const podsResult = await kubectl([
+            "--context", context, "-n", namespace, "get", "pods",
+            "-l", selectorParts.join(","), "-o", "json",
+        ]);
+        if (podsResult.exitCode === 0) {
+            const podsData = JSON.parse(podsResult.stdout);
+            pods = (podsData.items as any[]).map((p) => mapPodListItem(p));
+        }
+    }
+
+    let events: KubeEvent[] = [];
+    if (eventsResult.exitCode === 0) {
+        const evData = JSON.parse(eventsResult.stdout);
+        events = (evData.items as any[]).map((ev) => ({
+            type: ev.type as "Normal" | "Warning",
+            reason: ev.reason ?? "",
+            message: ev.message ?? "",
+            count: ev.count ?? 1,
+            lastSeen: ev.lastTimestamp ?? ev.eventTime ?? "",
+        }));
+    }
+
+    return {
+        kind,
+        name: item.metadata.name,
+        namespace: item.metadata.namespace,
+        createdAt: item.metadata.creationTimestamp,
+        labels: item.metadata.labels ?? {},
+        selector,
+        stats: workloadStats(kind, item),
+        pods,
+        events,
     };
 }
 

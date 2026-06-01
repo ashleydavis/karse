@@ -10,6 +10,8 @@ import {
     setContextNamespace,
     listNodes,
     getNodeDetail,
+    getWorkloadDetail,
+    isWorkloadKind,
     getClusterOverview,
     listPods,
     listEvents,
@@ -583,6 +585,211 @@ describe("getNodeDetail", () => {
             [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
         });
         await expect(getNodeDetail("test-ctx", "node-1")).rejects.toThrow("not found");
+    });
+});
+
+describe("isWorkloadKind", () => {
+    test("accepts the three workload kinds", () => {
+        expect(isWorkloadKind("deployments")).toBe(true);
+        expect(isWorkloadKind("statefulsets")).toBe(true);
+        expect(isWorkloadKind("daemonsets")).toBe(true);
+    });
+
+    test("rejects anything else", () => {
+        expect(isWorkloadKind("pods")).toBe(false);
+        expect(isWorkloadKind("")).toBe(false);
+    });
+});
+
+describe("getWorkloadDetail", () => {
+    // Argv keys for the deployment fetch, its scoped events fetch, and its selected pods fetch.
+    const DEPLOY_KEY = "--context test-ctx -n default get deployment nginx -o json";
+    const EVENTS_KEY = "--context test-ctx -n default get events --field-selector=involvedObject.name=nginx,involvedObject.namespace=default -o json";
+    const PODS_KEY = "--context test-ctx -n default get pods -l app=nginx -o json";
+
+    // A minimal deployment item shape with the fields getWorkloadDetail reads.
+    function makeDeploymentItem(): object {
+        return {
+            metadata: {
+                name: "nginx",
+                namespace: "default",
+                creationTimestamp: "2024-06-01T00:00:00Z",
+                labels: { app: "nginx" },
+            },
+            spec: {
+                replicas: 3,
+                selector: { matchLabels: { app: "nginx" } },
+            },
+            status: {
+                readyReplicas: 2,
+                updatedReplicas: 3,
+                availableReplicas: 2,
+            },
+        };
+    }
+
+    // A minimal pod item shape as returned by the label-selector query.
+    function makePodItem(name: string): object {
+        return {
+            metadata: {
+                name,
+                namespace: "default",
+                creationTimestamp: "2024-06-01T00:00:00Z",
+            },
+            spec: {
+                nodeName: "node-1",
+                containers: [{ name: "nginx" }],
+            },
+            status: {
+                phase: "Running",
+                containerStatuses: [{ ready: true, restartCount: 0 }],
+                initContainerStatuses: [],
+            },
+        };
+    }
+
+    test("fetches pods using the selector match labels", async () => {
+        setRunnerHandlers({
+            [DEPLOY_KEY]: () => ok(JSON.stringify(makeDeploymentItem())),
+            [EVENTS_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
+        });
+        await getWorkloadDetail("test-ctx", "deployments", "default", "nginx");
+        // setRunnerHandlers throws on any unmocked argv, so reaching here proves
+        // the exact label-selector argv was used.
+        expect(run).toHaveBeenCalledWith(
+            "kubectl",
+            ["--context", "test-ctx", "-n", "default", "get", "pods", "-l", "app=nginx", "-o", "json"],
+        );
+    });
+
+    test("parses deployment status into Ready/Up-to-date/Available stats and maps pods", async () => {
+        setRunnerHandlers({
+            [DEPLOY_KEY]: () => ok(JSON.stringify(makeDeploymentItem())),
+            [EVENTS_KEY]: () => ok(JSON.stringify({
+                items: [
+                    {
+                        type: "Normal",
+                        reason: "ScalingReplicaSet",
+                        message: "Scaled up replica set nginx-abc to 3",
+                        count: 1,
+                        lastTimestamp: "2024-06-01T00:01:00Z",
+                    },
+                ],
+            })),
+            [PODS_KEY]: () => ok(JSON.stringify({ items: [makePodItem("nginx-abc")] })),
+        });
+        const result = await getWorkloadDetail("test-ctx", "deployments", "default", "nginx");
+        expect(result.kind).toBe("deployments");
+        expect(result.name).toBe("nginx");
+        expect(result.namespace).toBe("default");
+        expect(result.labels).toEqual({ app: "nginx" });
+        expect(result.selector).toEqual({ app: "nginx" });
+        expect(result.stats).toEqual([
+            { label: "Ready", value: "2/3" },
+            { label: "Up-to-date", value: "3" },
+            { label: "Available", value: "2" },
+        ]);
+        expect(result.pods).toEqual([
+            {
+                name: "nginx-abc",
+                namespace: "default",
+                phase: "Running",
+                ready: "1/1",
+                containerCount: 1,
+                restarts: 0,
+                createdAt: "2024-06-01T00:00:00Z",
+                node: "node-1",
+            },
+        ]);
+        expect(result.events).toEqual([
+            {
+                type: "Normal",
+                reason: "ScalingReplicaSet",
+                message: "Scaled up replica set nginx-abc to 3",
+                count: 1,
+                lastSeen: "2024-06-01T00:01:00Z",
+            },
+        ]);
+    });
+
+    test("builds daemonset stats from the daemonset status numbers", async () => {
+        const dsKey = "--context test-ctx -n kube-system get daemonset fluentd -o json";
+        const dsEventsKey = "--context test-ctx -n kube-system get events --field-selector=involvedObject.name=fluentd,involvedObject.namespace=kube-system -o json";
+        const dsPodsKey = "--context test-ctx -n kube-system get pods -l app=fluentd -o json";
+        setRunnerHandlers({
+            [dsKey]: () => ok(JSON.stringify({
+                metadata: {
+                    name: "fluentd",
+                    namespace: "kube-system",
+                    creationTimestamp: "2024-06-01T00:00:00Z",
+                    labels: {},
+                },
+                spec: {
+                    selector: { matchLabels: { app: "fluentd" } },
+                },
+                status: {
+                    desiredNumberScheduled: 2,
+                    currentNumberScheduled: 2,
+                    numberReady: 2,
+                    updatedNumberScheduled: 2,
+                    numberAvailable: 2,
+                },
+            })),
+            [dsEventsKey]: () => ok(JSON.stringify({ items: [] })),
+            [dsPodsKey]: () => ok(JSON.stringify({ items: [] })),
+        });
+        const result = await getWorkloadDetail("test-ctx", "daemonsets", "kube-system", "fluentd");
+        expect(result.stats).toEqual([
+            { label: "Desired", value: "2" },
+            { label: "Current", value: "2" },
+            { label: "Ready", value: "2" },
+            { label: "Up-to-date", value: "2" },
+            { label: "Available", value: "2" },
+        ]);
+    });
+
+    test("skips the pods query when the workload has no selector", async () => {
+        setRunnerHandlers({
+            [DEPLOY_KEY]: () => ok(JSON.stringify({
+                metadata: {
+                    name: "nginx",
+                    namespace: "default",
+                    creationTimestamp: "2024-06-01T00:00:00Z",
+                    labels: {},
+                },
+                spec: {
+                    replicas: 1,
+                },
+                status: {
+                    readyReplicas: 1,
+                },
+            })),
+            [EVENTS_KEY]: () => ok(JSON.stringify({ items: [] })),
+        });
+        const result = await getWorkloadDetail("test-ctx", "deployments", "default", "nginx");
+        expect(result.selector).toEqual({});
+        expect(result.pods).toEqual([]);
+    });
+
+    test("tolerates the pods call failing and still returns workload detail", async () => {
+        setRunnerHandlers({
+            [DEPLOY_KEY]: () => ok(JSON.stringify(makeDeploymentItem())),
+            [EVENTS_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [PODS_KEY]: () => fail("forbidden"),
+        });
+        const result = await getWorkloadDetail("test-ctx", "deployments", "default", "nginx");
+        expect(result.name).toBe("nginx");
+        expect(result.pods).toEqual([]);
+    });
+
+    test("throws when the workload call fails", async () => {
+        setRunnerHandlers({
+            [DEPLOY_KEY]: () => fail("not found"),
+            [EVENTS_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
+        });
+        await expect(getWorkloadDetail("test-ctx", "deployments", "default", "nginx")).rejects.toThrow("not found");
     });
 });
 
