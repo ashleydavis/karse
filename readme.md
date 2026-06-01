@@ -4,17 +4,12 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
 
 ## Todo
 
-- Move the resource YAML onto a sub tab of each resource's detail page, for every resource that exposes YAML (pods, nodes, deployments, statefulsets, daemonsets, namespaces, etc.). The existing YAML modal/dialog must be removed ENTIRELY: delete yaml-dialog.tsx along with the per-row "YAML" button that opens the popup, so there is no YAML dialog/modal left anywhere in the app. YAML must be reachable only via the detail-page sub tab. A previous attempt failed because it added a YAML tab but left yaml-dialog.tsx and the button in place alongside it, so the dialog still existed. (This consolidates two duplicate todo items.)
 - Components for each page should be under a subdirectory for that page. Restructure to colocate a page and its components to be together. Eg pages/pod/index.tsx && pages/pod/components/... IMPORTANT: implement this on its own, NOT in parallel with any other todo items. A previous attempt was developed alongside other changes and went stale (it missed pages that were added by the other work and left the colocation partial and inconsistent). Do it as a standalone change against the current code so every page is covered.
+
+- Move the resource YAML onto a sub tab of each resource's detail page, for every resource that exposes YAML (pods, nodes, deployments, statefulsets, daemonsets, namespaces, etc.). The existing YAML modal/dialog must be removed ENTIRELY: delete yaml-dialog.tsx along with the per-row "YAML" button that opens the popup, so there is no YAML dialog/modal left anywhere in the app. YAML must be reachable only via the detail-page sub tab. A previous attempt failed because it added a YAML tab but left yaml-dialog.tsx and the button in place alongside it, so the dialog still existed. (This consolidates two duplicate todo items.)
 - Automatic updating pod logs didn't work.
 - Be nice if the dropdown pickers had an arrow pointing at the button. This must be implemented using a built-in MUI component (not custom UI/CSS code). A previous attempt hand-rolled a CSS beak and looked bad. Note MUI's Popover/Menu have no native arrow, so this likely means switching the picker to a MUI component that does (or reusing MUI's Tooltip arrow styling) rather than writing custom markup.
 - There should only ever be ONE test cluster at a time. Each scenario's setup script must first tear down the existing test cluster, then build the new one. Do NOT build a registry that accumulates multiple clusters (a previous attempt over-engineered it that way). Keep it simple: setup = teardown-then-build, plus one teardown script that removes the single cluster.
-- Need to confirm that live logs works with a real cluster.
-- Auto load logs when looking at logs. Remove the button to load/stream logs. Logs should automatically display. Have a refresh button to refresh the. By default logs should automatically update as new logs are produced from the cluster.
-- Make sure live logs can stream all logs from the cluster.
-  - Prolly not possible though.
-  - At the moment when trying this it just maxes out cpu.
-  - At the moment the page is pretty much just blank waiting to load data from the cluster. Would be nice to have a progress indicator while loading.
 - At the top of each page for resources (e.g. Pods, Daemonsets, etc) put some brief stats on the number of resources, the number healthy, the number in error, etc.
 - I need to be able to filter resources by status. There should be a dropdown with checkboxes for each status value. Do this for all resources that have a status field (e.g. Pods).
 - The Role column for nodes always seems to be set to `<none>` for our real cluster. Why have this column if it doesn't display anything useful?
@@ -27,6 +22,16 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
   - I'd actually like you to move the commands to be a tab (rather than a modal) on each resource's page.
 - I can't click through to see the page for a Namespace. At a minimum I'd like to have a tab on the Namespace page for the Yaml. The Namespace page should also show a Resources tab (with search and sort) in that page. There can also be a Details / Summary tab with stats about the namespace. Is there any other useful information we could display about a namespace? If yes add it. A Commands tab here would be good to show commands relating to the namespace.
 - In the namespaces page I want a column that shows how many resources are in that namespace.
+- At the moment pages are pretty much just blank waiting to load data from the cluster. Would be nice to have a progress indicator while loading.
+
+- Live logs (these need testing the AI can't really do by itself)
+   - Auto load logs when looking at logs. Remove the button to load/stream logs. Logs should automatically display. Have a refresh button to refresh the. By default logs should automatically update as new logs are produced from the cluster.
+   - Need to confirm that live logs works with a real cluster.
+   - Make sure live logs can stream all logs from the cluster.
+      - Prolly not possible though.
+      - At the moment when trying this it just maxes out cpu.
+
+
 
 ## Requirements
 
