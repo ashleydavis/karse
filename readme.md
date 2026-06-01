@@ -4,8 +4,6 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
 
 ## Todo
 
-- Components for each page should be under a subdirectory for that page. Restructure to colocate a page and its components to be together. Eg pages/pod/index.tsx && pages/pod/components/... IMPORTANT: implement this on its own, NOT in parallel with any other todo items. A previous attempt was developed alongside other changes and went stale (it missed pages that were added by the other work and left the colocation partial and inconsistent). Do it as a standalone change against the current code so every page is covered. You might have to update docs and tests after making this change.
-
 - Move the resource YAML onto a sub tab of each resource's detail page, for every resource that exposes YAML (pods, nodes, deployments, statefulsets, daemonsets, namespaces, etc.). The existing YAML modal/dialog must be removed ENTIRELY: delete yaml-dialog.tsx along with the per-row "YAML" button that opens the popup, so there is no YAML dialog/modal left anywhere in the app. YAML must be reachable only via the detail-page sub tab. A previous attempt failed because it added a YAML tab but left yaml-dialog.tsx and the button in place alongside it, so the dialog still existed. (This consolidates two duplicate todo items.)
 - Automatic updating pod logs didn't work.
 - Be nice if the dropdown pickers had an arrow pointing at the button. This must be implemented using a built-in MUI component (not custom UI/CSS code). A previous attempt hand-rolled a CSS beak and looked bad. Note MUI's Popover/Menu have no native arrow, so this likely means switching the picker to a MUI component that does (or reusing MUI's Tooltip arrow styling) rather than writing custom markup.
