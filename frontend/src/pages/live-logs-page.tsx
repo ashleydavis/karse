@@ -129,7 +129,7 @@ export function LiveLogsPage() {
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <FontAwesomeIcon icon={["fas", "stream"]} />
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    Live Logs
+                    Logs
                 </Typography>
             </Box>
 

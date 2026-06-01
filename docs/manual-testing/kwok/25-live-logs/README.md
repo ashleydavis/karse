@@ -1,7 +1,7 @@
 # Scenario 25: Live logs (stern-style multi-pod streaming)
 
 A cluster with one node and three pods (`nginx-one`, `nginx-two`, `redis-main`).
-Exercises the Live Logs page: streaming logs from multiple pods at once, each
+Exercises the Logs page: streaming logs from multiple pods at once, each
 line prefixed with its pod name, scoped by a namespace dropdown, a pod dropdown,
 and a wildcard/substring filter.
 
@@ -28,8 +28,8 @@ Select it in Karse.
 
 ### Navigation
 
-- The sidebar shows a "Live Logs" item with a stream icon. Click it.
-- The URL becomes `/logs` and the page title shows "Live Logs".
+- The sidebar shows a "Logs" item with a stream icon. Click it.
+- The URL becomes `/logs` and the page title shows "Logs".
 
 ### Controls
 

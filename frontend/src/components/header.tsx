@@ -51,7 +51,7 @@ function getPageTitle(pathname: string): string {
         return "DaemonSet";
     }
     if (pathname === "/logs") {
-        return "Live Logs";
+        return "Logs";
     }
     if (pathname === "/stern") {
         return "Stern";

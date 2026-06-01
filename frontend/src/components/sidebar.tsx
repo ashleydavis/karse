@@ -15,7 +15,7 @@ const NAV_ITEMS = [
     { to: "/statefulsets", icon: "database"     as const, label: "StatefulSets" },
     { to: "/daemonsets",   icon: "sitemap"      as const, label: "DaemonSets"   },
     { to: "/events",       icon: "bell"         as const, label: "Events"       },
-    { to: "/logs",         icon: "stream"       as const, label: "Live Logs"    },
+    { to: "/logs",         icon: "stream"       as const, label: "Logs"         },
     { to: "/stern",        icon: "tower-broadcast" as const, label: "Stern"      },
 ];
 

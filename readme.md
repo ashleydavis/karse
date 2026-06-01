@@ -16,11 +16,10 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
 - The Yaml needs to be on a separate tab, rather than having a button.
 - Be nice if the dropdown pickers had an arrow pointing at the button. This must be implemented using a built-in MUI component (not custom UI/CSS code). A previous attempt hand-rolled a CSS beak and looked bad. Note MUI's Popover/Menu have no native arrow, so this likely means switching the picker to a MUI component that does (or reusing MUI's Tooltip arrow styling) rather than writing custom markup.
 - There should only ever be ONE test cluster at a time. Each scenario's setup script must first tear down the existing test cluster, then build the new one. Do NOT build a registry that accumulates multiple clusters (a previous attempt over-engineered it that way). Keep it simple: setup = teardown-then-build, plus one teardown script that removes the single cluster.
-- Live Logs can just be called logs.
 - Need to confirm that live logs works with a real cluster.
 - The coding style hasn't been followed in header.tsx. If statement body is on one line after the curly brackets.
 - Auto load logs when looking at logs. Remove the button to load/stream logs. Logs should automatically display. Have a refresh button to refresh the. By default logs should automatically update as new logs are produced from the cluster.
-- It would be good to add a new page called Stern and actually use `stern` to show live logs (with filters/wildcards like the Live Logs page).
+- It would be good to add a new page called Stern and actually use `stern` to show live logs (with filters/wildcards like the Logs page).
    - If `stern` isn't installed show the user how to install it.
 - Make sure the Node page has tabs:
   - Status / Details

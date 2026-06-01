@@ -34,7 +34,7 @@ To tear down every test cluster at once (handy after running several scenarios, 
 | [22](22-breadcrumbs/) | Breadcrumb navigation: trail on list and detail pages, links back to lists |
 | [23](23-shareable-url-state/) | Shareable URL state: context and namespace in the URL query string |
 | [24](24-navbar-dropdown-pickers/) | Context and namespace pickers drop down from the nav bar |
-| [25](25-live-logs/) | Live logs: stern-style multi-pod streaming with namespace/pod scoping and wildcard filter |
+| [25](25-live-logs/) | Logs: stern-style multi-pod streaming with namespace/pod scoping and wildcard filter |
 | [26](26-table-row-hover/) | Consistent table row hover across all tables |
 | [27](27-live-pod-logs/) | Live (follow) pod logs: streaming log tail via the Live toggle on the pod detail page |
 | [28](28-events-view/) | Events view: cluster- and namespace-wide Kubernetes events |

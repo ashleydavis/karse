@@ -1973,8 +1973,8 @@ test.describe("karse e2e", () => {
             setContext(CLUSTER_1);
         });
 
-        test("shows page title Live Logs", async () => {
-            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Live Logs");
+        test("shows page title Logs", async () => {
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Logs");
         });
 
         test("renders namespace, pod, and filter controls", async () => {
