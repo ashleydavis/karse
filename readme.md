@@ -15,8 +15,7 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
 - Why does every icon need to go through the font-awesome file?
 - The Yaml needs to be on a separate tab, rather than having a button.
 - Be nice if the dropdown pickers had an arrow pointing at the button. This must be implemented using a built-in MUI component (not custom UI/CSS code). A previous attempt hand-rolled a CSS beak and looked bad. Note MUI's Popover/Menu have no native arrow, so this likely means switching the picker to a MUI component that does (or reusing MUI's Tooltip arrow styling) rather than writing custom markup.
-- The manual testing guide needs a way to register what clusters were created so that we can have one script to tear down any testing setup.
-  - Also it's annoying that we have to tear down before we can do another setup. Tear down should be an automatic first step in setup.
+- There should only ever be ONE test cluster at a time. Each scenario's setup script must first tear down the existing test cluster, then build the new one. Do NOT build a registry that accumulates multiple clusters (a previous attempt over-engineered it that way). Keep it simple: setup = teardown-then-build, plus one teardown script that removes the single cluster.
 - Live Logs can just be called logs.
 - Need to confirm that live logs works with a real cluster.
 - The coding style hasn't been followed in header.tsx. If statement body is on one line after the curly brackets.
