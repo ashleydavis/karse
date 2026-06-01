@@ -11,6 +11,22 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
 - There should only ever be ONE test cluster at a time. Each scenario's setup script must first tear down the existing test cluster, then build the new one. Do NOT build a registry that accumulates multiple clusters (a previous attempt over-engineered it that way). Keep it simple: setup = teardown-then-build, plus one teardown script that removes the single cluster.
 - Need to confirm that live logs works with a real cluster.
 - Auto load logs when looking at logs. Remove the button to load/stream logs. Logs should automatically display. Have a refresh button to refresh the. By default logs should automatically update as new logs are produced from the cluster.
+- Make sure live logs can stream all logs from the cluster.
+  - Prolly not possible though.
+  - At the moment when trying this it just maxes out cpu.
+  - At the moment the page is pretty much just blank waiting to load data from the cluster. Would be nice to have a progress indicator while loading.
+- At the top of each page for resources (e.g. Pods, Daemonsets, etc) put some brief stats on the number of resources, the number healthy, the number in error, etc.
+- I need to be able to filter resources by status. There should be a dropdown with checkboxes for each status value. Do this for all resources that have a status field (e.g. Pods).
+- The Role column for nodes always seems to be set to `<none>` for our real cluster. Why have this column if it doesn't display anything useful?
+- It would be good to have a column for resource labels for each resource type that supports labels.
+- For every table I'd like to be able to configure what columns to show and the order to show them in. You will need a modal to be able to configure this. Have two sections: visible and hidden. Use drag and drop to reorder columns in that modal. Use drag and drop to move columns between visible and hidden sections.
+- The commands modal:
+  - I'd prefer to have word wrap on for the commands so I can see them rather than having to scroll horizontally.
+  - The command modal should be almost fullscreen to show the commands as fully as possible.
+  - The command modal should be searchable.
+  - I'd actually like you to move the commands to be a tab (rather than a modal) on each resource's page.
+- I can't click through to see the page for a Namespace. At a minimum I'd like to have a tab on the Namespace page for the Yaml. The Namespace page should also show a Resources tab (with search and sort) in that page. There can also be a Details / Summary tab with stats about the namespace. Is there any other useful information we could display about a namespace? If yes add it. A Commands tab here would be good to show commands relating to the namespace.
+- In the namespaces page I want a column that shows how many resources are in that namespace.
 
 ## Requirements
 
