@@ -29,6 +29,7 @@ const LIST_LABELS: Record<string, string> = {
 const POD_TAB_LABELS: Record<string, string> = {
     detail: "Detail / Status",
     containers: "Containers",
+    "init-containers": "Init Containers",
     logs: "Logs",
 };
 

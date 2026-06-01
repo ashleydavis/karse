@@ -82,7 +82,7 @@ type PodDetailTab = "detail" | "containers" | "init-containers" | "logs";
 // Reads the active tab from the URL, falling back to the Detail tab for any
 // missing or unrecognized value so the page always has a valid selection.
 function parseTab(value: string | null): PodDetailTab {
-    if (value === "containers" || value === "logs") {
+    if (value === "containers" || value === "init-containers" || value === "logs") {
         return value;
     }
     return "detail";
