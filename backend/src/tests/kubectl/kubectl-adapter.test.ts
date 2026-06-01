@@ -15,6 +15,7 @@ import {
     getClusterOverview,
     listPods,
     listEvents,
+    listClusterErrors,
     getPodLogs,
     getResourceYaml,
     isYamlResourceType,
@@ -1352,6 +1353,310 @@ describe("listEvents", () => {
             "--context test-ctx get events -A -o json": () => fail("forbidden"),
         });
         await expect(listEvents("test-ctx")).rejects.toThrow("forbidden");
+    });
+});
+
+describe("listClusterErrors", () => {
+    // A Warning event item, mirroring the structurally significant fields kubectl
+    // returns for core/v1 Events when filtered by type=Warning.
+    function warningEventItem(overrides: {
+        reason?: string;
+        message?: string;
+        count?: number;
+        lastTimestamp?: string;
+        namespace?: string;
+        objectName?: string;
+    } = {}): object {
+        return {
+            metadata: {
+                name: "evt-1.abc",
+                namespace: overrides.namespace ?? "default",
+            },
+            involvedObject: {
+                kind: "Pod",
+                name: overrides.objectName ?? "nginx-abc",
+                namespace: overrides.namespace ?? "default",
+            },
+            reason: overrides.reason ?? "BackOff",
+            message: overrides.message ?? "Back-off restarting failed container",
+            type: "Warning",
+            count: overrides.count ?? 3,
+            lastTimestamp: overrides.lastTimestamp ?? "2024-06-01T00:00:00Z",
+        };
+    }
+
+    // A pod item whose single container is waiting in the given problem state.
+    function waitingPodItem(reason: string, overrides: {
+        name?: string;
+        namespace?: string;
+        message?: string;
+        startTime?: string;
+    } = {}): object {
+        return {
+            metadata: {
+                name: overrides.name ?? "broken-pod",
+                namespace: overrides.namespace ?? "default",
+                creationTimestamp: "2024-05-01T00:00:00Z",
+            },
+            status: {
+                phase: "Pending",
+                startTime: overrides.startTime ?? "2024-05-02T00:00:00Z",
+                containerStatuses: [
+                    {
+                        name: "app",
+                        state: {
+                            waiting: {
+                                reason,
+                                message: overrides.message,
+                            },
+                        },
+                    },
+                ],
+            },
+        };
+    }
+
+    // A healthy running pod that must never appear in the errors list.
+    function healthyPodItem(): object {
+        return {
+            metadata: {
+                name: "healthy-pod",
+                namespace: "default",
+                creationTimestamp: "2024-05-01T00:00:00Z",
+            },
+            status: {
+                phase: "Running",
+                containerStatuses: [
+                    {
+                        name: "app",
+                        state: {
+                            running: {
+                                startedAt: "2024-05-01T00:01:00Z",
+                            },
+                        },
+                    },
+                ],
+            },
+        };
+    }
+
+    test("requests Warning events and all pods with -A when no namespace given", async () => {
+        let eventsArgs: readonly string[] | null = null;
+        let podsArgs: readonly string[] | null = null;
+        run.mockImplementation((_binary: string, args: readonly string[]) => {
+            const key = args.join(" ");
+            if (key.includes("get events")) {
+                eventsArgs = args;
+                return Promise.resolve(ok(JSON.stringify({ items: [] })));
+            }
+            if (key.includes("get pods")) {
+                podsArgs = args;
+                return Promise.resolve(ok(JSON.stringify({ items: [] })));
+            }
+            throw new Error("unmocked kubectl call: " + key);
+        });
+        await listClusterErrors("test-ctx");
+        expect(eventsArgs).toEqual([
+            "--context", "test-ctx", "get", "events", "-A", "--field-selector=type=Warning", "-o", "json",
+        ]);
+        expect(podsArgs).toEqual([
+            "--context", "test-ctx", "get", "pods", "-A", "-o", "json",
+        ]);
+    });
+
+    test("scopes both queries with -n when a namespace is given", async () => {
+        let eventsArgs: readonly string[] | null = null;
+        let podsArgs: readonly string[] | null = null;
+        run.mockImplementation((_binary: string, args: readonly string[]) => {
+            const key = args.join(" ");
+            if (key.includes("get events")) {
+                eventsArgs = args;
+                return Promise.resolve(ok(JSON.stringify({ items: [] })));
+            }
+            if (key.includes("get pods")) {
+                podsArgs = args;
+                return Promise.resolve(ok(JSON.stringify({ items: [] })));
+            }
+            throw new Error("unmocked kubectl call: " + key);
+        });
+        await listClusterErrors("test-ctx", "my-ns");
+        expect(eventsArgs).toContain("-n");
+        expect(eventsArgs).toContain("my-ns");
+        expect(podsArgs).toContain("-n");
+        expect(podsArgs).toContain("my-ns");
+    });
+
+    test("maps a Warning event to a ClusterError with source Event", async () => {
+        run.mockImplementation((_binary: string, args: readonly string[]) => {
+            const key = args.join(" ");
+            if (key.includes("get events")) {
+                return Promise.resolve(ok(JSON.stringify({
+                    items: [warningEventItem({
+                        reason: "FailedScheduling",
+                        message: "0/3 nodes are available",
+                        count: 4,
+                        namespace: "prod",
+                        objectName: "api-xyz",
+                        lastTimestamp: "2024-06-02T00:00:00Z",
+                    })],
+                })));
+            }
+            return Promise.resolve(ok(JSON.stringify({ items: [] })));
+        });
+        const result = await listClusterErrors("test-ctx");
+        expect(result).toEqual([
+            {
+                source: "Event",
+                namespace: "prod",
+                objectKind: "Pod",
+                objectName: "api-xyz",
+                reason: "FailedScheduling",
+                message: "0/3 nodes are available",
+                count: 4,
+                lastSeen: "2024-06-02T00:00:00Z",
+            },
+        ]);
+    });
+
+    test("maps a CrashLoopBackOff pod to a ClusterError with source Pod", async () => {
+        run.mockImplementation((_binary: string, args: readonly string[]) => {
+            const key = args.join(" ");
+            if (key.includes("get pods")) {
+                return Promise.resolve(ok(JSON.stringify({
+                    items: [waitingPodItem("CrashLoopBackOff", {
+                        name: "crasher",
+                        namespace: "default",
+                        message: "back-off 5m0s restarting failed container",
+                        startTime: "2024-06-03T00:00:00Z",
+                    })],
+                })));
+            }
+            return Promise.resolve(ok(JSON.stringify({ items: [] })));
+        });
+        const result = await listClusterErrors("test-ctx");
+        expect(result).toEqual([
+            {
+                source: "Pod",
+                namespace: "default",
+                objectKind: "Pod",
+                objectName: "crasher",
+                reason: "CrashLoopBackOff",
+                message: "back-off 5m0s restarting failed container",
+                count: 1,
+                lastSeen: "2024-06-03T00:00:00Z",
+            },
+        ]);
+    });
+
+    test("excludes healthy running pods", async () => {
+        run.mockImplementation((_binary: string, args: readonly string[]) => {
+            const key = args.join(" ");
+            if (key.includes("get pods")) {
+                return Promise.resolve(ok(JSON.stringify({ items: [healthyPodItem()] })));
+            }
+            return Promise.resolve(ok(JSON.stringify({ items: [] })));
+        });
+        const result = await listClusterErrors("test-ctx");
+        expect(result).toEqual([]);
+    });
+
+    test("includes pods in the Failed phase", async () => {
+        run.mockImplementation((_binary: string, args: readonly string[]) => {
+            const key = args.join(" ");
+            if (key.includes("get pods")) {
+                return Promise.resolve(ok(JSON.stringify({
+                    items: [
+                        {
+                            metadata: {
+                                name: "evicted-pod",
+                                namespace: "default",
+                                creationTimestamp: "2024-05-01T00:00:00Z",
+                            },
+                            status: {
+                                phase: "Failed",
+                                reason: "Evicted",
+                                message: "Pod was evicted due to memory pressure",
+                                startTime: "2024-06-04T00:00:00Z",
+                            },
+                        },
+                    ],
+                })));
+            }
+            return Promise.resolve(ok(JSON.stringify({ items: [] })));
+        });
+        const result = await listClusterErrors("test-ctx");
+        expect(result).toHaveLength(1);
+        expect(result[0]!.source).toBe("Pod");
+        expect(result[0]!.reason).toBe("Evicted");
+        expect(result[0]!.message).toBe("Pod was evicted due to memory pressure");
+    });
+
+    test("uses the phase as reason for a Failed pod without a status reason", async () => {
+        run.mockImplementation((_binary: string, args: readonly string[]) => {
+            const key = args.join(" ");
+            if (key.includes("get pods")) {
+                return Promise.resolve(ok(JSON.stringify({
+                    items: [
+                        {
+                            metadata: {
+                                name: "dead-pod",
+                                namespace: "default",
+                                creationTimestamp: "2024-05-01T00:00:00Z",
+                            },
+                            status: {
+                                phase: "Failed",
+                                startTime: "2024-06-04T00:00:00Z",
+                            },
+                        },
+                    ],
+                })));
+            }
+            return Promise.resolve(ok(JSON.stringify({ items: [] })));
+        });
+        const result = await listClusterErrors("test-ctx");
+        expect(result).toHaveLength(1);
+        expect(result[0]!.reason).toBe("Failed");
+        expect(result[0]!.message).toBe("Pod is in Failed phase");
+    });
+
+    test("combines events and problem pods sorted newest-first", async () => {
+        run.mockImplementation((_binary: string, args: readonly string[]) => {
+            const key = args.join(" ");
+            if (key.includes("get events")) {
+                return Promise.resolve(ok(JSON.stringify({
+                    items: [warningEventItem({ objectName: "old-event", lastTimestamp: "2024-01-01T00:00:00Z" })],
+                })));
+            }
+            return Promise.resolve(ok(JSON.stringify({
+                items: [waitingPodItem("ImagePullBackOff", { name: "new-pod", startTime: "2024-09-01T00:00:00Z" })],
+            })));
+        });
+        const result = await listClusterErrors("test-ctx");
+        expect(result).toHaveLength(2);
+        expect(result[0]!.objectName).toBe("new-pod");
+        expect(result[1]!.objectName).toBe("old-event");
+    });
+
+    test("throws when the events query fails", async () => {
+        run.mockImplementation((_binary: string, args: readonly string[]) => {
+            const key = args.join(" ");
+            if (key.includes("get events")) {
+                return Promise.resolve(fail("forbidden"));
+            }
+            return Promise.resolve(ok(JSON.stringify({ items: [] })));
+        });
+        await expect(listClusterErrors("test-ctx")).rejects.toThrow("forbidden");
+    });
+
+    test("throws when the pods query fails", async () => {
+        run.mockImplementation((_binary: string, args: readonly string[]) => {
+            const key = args.join(" ");
+            if (key.includes("get pods")) {
+                return Promise.resolve(fail("pods unreachable"));
+            }
+            return Promise.resolve(ok(JSON.stringify({ items: [] })));
+        });
+        await expect(listClusterErrors("test-ctx")).rejects.toThrow("pods unreachable");
     });
 });
 

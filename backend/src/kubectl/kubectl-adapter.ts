@@ -5,7 +5,7 @@ import type {
     Deployment, StatefulSet, DaemonSet,
     ContainerInfo, ContainerState, KubeEvent, PodDetail,
     NodeCondition, NodeAddress, ResourceAmounts, NodeDetail,
-    ClusterEvent, WorkloadKind, WorkloadStat, WorkloadDetail,
+    ClusterEvent, WorkloadKind, WorkloadStat, WorkloadDetail, ClusterError,
 } from "karse-types";
 
 // Base directory for the rolling audit log; overridable via KARSE_LOGS_DIR.
@@ -246,6 +246,120 @@ export async function listEvents(context: string, namespace?: string): Promise<C
     });
     events.sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime());
     return events;
+}
+
+// Pod phases that indicate the pod itself is in an error state.
+const FAILED_POD_PHASES = new Set(["Failed", "Unknown"]);
+
+// Container waiting/terminated reasons that indicate a problem worth surfacing
+// on the Errors page even when the pod's phase is still Pending or Running.
+const PROBLEM_CONTAINER_REASONS = new Set([
+    "CrashLoopBackOff",
+    "ImagePullBackOff",
+    "ErrImagePull",
+    "CreateContainerConfigError",
+    "CreateContainerError",
+    "InvalidImageName",
+    "RunContainerError",
+    "Error",
+    "ContainerCannotRun",
+    "OOMKilled",
+    "CrashLoopBackoff",
+]);
+
+// Extracts the problem reason+message from a pod item if any of its containers
+// are in a known error state, or the pod phase itself is Failed/Unknown.
+// Returns null when the pod looks healthy enough to omit from the Errors page.
+function podProblem(item: any): { reason: string; message: string } | null {
+    const containerStatuses: any[] = item.status?.containerStatuses ?? [];
+    const initStatuses: any[] = item.status?.initContainerStatuses ?? [];
+    for (const cs of [...initStatuses, ...containerStatuses]) {
+        const waiting = cs.state?.waiting;
+        if (waiting && PROBLEM_CONTAINER_REASONS.has(waiting.reason)) {
+            return {
+                reason: waiting.reason,
+                message: waiting.message ?? `Container ${cs.name} is waiting: ${waiting.reason}`,
+            };
+        }
+        const terminated = cs.state?.terminated;
+        if (terminated && terminated.exitCode !== 0 && PROBLEM_CONTAINER_REASONS.has(terminated.reason)) {
+            return {
+                reason: terminated.reason,
+                message: terminated.message ?? `Container ${cs.name} terminated: ${terminated.reason} (exit ${terminated.exitCode})`,
+            };
+        }
+    }
+    const phase: string = item.status?.phase ?? "";
+    if (FAILED_POD_PHASES.has(phase)) {
+        // status.reason (e.g. "Evicted") refines the phase; status.message carries
+        // the human-readable detail. Fall back through both to a generic message.
+        const reason = item.status?.reason ?? phase;
+        return {
+            reason,
+            message: item.status?.message ?? `Pod is in ${phase} phase`,
+        };
+    }
+    return null;
+}
+
+// Returns the set of error conditions occurring in the cluster for the given
+// context, optionally scoped to a namespace. Combines two read-only sources:
+//   1. Warning-type Kubernetes events (kubectl get events --field-selector type=Warning).
+//   2. Pods in a failing state (CrashLoopBackOff, ImagePullBackOff, Failed, etc.).
+// Both sources are mapped to the unified ClusterError shape and returned sorted
+// newest-first by lastSeen. Pass namespace=undefined (or omit) for all namespaces.
+export async function listClusterErrors(context: string, namespace?: string): Promise<ClusterError[]> {
+    const nsArgs = namespace ? ["-n", namespace] : ["-A"];
+    const [eventsResult, podsResult] = await Promise.all([
+        kubectl(["--context", context, "get", "events", ...nsArgs, "--field-selector=type=Warning", "-o", "json"]),
+        kubectl(["--context", context, "get", "pods", ...nsArgs, "-o", "json"]),
+    ]);
+    if (eventsResult.exitCode !== 0) {
+        throw new Error(eventsResult.stderr);
+    }
+    if (podsResult.exitCode !== 0) {
+        throw new Error(podsResult.stderr);
+    }
+
+    const errors: ClusterError[] = [];
+
+    const eventItems: any[] = JSON.parse(eventsResult.stdout).items ?? [];
+    for (const ev of eventItems) {
+        const involved = ev.involvedObject ?? {};
+        const lastSeen = ev.lastTimestamp ?? ev.eventTime ?? ev.firstTimestamp ?? "";
+        errors.push({
+            source: "Event",
+            namespace: ev.metadata?.namespace ?? involved.namespace ?? "",
+            objectKind: involved.kind ?? "",
+            objectName: involved.name ?? "",
+            reason: ev.reason ?? "",
+            message: ev.message ?? "",
+            count: ev.count ?? 1,
+            lastSeen,
+        });
+    }
+
+    const podItems: any[] = JSON.parse(podsResult.stdout).items ?? [];
+    for (const item of podItems) {
+        const problem = podProblem(item);
+        if (problem === null) {
+            continue;
+        }
+        const lastSeen = item.status?.startTime ?? item.metadata?.creationTimestamp ?? "";
+        errors.push({
+            source: "Pod",
+            namespace: item.metadata?.namespace ?? "",
+            objectKind: "Pod",
+            objectName: item.metadata?.name ?? "",
+            reason: problem.reason,
+            message: problem.message,
+            count: 1,
+            lastSeen,
+        });
+    }
+
+    errors.sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime());
+    return errors;
 }
 
 // Maps a raw container status object from kubectl JSON output to a typed ContainerInfo.

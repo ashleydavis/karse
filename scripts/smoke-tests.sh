@@ -210,6 +210,18 @@ curl -fsS "$BASE/api/events?context=$CURRENT_CTX&namespace=default" \
     > /dev/null
 echo "OK"
 
+echo "--- GET /api/errors (all namespaces) ---"
+curl -fsS "$BASE/api/errors?context=$CURRENT_CTX" \
+    | jq -e 'has("errors")' \
+    > /dev/null
+echo "OK"
+
+echo "--- GET /api/errors (namespace scoped) ---"
+curl -fsS "$BASE/api/errors?context=$CURRENT_CTX&namespace=default" \
+    | jq -e 'has("errors")' \
+    > /dev/null
+echo "OK"
+
 echo "--- GET /api/nodes/:name ---"
 FIRST_NODE=$(curl -fsS "$BASE/api/cluster/nodes?context=$CURRENT_CTX" | jq -r '.nodes[0].name')
 if [[ -n "$FIRST_NODE" && "$FIRST_NODE" != "null" ]]; then

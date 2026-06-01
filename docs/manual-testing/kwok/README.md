@@ -41,3 +41,4 @@ To tear down every test cluster at once (handy after running several scenarios, 
 | [29](29-fuzzy-search/) | Fuzzy search: typo-tolerant, non-contiguous matching in table search boxes |
 | [30](30-workload-detail-pages/) | Workload detail pages: drilling into a deployment, stateful set, or daemon set |
 | [31](31-node-detail-tabs/) | Node detail tabs: Status / Details, Pods, Events |
+| [32](32-errors-view/) | Errors view: cluster-wide errors (Warning events + problem pods) linked from the sidebar bottom |

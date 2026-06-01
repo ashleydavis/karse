@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Box, Typography, List, ListItemButton, ListItemIcon, ListItemText, Divider, Tooltip, IconButton } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import type { IconName } from "@fortawesome/fontawesome-svg-core";
 import { Link, useLocation } from "react-router-dom";
 import { useShareableTo } from "../lib/nav-state";
 
@@ -17,10 +18,56 @@ const NAV_ITEMS = [
     { to: "/logs",         icon: "stream"       as const, label: "Live Logs"    },
 ];
 
+// Nav items pinned to the bottom of the sidebar, visually separated from the
+// main navigation above. Currently just the cluster-wide Errors page.
+const BOTTOM_NAV_ITEMS = [
+    { to: "/errors", icon: "circle-exclamation" as const, label: "Errors" },
+];
+
 export function Sidebar() {
     const { pathname } = useLocation();
     const buildTo = useShareableTo();
     const [collapsed, setCollapsed] = useState(false);
+
+    // Renders a single sidebar nav item (link with icon and label). Shared between
+    // the main nav list and the bottom-pinned nav list.
+    function renderNavItem({ to, icon, label }: { to: string; icon: IconName; label: string }) {
+        const active = pathname === to || pathname.startsWith(to + "/");
+        return (
+            <Tooltip key={to} title={collapsed ? label : ""} placement="right">
+                <ListItemButton
+                    component={Link}
+                    to={buildTo(to)}
+                    selected={active}
+                    aria-label={label.toLowerCase()}
+                    sx={{
+                        borderRadius: 1.5,
+                        mb: 0.25,
+                        py: 0.75,
+                        justifyContent: collapsed ? "center" : "flex-start",
+                        "& .MuiListItemIcon-root": {
+                            color: active ? "primary.main" : "text.secondary",
+                            transition: "color 0.15s",
+                        },
+                    }}
+                >
+                    <ListItemIcon sx={{ minWidth: collapsed ? 0 : 32 }}>
+                        <FontAwesomeIcon icon={["fas", icon]} />
+                    </ListItemIcon>
+                    {!collapsed && (
+                        <ListItemText
+                            primary={label}
+                            slotProps={{
+                                primary: {
+                                    sx: { fontSize: "0.875rem", fontWeight: active ? 600 : 400 },
+                                },
+                            }}
+                        />
+                    )}
+                </ListItemButton>
+            </Tooltip>
+        );
+    }
 
     return (
         <Box
@@ -58,43 +105,13 @@ export function Sidebar() {
             <Divider />
 
             <List sx={{ flex: 1, pt: 1, px: 0.75 }} disablePadding>
-                {NAV_ITEMS.map(({ to, icon, label }) => {
-                    const active = pathname === to || pathname.startsWith(to + "/");
-                    return (
-                        <Tooltip key={to} title={collapsed ? label : ""} placement="right">
-                            <ListItemButton
-                                component={Link}
-                                to={buildTo(to)}
-                                selected={active}
-                                aria-label={label.toLowerCase()}
-                                sx={{
-                                    borderRadius: 1.5,
-                                    mb: 0.25,
-                                    py: 0.75,
-                                    justifyContent: collapsed ? "center" : "flex-start",
-                                    "& .MuiListItemIcon-root": {
-                                        color: active ? "primary.main" : "text.secondary",
-                                        transition: "color 0.15s",
-                                    },
-                                }}
-                            >
-                                <ListItemIcon sx={{ minWidth: collapsed ? 0 : 32 }}>
-                                    <FontAwesomeIcon icon={["fas", icon]} />
-                                </ListItemIcon>
-                                {!collapsed && (
-                                    <ListItemText
-                                        primary={label}
-                                        slotProps={{
-                                            primary: {
-                                                sx: { fontSize: "0.875rem", fontWeight: active ? 600 : 400 },
-                                            },
-                                        }}
-                                    />
-                                )}
-                            </ListItemButton>
-                        </Tooltip>
-                    );
-                })}
+                {NAV_ITEMS.map((item) => renderNavItem(item))}
+            </List>
+
+            <Divider />
+
+            <List sx={{ py: 0.5, px: 0.75 }} disablePadding data-test-id="sidebar-bottom-nav">
+                {BOTTOM_NAV_ITEMS.map((item) => renderNavItem(item))}
             </List>
 
             <Divider />

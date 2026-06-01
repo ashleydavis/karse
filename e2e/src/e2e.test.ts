@@ -2121,4 +2121,124 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "redis-xyz" })).toHaveCount(0);
         });
     });
+
+    // ── Errors page ───────────────────────────────────────────────────────────
+
+    test.describe("errors page", () => {
+        // Predictable error data injected via route interception: one problem pod
+        // and one Warning event.
+        const FAKE_ERRORS = {
+            errors: [
+                {
+                    source: "Pod",
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "crasher-abc",
+                    reason: "CrashLoopBackOff",
+                    message: "back-off 5m0s restarting failed container",
+                    count: 1,
+                    lastSeen: new Date().toISOString(),
+                },
+                {
+                    source: "Event",
+                    namespace: "kube-system",
+                    objectKind: "Pod",
+                    objectName: "scheduler-xyz",
+                    reason: "FailedScheduling",
+                    message: "0/3 nodes are available",
+                    count: 4,
+                    lastSeen: new Date().toISOString(),
+                },
+            ],
+        };
+
+        // Install a route override that returns FAKE_ERRORS for every /api/errors request.
+        async function interceptErrors(): Promise<void> {
+            await page.route("**/api/errors*", async (route) => {
+                await route.fulfill({ json: FAKE_ERRORS });
+            });
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await interceptErrors();
+            await page.goto("/errors", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='errors-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/errors*");
+            setContext(CLUSTER_1);
+        });
+
+        test("shows page title Errors", async () => {
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Errors");
+        });
+
+        test("has all column headers", async () => {
+            const table = page.locator("[data-test-id='errors-table']");
+            for (const name of ["Age", "Source", "Object", "Reason", "Message", "Count", "Namespace"]) {
+                await expect(table.getByRole("columnheader", { name, exact: true })).toBeVisible();
+            }
+        });
+
+        test("shows a row for each fake error", async () => {
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(2);
+        });
+
+        test("shows Pod chip for the CrashLoopBackOff error", async () => {
+            const row = page.locator("[data-test-id='error-row']").filter({ hasText: "CrashLoopBackOff" });
+            await expect(row.locator(".MuiChip-label")).toHaveText("Pod");
+        });
+
+        test("shows Event chip for the FailedScheduling error", async () => {
+            const row = page.locator("[data-test-id='error-row']").filter({ hasText: "FailedScheduling" });
+            await expect(row.locator(".MuiChip-label")).toHaveText("Event");
+        });
+
+        test("renders the involved object as kind/name", async () => {
+            const row = page.locator("[data-test-id='error-row']").filter({ hasText: "CrashLoopBackOff" });
+            await expect(row).toContainText("Pod/crasher-abc");
+        });
+
+        test("search filters errors by reason", async () => {
+            await page.locator("[data-test-id='errors-search'] input").fill("CrashLoopBackOff");
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(1);
+        });
+
+        test("shows no-errors-match message when search has no results", async () => {
+            await page.locator("[data-test-id='errors-search'] input").fill("zzznotfound");
+            await expect(page.locator("[data-test-id='no-errors-match']")).toBeVisible();
+        });
+
+        test("clearing search restores all errors", async () => {
+            await page.locator("[data-test-id='errors-search'] input").fill("");
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(2);
+        });
+    });
+
+    // ── Sidebar bottom nav ──────────────────────────────────────────────────────
+
+    test.describe("sidebar bottom nav", () => {
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await navigateTo();
+        });
+
+        test("pins the Errors link to the bottom nav section", async () => {
+            const bottomNav = page.locator("[data-test-id='sidebar-bottom-nav']");
+            await expect(bottomNav).toBeVisible();
+            await expect(bottomNav.locator("[aria-label='errors']")).toBeVisible();
+        });
+
+        test("navigates to the Errors page from the bottom nav link", async () => {
+            await page.route("**/api/errors*", async (route) => {
+                await route.fulfill({ json: { errors: [] } });
+            });
+            await page.locator("[data-test-id='sidebar-bottom-nav'] [aria-label='errors']").click();
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Errors");
+            await expect(page.locator("[data-test-id='no-errors-empty']")).toBeVisible();
+            await page.unroute("**/api/errors*");
+        });
+    });
 });

@@ -38,6 +38,7 @@ import {
     faStop,
     faBell,
     faCircleInfo,
+    faCircleExclamation,
 } from "@fortawesome/free-solid-svg-icons";
 
 config.autoAddCss = false;
@@ -80,4 +81,5 @@ library.add(
     faStop,
     faBell,
     faCircleInfo,
+    faCircleExclamation,
 );

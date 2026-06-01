@@ -146,6 +146,29 @@ export type EventsResponse = {
     events: ClusterEvent[];
 };
 
+// The origin of a cluster error: a Warning-type Kubernetes event, or a pod
+// stuck in a failing/non-running state (CrashLoopBackOff, ImagePullBackOff, etc.).
+export type ClusterErrorSource = "Event" | "Pod";
+
+// A single error condition occurring in the cluster, returned by GET /api/errors.
+// Unifies Warning events and problem pods into one shape so they can be shown
+// together in a single table. age is computed by the UI from lastSeen.
+export type ClusterError = {
+    source: ClusterErrorSource;
+    namespace: string;
+    objectKind: string;     // e.g. "Pod", "Deployment"
+    objectName: string;
+    reason: string;         // event reason or pod waiting/terminated reason
+    message: string;
+    count: number;          // event count, or 1 for a problem pod
+    lastSeen: string;       // ISO timestamp; UI computes age
+};
+
+// Response body for GET /api/errors.
+export type ErrorsResponse = {
+    errors: ClusterError[];
+};
+
 // Detailed view of a single pod, returned by GET /api/pods/:namespace/:name.
 export type PodDetail = {
     name: string;

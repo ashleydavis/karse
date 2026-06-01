@@ -4,7 +4,7 @@ import type {
     DeploymentsResponse, StatefulSetsResponse, DaemonSetsResponse,
     WorkloadKind, WorkloadDetail,
     PodDetail, NodeDetail, YamlResourceType, YamlResponse,
-    LogStreamLine, LogStreamStarted, EventsResponse,
+    LogStreamLine, LogStreamStarted, EventsResponse, ErrorsResponse,
 } from "karse-types";
 
 const http = axios.create({ baseURL: "/api", headers: { "Content-Type": "application/json" } });
@@ -97,6 +97,17 @@ export async function fetchEvents(context: string, namespace?: string): Promise<
         params.namespace = namespace;
     }
     const response = await http.get<EventsResponse>("/events", { params });
+    return response.data;
+}
+
+// Fetches the cluster error conditions (Warning events and problem pods) for the
+// given context. Pass namespace to scope to one namespace, or omit for all namespaces.
+export async function fetchErrors(context: string, namespace?: string): Promise<ErrorsResponse> {
+    const params: Record<string, string> = { context };
+    if (namespace) {
+        params.namespace = namespace;
+    }
+    const response = await http.get<ErrorsResponse>("/errors", { params });
     return response.data;
 }
 
