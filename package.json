@@ -7,7 +7,7 @@
     "dev:test": "KARSE_FAKE_LOGS=1 bun run --filter '*' dev",
     "start": "bun run --filter '*' start",
     "compile": "bun run --filter '*' compile",
-    "test": "bun run --filter 'karse-backend' test",
+    "test": "bun run --filter 'karse-backend' test && bun run --filter 'karse-frontend' test",
     "tests:all": "bun run compile && bun run test && bun run smoke && bun run e2e",
     "smoke": "bash scripts/smoke-tests.sh",
     "e2e": "bash scripts/e2e-tests.sh",

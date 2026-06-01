@@ -219,7 +219,7 @@ Font Awesome via `@fortawesome/react-fontawesome`. Register icons in `src/lib/fo
 
 Every backend non-React TypeScript module has unit tests under `backend/src/tests/` mirroring the source tree. The sole exception is `index.ts` (pure bootstrap wiring, covered by `scripts/smoke-tests.sh`).
 
-The frontend is not unit-tested at all per project policy, including `frontend/src/lib/*.ts` modules. Frontend behaviour is exercised by the Playwright e2e suite (`bun run e2e`) and by `scripts/smoke-tests.sh`. The manual testing scenarios under `docs/manual-testing/` are useful for exploratory testing.
+Frontend React components are not unit-tested per project policy; their behaviour is exercised by the Playwright e2e suite (`bun run e2e`) and by `scripts/smoke-tests.sh`. Pure utility functions in `frontend/src/lib/*.ts` (e.g. `fuzzy-filter.ts`, `guided-commands.ts`) are unit-tested, using the same Jest + `@swc/jest` setup as the backend: tests live under `frontend/src/tests/` mirroring the source tree, run via `bun run --filter 'karse-frontend' test`, and are included in `bun run test` and `bun run tests:all`. Modules that are only side-effecting wiring (e.g. `query-client.ts`, `font-awesome.ts`) or React context/hooks (`.tsx`) are not unit-tested. The manual testing scenarios under `docs/manual-testing/` are useful for exploratory testing.
 
 Tests must:
 
