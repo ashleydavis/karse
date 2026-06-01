@@ -16,6 +16,7 @@ const NAV_ITEMS = [
     { to: "/daemonsets",   icon: "sitemap"      as const, label: "DaemonSets"   },
     { to: "/events",       icon: "bell"         as const, label: "Events"       },
     { to: "/logs",         icon: "stream"       as const, label: "Live Logs"    },
+    { to: "/stern",        icon: "tower-broadcast" as const, label: "Stern"      },
 ];
 
 // Nav items pinned to the bottom of the sidebar, visually separated from the

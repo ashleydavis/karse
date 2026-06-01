@@ -196,6 +196,20 @@ export type LogStreamStarted = {
     pods: Array<{ namespace: string; name: string }>;
 };
 
+// A single output line streamed from the stern endpoint, carried by the "line"
+// Server-Sent Event from GET /api/stern/stream. stern renders its own
+// "namespace pod message" prefix into the line, so it is displayed verbatim.
+export type SternStreamLine = {
+    line: string;
+};
+
+// The scope a stern stream attached to, carried by the "started" event from
+// GET /api/stern/stream.
+export type SternStreamStarted = {
+    query: string;
+    namespace: string | null;
+};
+
 // A single condition reported by a node's status.
 export type NodeCondition = {
     type: string;

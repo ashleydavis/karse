@@ -14,6 +14,7 @@ import { PodDetailPage } from "./pages/pod-detail-page";
 import { NodeDetailPage } from "./pages/node-detail-page";
 import { WorkloadDetailPage } from "./pages/workload-detail-page";
 import { LiveLogsPage } from "./pages/live-logs-page";
+import { SternPage } from "./pages/stern-page";
 
 // Redirects the index route to the cluster home while preserving the shareable query string (context, namespace) so a link to the bare root stays shareable.
 function IndexRedirect() {
@@ -42,6 +43,7 @@ export function App() {
                 <Route path="events" element={<EventsPage />} />
                 <Route path="logs" element={<LiveLogsPage />} />
                 <Route path="errors" element={<ErrorsPage />} />
+                <Route path="stern" element={<SternPage />} />
             </Route>
         </Routes>
     );

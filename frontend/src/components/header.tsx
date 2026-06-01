@@ -53,6 +53,9 @@ function getPageTitle(pathname: string): string {
     if (pathname === "/logs") {
         return "Live Logs";
     }
+    if (pathname === "/stern") {
+        return "Stern";
+    }
     if (pathname === "/events") {
         return "Events";
     }

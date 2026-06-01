@@ -1937,6 +1937,94 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Stern page (stern-powered live logs) ──────────────────────────────────
+
+    test.describe("stern page", () => {
+        // Builds a Server-Sent Events body that announces the stream then emits one
+        // stern-style "namespace pod message" line per pod, mirroring the backend.
+        function buildSternSseBody(query: string): string {
+            const started = `event: started\ndata: ${JSON.stringify({ query, namespace: "default" })}\n\n`;
+            const pods = ["nginx-abc", "redis-xyz"].filter(
+                (n) => query === "" || query === ".*" || n.toLowerCase().includes(query.toLowerCase())
+            );
+            const lines = pods
+                .map((n) => `event: line\ndata: ${JSON.stringify({ line: `default ${n} log line from ${n}` })}\n\n`)
+                .join("");
+            return started + lines;
+        }
+
+        // Intercepts the stern SSE stream, returning canned output for the request's
+        // query, or an "unavailable" event when forceUnavailable is set.
+        async function interceptSternStream(forceUnavailable: boolean): Promise<void> {
+            await page.route("**/api/stern/stream*", async (route) => {
+                if (forceUnavailable) {
+                    await route.fulfill({
+                        headers: { "Content-Type": "text/event-stream" },
+                        body: `event: unavailable\ndata: ${JSON.stringify({ binary: "stern" })}\n\n`,
+                    });
+                    return;
+                }
+                const query = new URL(route.request().url()).searchParams.get("query") ?? "";
+                await route.fulfill({
+                    headers: { "Content-Type": "text/event-stream" },
+                    body: buildSternSseBody(query),
+                });
+            });
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await interceptSternStream(false);
+            await page.goto("/stern", { waitUntil: "networkidle" });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/stern/stream*");
+            setContext(CLUSTER_1);
+        });
+
+        test("shows page title Stern", async () => {
+            await expect(page.locator("[data-test-id='page-title']")).toHaveText("Stern");
+        });
+
+        test("renders namespace and query controls", async () => {
+            await expect(page.locator("[data-test-id='stern-namespace-select']")).toBeVisible();
+            await expect(page.locator("[data-test-id='stern-query']")).toBeVisible();
+        });
+
+        test("streaming shows a stern-prefixed line per pod", async () => {
+            await page.locator("[data-test-id='stern-start']").click();
+            await expect(page.locator("[data-test-id='stern-line']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='stern-viewer']")).toContainText("default nginx-abc");
+            await expect(page.locator("[data-test-id='stern-viewer']")).toContainText("default redis-xyz");
+        });
+
+        test("Stop button replaces Stream while streaming", async () => {
+            await expect(page.locator("[data-test-id='stern-stop']")).toBeVisible();
+            await page.locator("[data-test-id='stern-stop']").click();
+            await expect(page.locator("[data-test-id='stern-start']")).toBeVisible();
+        });
+
+        test("query sends the query param and restricts the streamed pods", async () => {
+            await page.locator("[data-test-id='stern-query'] input").fill("nginx");
+            const requestPromise = page.waitForRequest((req) => req.url().includes("/api/stern/stream") && req.url().includes("query=nginx"));
+            await page.locator("[data-test-id='stern-start']").click();
+            await requestPromise;
+            await expect(page.locator("[data-test-id='stern-line']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='stern-viewer']")).toContainText("default nginx-abc");
+            await expect(page.locator("[data-test-id='stern-viewer']")).not.toContainText("redis-xyz");
+        });
+
+        test("shows install instructions when stern is not installed", async () => {
+            await page.unroute("**/api/stern/stream*");
+            await interceptSternStream(true);
+            await page.goto("/stern", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='stern-start']").click();
+            await expect(page.locator("[data-test-id='stern-not-installed']")).toBeVisible();
+            await expect(page.locator("[data-test-id='stern-not-installed']")).toContainText("brew install stern");
+        });
+    });
+
     // ── Table row hover consistency ─────────────────────────────────────────────
     // Every data table in Karse applies the same row hover treatment via the
     // shared tableRowSx() helper: hovering any data row highlights it with the

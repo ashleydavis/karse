@@ -112,7 +112,7 @@ echo "--- Starting backend (OS-assigned free port) ---"
 # KARSE_PORT=0 asks the OS for the next free port, avoiding conflicts with any
 # already-running instance. The backend writes the chosen port to KARSE_PORT_FILE.
 : > "$PORT_FILE"
-(cd backend && KARSE_FAKE_LOGS=1 KARSE_PORT=0 KARSE_PORT_FILE="$PORT_FILE" bun src/index.ts) &
+(cd backend && KARSE_FAKE_LOGS=1 KARSE_FAKE_STERN=1 KARSE_PORT=0 KARSE_PORT_FILE="$PORT_FILE" bun src/index.ts) &
 BACKEND_PID=$!
 
 # Wait for the backend to write its actual port, then build the base URL.
@@ -293,6 +293,22 @@ echo "--- GET /api/logs/stream (no pods match) ---"
 NO_MATCH=$(curl -fsS --max-time 5 -H "Accept: text/event-stream" \
     "$BASE/api/logs/stream?context=$CURRENT_CTX&filter=does-not-exist-xyz" || true)
 echo "$NO_MATCH" | grep -q "event: done"
+echo "OK"
+
+echo "--- GET /api/stern/stream (SSE stern-powered live logs) ---"
+# KARSE_FAKE_STERN=1 is set, so the backend reports stern as available and emits
+# canned stern-style "namespace pod message" lines as SSE "line" events without
+# the real binary. Cap the read with --max-time (follow mode keeps it open).
+STERN_STREAM=$(curl -fsS --max-time 5 -H "Accept: text/event-stream" \
+    "$BASE/api/stern/stream?context=$CURRENT_CTX&namespace=default&query=nginx" || true)
+echo "$STERN_STREAM" | grep -q "event: started"
+echo "$STERN_STREAM" | grep -q "event: line"
+echo "$STERN_STREAM" | grep -q "nginx-abc"
+# The query restricts output to matching pods, so redis must not appear.
+if echo "$STERN_STREAM" | grep -q "redis-xyz"; then
+    echo "Expected stern query=nginx to exclude redis pods" >&2
+    exit 1
+fi
 echo "OK"
 
 echo "--- GET /api/pods/:namespace/:name/logs/stream (single-pod live SSE) ---"

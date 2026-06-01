@@ -9,6 +9,7 @@ import { nodeDetailRouter } from "./routes/node-detail-route";
 import { workloadsRouter } from "./routes/workloads-route";
 import { yamlRouter } from "./routes/yaml-route";
 import { logsStreamRouter } from "./routes/logs-stream-route";
+import { sternStreamRouter } from "./routes/stern-stream-route";
 import { eventsRouter } from "./routes/events-route";
 import { errorsRouter } from "./routes/errors-route";
 
@@ -28,6 +29,7 @@ export function createServer(): express.Express {
     app.use("/api", workloadsRouter);
     app.use("/api", yamlRouter);
     app.use("/api", logsStreamRouter);
+    app.use("/api", sternStreamRouter);
     app.use("/api", eventsRouter);
     app.use("/api", errorsRouter);
     const errorHandler: ErrorRequestHandler = (err: Error, _req, res, _next) => {
