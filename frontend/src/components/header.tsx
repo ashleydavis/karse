@@ -11,21 +11,51 @@ import { ContextQuickPicker } from "./context-quick-picker";
 import { NamespaceQuickPicker } from "./namespace-quick-picker";
 
 function getPageTitle(pathname: string): string {
-    if (pathname === "/" || pathname === "/cluster") return "Cluster";
-    if (pathname === "/nodes") return "Nodes";
-    if (pathname.startsWith("/nodes/")) return "Node";
-    if (pathname === "/pods") return "Pods";
-    if (pathname.startsWith("/pods/")) return "Pod";
-    if (pathname === "/namespaces") return "Namespaces";
-    if (pathname === "/contexts") return "Contexts";
-    if (pathname === "/deployments") return "Deployments";
-    if (pathname.startsWith("/deployments/")) return "Deployment";
-    if (pathname === "/statefulsets") return "StatefulSets";
-    if (pathname.startsWith("/statefulsets/")) return "StatefulSet";
-    if (pathname === "/daemonsets") return "DaemonSets";
-    if (pathname.startsWith("/daemonsets/")) return "DaemonSet";
-    if (pathname === "/logs") return "Live Logs";
-    if (pathname === "/events") return "Events";
+    if (pathname === "/" || pathname === "/cluster") {
+        return "Cluster";
+    }
+    if (pathname === "/nodes") {
+        return "Nodes";
+    }
+    if (pathname.startsWith("/nodes/")) {
+        return "Node";
+    }
+    if (pathname === "/pods") {
+        return "Pods";
+    }
+    if (pathname.startsWith("/pods/")) {
+        return "Pod";
+    }
+    if (pathname === "/namespaces") {
+        return "Namespaces";
+    }
+    if (pathname === "/contexts") {
+        return "Contexts";
+    }
+    if (pathname === "/deployments") {
+        return "Deployments";
+    }
+    if (pathname.startsWith("/deployments/")) {
+        return "Deployment";
+    }
+    if (pathname === "/statefulsets") {
+        return "StatefulSets";
+    }
+    if (pathname.startsWith("/statefulsets/")) {
+        return "StatefulSet";
+    }
+    if (pathname === "/daemonsets") {
+        return "DaemonSets";
+    }
+    if (pathname.startsWith("/daemonsets/")) {
+        return "DaemonSet";
+    }
+    if (pathname === "/logs") {
+        return "Live Logs";
+    }
+    if (pathname === "/events") {
+        return "Events";
+    }
     return "Karse";
 }
 
@@ -126,7 +156,10 @@ export function Header() {
                             <MenuItem
                                 key={m}
                                 selected={colorMode === m}
-                                onClick={() => { setColorMode(m); setMenuAnchor(null); }}
+                                onClick={() => {
+                                    setColorMode(m);
+                                    setMenuAnchor(null);
+                                }}
                             >
                                 <ListItemIcon>
                                     <FontAwesomeIcon icon={["fas", m === "dark" ? "moon" : m === "light" ? "sun" : "circle-half-stroke"]} />
