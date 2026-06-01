@@ -266,6 +266,96 @@ describe("listNodes", () => {
         });
     });
 
+    test("derives statuses from realistic kwok-style mixed conditions", async () => {
+        // Conditions mirror what a real cluster reports: a full ordered set of
+        // kubelet conditions where Ready is not the first entry, plus reason,
+        // message and heartbeat fields. Covers Ready, NotReady (Ready=False), a
+        // cordoned node (unschedulable but still Ready) and Unknown (Ready
+        // condition reporting status Unknown, e.g. a lost-heartbeat node).
+        const fixture = {
+            items: [
+                {
+                    metadata: {
+                        name: "node-ready",
+                        creationTimestamp: "2024-01-01T00:00:00Z",
+                        labels: { "node-role.kubernetes.io/worker": "" },
+                    },
+                    status: {
+                        conditions: [
+                            { type: "MemoryPressure", status: "False", reason: "KubeletHasSufficientMemory", message: "kubelet has sufficient memory available" },
+                            { type: "DiskPressure", status: "False", reason: "KubeletHasNoDiskPressure", message: "kubelet has no disk pressure" },
+                            { type: "PIDPressure", status: "False", reason: "KubeletHasSufficientPID", message: "kubelet has sufficient PID available" },
+                            { type: "Ready", status: "True", reason: "KubeletReady", message: "kubelet is posting ready status" },
+                        ],
+                        nodeInfo: { kubeletVersion: "kwok-v0.7.0" },
+                    },
+                },
+                {
+                    metadata: {
+                        name: "node-notready",
+                        creationTimestamp: "2024-02-01T00:00:00Z",
+                        labels: {},
+                    },
+                    status: {
+                        conditions: [
+                            { type: "MemoryPressure", status: "False", reason: "KubeletHasSufficientMemory", message: "kubelet has sufficient memory available" },
+                            {
+                                type: "Ready",
+                                status: "False",
+                                reason: "KubeletNotReady",
+                                message: "Simulated NotReady node",
+                                lastHeartbeatTime: "2024-01-01T00:00:00Z",
+                                lastTransitionTime: "2024-01-01T00:00:00Z",
+                            },
+                        ],
+                        nodeInfo: { kubeletVersion: "fake" },
+                    },
+                },
+                {
+                    metadata: {
+                        name: "node-cordoned",
+                        creationTimestamp: "2024-03-01T00:00:00Z",
+                        labels: { "node-role.kubernetes.io/worker": "" },
+                    },
+                    spec: { unschedulable: true },
+                    status: {
+                        conditions: [
+                            { type: "Ready", status: "True", reason: "KubeletReady", message: "kubelet is posting ready status" },
+                        ],
+                        nodeInfo: { kubeletVersion: "kwok-v0.7.0" },
+                    },
+                },
+                {
+                    metadata: {
+                        name: "node-unknown",
+                        creationTimestamp: "2024-04-01T00:00:00Z",
+                        labels: {},
+                    },
+                    status: {
+                        conditions: [
+                            {
+                                type: "Ready",
+                                status: "Unknown",
+                                reason: "NodeStatusUnknown",
+                                message: "Kubelet stopped posting node status.",
+                            },
+                        ],
+                        nodeInfo: { kubeletVersion: "v1.30.0" },
+                    },
+                },
+            ],
+        };
+        setRunnerHandlers({
+            "--context test-ctx get nodes -o json": () => ok(JSON.stringify(fixture)),
+        });
+        const result = await listNodes("test-ctx");
+        const byName = new Map(result.map((n) => [n.name, n.status]));
+        expect(byName.get("node-ready")).toBe("Ready");
+        expect(byName.get("node-notready")).toBe("NotReady");
+        expect(byName.get("node-cordoned")).toBe("Ready");
+        expect(byName.get("node-unknown")).toBe("Unknown");
+    });
+
     test("handles multiple role labels sorted alphabetically", async () => {
         const fixture = {
             items: [
