@@ -135,7 +135,10 @@ bunx wait-on "http://127.0.0.1:$BACKEND_PORT/api/contexts" --timeout 10000
 # proxy at the backend's dynamic port. The chosen frontend port is scraped from
 # Vite's "Local:" output line.
 echo "--- Starting frontend dev server (OS-assigned free port) ---"
-(cd frontend && KARSE_NO_OPEN=1 KARSE_FRONTEND_PORT=0 KARSE_PORT="$BACKEND_PORT" bun run dev) > "$FRONTEND_LOG" 2>&1 &
+# NO_COLOR keeps Vite's banner plain so the port scrape below works. In CI
+# (CI=true) Vite would otherwise colorize, inserting an ANSI escape between
+# "localhost:" and the port. Only affects the test run; normal `dev` stays colored.
+(cd frontend && NO_COLOR=true KARSE_NO_OPEN=1 KARSE_FRONTEND_PORT=0 KARSE_PORT="$BACKEND_PORT" bun run dev) > "$FRONTEND_LOG" 2>&1 &
 FRONTEND_PID=$!
 
 FRONTEND_PORT=""
