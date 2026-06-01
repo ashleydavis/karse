@@ -1,4 +1,4 @@
-# Scenario 17: Shareable URL state
+# Scenario 23: Shareable URL state
 
 Every meaningful piece of UI state lives in the URL so a link can be copied and reopened to reproduce the exact same view:
 

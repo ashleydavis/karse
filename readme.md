@@ -4,7 +4,6 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
 
 ## Todo
 
-- Make sure the docs in the manual testing guide are numbered sequentially.
 - Yaml should be displayed on a sub tab of the resource page.
 - Drilling down into a Deployment, Statefulset, or Daemonset shows a blank page. Drilling down into Pods is ok.
 - Maybe separate tabs under Pods for Containers and Init Containers.

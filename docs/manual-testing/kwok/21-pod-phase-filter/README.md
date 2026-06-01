@@ -1,4 +1,4 @@
-# Scenario 17: Pod phase filter
+# Scenario 21: Pod phase filter
 
 A cluster with five pods in the `default` namespace, one in each phase: Running, Pending, Succeeded, Failed, Unknown. Exercises the phase filter dropdown on the pods page.
 

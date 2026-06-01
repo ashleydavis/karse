@@ -1,4 +1,4 @@
-# Scenario 17: Guided commands
+# Scenario 18: Guided commands
 
 A cluster with one node and one pod. Exercises the guided-commands feature: a
 "Commands" button on the pod and node detail pages that opens a dialog listing

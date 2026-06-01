@@ -1,4 +1,4 @@
-# Scenario 18: Multi-container pods
+# Scenario 19: Multi-container pods
 
 A cluster with three pods in the `default` namespace exercising the multi-container support:
 

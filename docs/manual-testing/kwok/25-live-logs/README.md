@@ -1,4 +1,4 @@
-# Scenario 17: Live logs (stern-style multi-pod streaming)
+# Scenario 25: Live logs (stern-style multi-pod streaming)
 
 A cluster with one node and three pods (`nginx-one`, `nginx-two`, `redis-main`).
 Exercises the Live Logs page: streaming logs from multiple pods at once, each

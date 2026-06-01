@@ -1,4 +1,4 @@
-# Scenario 17: Pod detail tabs
+# Scenario 20: Pod detail tabs
 
 A cluster with one node and one multi-container pod (plus an init container). Exercises the tabbed layout of the pod detail page: Detail / Status, Containers, and Logs.
 

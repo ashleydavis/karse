@@ -1,4 +1,4 @@
-# Scenario 18: Breadcrumb navigation
+# Scenario 22: Breadcrumb navigation
 
 A cluster with one node and one pod. Exercises the breadcrumb trail shown above
 every page and confirms breadcrumb links navigate back to list pages.

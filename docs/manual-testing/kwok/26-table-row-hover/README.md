@@ -1,4 +1,4 @@
-# Scenario 17: Consistent table row hover
+# Scenario 26: Consistent table row hover
 
 A cluster with one node and one multi-container pod. Exercises the consistent
 row hover treatment that every data table in Karse now shares.

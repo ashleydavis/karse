@@ -1,4 +1,4 @@
-# Scenario 17: Nav-bar dropdown pickers
+# Scenario 24: Nav-bar dropdown pickers
 
 The context picker and namespace picker open as dropdowns anchored to their header buttons rather than as centered modal dialogs. This scenario verifies the dropdown placement, search/filter, selection, and keyboard shortcuts.
 
