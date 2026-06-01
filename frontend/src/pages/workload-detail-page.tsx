@@ -17,6 +17,7 @@ import {
     Button,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTriangleExclamation, faArrowLeft, faTerminal, faTag } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { WorkloadKind, KubeEvent } from "karse-types";
 import type { GuidedResourceKind } from "../lib/guided-commands";
@@ -50,7 +51,7 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
                 label="Warning"
                 color="warning"
                 size="small"
-                icon={<FontAwesomeIcon icon={["fas", "triangle-exclamation"]} />}
+                icon={<FontAwesomeIcon icon={faTriangleExclamation} />}
             />
         );
     }
@@ -99,7 +100,7 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <Tooltip title={`Back to ${kind}`}>
                     <IconButton size="small" onClick={() => navigate(`/${kind}`)}>
-                        <FontAwesomeIcon icon={["fas", "arrow-left"]} />
+                        <FontAwesomeIcon icon={faArrowLeft} />
                     </IconButton>
                 </Tooltip>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -111,7 +112,7 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                 <Button
                     size="small"
                     variant="outlined"
-                    startIcon={<FontAwesomeIcon icon={["fas", "terminal"]} />}
+                    startIcon={<FontAwesomeIcon icon={faTerminal} />}
                     onClick={() => setShowCommands(true)}
                     data-test-id="commands-button"
                 >
@@ -151,7 +152,7 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                                 label={`${k}=${v}`}
                                 size="small"
                                 variant="outlined"
-                                icon={<FontAwesomeIcon icon={["fas", "tag"]} />}
+                                icon={<FontAwesomeIcon icon={faTag} />}
                             />
                         ))}
                     </Box>
@@ -210,7 +211,7 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                                 label={`${k}=${v}`}
                                 size="small"
                                 variant="outlined"
-                                icon={<FontAwesomeIcon icon={["fas", "tag"]} />}
+                                icon={<FontAwesomeIcon icon={faTag} />}
                             />
                         ))}
                     </Box>

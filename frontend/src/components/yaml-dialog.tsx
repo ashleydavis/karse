@@ -12,6 +12,7 @@ import {
     Typography,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFileCode, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { YamlResourceType } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
@@ -39,14 +40,14 @@ function YamlDialog({ target, open, onClose }: { target: YamlTarget; open: boole
         <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth data-test-id="yaml-dialog">
             <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <FontAwesomeIcon icon={["fas", "file-code"]} />
+                    <FontAwesomeIcon icon={faFileCode} />
                     <Typography component="span" sx={{ fontWeight: 600 }}>
                         {target.name}
                     </Typography>
                 </Box>
                 <Tooltip title="Close">
                     <IconButton size="small" onClick={onClose} aria-label="close yaml" data-test-id="yaml-close">
-                        <FontAwesomeIcon icon={["fas", "xmark"]} />
+                        <FontAwesomeIcon icon={faXmark} />
                     </IconButton>
                 </Tooltip>
             </DialogTitle>
@@ -83,7 +84,7 @@ export function YamlButton({ type, name, namespace }: YamlTarget) {
             <Button
                 size="small"
                 variant="outlined"
-                startIcon={<FontAwesomeIcon icon={["fas", "file-code"]} />}
+                startIcon={<FontAwesomeIcon icon={faFileCode} />}
                 onClick={(e) => {
                     e.stopPropagation();
                     setOpen(true);

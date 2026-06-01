@@ -11,6 +11,7 @@ import {
     Divider,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
 import { useKubeContext } from "../lib/kube-context";
 
 // Dropdown picker for switching kube contexts, anchored to the header button.
@@ -62,7 +63,7 @@ export function ContextQuickPicker({ anchorEl, onClose }: Props) {
                         slotProps={{
                             input: {
                                 startAdornment: (
-                                    <FontAwesomeIcon icon={["fas", "magnifying-glass"]} style={{ marginRight: 8 }} />
+                                    <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
                                 ),
                             },
                         }}

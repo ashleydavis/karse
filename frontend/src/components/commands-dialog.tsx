@@ -10,6 +10,7 @@ import {
     Alert,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCheck, faCopy, faTerminal } from "@fortawesome/free-solid-svg-icons";
 import { buildGuidedCommands, type GuidedResourceTarget } from "../lib/guided-commands";
 
 // Copies a string to the clipboard, falling back gracefully when unavailable.
@@ -60,7 +61,7 @@ function CommandRow({ label, command }: { label: string; command: string }) {
                         aria-label={`copy ${label}`}
                         data-test-id="command-copy"
                     >
-                        <FontAwesomeIcon icon={["fas", copied ? "check" : "copy"]} />
+                        <FontAwesomeIcon icon={copied ? faCheck : faCopy} />
                     </IconButton>
                 </Tooltip>
             </Box>
@@ -80,7 +81,7 @@ export function CommandsDialog({ open, onClose, target }: {
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" data-test-id="commands-dialog">
             <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <FontAwesomeIcon icon={["fas", "terminal"]} />
+                <FontAwesomeIcon icon={faTerminal} />
                 Commands for {target.name}
             </DialogTitle>
             <DialogContent>

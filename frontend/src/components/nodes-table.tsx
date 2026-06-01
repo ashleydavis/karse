@@ -23,6 +23,7 @@ import {
     Alert,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCircleCheck, faCircleQuestion, faCircleXmark, faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { Node, NodeStatus } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
@@ -45,7 +46,7 @@ function StatusChip({ status }: { status: NodeStatus }) {
     if (status === "Ready") {
         return (
             <Chip
-                icon={<FontAwesomeIcon icon={["fas", "circle-check"]} />}
+                icon={<FontAwesomeIcon icon={faCircleCheck} />}
                 label="Ready"
                 color="success"
                 size="small"
@@ -55,7 +56,7 @@ function StatusChip({ status }: { status: NodeStatus }) {
     if (status === "NotReady") {
         return (
             <Chip
-                icon={<FontAwesomeIcon icon={["fas", "circle-xmark"]} />}
+                icon={<FontAwesomeIcon icon={faCircleXmark} />}
                 label="NotReady"
                 color="error"
                 size="small"
@@ -64,7 +65,7 @@ function StatusChip({ status }: { status: NodeStatus }) {
     }
     return (
         <Chip
-            icon={<FontAwesomeIcon icon={["fas", "circle-question"]} />}
+            icon={<FontAwesomeIcon icon={faCircleQuestion} />}
             label="Unknown"
             size="small"
         />
@@ -156,9 +157,9 @@ export function NodesTable() {
     function SortIcon({ columnId }: { columnId: string }) {
         const col = table.getColumn(columnId);
         const sorted = col?.getIsSorted();
-        if (sorted === "asc") return <FontAwesomeIcon icon={["fas", "sort-up"]} />;
-        if (sorted === "desc") return <FontAwesomeIcon icon={["fas", "sort-down"]} />;
-        return <FontAwesomeIcon icon={["fas", "sort"]} />;
+        if (sorted === "asc") return <FontAwesomeIcon icon={faSortUp} />;
+        if (sorted === "desc") return <FontAwesomeIcon icon={faSortDown} />;
+        return <FontAwesomeIcon icon={faSort} />;
     }
 
     return (
@@ -172,7 +173,7 @@ export function NodesTable() {
                 slotProps={{
                     input: {
                         startAdornment: (
-                            <FontAwesomeIcon icon={["fas", "magnifying-glass"]} style={{ marginRight: 8 }} />
+                            <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
                         ),
                     },
                 }}

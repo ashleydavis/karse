@@ -213,7 +213,7 @@ React Router 7. Routes are declared centrally in `src/app.tsx`. Route-level comp
 
 ### Icons
 
-Font Awesome via `@fortawesome/react-fontawesome`. Register icons in `src/lib/font-awesome.ts`, then use `<FontAwesomeIcon icon={["fas", "icon-name"]} />` in components. Do not import icon objects directly in component files.
+Font Awesome via `@fortawesome/react-fontawesome`. Import the icon objects you need directly from `@fortawesome/free-solid-svg-icons` in each component and pass them as `<FontAwesomeIcon icon={faIconName} />`. This keeps icon usage local and tree-shakeable, with no central registration file. The Font Awesome core CSS is imported once in `src/main.tsx`, where `config.autoAddCss = false` stops the library injecting it again at runtime.
 
 ## Testing discipline
 

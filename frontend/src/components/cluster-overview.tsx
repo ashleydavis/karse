@@ -1,5 +1,6 @@
 import { Card, CardContent, CardActionArea, Typography, Alert, Grid, Box, Divider } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCube, faDharmachakra, faLayerGroup, faServer } from "@fortawesome/free-solid-svg-icons";
 import type { IconProp } from "@fortawesome/fontawesome-svg-core";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -126,7 +127,7 @@ export function ClusterOverview() {
             <Grid container spacing={2} data-test-id="stat-tiles">
                 <Grid size={3}>
                     <StatTile
-                        icon={["fas", "server"]}
+                        icon={faServer}
                         label="Server version"
                         value={data.serverVersion ?? "-"}
                         sublabel={data.clientVersion ? `Client: ${data.clientVersion}` : undefined}
@@ -136,7 +137,7 @@ export function ClusterOverview() {
                 </Grid>
                 <Grid size={3}>
                     <StatTile
-                        icon={["fas", "dharmachakra"]}
+                        icon={faDharmachakra}
                         label="Nodes"
                         value={data.nodeCount}
                         sublabel={nodeSubLabel}
@@ -148,7 +149,7 @@ export function ClusterOverview() {
                 </Grid>
                 <Grid size={3}>
                     <StatTile
-                        icon={["fas", "layer-group"]}
+                        icon={faLayerGroup}
                         label="Namespaces"
                         value={data.namespaceCount}
                         color="success"
@@ -158,7 +159,7 @@ export function ClusterOverview() {
                 </Grid>
                 <Grid size={3}>
                     <StatTile
-                        icon={["fas", "cube"]}
+                        icon={faCube}
                         label="Pods"
                         value={data.podCount}
                         sublabel={`${data.runningPodCount} running`}

@@ -1,28 +1,29 @@
 import { useState } from "react";
 import { Box, Typography, List, ListItemButton, ListItemIcon, ListItemText, Divider, Tooltip, IconButton } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import type { IconName } from "@fortawesome/fontawesome-svg-core";
+import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import { faLink, faDharmachakra, faServer, faLayerGroup, faCube, faCubes, faDatabase, faSitemap, faBell, faStream, faTowerBroadcast, faCircleExclamation, faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation } from "react-router-dom";
 import { useShareableTo } from "../lib/nav-state";
 
 const NAV_ITEMS = [
-    { to: "/contexts",     icon: "link"         as const, label: "Contexts"     },
-    { to: "/cluster",      icon: "dharmachakra" as const, label: "Cluster"      },
-    { to: "/nodes",        icon: "server"       as const, label: "Nodes"        },
-    { to: "/namespaces",   icon: "layer-group"  as const, label: "Namespaces"   },
-    { to: "/pods",         icon: "cube"         as const, label: "Pods"         },
-    { to: "/deployments",  icon: "cubes"        as const, label: "Deployments"  },
-    { to: "/statefulsets", icon: "database"     as const, label: "StatefulSets" },
-    { to: "/daemonsets",   icon: "sitemap"      as const, label: "DaemonSets"   },
-    { to: "/events",       icon: "bell"         as const, label: "Events"       },
-    { to: "/logs",         icon: "stream"       as const, label: "Logs"         },
-    { to: "/stern",        icon: "tower-broadcast" as const, label: "Stern"      },
+    { to: "/contexts",     icon: faLink,          label: "Contexts"     },
+    { to: "/cluster",      icon: faDharmachakra,  label: "Cluster"      },
+    { to: "/nodes",        icon: faServer,        label: "Nodes"        },
+    { to: "/namespaces",   icon: faLayerGroup,    label: "Namespaces"   },
+    { to: "/pods",         icon: faCube,          label: "Pods"         },
+    { to: "/deployments",  icon: faCubes,         label: "Deployments"  },
+    { to: "/statefulsets", icon: faDatabase,      label: "StatefulSets" },
+    { to: "/daemonsets",   icon: faSitemap,       label: "DaemonSets"   },
+    { to: "/events",       icon: faBell,          label: "Events"       },
+    { to: "/logs",         icon: faStream,        label: "Logs"         },
+    { to: "/stern",        icon: faTowerBroadcast, label: "Stern"       },
 ];
 
 // Nav items pinned to the bottom of the sidebar, visually separated from the
 // main navigation above. Currently just the cluster-wide Errors page.
 const BOTTOM_NAV_ITEMS = [
-    { to: "/errors", icon: "circle-exclamation" as const, label: "Errors" },
+    { to: "/errors", icon: faCircleExclamation, label: "Errors" },
 ];
 
 export function Sidebar() {
@@ -32,7 +33,7 @@ export function Sidebar() {
 
     // Renders a single sidebar nav item (link with icon and label). Shared between
     // the main nav list and the bottom-pinned nav list.
-    function renderNavItem({ to, icon, label }: { to: string; icon: IconName; label: string }) {
+    function renderNavItem({ to, icon, label }: { to: string; icon: IconDefinition; label: string }) {
         const active = pathname === to || pathname.startsWith(to + "/");
         return (
             <Tooltip key={to} title={collapsed ? label : ""} placement="right">
@@ -53,7 +54,7 @@ export function Sidebar() {
                     }}
                 >
                     <ListItemIcon sx={{ minWidth: collapsed ? 0 : 32 }}>
-                        <FontAwesomeIcon icon={["fas", icon]} />
+                        <FontAwesomeIcon icon={icon} />
                     </ListItemIcon>
                     {!collapsed && (
                         <ListItemText
@@ -88,7 +89,7 @@ export function Sidebar() {
         >
             <Box sx={{ px: collapsed ? 0 : 2.5, height: 48, display: "flex", alignItems: "center", gap: 1.5, justifyContent: collapsed ? "center" : "flex-start" }}>
                 <Box sx={{ color: "primary.main", flexShrink: 0 }}>
-                    <FontAwesomeIcon icon={["fas", "dharmachakra"]} />
+                    <FontAwesomeIcon icon={faDharmachakra} />
                 </Box>
                 {!collapsed && (
                     <Typography
@@ -123,7 +124,7 @@ export function Sidebar() {
                     onClick={() => setCollapsed(!collapsed)}
                     aria-label={collapsed ? "expand sidebar" : "collapse sidebar"}
                 >
-                    <FontAwesomeIcon icon={["fas", collapsed ? "chevron-right" : "chevron-left"]} />
+                    <FontAwesomeIcon icon={collapsed ? faChevronRight : faChevronLeft} />
                 </IconButton>
             </Box>
         </Box>

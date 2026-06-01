@@ -24,6 +24,7 @@ import {
     Alert,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import type { Namespace } from "karse-types";
 import { YamlButton } from "./yaml-dialog";
 import { tableRowSx } from "../lib/table-row-style";
@@ -115,9 +116,9 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
     function SortIcon({ columnId }: { columnId: string }) {
         const col = table.getColumn(columnId);
         const sorted = col?.getIsSorted();
-        if (sorted === "asc") return <FontAwesomeIcon icon={["fas", "sort-up"]} />;
-        if (sorted === "desc") return <FontAwesomeIcon icon={["fas", "sort-down"]} />;
-        return <FontAwesomeIcon icon={["fas", "sort"]} />;
+        if (sorted === "asc") return <FontAwesomeIcon icon={faSortUp} />;
+        if (sorted === "desc") return <FontAwesomeIcon icon={faSortDown} />;
+        return <FontAwesomeIcon icon={faSort} />;
     }
 
     return (
@@ -131,7 +132,7 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
                 slotProps={{
                     input: {
                         startAdornment: (
-                            <FontAwesomeIcon icon={["fas", "magnifying-glass"]} style={{ marginRight: 8 }} />
+                            <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
                         ),
                     },
                 }}

@@ -13,6 +13,7 @@ import {
     Switch,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faRotate } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useKubeContext } from "../lib/kube-context";
 import { fetchPodLogs, streamPodLogs } from "../lib/api-client";
@@ -130,7 +131,7 @@ export function PodLogsPanel({ namespace, podName, containers }: {
                 </div>
                 <Tooltip title="Refresh logs">
                     <IconButton size="small" onClick={() => refetch()} disabled={isLoading || live} aria-label="refresh logs" data-test-id="log-refresh">
-                        <FontAwesomeIcon icon={["fas", "rotate"]} />
+                        <FontAwesomeIcon icon={faRotate} />
                     </IconButton>
                 </Tooltip>
                 <FormControlLabel

@@ -3,9 +3,13 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider, CssBaseline, createTheme } from "@mui/material";
+import { config } from "@fortawesome/fontawesome-svg-core";
+import "@fortawesome/fontawesome-svg-core/styles.css";
 import "./index.css";
-import "./lib/font-awesome";
 import { queryClient } from "./lib/query-client";
+
+// Import the Font Awesome CSS above ourselves and stop the library injecting it again at runtime.
+config.autoAddCss = false;
 import { KubeContextProvider } from "./lib/kube-context";
 import { KubeNamespaceProvider } from "./lib/kube-namespace";
 import { ConfigProvider, useConfig } from "./lib/config";

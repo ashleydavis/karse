@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { AppBar, Toolbar, IconButton, Alert, Tooltip, Box, Menu, MenuItem, ListItemIcon, ListItemText, Chip } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faLink, faLayerGroup, faSun, faMoon, faCircleHalfStroke, faCheck, faShareNodes, faRotate } from "@fortawesome/free-solid-svg-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
@@ -38,7 +39,7 @@ export function Header() {
         return () => window.removeEventListener("keydown", onKey);
     }, []);
 
-    const colorModeIcon = colorMode === "dark" ? "sun" : colorMode === "light" ? "moon" : "circle-half-stroke";
+    const colorModeIcon = colorMode === "dark" ? faSun : colorMode === "light" ? faMoon : faCircleHalfStroke;
 
     async function handleRefresh(): Promise<void> {
         await qc.invalidateQueries({ queryKey: ["contexts"] });
@@ -75,7 +76,7 @@ export function Header() {
                             onClick={(e) => setContextPickerAnchor(e.currentTarget)}
                             aria-label="context picker"
                         >
-                            <FontAwesomeIcon icon={["fas", "link"]} />
+                            <FontAwesomeIcon icon={faLink} />
                         </IconButton>
                     </Tooltip>
                     <Tooltip title="Namespace picker (Ctrl+Shift+K)">
@@ -85,12 +86,12 @@ export function Header() {
                             onClick={(e) => setNamespacePickerAnchor(e.currentTarget)}
                             aria-label="namespace picker"
                         >
-                            <FontAwesomeIcon icon={["fas", "layer-group"]} />
+                            <FontAwesomeIcon icon={faLayerGroup} />
                         </IconButton>
                     </Tooltip>
                     <Tooltip title="Color mode">
                         <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)} aria-label="color mode">
-                            <FontAwesomeIcon icon={["fas", colorModeIcon]} />
+                            <FontAwesomeIcon icon={colorModeIcon} />
                         </IconButton>
                     </Tooltip>
                     <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}>
@@ -104,7 +105,7 @@ export function Header() {
                                 }}
                             >
                                 <ListItemIcon>
-                                    <FontAwesomeIcon icon={["fas", m === "dark" ? "moon" : m === "light" ? "sun" : "circle-half-stroke"]} />
+                                    <FontAwesomeIcon icon={m === "dark" ? faMoon : m === "light" ? faSun : faCircleHalfStroke} />
                                 </ListItemIcon>
                                 <ListItemText>{m.charAt(0).toUpperCase() + m.slice(1)}</ListItemText>
                             </MenuItem>
@@ -112,12 +113,12 @@ export function Header() {
                     </Menu>
                     <Tooltip title={copied ? "Link copied" : "Copy a shareable link to this view"}>
                         <IconButton size="small" onClick={handleShare} aria-label="share link" data-test-id="share-button">
-                            <FontAwesomeIcon icon={["fas", copied ? "check" : "share-nodes"]} />
+                            <FontAwesomeIcon icon={copied ? faCheck : faShareNodes} />
                         </IconButton>
                     </Tooltip>
                     <Tooltip title="Refresh">
                         <IconButton size="small" onClick={handleRefresh} disabled={isLoading} aria-label="refresh">
-                            <FontAwesomeIcon icon={["fas", "rotate"]} />
+                            <FontAwesomeIcon icon={faRotate} />
                         </IconButton>
                     </Tooltip>
                 </Toolbar>

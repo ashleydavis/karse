@@ -22,6 +22,7 @@ import {
     Alert,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCircleExclamation, faTriangleExclamation, faSortUp, faSortDown, faSort, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { ClusterError } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
@@ -51,7 +52,7 @@ function SourceChip({ source }: { source: ClusterError["source"] }) {
     if (source === "Pod") {
         return (
             <Chip
-                icon={<FontAwesomeIcon icon={["fas", "circle-exclamation"]} />}
+                icon={<FontAwesomeIcon icon={faCircleExclamation} />}
                 label="Pod"
                 color="error"
                 size="small"
@@ -60,7 +61,7 @@ function SourceChip({ source }: { source: ClusterError["source"] }) {
     }
     return (
         <Chip
-            icon={<FontAwesomeIcon icon={["fas", "triangle-exclamation"]} />}
+            icon={<FontAwesomeIcon icon={faTriangleExclamation} />}
             label="Event"
             color="warning"
             size="small"
@@ -143,12 +144,12 @@ export function ErrorsTable() {
         const col = table.getColumn(columnId);
         const sorted = col?.getIsSorted();
         if (sorted === "asc") {
-            return <FontAwesomeIcon icon={["fas", "sort-up"]} />;
+            return <FontAwesomeIcon icon={faSortUp} />;
         }
         if (sorted === "desc") {
-            return <FontAwesomeIcon icon={["fas", "sort-down"]} />;
+            return <FontAwesomeIcon icon={faSortDown} />;
         }
-        return <FontAwesomeIcon icon={["fas", "sort"]} />;
+        return <FontAwesomeIcon icon={faSort} />;
     }
 
     return (
@@ -162,7 +163,7 @@ export function ErrorsTable() {
                 slotProps={{
                     input: {
                         startAdornment: (
-                            <FontAwesomeIcon icon={["fas", "magnifying-glass"]} style={{ marginRight: 8 }} />
+                            <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
                         ),
                     },
                 }}

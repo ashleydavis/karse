@@ -28,6 +28,7 @@ import {
     ListItemText,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCircleCheck, faCirclePause, faCircleQuestion, faCircleXmark, faFilter, faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { Pod, PodPhase } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
@@ -58,7 +59,7 @@ function PhaseChip({ phase }: { phase: PodPhase }) {
     if (phase === "Running") {
         return (
             <Chip
-                icon={<FontAwesomeIcon icon={["fas", "circle-check"]} />}
+                icon={<FontAwesomeIcon icon={faCircleCheck} />}
                 label="Running"
                 color="success"
                 size="small"
@@ -68,7 +69,7 @@ function PhaseChip({ phase }: { phase: PodPhase }) {
     if (phase === "Pending") {
         return (
             <Chip
-                icon={<FontAwesomeIcon icon={["fas", "circle-pause"]} />}
+                icon={<FontAwesomeIcon icon={faCirclePause} />}
                 label="Pending"
                 color="warning"
                 size="small"
@@ -78,7 +79,7 @@ function PhaseChip({ phase }: { phase: PodPhase }) {
     if (phase === "Succeeded") {
         return (
             <Chip
-                icon={<FontAwesomeIcon icon={["fas", "circle-check"]} />}
+                icon={<FontAwesomeIcon icon={faCircleCheck} />}
                 label="Succeeded"
                 color="info"
                 size="small"
@@ -88,7 +89,7 @@ function PhaseChip({ phase }: { phase: PodPhase }) {
     if (phase === "Failed") {
         return (
             <Chip
-                icon={<FontAwesomeIcon icon={["fas", "circle-xmark"]} />}
+                icon={<FontAwesomeIcon icon={faCircleXmark} />}
                 label="Failed"
                 color="error"
                 size="small"
@@ -97,7 +98,7 @@ function PhaseChip({ phase }: { phase: PodPhase }) {
     }
     return (
         <Chip
-            icon={<FontAwesomeIcon icon={["fas", "circle-question"]} />}
+            icon={<FontAwesomeIcon icon={faCircleQuestion} />}
             label="Unknown"
             size="small"
         />
@@ -140,7 +141,7 @@ function PhaseFilter({ selected, onChange }: { selected: PodPhase[]; onChange: (
                 variant="outlined"
                 size="small"
                 onClick={(e) => setAnchorEl(e.currentTarget)}
-                startIcon={<FontAwesomeIcon icon={["fas", "filter"]} />}
+                startIcon={<FontAwesomeIcon icon={faFilter} />}
                 data-test-id="pods-phase-filter-button"
             >
                 {label}
@@ -299,12 +300,12 @@ export function PodsTable() {
         const col = table.getColumn(columnId);
         const sorted = col?.getIsSorted();
         if (sorted === "asc") {
-            return <FontAwesomeIcon icon={["fas", "sort-up"]} />;
+            return <FontAwesomeIcon icon={faSortUp} />;
         }
         if (sorted === "desc") {
-            return <FontAwesomeIcon icon={["fas", "sort-down"]} />;
+            return <FontAwesomeIcon icon={faSortDown} />;
         }
-        return <FontAwesomeIcon icon={["fas", "sort"]} />;
+        return <FontAwesomeIcon icon={faSort} />;
     }
 
     return (
@@ -319,7 +320,7 @@ export function PodsTable() {
                     slotProps={{
                         input: {
                             startAdornment: (
-                                <FontAwesomeIcon icon={["fas", "magnifying-glass"]} style={{ marginRight: 8 }} />
+                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
                             ),
                         },
                     }}

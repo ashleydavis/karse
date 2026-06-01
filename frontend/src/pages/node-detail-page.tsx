@@ -19,6 +19,7 @@ import {
     Tab,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCircleCheck, faCircleXmark, faCircleQuestion, faTriangleExclamation, faArrowLeft, faTerminal, faTag } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { NodeStatus, NodeCondition, KubeEvent } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
@@ -46,12 +47,12 @@ function formatAge(createdAt: string): string {
 // Renders a colored MUI Chip for a node's Ready / NotReady / Unknown status.
 function StatusChip({ status }: { status: NodeStatus }) {
     if (status === "Ready") {
-        return <Chip label="Ready" color="success" size="small" icon={<FontAwesomeIcon icon={["fas", "circle-check"]} />} />;
+        return <Chip label="Ready" color="success" size="small" icon={<FontAwesomeIcon icon={faCircleCheck} />} />;
     }
     if (status === "NotReady") {
-        return <Chip label="NotReady" color="error" size="small" icon={<FontAwesomeIcon icon={["fas", "circle-xmark"]} />} />;
+        return <Chip label="NotReady" color="error" size="small" icon={<FontAwesomeIcon icon={faCircleXmark} />} />;
     }
-    return <Chip label="Unknown" size="small" icon={<FontAwesomeIcon icon={["fas", "circle-question"]} />} />;
+    return <Chip label="Unknown" size="small" icon={<FontAwesomeIcon icon={faCircleQuestion} />} />;
 }
 
 // Renders a chip indicating whether a node condition is in a healthy state.
@@ -71,7 +72,7 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
                 label="Warning"
                 color="warning"
                 size="small"
-                icon={<FontAwesomeIcon icon={["fas", "triangle-exclamation"]} />}
+                icon={<FontAwesomeIcon icon={faTriangleExclamation} />}
             />
         );
     }
@@ -108,7 +109,7 @@ export function NodeDetailPage() {
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <Tooltip title="Back to nodes">
                     <IconButton size="small" onClick={() => navigate("/nodes")}>
-                        <FontAwesomeIcon icon={["fas", "arrow-left"]} />
+                        <FontAwesomeIcon icon={faArrowLeft} />
                     </IconButton>
                 </Tooltip>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -120,7 +121,7 @@ export function NodeDetailPage() {
                 <Button
                     size="small"
                     variant="outlined"
-                    startIcon={<FontAwesomeIcon icon={["fas", "terminal"]} />}
+                    startIcon={<FontAwesomeIcon icon={faTerminal} />}
                     onClick={() => setShowCommands(true)}
                     data-test-id="commands-button"
                 >
@@ -238,7 +239,7 @@ export function NodeDetailPage() {
                                         label={`${k}=${v}`}
                                         size="small"
                                         variant="outlined"
-                                        icon={<FontAwesomeIcon icon={["fas", "tag"]} />}
+                                        icon={<FontAwesomeIcon icon={faTag} />}
                                     />
                                 ))}
                             </Box>

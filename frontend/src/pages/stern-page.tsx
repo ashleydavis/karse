@@ -14,6 +14,7 @@ import {
     Link,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTowerBroadcast, faMagnifyingGlass, faPlay, faStop } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { SternStreamLine } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
@@ -111,7 +112,7 @@ export function SternPage() {
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, height: "100%" }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <FontAwesomeIcon icon={["fas", "tower-broadcast"]} />
+                <FontAwesomeIcon icon={faTowerBroadcast} />
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
                     Stern
                 </Typography>
@@ -145,7 +146,7 @@ export function SternPage() {
                     slotProps={{
                         input: {
                             startAdornment: (
-                                <FontAwesomeIcon icon={["fas", "magnifying-glass"]} style={{ marginRight: 8 }} />
+                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
                             ),
                         },
                     }}
@@ -157,7 +158,7 @@ export function SternPage() {
                         onClick={startStream}
                         disabled={current === null}
                         data-test-id="stern-start"
-                        startIcon={<FontAwesomeIcon icon={["fas", "play"]} />}
+                        startIcon={<FontAwesomeIcon icon={faPlay} />}
                     >
                         Stream
                     </Button>
@@ -167,7 +168,7 @@ export function SternPage() {
                         color="error"
                         onClick={stopStream}
                         data-test-id="stern-stop"
-                        startIcon={<FontAwesomeIcon icon={["fas", "stop"]} />}
+                        startIcon={<FontAwesomeIcon icon={faStop} />}
                     >
                         Stop
                     </Button>

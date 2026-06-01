@@ -12,6 +12,7 @@ import {
     CircularProgress,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
@@ -73,7 +74,7 @@ export function NamespaceQuickPicker({ anchorEl, onClose }: Props) {
                         slotProps={{
                             input: {
                                 startAdornment: (
-                                    <FontAwesomeIcon icon={["fas", "magnifying-glass"]} style={{ marginRight: 8 }} />
+                                    <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
                                 ),
                             },
                         }}

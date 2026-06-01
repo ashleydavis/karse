@@ -19,6 +19,7 @@ import {
     Tab,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faArrowLeft, faCircleCheck, faCirclePause, faCircleQuestion, faCircleXmark, faTag, faTerminal, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { PodPhase, KubeEvent } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
@@ -47,18 +48,18 @@ function formatAge(createdAt: string): string {
 // Renders a colored MUI Chip for a pod phase value.
 function PhaseChip({ phase }: { phase: PodPhase }) {
     if (phase === "Running") {
-        return <Chip label="Running" color="success" size="small" icon={<FontAwesomeIcon icon={["fas", "circle-check"]} />} />;
+        return <Chip label="Running" color="success" size="small" icon={<FontAwesomeIcon icon={faCircleCheck} />} />;
     }
     if (phase === "Pending") {
-        return <Chip label="Pending" color="warning" size="small" icon={<FontAwesomeIcon icon={["fas", "circle-pause"]} />} />;
+        return <Chip label="Pending" color="warning" size="small" icon={<FontAwesomeIcon icon={faCirclePause} />} />;
     }
     if (phase === "Succeeded") {
-        return <Chip label="Succeeded" color="info" size="small" icon={<FontAwesomeIcon icon={["fas", "circle-check"]} />} />;
+        return <Chip label="Succeeded" color="info" size="small" icon={<FontAwesomeIcon icon={faCircleCheck} />} />;
     }
     if (phase === "Failed") {
-        return <Chip label="Failed" color="error" size="small" icon={<FontAwesomeIcon icon={["fas", "circle-xmark"]} />} />;
+        return <Chip label="Failed" color="error" size="small" icon={<FontAwesomeIcon icon={faCircleXmark} />} />;
     }
-    return <Chip label="Unknown" size="small" icon={<FontAwesomeIcon icon={["fas", "circle-question"]} />} />;
+    return <Chip label="Unknown" size="small" icon={<FontAwesomeIcon icon={faCircleQuestion} />} />;
 }
 
 // Renders a chip indicating whether a pod event is Normal or Warning.
@@ -69,7 +70,7 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
                 label="Warning"
                 color="warning"
                 size="small"
-                icon={<FontAwesomeIcon icon={["fas", "triangle-exclamation"]} />}
+                icon={<FontAwesomeIcon icon={faTriangleExclamation} />}
             />
         );
     }
@@ -137,7 +138,7 @@ export function PodDetailPage() {
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <Tooltip title="Back to pods">
                     <IconButton size="small" onClick={() => navigate("/pods")}>
-                        <FontAwesomeIcon icon={["fas", "arrow-left"]} />
+                        <FontAwesomeIcon icon={faArrowLeft} />
                     </IconButton>
                 </Tooltip>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -149,7 +150,7 @@ export function PodDetailPage() {
                 <Button
                     size="small"
                     variant="outlined"
-                    startIcon={<FontAwesomeIcon icon={["fas", "terminal"]} />}
+                    startIcon={<FontAwesomeIcon icon={faTerminal} />}
                     onClick={() => setShowCommands(true)}
                     data-test-id="commands-button"
                 >
@@ -211,7 +212,7 @@ export function PodDetailPage() {
                                         label={`${k}=${v}`}
                                         size="small"
                                         variant="outlined"
-                                        icon={<FontAwesomeIcon icon={["fas", "tag"]} />}
+                                        icon={<FontAwesomeIcon icon={faTag} />}
                                     />
                                 ))}
                             </Box>

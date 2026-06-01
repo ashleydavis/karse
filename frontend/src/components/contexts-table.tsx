@@ -22,6 +22,7 @@ import {
     Button,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import type { Context } from "karse-types";
 import { tableRowSx } from "../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../lib/fuzzy-filter";
@@ -107,9 +108,9 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
     function SortIcon({ columnId }: { columnId: string }) {
         const col = table.getColumn(columnId);
         const sorted = col?.getIsSorted();
-        if (sorted === "asc") return <FontAwesomeIcon icon={["fas", "sort-up"]} />;
-        if (sorted === "desc") return <FontAwesomeIcon icon={["fas", "sort-down"]} />;
-        return <FontAwesomeIcon icon={["fas", "sort"]} />;
+        if (sorted === "asc") return <FontAwesomeIcon icon={faSortUp} />;
+        if (sorted === "desc") return <FontAwesomeIcon icon={faSortDown} />;
+        return <FontAwesomeIcon icon={faSort} />;
     }
 
     return (
@@ -123,7 +124,7 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
                 slotProps={{
                     input: {
                         startAdornment: (
-                            <FontAwesomeIcon icon={["fas", "magnifying-glass"]} style={{ marginRight: 8 }} />
+                            <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
                         ),
                     },
                 }}

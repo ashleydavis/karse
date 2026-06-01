@@ -1,5 +1,6 @@
 import { Breadcrumbs as MuiBreadcrumbs, Link as MuiLink, Typography } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 
 // One entry in the breadcrumb trail; a missing "to" marks the current (non-linked) page.
@@ -87,7 +88,7 @@ export function Breadcrumbs() {
         <MuiBreadcrumbs
             data-test-id="breadcrumbs"
             aria-label="breadcrumb"
-            separator={<FontAwesomeIcon icon={["fas", "chevron-right"]} style={{ fontSize: "0.7rem" }} />}
+            separator={<FontAwesomeIcon icon={faChevronRight} style={{ fontSize: "0.7rem" }} />}
             sx={{ "& .MuiBreadcrumbs-li": { display: "flex", alignItems: "center" } }}
         >
             {crumbs.map((crumb, index) => {

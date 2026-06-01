@@ -21,6 +21,7 @@ import {
     Alert,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useShareableNavigate } from "../lib/nav-state";
 import type { Deployment } from "karse-types";
@@ -121,12 +122,12 @@ export function DeploymentsTable() {
         const col = table.getColumn(columnId);
         const sorted = col?.getIsSorted();
         if (sorted === "asc") {
-            return <FontAwesomeIcon icon={["fas", "sort-up"]} />;
+            return <FontAwesomeIcon icon={faSortUp} />;
         }
         if (sorted === "desc") {
-            return <FontAwesomeIcon icon={["fas", "sort-down"]} />;
+            return <FontAwesomeIcon icon={faSortDown} />;
         }
-        return <FontAwesomeIcon icon={["fas", "sort"]} />;
+        return <FontAwesomeIcon icon={faSort} />;
     }
 
     return (
@@ -140,7 +141,7 @@ export function DeploymentsTable() {
                 slotProps={{
                     input: {
                         startAdornment: (
-                            <FontAwesomeIcon icon={["fas", "magnifying-glass"]} style={{ marginRight: 8 }} />
+                            <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
                         ),
                     },
                 }}
