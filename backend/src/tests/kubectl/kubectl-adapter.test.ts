@@ -1308,4 +1308,31 @@ describe("streamPodLogs", () => {
         expect(emitted).toContain("start worker processes");
         expect(emitted).toContain("kube-probe/1.29");
     });
+
+    test("calls onClose after emitting fake log lines when KARSE_FAKE_LOGS=1", async () => {
+        process.env.KARSE_FAKE_LOGS = "1";
+        const onClose = jest.fn();
+        streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
+            onLine: jest.fn(),
+            onError: jest.fn(),
+            onClose,
+        });
+        // The fake stream defers onClose so callers can attach listeners first.
+        expect(onClose).not.toHaveBeenCalled();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    test("stop() suppresses the deferred onClose for fake streams", async () => {
+        process.env.KARSE_FAKE_LOGS = "1";
+        const onClose = jest.fn();
+        const handle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
+            onLine: jest.fn(),
+            onError: jest.fn(),
+            onClose,
+        });
+        handle.stop();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(onClose).not.toHaveBeenCalled();
+    });
 });
