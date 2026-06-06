@@ -259,6 +259,9 @@ describe("listNodes", () => {
             roles: ["control-plane"],
             version: "v1.30.0",
             createdAt: "2024-01-01T00:00:00Z",
+            labels: {
+                "node-role.kubernetes.io/control-plane": "",
+            },
         });
         expect(result[1]!).toEqual({
             name: "worker-0",
@@ -266,6 +269,7 @@ describe("listNodes", () => {
             roles: [],
             version: "v1.30.0",
             createdAt: "2024-06-01T00:00:00Z",
+            labels: {},
         });
     });
 
@@ -625,6 +629,7 @@ describe("getNodeDetail", () => {
                 restarts: 0,
                 createdAt: "2024-06-01T00:00:00Z",
                 node: "node-1",
+                labels: {},
             },
             {
                 name: "web",
@@ -635,6 +640,7 @@ describe("getNodeDetail", () => {
                 restarts: 0,
                 createdAt: "2024-06-01T00:00:00Z",
                 node: "node-1",
+                labels: {},
             },
         ]);
     });
@@ -782,6 +788,7 @@ describe("getWorkloadDetail", () => {
                 restarts: 0,
                 createdAt: "2024-06-01T00:00:00Z",
                 node: "node-1",
+                labels: {},
             },
         ]);
         expect(result.events).toEqual([
@@ -1000,6 +1007,7 @@ describe("listPods", () => {
         initContainerStatuses?: any[];
         nodeName?: string;
         creationTimestamp?: string;
+        labels?: Record<string, string>;
     } = {}): object {
         const containerStatuses = overrides.containerStatuses ?? [
             {
@@ -1015,6 +1023,7 @@ describe("listPods", () => {
                 name: overrides.name ?? "my-pod",
                 namespace: overrides.namespace ?? "default",
                 creationTimestamp: overrides.creationTimestamp ?? "2024-06-01T00:00:00Z",
+                labels: overrides.labels ?? {},
             },
             spec: {
                 nodeName: overrides.nodeName ?? "node-1",
@@ -1068,6 +1077,7 @@ describe("listPods", () => {
                         ],
                         nodeName: "node-worker",
                         creationTimestamp: "2024-01-15T12:00:00Z",
+                        labels: { app: "nginx", tier: "frontend" },
                     }),
                 ],
             })),
@@ -1082,7 +1092,20 @@ describe("listPods", () => {
             restarts: 3,
             node: "node-worker",
             createdAt: "2024-01-15T12:00:00Z",
+            labels: { app: "nginx", tier: "frontend" },
         });
+    });
+
+    test("defaults labels to an empty object when metadata.labels is absent", async () => {
+        const item = makePodItem();
+        (item as any).metadata.labels = undefined;
+        setRunnerHandlers({
+            "--context test-ctx get pods -A -o json": () => ok(JSON.stringify({
+                items: [item],
+            })),
+        });
+        const result = await listPods("test-ctx");
+        expect(result[0]!.labels).toEqual({});
     });
 
     test("reports container count from spec.containers for a multi-container pod", async () => {
@@ -1190,6 +1213,7 @@ describe("listNamespaces", () => {
                 {
                     metadata: {
                         name: "default",
+                        labels: { "kubernetes.io/metadata.name": "default" },
                     },
                 },
                 {
@@ -1206,9 +1230,12 @@ describe("listNamespaces", () => {
         expect(result.length).toBe(2);
         expect(result[0]!).toEqual({
             name: "default",
+            labels: { "kubernetes.io/metadata.name": "default" },
         });
+        // Namespace with no labels in metadata falls back to an empty object.
         expect(result[1]!).toEqual({
             name: "kube-system",
+            labels: {},
         });
     });
 

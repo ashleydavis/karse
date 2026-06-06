@@ -30,6 +30,8 @@ import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { fetchDaemonSets } from "../../../lib/api-client";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
+import { LabelsCell } from "../../../components/labels-cell";
+import { labelsToPairs } from "../../../components/labels-cell-pairs";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -62,6 +64,15 @@ const columns: ColumnDef<DaemonSet>[] = [
         cell: (info) => formatAge(info.getValue<string>()),
         sortingFn: (a, b) =>
             new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
+    },
+    {
+        id: "labels",
+        // Joins labels into searchable "key=value" text so the table's fuzzy
+        // search matches on both label keys and values.
+        accessorFn: (row) => labelsToPairs(row.labels).join(" "),
+        header: "Labels",
+        cell: (info) => <LabelsCell labels={info.row.original.labels} />,
+        enableSorting: false,
     },
 ];
 

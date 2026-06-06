@@ -28,6 +28,8 @@ import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/fr
 import type { Namespace } from "karse-types";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
+import { LabelsCell } from "../../../components/labels-cell";
+import { labelsToPairs } from "../../../components/labels-cell-pairs";
 
 type Props = {
     namespaces: Namespace[];
@@ -58,6 +60,15 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
                     )}
                 </span>
             ),
+        },
+        {
+            id: "labels",
+            // Joins labels into searchable "key=value" text so the table's fuzzy
+            // search matches on both label keys and values.
+            accessorFn: (row) => labelsToPairs(row.labels).join(" "),
+            header: "Labels",
+            cell: (info) => <LabelsCell labels={info.row.original.labels} />,
+            enableSorting: false,
         },
         {
             id: "action",

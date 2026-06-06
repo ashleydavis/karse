@@ -76,6 +76,7 @@ describe("GET /api/cluster/nodes", () => {
         roles: ["control-plane"],
         version: "v1.30.0",
         createdAt: "2024-01-01T00:00:00Z",
+        labels: { "node-role.kubernetes.io/control-plane": "" },
     };
 
     test("with ?context forwards it to adapter", async () => {

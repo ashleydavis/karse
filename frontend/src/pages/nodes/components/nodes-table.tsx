@@ -33,6 +33,8 @@ import { StatusFilter } from "../../../components/status-filter";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { statusColumnFilterFn, makeStatusFilterController } from "../../../lib/status-filter-state";
+import { LabelsCell } from "../../../components/labels-cell";
+import { labelsToPairs } from "../../../components/labels-cell-pairs";
 
 function formatAge(createdAt: string): string {
     const ms = Date.now() - new Date(createdAt).getTime();
@@ -119,6 +121,15 @@ const columns: ColumnDef<Node>[] = [
         cell: (info) => formatAge(info.getValue<string>()),
         sortingFn: (a, b) =>
             new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
+    },
+    {
+        id: "labels",
+        // Joins labels into searchable "key=value" text so the table's fuzzy
+        // search matches on both label keys and values.
+        accessorFn: (row) => labelsToPairs(row.labels).join(" "),
+        header: "Labels",
+        cell: (info) => <LabelsCell labels={info.row.original.labels} />,
+        enableSorting: false,
     },
 ];
 

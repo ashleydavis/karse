@@ -156,21 +156,23 @@ test.describe("karse e2e", () => {
             expect(names).toContain("node-notready");
         });
 
+        // The Status chip lives in the second column (td:nth-child(2)); scope to it
+        // so the Labels column's own key=value chips don't match these assertions.
         test("shows Ready chip for node-cp", async () => {
             const row = page.locator("[data-test-id='node-row']").filter({ hasText: "node-cp" });
-            await expect(row.locator(".MuiChip-label")).toHaveText("Ready");
+            await expect(row.locator("td:nth-child(2) .MuiChip-label")).toHaveText("Ready");
         });
 
         // node-notready is created without the kwok annotation, so kwok leaves its
         // patched Ready=False status alone and it renders as genuinely NotReady.
         test("shows NotReady chip for node-notready", async () => {
             const row = page.locator("[data-test-id='node-row']").filter({ hasText: "node-notready" });
-            await expect(row.locator(".MuiChip-label")).toHaveText("NotReady");
+            await expect(row.locator("td:nth-child(2) .MuiChip-label")).toHaveText("NotReady");
         });
 
         test("shows Ready chip for node-worker", async () => {
             const row = page.locator("[data-test-id='node-row']").filter({ hasText: "node-worker" });
-            await expect(row.locator(".MuiChip-label")).toHaveText("Ready");
+            await expect(row.locator("td:nth-child(2) .MuiChip-label")).toHaveText("Ready");
         });
 
         test("shows control-plane role for node-cp", async () => {
@@ -221,7 +223,7 @@ test.describe("karse e2e", () => {
         test("clicking Status header sorts Ready rows before NotReady", async () => {
             await page.locator("[data-test-id='nodes-table'] thead th").filter({ hasText: "Status" }).click();
 
-            const statuses = await page.locator("[data-test-id='node-row'] .MuiChip-label").allTextContents();
+            const statuses = await page.locator("[data-test-id='node-row'] td:nth-child(2) .MuiChip-label").allTextContents();
             const readyIdx = statuses.indexOf("Ready");
             const notReadyIdx = statuses.indexOf("NotReady");
             expect(readyIdx).toBeGreaterThanOrEqual(0);
@@ -520,10 +522,16 @@ test.describe("karse e2e", () => {
             expect(names.some((n) => n.includes("kube-system"))).toBe(true);
         });
 
+        // Every namespace carries the auto-applied kubernetes.io/metadata.name
+        // label, and the Labels column participates in the search, so a bare
+        // "kube" now matches every row. Filter on "kube-system" instead: that
+        // string is unique to the kube-system namespace (name and label value),
+        // so it still excludes "default".
         test("filtering narrows the list to matching namespaces", async () => {
-            await page.locator("[data-test-id='namespaces-filter'] input").fill("kube");
+            await page.locator("[data-test-id='namespaces-filter'] input").fill("kube-system");
             const names = await page.locator("[data-test-id='namespace-row'] td:first-child").allTextContents();
-            expect(names.every((n) => n.toLowerCase().includes("kube"))).toBe(true);
+            expect(names.some((n) => n.includes("kube-system"))).toBe(true);
+            expect(names.every((n) => n.toLowerCase().includes("kube-system"))).toBe(true);
             expect(names.some((n) => /^default/.test(n))).toBe(false);
         });
 
@@ -2607,6 +2615,59 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Errors");
             await expect(page.locator("[data-test-id='no-errors-empty']")).toBeVisible();
             await page.unroute("**/api/errors*");
+        });
+    });
+
+    // ── Labels column ──────────────────────────────────────────────────────────
+
+    test.describe("labels column", () => {
+        // Deterministic pod list with distinct labels so chip-render and
+        // label-search assertions are stable.
+        const FAKE_PODS = {
+            pods: [
+                { name: "web-pod", namespace: "default", phase: "Running", ready: "1/1", containerCount: 1, restarts: 0, node: "node-worker", createdAt: new Date().toISOString(), labels: { app: "web", tier: "frontend" } },
+                { name: "db-pod", namespace: "default", phase: "Running", ready: "1/1", containerCount: 1, restarts: 0, node: "node-worker", createdAt: new Date().toISOString(), labels: { app: "db" } },
+            ],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: FAKE_PODS });
+            });
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']").first()).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+        });
+
+        test("the pods table has a Labels column header", async () => {
+            const table = page.locator("[data-test-id='pods-table']");
+            await expect(table.getByRole("columnheader", { name: "Labels", exact: true })).toBeVisible();
+        });
+
+        test("renders each pod's labels as key=value chips", async () => {
+            const webRow = page.locator("[data-test-id='pod-row']").filter({ hasText: "web-pod" });
+            const chips = webRow.locator("[data-test-id='labels-cell'] .MuiChip-label");
+            await expect(chips).toHaveCount(2);
+            await expect(chips.nth(0)).toHaveText("app=web");
+            await expect(chips.nth(1)).toHaveText("tier=frontend");
+        });
+
+        test("search matches on a label value and filters to the matching pod", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("tier=frontend");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("web-pod");
+            await page.locator("[data-test-id='pods-search'] input").fill("");
+        });
+
+        test("search matches on a label key shared across pods", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("app=db");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("db-pod");
+            await page.locator("[data-test-id='pods-search'] input").fill("");
         });
     });
 });

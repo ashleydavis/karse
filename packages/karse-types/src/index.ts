@@ -18,6 +18,7 @@ export type Node = {
     roles: string[];           // empty array means "<none>"
     version: string;           // kubeletVersion
     createdAt: string;         // ISO timestamp; UI computes age
+    labels: Record<string, string>;  // metadata.labels; empty object when none
 };
 
 export type ClusterOverview = {
@@ -35,6 +36,7 @@ export type ClusterOverview = {
 // A single Kubernetes namespace in the active cluster.
 export type Namespace = {
     name: string;
+    labels: Record<string, string>;  // metadata.labels; empty object when none
 };
 
 // Response body for GET /api/namespaces.
@@ -53,6 +55,7 @@ export type Pod = {
     restarts: number;
     createdAt: string;      // ISO timestamp
     node: string;
+    labels: Record<string, string>;  // metadata.labels; empty object when none
 };
 
 // Response body for GET /api/pods.
@@ -68,6 +71,7 @@ export type Deployment = {
     upToDate: number;
     available: number;
     createdAt: string;
+    labels: Record<string, string>;  // metadata.labels; empty object when none
 };
 
 // Response body for GET /api/deployments.
@@ -81,6 +85,7 @@ export type StatefulSet = {
     namespace: string;
     ready: string;       // e.g. "2/3"
     createdAt: string;
+    labels: Record<string, string>;  // metadata.labels; empty object when none
 };
 
 // Response body for GET /api/statefulsets.
@@ -98,6 +103,7 @@ export type DaemonSet = {
     upToDate: number;
     available: number;
     createdAt: string;
+    labels: Record<string, string>;  // metadata.labels; empty object when none
 };
 
 // Response body for GET /api/daemonsets.

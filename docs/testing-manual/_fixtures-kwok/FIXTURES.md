@@ -55,3 +55,4 @@ To tear down every test cluster at once (after running several fixtures, or to c
 | [30-workload-detail-pages](30-workload-detail-pages/) | One deployment, stateful set, daemon set | workload-detail |
 | [31-node-detail-tabs](31-node-detail-tabs/) | One node, two pods, node events | node-detail |
 | [32-errors-view](32-errors-view/) | Problem pod + Warning event + healthy pod | errors-feed |
+| [33-labels-column](33-labels-column/) | Labelled pods + a labelled deployment in `default` | pods-view, deployments-view |

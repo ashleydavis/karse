@@ -65,6 +65,7 @@ export async function listNamespaces(context: string): Promise<Namespace[]> {
     const data = JSON.parse(result.stdout);
     return (data.items as any[]).map((item) => ({
         name: item.metadata.name,
+        labels: item.metadata.labels ?? {},
     }));
 }
 
@@ -116,6 +117,7 @@ export async function listNodes(context: string): Promise<Node[]> {
             roles,
             version: item.status.nodeInfo.kubeletVersion,
             createdAt: item.metadata.creationTimestamp,
+            labels: item.metadata.labels ?? {},
         };
     });
 }
@@ -155,6 +157,7 @@ function mapPodListItem(item: any): Pod {
         restarts,
         createdAt: item.metadata.creationTimestamp,
         node: item.spec?.nodeName ?? "",
+        labels: item.metadata.labels ?? {},
     };
 }
 
@@ -176,6 +179,7 @@ export async function listDeployments(context: string, namespace?: string): Prom
             upToDate: item.status?.updatedReplicas ?? 0,
             available: item.status?.availableReplicas ?? 0,
             createdAt: item.metadata.creationTimestamp,
+            labels: item.metadata.labels ?? {},
         };
     });
 }
@@ -196,6 +200,7 @@ export async function listStatefulSets(context: string, namespace?: string): Pro
             namespace: item.metadata.namespace,
             ready: `${ready}/${desired}`,
             createdAt: item.metadata.creationTimestamp,
+            labels: item.metadata.labels ?? {},
         };
     });
 }
@@ -217,6 +222,7 @@ export async function listDaemonSets(context: string, namespace?: string): Promi
         upToDate: item.status?.updatedNumberScheduled ?? 0,
         available: item.status?.numberAvailable ?? 0,
         createdAt: item.metadata.creationTimestamp,
+        labels: item.metadata.labels ?? {},
     }));
 }
 

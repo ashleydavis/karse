@@ -105,6 +105,8 @@ A table of pods for the active context. When a namespace is active, pods are sco
 
 Type in the search box to filter rows. Use the **Phase** dropdown (filter icon, beside the search box) to show only pods with the phases you check; all phases are shown by default.
 
+A Labels column shows each resource's labels as compact `key=value` chips (also present on the Nodes, Deployments, StatefulSets, DaemonSets, and Namespaces tables). The chips participate in the table's search, so typing a label key or value filters the rows.
+
 ## Environment variables
 
 | Variable | Default | Description |

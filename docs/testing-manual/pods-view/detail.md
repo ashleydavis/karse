@@ -84,3 +84,19 @@ Five pods in `default`, one each in Running, Pending, Succeeded, Failed, Unknown
 - **Re-check all phases**: all five rows return and the button reads `Phase: All`.
 - The phase filter combines with the search box: searching while a subset of phases is selected narrows results further.
 - If KWOK overrides a patched terminal phase back to `Running`, re-run the patch commands from the setup script and reload.
+
+## Scenario F: Labels column
+
+Two pods in `default`: `web-pod` (labels `app=web`, `tier=frontend`) and `db-pod` (label `app=db`), plus a labelled deployment. Verifies the Labels column renders and is searchable. The same fixture also covers the deployments view's Labels column.
+
+**Fixture:** [_fixtures-kwok/33-labels-column](../_fixtures-kwok/33-labels-column/)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/33-labels-column/setup.sh
+```
+
+### What to check
+- **Pods page**: a **Labels** column appears after the Age column. `web-pod` shows `app=web` and `tier=frontend` chips; `db-pod` shows an `app=db` chip.
+- **Search by label value**: type `tier=frontend` in the search box. Only `web-pod` remains.
+- **Search by label key/value shared form**: type `app=db`. Only `db-pod` remains. Clear the search to restore both rows.
+- **Deployments page** (`/deployments`): the `web-deploy` row shows `app=web` and `tier=frontend` chips in its Labels column.
