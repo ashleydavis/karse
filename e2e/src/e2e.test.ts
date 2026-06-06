@@ -3748,6 +3748,113 @@ test.describe("karse e2e", () => {
 
     // ── Errors page: type filter ────────────────────────────────────────────────
 
+    // ── Column configuration ────────────────────────────────────────────────────
+
+    // Simulates an HTML5 drag-and-drop from one element onto another by dispatching the
+    // native drag event sequence. Playwright's mouse-based dragTo does not trigger native
+    // draggable elements reliably, so the events are dispatched directly. The same
+    // DataTransfer is shared across the events, as a real drag would.
+    async function dragColumnOnto(sourceTestId: string, targetTestId: string): Promise<void> {
+        await page.evaluate(
+            ({ sourceTestId, targetTestId }) => {
+                const source = document.querySelector(`[data-test-id='${sourceTestId}']`);
+                const target = document.querySelector(`[data-test-id='${targetTestId}']`);
+                if (source === null || target === null) {
+                    throw new Error("drag source or target not found");
+                }
+                const dataTransfer = new DataTransfer();
+                source.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer }));
+                target.dispatchEvent(new DragEvent("dragover", { bubbles: true, dataTransfer }));
+                target.dispatchEvent(new DragEvent("drop", { bubbles: true, dataTransfer }));
+                source.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer }));
+            },
+            { sourceTestId, targetTestId },
+        );
+    }
+
+    // Returns the visible nodes-table column header texts (excluding the empty actions header).
+    async function getNodeHeaders(): Promise<string[]> {
+        const texts = await page.locator("[data-test-id='nodes-table'] thead th").allTextContents();
+        return texts.map((t) => t.trim()).filter((t) => t.length > 0);
+    }
+
+    test.describe("column configuration", () => {
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            // Start from a clean configuration so the test is deterministic.
+            await page.goto("/nodes");
+            await page.evaluate(() => localStorage.removeItem("karse-columns-nodes"));
+            await navigateToNodes();
+        });
+
+        test("nodes table has a Columns button that opens the config modal", async () => {
+            await expect(page.locator("[data-test-id='column-config-button']")).toBeVisible();
+            await page.locator("[data-test-id='column-config-button']").click();
+            await expect(page.locator("[data-test-id='column-config-modal']")).toBeVisible();
+        });
+
+        test("modal lists configurable columns in the Visible section", async () => {
+            const visible = page.locator("[data-test-id='column-config-section-visible']");
+            for (const id of ["name", "status", "roles", "version", "age"]) {
+                await expect(visible.locator(`[data-test-id='column-config-item-${id}']`)).toBeVisible();
+            }
+            // The Hidden section starts empty.
+            await expect(page.locator("[data-test-id='column-config-empty-hidden']")).toBeVisible();
+        });
+
+        test("dragging a column to the Hidden section hides it from the table", async () => {
+            // Drag the Roles column onto the Hidden section.
+            await dragColumnOnto("column-config-item-roles", "column-config-section-hidden");
+            // The item now lives in the Hidden section.
+            await expect(
+                page.locator("[data-test-id='column-config-section-hidden'] [data-test-id='column-config-item-roles']"),
+            ).toBeVisible();
+            // Close the modal and confirm the table no longer shows the Roles header.
+            await page.locator("[data-test-id='column-config-close']").click();
+            await expect(page.locator("[data-test-id='column-config-modal']")).toBeHidden();
+            const headers = await getNodeHeaders();
+            expect(headers).not.toContain("Roles");
+            expect(headers).toContain("Name");
+        });
+
+        test("reordering moves a column before another within Visible", async () => {
+            await page.locator("[data-test-id='column-config-button']").click();
+            // Drag Version so it sits before Status.
+            await dragColumnOnto("column-config-item-version", "column-config-item-status");
+            await page.locator("[data-test-id='column-config-close']").click();
+            const headers = await getNodeHeaders();
+            const versionIdx = headers.indexOf("Version");
+            const statusIdx = headers.indexOf("Status");
+            expect(versionIdx).toBeGreaterThanOrEqual(0);
+            expect(statusIdx).toBeGreaterThanOrEqual(0);
+            expect(versionIdx).toBeLessThan(statusIdx);
+        });
+
+        test("the configuration persists across a reload", async () => {
+            await page.reload({ waitUntil: "networkidle" });
+            await waitForNodeRows();
+            const headers = await getNodeHeaders();
+            // Roles remains hidden and Version remains before Status after reload.
+            expect(headers).not.toContain("Roles");
+            const versionIdx = headers.indexOf("Version");
+            const statusIdx = headers.indexOf("Status");
+            expect(versionIdx).toBeLessThan(statusIdx);
+        });
+
+        test("dragging a hidden column back to Visible restores it", async () => {
+            await page.locator("[data-test-id='column-config-button']").click();
+            await dragColumnOnto("column-config-item-roles", "column-config-section-visible");
+            await page.locator("[data-test-id='column-config-close']").click();
+            const headers = await getNodeHeaders();
+            expect(headers).toContain("Roles");
+        });
+
+        test.afterAll(async () => {
+            // Reset so later tests see the default column layout.
+            await page.evaluate(() => localStorage.removeItem("karse-columns-nodes"));
+        });
+    });
+
     test.describe("errors page type filter", () => {
         // Three errors across three distinct reasons (types), so filtering by one
         // reason narrows the table predictably.

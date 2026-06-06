@@ -40,6 +40,8 @@ import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
 import { ResourceStatsHeader } from "../../../components/resource-stats-header";
 import { computeNodeStats, nodeHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
+import { useColumnConfig } from "../../../lib/column-config";
+import { ColumnConfigButton } from "../../../components/column-config-modal";
 
 function formatAge(createdAt: string): string {
     const ms = Date.now() - new Date(createdAt).getTime();
@@ -149,6 +151,8 @@ const columns: ColumnDef<Node>[] = [
         filterFn: statusColumnFilterFn,
         enableSorting: false,
         enableGlobalFilter: false,
+        // Excluded from the column-config modal: it is an always-hidden filter helper, never shown.
+        enableHiding: false,
     },
 ];
 
@@ -173,10 +177,12 @@ export function NodesTable() {
     // The label-filter selection lives in the table's "labels" column filter; an absent filter means "no selection" (all rows show).
     const labelFilterController = makeLabelFilterController("labels", data?.nodes ?? [], columnFilters, setColumnFilters);
 
+    const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("nodes", columns);
+
     const table = useReactTable({
         data: data?.nodes ?? [],
         columns,
-        state: { sorting, globalFilter, columnFilters, columnVisibility: { health: false } },
+        state: { sorting, globalFilter, columnFilters, columnOrder, columnVisibility: { ...columnVisibility, health: false } },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
         onColumnFiltersChange: setColumnFilters,
@@ -246,6 +252,7 @@ export function NodesTable() {
                     selectedCount={labelFilterController.selectedCount}
                     testIdPrefix="nodes-label-filter"
                 />
+                <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
             </div>
             <TableContainer component={Paper} data-test-id="nodes-table">
                 <Table size="small">

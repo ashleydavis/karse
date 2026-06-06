@@ -40,6 +40,8 @@ import { LabelFilter } from "../../../components/label-filter";
 import { labelColumnFilterFn, makeLabelFilterController } from "../../../lib/label-filter-state";
 import { ResourceStatsHeader } from "../../../components/resource-stats-header";
 import { computeDeploymentStats, deploymentHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
+import { useColumnConfig } from "../../../lib/column-config";
+import { ColumnConfigButton } from "../../../components/column-config-modal";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -93,6 +95,8 @@ const columns: ColumnDef<Deployment>[] = [
         filterFn: statusColumnFilterFn,
         enableSorting: false,
         enableGlobalFilter: false,
+        // Excluded from the column-config modal: it is an always-hidden filter helper, never shown.
+        enableHiding: false,
     },
 ];
 
@@ -118,6 +122,8 @@ export function DeploymentsTable() {
     // The label-filter selection lives in the table's "labels" column filter; an absent filter means "no selection" (all rows show).
     const labelFilterController = makeLabelFilterController("labels", data?.deployments ?? [], columnFilters, setColumnFilters);
 
+    const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("deployments", columns);
+
     const table = useReactTable({
         data: data?.deployments ?? [],
         columns,
@@ -125,9 +131,8 @@ export function DeploymentsTable() {
             sorting,
             globalFilter,
             columnFilters,
-            columnVisibility: {
-                health: false,
-            },
+            columnOrder,
+            columnVisibility: { ...columnVisibility, health: false },
         },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
@@ -196,6 +201,7 @@ export function DeploymentsTable() {
                     selectedCount={labelFilterController.selectedCount}
                     testIdPrefix="deployments-label-filter"
                 />
+                <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
             </div>
             <TableContainer component={Paper} data-test-id="deployments-table">
                 <Table size="small">

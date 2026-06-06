@@ -40,6 +40,8 @@ import { LabelFilter } from "../../../components/label-filter";
 import { labelColumnFilterFn, makeLabelFilterController } from "../../../lib/label-filter-state";
 import { ResourceStatsHeader } from "../../../components/resource-stats-header";
 import { computeDaemonSetStats, daemonSetHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
+import { useColumnConfig } from "../../../lib/column-config";
+import { ColumnConfigButton } from "../../../components/column-config-modal";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -95,6 +97,8 @@ const columns: ColumnDef<DaemonSet>[] = [
         filterFn: statusColumnFilterFn,
         enableSorting: false,
         enableGlobalFilter: false,
+        // Excluded from the column-config modal: it is an always-hidden filter helper, never shown.
+        enableHiding: false,
     },
 ];
 
@@ -120,6 +124,8 @@ export function DaemonSetsTable() {
     // The label-filter selection lives in the table's "labels" column filter; an absent filter means "no selection" (all rows show).
     const labelFilterController = makeLabelFilterController("labels", data?.daemonSets ?? [], columnFilters, setColumnFilters);
 
+    const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("daemonsets", columns);
+
     const table = useReactTable({
         data: data?.daemonSets ?? [],
         columns,
@@ -127,9 +133,8 @@ export function DaemonSetsTable() {
             sorting,
             globalFilter,
             columnFilters,
-            columnVisibility: {
-                health: false,
-            },
+            columnOrder,
+            columnVisibility: { ...columnVisibility, health: false },
         },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
@@ -198,6 +203,7 @@ export function DaemonSetsTable() {
                     selectedCount={labelFilterController.selectedCount}
                     testIdPrefix="daemonsets-label-filter"
                 />
+                <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
             </div>
             <TableContainer component={Paper} data-test-id="daemonsets-table">
                 <Table size="small">

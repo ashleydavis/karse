@@ -32,6 +32,8 @@ import { LoadingIndicator } from "../../../components/loading-indicator";
 import { TypeFilter } from "../../../components/type-filter";
 import { typeColumnFilterFn, makeTypeFilterController } from "../../../lib/type-filter-state";
 import { LoadError } from "../../../components/load-error";
+import { useColumnConfig } from "../../../lib/column-config";
+import { ColumnConfigButton } from "../../../components/column-config-modal";
 
 // The distinct error types (reasons) present in the data, in display order
 // (alphabetical). These are the checkboxes offered by the type filter.
@@ -132,6 +134,8 @@ export function ErrorsTable() {
     // empty selection means "show all" (the default).
     const typeFilterController = makeTypeFilterController("reason", columnFilters, setColumnFilters);
 
+    const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("errors", columns);
+
     const table = useReactTable({
         data: data?.errors ?? [],
         columns,
@@ -139,6 +143,8 @@ export function ErrorsTable() {
             sorting,
             globalFilter,
             columnFilters,
+            columnOrder,
+            columnVisibility,
         },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
@@ -198,6 +204,7 @@ export function ErrorsTable() {
                     label="Type"
                     testIdPrefix="errors-type-filter"
                 />
+                <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
             </div>
             <TableContainer component={Paper} data-test-id="errors-table">
                 <Table size="small">

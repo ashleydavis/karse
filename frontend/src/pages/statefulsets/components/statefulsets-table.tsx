@@ -40,6 +40,8 @@ import { LabelFilter } from "../../../components/label-filter";
 import { labelColumnFilterFn, makeLabelFilterController } from "../../../lib/label-filter-state";
 import { ResourceStatsHeader } from "../../../components/resource-stats-header";
 import { computeStatefulSetStats, statefulSetHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
+import { useColumnConfig } from "../../../lib/column-config";
+import { ColumnConfigButton } from "../../../components/column-config-modal";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -91,6 +93,8 @@ const columns: ColumnDef<StatefulSet>[] = [
         filterFn: statusColumnFilterFn,
         enableSorting: false,
         enableGlobalFilter: false,
+        // Excluded from the column-config modal: it is an always-hidden filter helper, never shown.
+        enableHiding: false,
     },
 ];
 
@@ -116,6 +120,8 @@ export function StatefulSetsTable() {
     // The label-filter selection lives in the table's "labels" column filter; an absent filter means "no selection" (all rows show).
     const labelFilterController = makeLabelFilterController("labels", data?.statefulSets ?? [], columnFilters, setColumnFilters);
 
+    const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("statefulsets", columns);
+
     const table = useReactTable({
         data: data?.statefulSets ?? [],
         columns,
@@ -123,9 +129,8 @@ export function StatefulSetsTable() {
             sorting,
             globalFilter,
             columnFilters,
-            columnVisibility: {
-                health: false,
-            },
+            columnOrder,
+            columnVisibility: { ...columnVisibility, health: false },
         },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
@@ -194,6 +199,7 @@ export function StatefulSetsTable() {
                     selectedCount={labelFilterController.selectedCount}
                     testIdPrefix="statefulsets-label-filter"
                 />
+                <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
             </div>
             <TableContainer component={Paper} data-test-id="statefulsets-table">
                 <Table size="small">

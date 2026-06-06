@@ -31,6 +31,8 @@ import { LoadingIndicator } from "../../../components/loading-indicator";
 import { EventTypeFilter } from "../../../components/event-type-filter";
 import { ALL_EVENT_TYPES, filterEventsByType } from "../../../lib/event-type-filter";
 import { LoadError } from "../../../components/load-error";
+import { useColumnConfig } from "../../../lib/column-config";
+import { ColumnConfigButton } from "../../../components/column-config-modal";
 
 // Formats a Kubernetes timestamp into a human-readable age string.
 function formatAge(lastSeen: string): string {
@@ -129,12 +131,16 @@ export function EventsTable() {
     // leaves every event in place.
     const typeFiltered = filterEventsByType(data?.events ?? [], selectedTypes);
 
+    const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("events", columns);
+
     const table = useReactTable({
         data: typeFiltered,
         columns,
         state: {
             sorting,
             globalFilter,
+            columnOrder,
+            columnVisibility,
         },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
@@ -190,6 +196,7 @@ export function EventsTable() {
                     selected={selectedTypes}
                     onChange={setSelectedTypes}
                 />
+                <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
             </div>
             <TableContainer component={Paper} data-test-id="events-table">
                 <Table size="small">

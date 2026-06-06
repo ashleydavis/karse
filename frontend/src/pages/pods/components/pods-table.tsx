@@ -41,6 +41,8 @@ import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
 import { ResourceStatsHeader } from "../../../components/resource-stats-header";
 import { computePodStats, podHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
+import { useColumnConfig } from "../../../lib/column-config";
+import { ColumnConfigButton } from "../../../components/column-config-modal";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -196,6 +198,8 @@ function buildColumns(): ColumnDef<Pod>[] {
             filterFn: statusColumnFilterFn,
             enableSorting: false,
             enableGlobalFilter: false,
+            // Excluded from the column-config modal: it is an always-hidden filter helper, never shown.
+            enableHiding: false,
         },
     );
 
@@ -221,6 +225,7 @@ export function PodsTable() {
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
     const columns = buildColumns();
+    const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("pods", columns);
 
     // The selected phases live in the table's "phase" column filter; an absent filter means "all".
     const phaseFilterController = makeStatusFilterController("phase", ALL_PHASES, columnFilters, setColumnFilters);
@@ -237,9 +242,8 @@ export function PodsTable() {
             sorting,
             globalFilter,
             columnFilters,
-            columnVisibility: {
-                health: false,
-            },
+            columnOrder,
+            columnVisibility: { ...columnVisibility, health: false },
         },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
@@ -314,6 +318,7 @@ export function PodsTable() {
                     selectedCount={labelFilterController.selectedCount}
                     testIdPrefix="pods-label-filter"
                 />
+                <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
             </div>
             <TableContainer component={Paper} data-test-id="pods-table">
                 <Table size="small">
