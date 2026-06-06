@@ -30,6 +30,9 @@ Repeat a couple of the queries on the **Nodes page** search box (for example `nw
 ### Column sorting
 Column sorting is shared across all tables. See the sort checks in [nodes-view](../nodes-view/detail.md) (many-nodes scenario) and [pods-view](../pods-view/detail.md) (many-pods scenario): clicking a column header reorders rows, and clicking again reverses.
 
+### Status filtering
+Tables whose kind has a status field share one status-filter dropdown (the same `status-filter.tsx` component and `status-filter-state.ts` column-filter wiring). The dropdown sits beside the search box, has one checkbox per status value, defaults to all selected, hides rows whose status is unchecked, and shows the table's no-match message when every status is unchecked. It composes with the search box. See the dedicated scenarios: pods by phase in [pods-view](../pods-view/detail.md) (Scenario E) and nodes by status in [nodes-view](../nodes-view/detail.md) (Scenario G).
+
 Teardown:
 
 ```sh

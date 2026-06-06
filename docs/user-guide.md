@@ -88,7 +88,7 @@ A read-only table of the cluster's nodes:
 
 - **Name**, **Status** (Ready/NotReady/Unknown chip), **Roles**, **Version**, **Age**.
 
-Click a column header to sort; type in the search box to filter rows.
+Click a column header to sort; type in the search box to filter rows. Use the **Status** dropdown (filter icon, beside the search box) to show only nodes with the statuses you check; all statuses are shown by default.
 
 ## Namespaces page (`/namespaces`)
 
@@ -102,6 +102,8 @@ A table of namespaces for the active context.
 ## Pods page (`/pods`)
 
 A table of pods for the active context. When a namespace is active, pods are scoped to that namespace; when no namespace is selected, all pods across all namespaces are shown. The Namespace column is always shown regardless of the active namespace.
+
+Type in the search box to filter rows. Use the **Phase** dropdown (filter icon, beside the search box) to show only pods with the phases you check; all phases are shown by default.
 
 ## Environment variables
 

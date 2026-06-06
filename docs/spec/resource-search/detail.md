@@ -2,9 +2,9 @@
 
 ## Overview
 
-A per-table search and sort behaviour. Resource tables use a search box plus TanStack Table sorting. The fuzzy subsequence global filter (`fuzzyGlobalFilter`) is used by the nodes, pods, deployments, stateful sets and daemon sets tables. The events and errors tables instead use TanStack's built-in plain substring match (`globalFilterFn: "includesString"`).
+A per-table search and sort behaviour. Resource tables use a search box plus TanStack Table sorting. The fuzzy subsequence global filter (`fuzzyGlobalFilter`) is used by the nodes, pods, deployments, stateful sets and daemon sets tables. The events and errors tables instead use TanStack's built-in plain substring match (`globalFilterFn: "includesString"`). Tables whose kind has a status field (pods by phase, nodes by Ready/NotReady/Unknown) additionally share a status-filter dropdown.
 
-Backed by: `frontend/src/lib/fuzzy-filter.ts` and the per-page table components under `frontend/src/pages/*/components/`.
+Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-state.ts`, `frontend/src/components/status-filter.tsx`, and the per-page table components under `frontend/src/pages/*/components/`.
 
 ## Behaviour
 
@@ -16,6 +16,14 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts` and the per-page table components 
 - Column headers sort the loaded rows.
 - Scope: this filters and sorts the rows already loaded for the current view. It is not a global search across resource kinds (a global all-resources browser and a cross-kind quick-find are on the roadmap; see `quick-find` and `docs/roadmap.md`).
 
+### Status filtering
+
+- Every resource table whose kind has a status field has a status-filter dropdown beside the search box, with one checkbox per status value (pods: Running/Pending/Succeeded/Failed/Unknown; nodes: Ready/NotReady/Unknown).
+- All statuses are selected by default; the button reads `<Label>: All` (e.g. "Phase: All", "Status: All"). With a partial selection it reads `<Label>: N selected`.
+- Unchecking a status hides every row with that status. Unchecking every status hides all rows and shows the table's no-match message.
+- The dropdown drives a TanStack Table column filter on the status column. A full selection clears the filter (every row passes); the status filter and the search box compose (both must match for a row to show).
+- The dropdown and its column-filter wiring are shared (`status-filter.tsx` and `status-filter-state.ts`) so behaviour is identical across tables. There is no per-table duplicate.
+
 ## Acceptance Criteria
 
 - [x] Each resource table has a search box that filters its rows.
@@ -23,6 +31,10 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts` and the per-page table components 
 - [x] The events and errors tables use a plain case-insensitive substring match instead of the fuzzy filter.
 - [x] An empty query keeps all rows.
 - [x] Column headers sort the table.
+- [x] The same filter/sort behaviour is shared across all resource tables.
+- [x] Every table whose kind has a status field has a status-filter dropdown with one checkbox per status value; all selected by default.
+- [x] Unchecking a status hides rows with that status; unchecking all shows the no-match message.
+- [x] The status-filter dropdown and its column-filter wiring are shared across tables, with no per-table duplicate.
 
 ## Open Questions
 

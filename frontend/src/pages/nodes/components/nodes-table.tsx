@@ -8,6 +8,7 @@ import {
     flexRender,
     type ColumnDef,
     type SortingState,
+    type ColumnFiltersState,
 } from "@tanstack/react-table";
 import {
     Table,
@@ -29,8 +30,10 @@ import type { Node, NodeStatus } from "karse-types";
 import { useKubeContext } from "../../../lib/kube-context";
 import { fetchNodes } from "../../../lib/api-client";
 import { YamlButton } from "../../../components/yaml-dialog";
+import { StatusFilter } from "../../../components/status-filter";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
+import { statusColumnFilterFn, makeStatusFilterController } from "../../../lib/status-filter-state";
 
 function formatAge(createdAt: string): string {
     const ms = Date.now() - new Date(createdAt).getTime();
@@ -74,6 +77,9 @@ function StatusChip({ status }: { status: NodeStatus }) {
 
 const STATUS_ORDER: Record<NodeStatus, number> = { Ready: 0, NotReady: 1, Unknown: 2 };
 
+// All selectable node statuses, in display order, for the status filter dropdown.
+const ALL_STATUSES: NodeStatus[] = ["Ready", "NotReady", "Unknown"];
+
 const columns: ColumnDef<Node>[] = [
     {
         accessorKey: "name",
@@ -85,6 +91,10 @@ const columns: ColumnDef<Node>[] = [
         cell: (info) => <StatusChip status={info.getValue<NodeStatus>()} />,
         sortingFn: (a, b) =>
             STATUS_ORDER[a.original.status] - STATUS_ORDER[b.original.status],
+        // Keeps a row only when its status is in the selected set. "All statuses" is
+        // represented by the absence of this filter (cleared by the shared status
+        // filter controller), so an empty selection here correctly matches no rows.
+        filterFn: statusColumnFilterFn,
     },
     {
         accessorKey: "roles",
@@ -132,13 +142,18 @@ export function NodesTable() {
 
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+
+    // The selected statuses live in the table's "status" column filter; an absent filter means "all".
+    const statusFilterController = makeStatusFilterController("status", ALL_STATUSES, columnFilters, setColumnFilters);
 
     const table = useReactTable({
         data: data?.nodes ?? [],
         columns,
-        state: { sorting, globalFilter },
+        state: { sorting, globalFilter, columnFilters },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
+        onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -164,20 +179,29 @@ export function NodesTable() {
 
     return (
         <div className="flex flex-col gap-2">
-            <TextField
-                size="small"
-                placeholder="Search nodes..."
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                data-test-id="nodes-search"
-                slotProps={{
-                    input: {
-                        startAdornment: (
-                            <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                        ),
-                    },
-                }}
-            />
+            <div className="flex flex-row gap-2 items-center">
+                <TextField
+                    size="small"
+                    placeholder="Search nodes..."
+                    value={globalFilter}
+                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    data-test-id="nodes-search"
+                    slotProps={{
+                        input: {
+                            startAdornment: (
+                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
+                            ),
+                        },
+                    }}
+                />
+                <StatusFilter
+                    all={ALL_STATUSES}
+                    selected={statusFilterController.selected}
+                    onChange={statusFilterController.setSelected}
+                    label="Status"
+                    testIdPrefix="nodes-status-filter"
+                />
+            </div>
             <TableContainer component={Paper} data-test-id="nodes-table">
                 <Table size="small">
                     <TableHead>

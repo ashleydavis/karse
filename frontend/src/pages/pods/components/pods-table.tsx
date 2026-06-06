@@ -21,14 +21,9 @@ import {
     TextField,
     Typography,
     Alert,
-    Button,
-    Menu,
-    MenuItem,
-    Checkbox,
-    ListItemText,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleCheck, faCirclePause, faCircleQuestion, faCircleXmark, faFilter, faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
+import { faCircleCheck, faCirclePause, faCircleQuestion, faCircleXmark, faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { Pod, PodPhase } from "karse-types";
 import { useKubeContext } from "../../../lib/kube-context";
@@ -36,8 +31,10 @@ import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { useShareableNavigate } from "../../../lib/nav-state";
 import { fetchPods } from "../../../lib/api-client";
 import { YamlButton } from "../../../components/yaml-dialog";
+import { StatusFilter } from "../../../components/status-filter";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
+import { statusColumnFilterFn, makeStatusFilterController } from "../../../lib/status-filter-state";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -117,51 +114,6 @@ const PHASE_ORDER: Record<PodPhase, number> = {
 // All selectable pod phases, in display order, for the phase filter dropdown.
 const ALL_PHASES: PodPhase[] = ["Running", "Pending", "Succeeded", "Failed", "Unknown"];
 
-// Dropdown of phase checkboxes that controls which pod phases are visible.
-// Multi-select; defaults to all phases selected. Calls onChange with the new selection.
-function PhaseFilter({ selected, onChange }: { selected: PodPhase[]; onChange: (next: PodPhase[]) => void }) {
-    const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-    const open = anchorEl !== null;
-
-    function toggle(phase: PodPhase) {
-        if (selected.includes(phase)) {
-            onChange(selected.filter((p) => p !== phase));
-        }
-        else {
-            onChange([...selected, phase]);
-        }
-    }
-
-    const allSelected = selected.length === ALL_PHASES.length;
-    const label = allSelected ? "Phase: All" : `Phase: ${selected.length} selected`;
-
-    return (
-        <div>
-            <Button
-                variant="outlined"
-                size="small"
-                onClick={(e) => setAnchorEl(e.currentTarget)}
-                startIcon={<FontAwesomeIcon icon={faFilter} />}
-                data-test-id="pods-phase-filter-button"
-            >
-                {label}
-            </Button>
-            <Menu anchorEl={anchorEl} open={open} onClose={() => setAnchorEl(null)} data-test-id="pods-phase-filter-menu">
-                {ALL_PHASES.map((phase) => (
-                    <MenuItem
-                        key={phase}
-                        onClick={() => toggle(phase)}
-                        data-test-id={`pods-phase-filter-item-${phase}`}
-                    >
-                        <Checkbox checked={selected.includes(phase)} size="small" />
-                        <ListItemText primary={phase} />
-                    </MenuItem>
-                ))}
-            </Menu>
-        </div>
-    );
-}
-
 // Builds the column definitions for the pods table.
 function buildColumns(): ColumnDef<Pod>[] {
     const cols: ColumnDef<Pod>[] = [];
@@ -185,10 +137,9 @@ function buildColumns(): ColumnDef<Pod>[] {
             sortingFn: (a, b) =>
                 PHASE_ORDER[a.original.phase] - PHASE_ORDER[b.original.phase],
             // Keeps a row only when its phase is in the selected set. "All phases" is
-            // represented by the absence of this filter (cleared in setSelectedPhases),
-            // so an empty selection here correctly matches no rows.
-            filterFn: (row, columnId, value: PodPhase[]) =>
-                value.includes(row.getValue<PodPhase>(columnId)),
+            // represented by the absence of this filter (cleared by the shared status
+            // filter controller), so an empty selection here correctly matches no rows.
+            filterFn: statusColumnFilterFn,
         },
         {
             accessorKey: "ready",
@@ -255,18 +206,7 @@ export function PodsTable() {
     const columns = buildColumns();
 
     // The selected phases live in the table's "phase" column filter; an absent filter means "all".
-    const phaseFilter = columnFilters.find((f) => f.id === "phase");
-    const selectedPhases = phaseFilter ? (phaseFilter.value as PodPhase[]) : ALL_PHASES;
-
-    // Updates the phase column filter: a full selection clears the filter so every phase shows.
-    function setSelectedPhases(next: PodPhase[]): void {
-        if (next.length === ALL_PHASES.length) {
-            setColumnFilters((prev) => prev.filter((f) => f.id !== "phase"));
-        }
-        else {
-            setColumnFilters((prev) => [...prev.filter((f) => f.id !== "phase"), { id: "phase", value: next }]);
-        }
-    }
+    const phaseFilterController = makeStatusFilterController("phase", ALL_PHASES, columnFilters, setColumnFilters);
 
     const table = useReactTable({
         data: data?.pods ?? [],
@@ -325,7 +265,13 @@ export function PodsTable() {
                         },
                     }}
                 />
-                <PhaseFilter selected={selectedPhases} onChange={setSelectedPhases} />
+                <StatusFilter
+                    all={ALL_PHASES}
+                    selected={phaseFilterController.selected}
+                    onChange={phaseFilterController.setSelected}
+                    label="Phase"
+                    testIdPrefix="pods-phase-filter"
+                />
             </div>
             <TableContainer component={Paper} data-test-id="pods-table">
                 <Table size="small">

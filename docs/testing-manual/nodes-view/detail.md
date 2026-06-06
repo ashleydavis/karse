@@ -88,3 +88,28 @@ One node with both `control-plane` and `worker` roles, and one plain worker node
 
 ### What to check
 - **Nodes table**: `fake-node-multi-role` shows `control-plane, worker` in the Roles column. `fake-node-worker` shows `worker`.
+
+## Scenario G: Node status filter
+
+A Ready node, a NotReady node, and a cordoned (Ready) node, so at least two distinct statuses are present. Reuses the mixed-statuses fixture.
+
+**Fixture:** [_fixtures-kwok/04-mixed-node-statuses](../_fixtures-kwok/04-mixed-node-statuses/)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/04-mixed-node-statuses/setup.sh
+```
+
+### What to check
+- **Nodes table**: three rows. The status filter button (filter icon, beside the search box) reads `Status: All`.
+- Click the **Status** button to open the dropdown. `Ready`, `NotReady`, and `Unknown` are listed; all are checked.
+- **Uncheck `NotReady`**: the `fake-node-notready` row disappears and the button updates to `Status: 2 selected`.
+- **Check only `Ready`**: uncheck the others until just `Ready` remains. Only the Ready nodes (`fake-node-ready`, `fake-node-cordoned`) are listed and the button reads `Status: 1 selected`.
+- **Uncheck every status**: the table shows the "No nodes match the search." message.
+- **Re-check all statuses**: all three rows return and the button reads `Status: All`.
+- The status filter combines with the search box: searching while a subset of statuses is selected narrows results further.
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/04-mixed-node-statuses/teardown.sh
+```

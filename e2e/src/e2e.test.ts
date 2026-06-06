@@ -1866,6 +1866,98 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Nodes page: status filter ───────────────────────────────────────────────
+
+    test.describe("nodes page status filter", () => {
+        // One node per status so each filter checkbox is independently observable.
+        const STATUS_NODES = {
+            nodes: [
+                {
+                    name: "node-ready",
+                    status: "Ready",
+                    roles: ["worker"],
+                    version: "v1.30.0",
+                    createdAt: new Date().toISOString(),
+                },
+                {
+                    name: "node-notready",
+                    status: "NotReady",
+                    roles: ["worker"],
+                    version: "v1.30.0",
+                    createdAt: new Date().toISOString(),
+                },
+                {
+                    name: "node-unknown",
+                    status: "Unknown",
+                    roles: ["worker"],
+                    version: "v1.30.0",
+                    createdAt: new Date().toISOString(),
+                },
+            ],
+        };
+
+        // Install a route override that returns STATUS_NODES for every nodes-list request.
+        async function interceptStatusNodes(): Promise<void> {
+            await page.route("**/api/cluster/nodes*", async (route) => {
+                await route.fulfill({ json: STATUS_NODES });
+            });
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await interceptStatusNodes();
+            await page.goto("/nodes", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='nodes-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/cluster/nodes*");
+            setContext(CLUSTER_1);
+        });
+
+        test("shows all statuses by default", async () => {
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='nodes-status-filter-button']")).toHaveText("Status: All");
+        });
+
+        test("deselecting a status hides matching nodes", async () => {
+            await page.locator("[data-test-id='nodes-status-filter-button']").click();
+            await page.locator("[data-test-id='nodes-status-filter-item-NotReady']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='node-row']").filter({ hasText: "node-notready" })).toHaveCount(0);
+            await expect(page.locator("[data-test-id='nodes-status-filter-button']")).toHaveText("Status: 2 selected");
+        });
+
+        test("selecting only one status shows just those nodes", async () => {
+            await page.locator("[data-test-id='nodes-status-filter-button']").click();
+            // NotReady is already off from the previous test; turn Unknown off so only Ready remains.
+            await page.locator("[data-test-id='nodes-status-filter-item-Unknown']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='node-row'] td:first-child")).toHaveText("node-ready");
+            await expect(page.locator("[data-test-id='nodes-status-filter-button']")).toHaveText("Status: 1 selected");
+        });
+
+        test("deselecting every status shows the no-match message", async () => {
+            await page.locator("[data-test-id='nodes-status-filter-button']").click();
+            await page.locator("[data-test-id='nodes-status-filter-item-Ready']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-nodes-match']")).toBeVisible();
+        });
+
+        test("re-selecting statuses restores matching nodes", async () => {
+            await page.locator("[data-test-id='nodes-status-filter-button']").click();
+            for (const status of ["Ready", "NotReady", "Unknown"]) {
+                await page.locator(`[data-test-id='nodes-status-filter-item-${status}']`).click();
+            }
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='nodes-status-filter-button']")).toHaveText("Status: All");
+        });
+    });
+
     // ── Breadcrumbs ─────────────────────────────────────────────────────────────
 
     test.describe("breadcrumbs", () => {
