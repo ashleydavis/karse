@@ -12,6 +12,7 @@ Backed by: `GET /api/cluster/nodes`, `backend/src/routes/cluster-route.ts`, `bac
 - Status is derived from the node's `Ready` condition; roles are parsed from `node-role.kubernetes.io/<role>` labels and sorted.
 - The table columns are Name, Status (Ready/NotReady/Unknown chip), Roles, Version, Age, Labels.
 - The Labels column renders each node's labels as compact `key=value` chips (a muted dash when none) and participates in the table's fuzzy search.
+- A stats header above the table shows Total / Healthy / Error chips for the current scope; Healthy counts `Ready` nodes, Error counts the rest (see `resource-stats`).
 - Column headers sort; a search box filters rows (see `resource-search`).
 - Each row links to the node detail page (see `clickable-resource-rows`).
 

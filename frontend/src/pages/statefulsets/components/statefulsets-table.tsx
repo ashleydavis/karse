@@ -32,6 +32,8 @@ import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
+import { ResourceStatsHeader } from "../../../components/resource-stats-header";
+import { computeStatefulSetStats } from "../../../lib/resource-stats";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -112,6 +114,7 @@ export function StatefulSetsTable() {
 
     const rows = table.getRowModel().rows;
     const all = data?.statefulSets ?? [];
+    const stats = computeStatefulSetStats(all);
 
     // Renders the appropriate sort direction icon for a column header.
     function SortIcon({ columnId }: { columnId: string }) {
@@ -128,6 +131,7 @@ export function StatefulSetsTable() {
 
     return (
         <div className="flex flex-col gap-2">
+            <ResourceStatsHeader stats={stats} testIdPrefix="statefulsets" />
             <TextField
                 size="small"
                 placeholder="Search stateful sets..."

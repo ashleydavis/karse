@@ -35,6 +35,8 @@ import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { statusColumnFilterFn, makeStatusFilterController } from "../../../lib/status-filter-state";
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
+import { ResourceStatsHeader } from "../../../components/resource-stats-header";
+import { computeNodeStats } from "../../../lib/resource-stats";
 
 function formatAge(createdAt: string): string {
     const ms = Date.now() - new Date(createdAt).getTime();
@@ -170,6 +172,7 @@ export function NodesTable() {
 
     const rows = table.getRowModel().rows;
     const allNodes = data?.nodes ?? [];
+    const stats = computeNodeStats(allNodes);
 
     function SortIcon({ columnId }: { columnId: string }) {
         const col = table.getColumn(columnId);
@@ -181,6 +184,7 @@ export function NodesTable() {
 
     return (
         <div className="flex flex-col gap-2">
+            <ResourceStatsHeader stats={stats} testIdPrefix="nodes" />
             <div className="flex flex-row gap-2 items-center">
                 <TextField
                     size="small"

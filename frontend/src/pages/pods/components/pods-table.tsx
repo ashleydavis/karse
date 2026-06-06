@@ -36,6 +36,8 @@ import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { statusColumnFilterFn, makeStatusFilterController } from "../../../lib/status-filter-state";
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
+import { ResourceStatsHeader } from "../../../components/resource-stats-header";
+import { computePodStats } from "../../../lib/resource-stats";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -233,6 +235,7 @@ export function PodsTable() {
 
     const rows = table.getRowModel().rows;
     const allPods = data?.pods ?? [];
+    const stats = computePodStats(allPods);
 
     function SortIcon({ columnId }: { columnId: string }) {
         const col = table.getColumn(columnId);
@@ -248,6 +251,7 @@ export function PodsTable() {
 
     return (
         <div className="flex flex-col gap-2">
+            <ResourceStatsHeader stats={stats} testIdPrefix="pods" />
             <div className="flex flex-row gap-2 items-center">
                 <TextField
                     size="small"

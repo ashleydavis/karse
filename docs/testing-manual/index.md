@@ -41,6 +41,7 @@ Single-test-cluster discipline (per `readme.md`): there is only ever ONE test cl
 | [events-feed](./events-feed/index.md) | Recent cluster events view. |
 | [errors-feed](./errors-feed/index.md) | Warning events and problem pods. |
 | [resource-search](./resource-search/index.md) | Fuzzy search and column sorting. |
+| [resource-stats](./resource-stats/index.md) | Per-page Total / Healthy / Error stats header on each resource list page. |
 | [quick-find](./quick-find/index.md) | Header context and namespace dropdown pickers. |
 | [guided-commands](./guided-commands/index.md) | Copy-only kubectl command suggestions. |
 | [yaml-viewer](./yaml-viewer/index.md) | Raw YAML sub tab on resource detail pages. |

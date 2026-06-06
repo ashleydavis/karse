@@ -196,6 +196,12 @@ test.describe("karse e2e", () => {
                 expect(age.trim().length).toBeGreaterThan(0);
             }
         });
+
+        test("stats header shows total/healthy/error counts (3 nodes, 2 Ready, 1 NotReady)", async () => {
+            await expect(page.locator("[data-test-id='nodes-stats-total']")).toHaveText("Total: 3");
+            await expect(page.locator("[data-test-id='nodes-stats-healthy']")).toHaveText("Healthy: 2");
+            await expect(page.locator("[data-test-id='nodes-stats-error']")).toHaveText("Error: 1");
+        });
     });
 
     // ── Sort ──────────────────────────────────────────────────────────────────
@@ -1001,6 +1007,12 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='deployment-row'] td:first-child")).toHaveText("nginx");
         });
 
+        test("stats header shows total/healthy/error (1 deployment, ready 2/2)", async () => {
+            await expect(page.locator("[data-test-id='deployments-stats-total']")).toHaveText("Total: 1");
+            await expect(page.locator("[data-test-id='deployments-stats-healthy']")).toHaveText("Healthy: 1");
+            await expect(page.locator("[data-test-id='deployments-stats-error']")).toHaveText("Error: 0");
+        });
+
         test("search filters deployment rows", async () => {
             await page.locator("[data-test-id='deployments-search'] input").fill("zzznotfound");
             await expect(page.locator("[data-test-id='no-deployments-match']")).toBeVisible();
@@ -1105,6 +1117,12 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='statefulset-row'] td:first-child")).toHaveText("postgres");
         });
 
+        test("stats header shows total/healthy/error (1 stateful set, ready 1/1)", async () => {
+            await expect(page.locator("[data-test-id='statefulsets-stats-total']")).toHaveText("Total: 1");
+            await expect(page.locator("[data-test-id='statefulsets-stats-healthy']")).toHaveText("Healthy: 1");
+            await expect(page.locator("[data-test-id='statefulsets-stats-error']")).toHaveText("Error: 0");
+        });
+
         test("clicking a stateful set row navigates to its detail URL", async () => {
             await page.locator("[data-test-id='statefulset-row']").click();
             await expect(page).toHaveURL(/\/statefulsets\/default\/postgres/);
@@ -1182,6 +1200,12 @@ test.describe("karse e2e", () => {
         test("shows a row for the fake daemon set", async () => {
             await expect(page.locator("[data-test-id='daemonset-row']")).toHaveCount(1);
             await expect(page.locator("[data-test-id='daemonset-row'] td:first-child")).toHaveText("fluentd");
+        });
+
+        test("stats header shows total/healthy/error (1 daemon set, 2/2 ready)", async () => {
+            await expect(page.locator("[data-test-id='daemonsets-stats-total']")).toHaveText("Total: 1");
+            await expect(page.locator("[data-test-id='daemonsets-stats-healthy']")).toHaveText("Healthy: 1");
+            await expect(page.locator("[data-test-id='daemonsets-stats-error']")).toHaveText("Error: 0");
         });
 
         test("clicking a daemon set row navigates to its detail URL", async () => {
@@ -1818,6 +1842,12 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
         });
 
+        test("stats header shows total/healthy/error (2 pods, 1 Running, 1 Pending)", async () => {
+            await expect(page.locator("[data-test-id='pods-stats-total']")).toHaveText("Total: 2");
+            await expect(page.locator("[data-test-id='pods-stats-healthy']")).toHaveText("Healthy: 1");
+            await expect(page.locator("[data-test-id='pods-stats-error']")).toHaveText("Error: 0");
+        });
+
         test("shows the container count for a multi-container pod", async () => {
             const row = page.locator("[data-test-id='pod-row']").filter({ hasText: "nginx-abc" });
             await expect(row.locator("[data-test-id='pod-container-count']")).toHaveText("3");
@@ -1901,6 +1931,14 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
             await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "nginx-abc" })).toBeVisible();
             await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "redis-xyz" })).toHaveCount(0);
+        });
+
+        test("stats header reflects the namespace scope after refetch", async () => {
+            // Scoped to the default namespace the list refetched to a single
+            // Running pod, so the stats recompute from the new data.
+            await expect(page.locator("[data-test-id='pods-stats-total']")).toHaveText("Total: 1");
+            await expect(page.locator("[data-test-id='pods-stats-healthy']")).toHaveText("Healthy: 1");
+            await expect(page.locator("[data-test-id='pods-stats-error']")).toHaveText("Error: 0");
         });
     });
 

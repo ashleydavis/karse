@@ -32,6 +32,8 @@ import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
+import { ResourceStatsHeader } from "../../../components/resource-stats-header";
+import { computeDeploymentStats } from "../../../lib/resource-stats";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -114,6 +116,7 @@ export function DeploymentsTable() {
 
     const rows = table.getRowModel().rows;
     const all = data?.deployments ?? [];
+    const stats = computeDeploymentStats(all);
 
     // Renders the appropriate sort direction icon for a column header.
     function SortIcon({ columnId }: { columnId: string }) {
@@ -130,6 +133,7 @@ export function DeploymentsTable() {
 
     return (
         <div className="flex flex-col gap-2">
+            <ResourceStatsHeader stats={stats} testIdPrefix="deployments" />
             <TextField
                 size="small"
                 placeholder="Search deployments..."
