@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { AppBar, Toolbar, IconButton, Alert, Tooltip, Box, Menu, MenuItem, ListItemIcon, ListItemText, Chip } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLink, faLayerGroup, faSun, faMoon, faCircleHalfStroke, faCheck, faShareNodes, faRotate } from "@fortawesome/free-solid-svg-icons";
@@ -19,21 +19,19 @@ export function Header() {
     const qc = useQueryClient();
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
     const [copied, setCopied] = useState(false);
-    const [contextPickerAnchor, setContextPickerAnchor] = useState<HTMLElement | null>(null);
-    const [namespacePickerAnchor, setNamespacePickerAnchor] = useState<HTMLElement | null>(null);
-    const contextButtonRef = useRef<HTMLButtonElement | null>(null);
-    const namespaceButtonRef = useRef<HTMLButtonElement | null>(null);
+    const [contextPickerOpen, setContextPickerOpen] = useState(false);
+    const [namespacePickerOpen, setNamespacePickerOpen] = useState(false);
 
     // Keyboard shortcuts to open the pickers, anchored to their header buttons.
     useEffect(() => {
         function onKey(e: KeyboardEvent): void {
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "K") {
                 e.preventDefault();
-                setNamespacePickerAnchor(namespaceButtonRef.current);
+                setNamespacePickerOpen(true);
             }
             else if ((e.ctrlKey || e.metaKey) && e.key === "k") {
                 e.preventDefault();
-                setContextPickerAnchor(contextButtonRef.current);
+                setContextPickerOpen(true);
             }
         }
         window.addEventListener("keydown", onKey);
@@ -70,26 +68,32 @@ export function Header() {
                     )}
                     <Box sx={{ flexGrow: 1 }} />
                     <ContextPicker contexts={contexts} current={current} onSwitch={switchTo} />
-                    <Tooltip title="Context picker (Ctrl+K)">
+                    <ContextQuickPicker
+                        open={contextPickerOpen}
+                        onClose={() => setContextPickerOpen(false)}
+                    >
                         <IconButton
                             size="small"
-                            ref={contextButtonRef}
-                            onClick={(e) => setContextPickerAnchor(e.currentTarget)}
+                            onClick={() => setContextPickerOpen(true)}
                             aria-label="context picker"
+                            title="Context picker (Ctrl+K)"
                         >
                             <FontAwesomeIcon icon={faLink} />
                         </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Namespace picker (Ctrl+Shift+K)">
+                    </ContextQuickPicker>
+                    <NamespaceQuickPicker
+                        open={namespacePickerOpen}
+                        onClose={() => setNamespacePickerOpen(false)}
+                    >
                         <IconButton
                             size="small"
-                            ref={namespaceButtonRef}
-                            onClick={(e) => setNamespacePickerAnchor(e.currentTarget)}
+                            onClick={() => setNamespacePickerOpen(true)}
                             aria-label="namespace picker"
+                            title="Namespace picker (Ctrl+Shift+K)"
                         >
                             <FontAwesomeIcon icon={faLayerGroup} />
                         </IconButton>
-                    </Tooltip>
+                    </NamespaceQuickPicker>
                     <Tooltip title="Color mode">
                         <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)} aria-label="color mode">
                             <FontAwesomeIcon icon={colorModeIcon} />
@@ -124,14 +128,6 @@ export function Header() {
                     </Tooltip>
                 </Toolbar>
             </AppBar>
-            <ContextQuickPicker
-                anchorEl={contextPickerAnchor}
-                onClose={() => setContextPickerAnchor(null)}
-            />
-            <NamespaceQuickPicker
-                anchorEl={namespacePickerAnchor}
-                onClose={() => setNamespacePickerAnchor(null)}
-            />
             {error !== null && (
                 <Alert severity="error" sx={{ borderRadius: 0 }}>
                     {error.message}

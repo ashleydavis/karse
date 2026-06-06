@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactElement } from "react";
 import {
-    Popover,
+    Tooltip,
+    ClickAwayListener,
     TextField,
     List,
     ListItemButton,
@@ -20,16 +21,17 @@ import { fetchNamespaces } from "../lib/api-client";
 
 // Dropdown picker for selecting a namespace, anchored to the header button.
 type Props = {
-    anchorEl: HTMLElement | null;
+    open: boolean;
     onClose: () => void;
+    children: ReactElement;
 };
 
-// Renders the namespace picker as a nav-bar dropdown anchored to its trigger button.
-export function NamespaceQuickPicker({ anchorEl, onClose }: Props) {
+// Renders the namespace picker as a nav-bar dropdown anchored to its trigger button,
+// using a MUI Tooltip so the dropdown gets a built-in arrow pointing at the button.
+export function NamespaceQuickPicker({ open, onClose, children }: Props) {
     const { current: context } = useKubeContext();
     const { namespace: currentNamespace, setNamespace } = useKubeNamespace();
     const [query, setQuery] = useState("");
-    const open = anchorEl !== null;
 
     useEffect(() => {
         if (open) {
@@ -53,16 +55,10 @@ export function NamespaceQuickPicker({ anchorEl, onClose }: Props) {
         onClose();
     }
 
-    return (
-        <Popover
-            open={open}
-            anchorEl={anchorEl}
-            onClose={onClose}
-            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-            transformOrigin={{ vertical: "top", horizontal: "right" }}
-            slotProps={{ paper: { sx: { width: 360 } } }}
-        >
-            <Box data-test-id="namespace-quick-picker-dropdown">
+    // The picker content rendered inside the Tooltip surface.
+    const content = (
+        <ClickAwayListener onClickAway={onClose}>
+            <Box data-test-id="namespace-quick-picker-dropdown" sx={{ width: 360 }}>
                 <Box sx={{ p: 2 }}>
                     <TextField
                         autoFocus
@@ -127,6 +123,51 @@ export function NamespaceQuickPicker({ anchorEl, onClose }: Props) {
                     )}
                 </Box>
             </Box>
-        </Popover>
+        </ClickAwayListener>
+    );
+
+    return (
+        <Tooltip
+            open={open}
+            onClose={onClose}
+            title={content}
+            arrow
+            placement="bottom-end"
+            disableFocusListener
+            disableHoverListener
+            disableTouchListener
+            slotProps={{
+                // No enter/exit animation so the dropdown is positioned and stable
+                // immediately (matching the previous Popover and keeping clicks reliable).
+                transition: { timeout: 0 },
+                tooltip: {
+                    sx: (theme) => ({
+                        bgcolor: "background.paper",
+                        color: "text.primary",
+                        p: 0,
+                        maxWidth: "none",
+                        boxShadow: 3,
+                        borderRadius: 1,
+                        // A divider-coloured border so the panel edges stay visible in dark
+                        // mode, where the panel shares the nav bar's background colour.
+                        border: `1px solid ${theme.palette.divider}`,
+                    }),
+                },
+                arrow: {
+                    sx: (theme) => ({
+                        color: "background.paper",
+                        // A soft drop shadow on the arrow so its edges read against the
+                        // page, plus a divider-coloured border on its two outer edges so the
+                        // arrow stays visible in dark mode (matching the panel border).
+                        "&::before": {
+                            boxShadow: 1,
+                            border: `1px solid ${theme.palette.divider}`,
+                        },
+                    }),
+                },
+            }}
+        >
+            {children}
+        </Tooltip>
     );
 }

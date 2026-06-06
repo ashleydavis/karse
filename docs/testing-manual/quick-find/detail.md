@@ -24,6 +24,8 @@ Two KWOK clusters run simultaneously so the context picker has more than one ent
 - **All namespaces**: clicking `All namespaces` clears the selection and removes the header namespace chip.
 - **Keyboard shortcuts**: Ctrl+K opens the context dropdown, Ctrl+Shift+K opens the namespace dropdown, and Escape closes either.
 - **Click-away closes the picker**: clicking outside the open dropdown closes it.
+- **Arrow points at the trigger**: each open dropdown shows a small arrow (the built-in MUI Tooltip arrow) between the trigger button and the dropdown body, visually pointing back up at the button that opened it. No hand-rolled CSS beak.
+- **Border visible in both modes**: the dropdown panel (and its arrow) has a clear border so its edges stay visible in dark mode, where the panel shares the nav bar's background colour. Switch the app to dark mode, open each picker, and confirm the panel edges and arrow are clearly visible against the nav bar behind them.
 
 Teardown:
 

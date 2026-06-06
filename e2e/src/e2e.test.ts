@@ -655,6 +655,32 @@ test.describe("karse e2e", () => {
             await closePicker();
         });
 
+        test("renders a MUI arrow pointing at the trigger button", async () => {
+            await openPicker();
+            // The arrow is the built-in MUI Tooltip arrow (.MuiTooltip-arrow), not a hand-rolled CSS beak.
+            const arrow = page.locator(".MuiTooltip-arrow");
+            await expect(arrow).toBeVisible();
+            const arrowBox = await arrow.boundingBox();
+            const buttonBox = await page.locator("[aria-label='context picker']").boundingBox();
+            const dropdownBox = await page.locator("[data-test-id='context-quick-picker-dropdown']").boundingBox();
+            expect(arrowBox).not.toBeNull();
+            expect(buttonBox).not.toBeNull();
+            expect(dropdownBox).not.toBeNull();
+            // The arrow sits between the button and the dropdown body, pointing up at the button.
+            expect(arrowBox!.y).toBeGreaterThanOrEqual(buttonBox!.y);
+            expect(arrowBox!.y).toBeLessThanOrEqual(dropdownBox!.y + 1);
+            // The dropdown panel has a visible border so its edges (and the arrow) stay
+            // visible in dark mode, where the panel shares the nav bar's background colour.
+            const panelBorder = await page.locator(".MuiTooltip-tooltip").evaluate((el) => {
+                const style = window.getComputedStyle(el);
+                return { width: style.borderTopWidth, color: style.borderTopColor };
+            });
+            expect(parseFloat(panelBorder.width)).toBeGreaterThan(0);
+            expect(panelBorder.color).not.toBe("rgba(0, 0, 0, 0)");
+            expect(panelBorder.color).not.toBe("transparent");
+            await closePicker();
+        });
+
         test("shows both clusters", async () => {
             await openPicker();
             const rows = page.locator("[data-test-id='context-quick-picker-row']");
@@ -717,6 +743,32 @@ test.describe("karse e2e", () => {
         test("opens with the Ctrl+Shift+K keyboard shortcut", async () => {
             await page.keyboard.press("Control+Shift+K");
             await expect(page.locator("[data-test-id='namespace-quick-picker-dropdown']")).toBeVisible();
+            await closePicker();
+        });
+
+        test("renders a MUI arrow pointing at the trigger button", async () => {
+            await openPicker();
+            // The arrow is the built-in MUI Tooltip arrow (.MuiTooltip-arrow), not a hand-rolled CSS beak.
+            const arrow = page.locator(".MuiTooltip-arrow");
+            await expect(arrow).toBeVisible();
+            const arrowBox = await arrow.boundingBox();
+            const buttonBox = await page.locator("[aria-label='namespace picker']").boundingBox();
+            const dropdownBox = await page.locator("[data-test-id='namespace-quick-picker-dropdown']").boundingBox();
+            expect(arrowBox).not.toBeNull();
+            expect(buttonBox).not.toBeNull();
+            expect(dropdownBox).not.toBeNull();
+            // The arrow sits between the button and the dropdown body, pointing up at the button.
+            expect(arrowBox!.y).toBeGreaterThanOrEqual(buttonBox!.y);
+            expect(arrowBox!.y).toBeLessThanOrEqual(dropdownBox!.y + 1);
+            // The dropdown panel has a visible border so its edges (and the arrow) stay
+            // visible in dark mode, where the panel shares the nav bar's background colour.
+            const panelBorder = await page.locator(".MuiTooltip-tooltip").evaluate((el) => {
+                const style = window.getComputedStyle(el);
+                return { width: style.borderTopWidth, color: style.borderTopColor };
+            });
+            expect(parseFloat(panelBorder.width)).toBeGreaterThan(0);
+            expect(panelBorder.color).not.toBe("rgba(0, 0, 0, 0)");
+            expect(panelBorder.color).not.toBe("transparent");
             await closePicker();
         });
 
