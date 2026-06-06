@@ -1347,51 +1347,101 @@ describe("listPods", () => {
 });
 
 describe("listNamespaces", () => {
-    test("parses a fixture with two namespaces", async () => {
-        const fixture = {
-            items: [
-                {
-                    metadata: {
-                        name: "default",
-                        labels: { "kubernetes.io/metadata.name": "default" },
-                    },
+    // Builds a minimal namespace list fixture from the given names. Pass an
+    // object instead of a bare name to attach labels for the label-parsing test.
+    function nsFixture(...names: Array<string | { name: string; labels: Record<string, string> }>): string {
+        return JSON.stringify({
+            items: names.map((entry) => {
+                const name = typeof entry === "string" ? entry : entry.name;
+                const labels = typeof entry === "string" ? undefined : entry.labels;
+                return {
+                    metadata: labels === undefined ? { name } : { name, labels },
+                };
+            }),
+        });
+    }
+
+    // Builds a minimal pod list fixture; each entry is one pod in the given namespace.
+    function podsFixture(...namespaces: string[]): string {
+        return JSON.stringify({
+            items: namespaces.map((namespace, i) => ({
+                metadata: {
+                    name: `pod-${i}`,
+                    namespace,
                 },
-                {
-                    metadata: {
-                        name: "kube-system",
-                    },
-                },
-            ],
-        };
+            })),
+        });
+    }
+
+    test("parses two namespaces, parses labels, and counts pods per namespace", async () => {
         setRunnerHandlers({
-            "--context test-ctx get namespaces -o json": () => ok(JSON.stringify(fixture)),
+            "--context test-ctx get namespaces -o json": () => ok(nsFixture(
+                { name: "default", labels: { "kubernetes.io/metadata.name": "default" } },
+                "kube-system",
+            )),
+            "--context test-ctx get pods -A -o json": () =>
+                ok(podsFixture("default", "default", "kube-system")),
         });
         const result = await listNamespaces("test-ctx");
         expect(result.length).toBe(2);
         expect(result[0]!).toEqual({
             name: "default",
             labels: { "kubernetes.io/metadata.name": "default" },
+            resourceCount: 2,
         });
         // Namespace with no labels in metadata falls back to an empty object.
         expect(result[1]!).toEqual({
             name: "kube-system",
             labels: {},
+            resourceCount: 1,
+        });
+    });
+
+    test("reports resourceCount 0 for a namespace with no pods", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get namespaces -o json": () => ok(nsFixture("default", "empty-ns")),
+            "--context test-ctx get pods -A -o json": () => ok(podsFixture("default")),
+        });
+        const result = await listNamespaces("test-ctx");
+        expect(result[1]!).toEqual({
+            name: "empty-ns",
+            labels: {},
+            resourceCount: 0,
         });
     });
 
     test("returns [] when items is empty", async () => {
         setRunnerHandlers({
-            "--context test-ctx get namespaces -o json": () => ok(JSON.stringify({
-                items: [],
-            })),
+            "--context test-ctx get namespaces -o json": () => ok(nsFixture()),
+            "--context test-ctx get pods -A -o json": () => ok(podsFixture()),
         });
         const result = await listNamespaces("test-ctx");
         expect(result.length).toBe(0);
     });
 
-    test("throws on non-zero exit", async () => {
+    test("a failed pod count does not break the table (resourceCount null)", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get namespaces -o json": () => ok(nsFixture("default", "kube-system")),
+            "--context test-ctx get pods -A -o json": () => fail("forbidden"),
+        });
+        const result = await listNamespaces("test-ctx");
+        expect(result.length).toBe(2);
+        expect(result[0]!).toEqual({
+            name: "default",
+            labels: {},
+            resourceCount: null,
+        });
+        expect(result[1]!).toEqual({
+            name: "kube-system",
+            labels: {},
+            resourceCount: null,
+        });
+    });
+
+    test("throws on non-zero exit of the namespace query", async () => {
         setRunnerHandlers({
             "--context test-ctx get namespaces -o json": () => fail("denied"),
+            "--context test-ctx get pods -A -o json": () => ok(podsFixture()),
         });
         await expect(listNamespaces("test-ctx")).rejects.toThrow("denied");
     });

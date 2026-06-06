@@ -8,7 +8,8 @@ Backed by: `GET /api/namespaces`, `POST /api/namespaces/default`, `backend/src/r
 
 ## Behaviour
 
-- `GET /api/namespaces?context=<ctx>` returns `{ namespaces: Namespace[] }` (each `{ name, labels }`, where `labels` is the namespace's `metadata.labels`, an empty object when none). It responds 400 when `context` is missing or blank, and 500 with kubectl's stderr on failure.
+- `GET /api/namespaces?context=<ctx>` returns `{ namespaces: Namespace[] }` (each `{ name, labels, resourceCount }`, where `labels` is the namespace's `metadata.labels`, an empty object when none). It responds 400 when `context` is missing or blank, and 500 with kubectl's stderr on failure.
+- **Resource count.** `resourceCount` is the number of **pods** in the namespace. "Resources" is defined as pods: pods are the unit of running workload, present in every namespace, and already the count surfaced on the cluster overview, so the two views stay consistent. The counts come from a single cluster-wide `kubectl get pods -A` call (not one call per namespace), so the cost does not grow with namespace count. The pod query runs in parallel with the namespace list and is tolerated: if it fails, every namespace is still returned with `resourceCount: null` and the table renders, showing an em-dash in that column. The namespaces page shows a sortable **Resources** column with the per-namespace count.
 - `POST /api/namespaces/default` with body `{ context, namespace }` sets the context's default namespace via `kubectl config set-context <ctx> --namespace=<ns>`, or clears it via `kubectl config unset contexts.<ctx>.namespace` when `namespace` is an empty string. Returns `{ ok: true }`. Responds 400 when `context` is blank or `namespace` is not a string.
 - The **active** namespace is tab-local (`kube-namespace.tsx`), resets on reload, and is included in query keys so changing it refetches scoped views.
 - When an active namespace is set, list views (pods, deployments, etc.) are scoped to it; when none is set, views show all namespaces (`-A`). The pods table's Namespace column is always rendered regardless of the active namespace.
@@ -25,6 +26,7 @@ Backed by: `GET /api/namespaces`, `POST /api/namespaces/default`, `backend/src/r
 - [x] The namespaces page sets/clears active and default per namespace, with chips.
 - [x] The namespaces page has a Labels column showing each namespace's labels as key=value chips, searchable.
 - [x] A `Ctrl+Shift+K` header quick-picker selects a namespace or clears the selection via "All namespaces".
+- [x] The namespaces page shows a Resources column with the per-namespace pod count, defined and documented as pods, computed without a per-namespace call, and a failure to count does not break the table (shows an em-dash).
 
 ## Open Questions
 

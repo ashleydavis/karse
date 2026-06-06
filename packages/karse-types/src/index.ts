@@ -34,9 +34,12 @@ export type ClusterOverview = {
 };
 
 // A single Kubernetes namespace in the active cluster.
+// resourceCount is the number of pods in the namespace, or null when the count
+// could not be determined (the pod query failed) so the table still renders.
 export type Namespace = {
     name: string;
     labels: Record<string, string>;  // metadata.labels; empty object when none
+    resourceCount: number | null;
 };
 
 // Response body for GET /api/namespaces.

@@ -185,7 +185,7 @@ echo "OK"
 
 echo "--- GET /api/namespaces ---"
 curl -fsS "$BASE/api/namespaces?context=$CURRENT_CTX" \
-    | jq -e 'has("namespaces")' \
+    | jq -e 'has("namespaces") and (.namespaces | all(has("name") and has("resourceCount")))' \
     > /dev/null
 echo "OK"
 

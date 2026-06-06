@@ -35,16 +35,16 @@ beforeEach(() => {
 describe("GET /api/namespaces", () => {
     test("happy path returns namespace list", async () => {
         kubectlMocks.listNamespaces.mockResolvedValue([
-            { name: "default" },
-            { name: "kube-system" },
+            { name: "default", resourceCount: 3 },
+            { name: "kube-system", resourceCount: 8 },
         ]);
         const res = await fetch(`http://127.0.0.1:${port}/api/namespaces?context=my-ctx`);
         const body = await res.json();
         expect(res.status).toBe(200);
         expect(body).toEqual({
             namespaces: [
-                { name: "default" },
-                { name: "kube-system" },
+                { name: "default", resourceCount: 3 },
+                { name: "kube-system", resourceCount: 8 },
             ],
         });
         expect(kubectlMocks.listNamespaces).toHaveBeenCalledWith("my-ctx");

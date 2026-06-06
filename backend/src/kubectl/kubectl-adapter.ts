@@ -57,17 +57,46 @@ export async function setCurrentContext(name: string): Promise<void> {
     }
 }
 
-// Returns every namespace in the cluster for the given context.
+// Returns every namespace in the cluster for the given context, each annotated
+// with its resource count (number of pods in the namespace). The pod count comes
+// from a single "get pods -A" call rather than one call per namespace, so the cost
+// does not grow with the number of namespaces. The pod query is fetched in parallel
+// and tolerated: if it fails, namespaces are still returned with resourceCount=null
+// so the table renders regardless. Throws only when the namespace list itself fails.
 export async function listNamespaces(context: string): Promise<Namespace[]> {
-    const result = await kubectl(["--context", context, "get", "namespaces", "-o", "json"]);
-    if (result.exitCode !== 0) {
-        throw new Error(result.stderr);
+    const [nsResult, podsResult] = await Promise.allSettled([
+        kubectl(["--context", context, "get", "namespaces", "-o", "json"]),
+        kubectl(["--context", context, "get", "pods", "-A", "-o", "json"]),
+    ]);
+
+    if (nsResult.status === "rejected") {
+        throw nsResult.reason;
     }
-    const data = JSON.parse(result.stdout);
-    return (data.items as any[]).map((item) => ({
-        name: item.metadata.name,
-        labels: item.metadata.labels ?? {},
-    }));
+    if (nsResult.value.exitCode !== 0) {
+        throw new Error(nsResult.value.stderr);
+    }
+    const nsData = JSON.parse(nsResult.value.stdout);
+
+    // Build a name -> pod count map from the pods query. When the query failed,
+    // counts stays null and every namespace reports resourceCount=null.
+    let counts: Map<string, number> | null = null;
+    if (podsResult.status === "fulfilled" && podsResult.value.exitCode === 0) {
+        counts = new Map<string, number>();
+        const podItems: any[] = JSON.parse(podsResult.value.stdout).items ?? [];
+        for (const pod of podItems) {
+            const ns: string = pod.metadata?.namespace ?? "";
+            counts.set(ns, (counts.get(ns) ?? 0) + 1);
+        }
+    }
+
+    return (nsData.items as any[]).map((item) => {
+        const name: string = item.metadata.name;
+        return {
+            name,
+            labels: item.metadata.labels ?? {},
+            resourceCount: counts === null ? null : (counts.get(name) ?? 0),
+        };
+    });
 }
 
 // Sets the default namespace for the given context in the local kubeconfig.

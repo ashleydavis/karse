@@ -72,6 +72,18 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
             enableSorting: false,
         },
         {
+            accessorKey: "resourceCount",
+            header: "Resources",
+            cell: (info) => {
+                const count = info.getValue<number | null>();
+                return (
+                    <span data-test-id="namespace-resource-count">
+                        {count === null ? "—" : count}
+                    </span>
+                );
+            },
+        },
+        {
             id: "action",
             header: "Actions",
             enableSorting: false,

@@ -522,6 +522,17 @@ test.describe("karse e2e", () => {
             expect(names.some((n) => n.includes("kube-system"))).toBe(true);
         });
 
+        test("shows a Resources column with a numeric count per namespace", async () => {
+            await expect(
+                page.locator("[data-test-id='namespaces-list'] thead th").filter({ hasText: "Resources" })
+            ).toBeVisible();
+            const counts = await page.locator("[data-test-id='namespace-resource-count']").allTextContents();
+            expect(counts.length).toBeGreaterThan(0);
+            // Every cell is either a non-negative integer or the em-dash placeholder
+            // shown when the count could not be determined.
+            expect(counts.every((c) => c === "—" || /^\d+$/.test(c.trim()))).toBe(true);
+        });
+
         // Every namespace carries the auto-applied kubernetes.io/metadata.name
         // label, and the Labels column participates in the search, so a bare
         // "kube" now matches every row. Filter on "kube-system" instead: that

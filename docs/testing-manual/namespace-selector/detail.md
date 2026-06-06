@@ -44,3 +44,17 @@ Each fixture stands up a `karse-test` KWOK cluster; select the `kwok-karse-test`
 - On `/namespaces`, "Set as active" shows the `active` chip; "Set as default" shows the `default` chip (tab-local active vs persisted default).
 - With `team-1` active, exactly 4 pods are shown.
 - "All namespaces" clears the selection; all 20 pods appear and the header namespace chip is removed.
+
+## Scenario D: Resource-count column
+
+**Fixture:** [_fixtures-kwok/09-many-pods-many-namespaces](../_fixtures-kwok/09-many-pods-many-namespaces/) (any pods fixture works)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/09-many-pods-many-namespaces/setup.sh
+```
+
+### What to check
+- On `/namespaces`, the table has a **Resources** column. The count is the number of pods in that namespace.
+- With the fixture above, each `team-N` namespace shows `4`; namespaces with no pods show `0`.
+- Clicking the **Resources** header sorts the table by count.
+- The column does not block the table: namespaces render even before/if the pod count is unavailable. When a count cannot be determined the cell shows an em-dash (`—`) rather than breaking the row.
