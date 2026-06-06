@@ -94,6 +94,7 @@ Click a column header to sort; type in the search box to filter rows. Use the **
 
 A table of namespaces for the active context.
 
+- **Resources** column: the number of pods in each namespace. Click the header to sort by count. If the count cannot be determined it shows an em-dash (`—`); the table still lists the namespaces.
 - **Set as active / Clear active**: sets or clears the tab-local namespace selection.
 - **Set as default / Clear default**: writes or removes the default namespace for this context in your kubeconfig.
 - **active** chip: this namespace is currently active in the tab.

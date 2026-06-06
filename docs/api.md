@@ -122,7 +122,7 @@ curl -fsS http://127.0.0.1:5172/api/cluster/nodes
 Lists all namespaces in the cluster for the given context.
 
 - **Request query**: `context` (required) — the kubeconfig context name.
-- **Response 200**: `NamespacesResponse` — `{ "namespaces": Namespace[] }`.
+- **Response 200**: `NamespacesResponse` — `{ "namespaces": Namespace[] }`, where each `Namespace` is `{ "name": string, "resourceCount": number | null }`. `resourceCount` is the number of pods in the namespace, computed from a single cluster-wide `kubectl get pods -A` call; it is `null` when that pod query fails (the namespace list is still returned so the table renders).
 - **Response 400**: `{ "error": "context query parameter is required" }` when `context` is missing or blank.
 - **Response 500**: `{ "error": "<kubectl stderr>" }` when listing namespaces fails.
 
@@ -133,8 +133,8 @@ curl -fsS 'http://127.0.0.1:5172/api/namespaces?context=my-ctx'
 ```json
 {
   "namespaces": [
-    { "name": "default" },
-    { "name": "kube-system" }
+    { "name": "default", "resourceCount": 3 },
+    { "name": "kube-system", "resourceCount": 8 }
   ]
 }
 ```
