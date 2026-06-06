@@ -235,8 +235,8 @@ function buildColumns(): ColumnDef<Pod>[] {
 }
 
 // Sortable, filterable table of Kubernetes pods for the active context.
-// When a namespace is selected it scopes the query; otherwise shows all namespaces
-// and includes a Namespace column.
+// When a namespace is selected it scopes the query; otherwise shows all namespaces.
+// The Namespace column is always rendered regardless of the active namespace.
 export function PodsTable() {
     const { current } = useKubeContext();
     const { namespace } = useKubeNamespace();

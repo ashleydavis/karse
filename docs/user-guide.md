@@ -101,7 +101,7 @@ A table of namespaces for the active context.
 
 ## Pods page (`/pods`)
 
-A table of pods for the active context. When a namespace is active, pods are scoped to that namespace and the Namespace column is hidden. When no namespace is selected, all pods across all namespaces are shown.
+A table of pods for the active context. When a namespace is active, pods are scoped to that namespace; when no namespace is selected, all pods across all namespaces are shown. The Namespace column is always shown regardless of the active namespace.
 
 ## Environment variables
 
