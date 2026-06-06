@@ -246,7 +246,7 @@ Mock modules using Jest `__mocks__` directories adjacent to the module being moc
 
 ## Read-only kubectl invariant
 
-The kubectl adapter exposes only specific named functions. There is no "run any kubectl" interface. Create/write/edit cluster commands must never be added. This invariant is enforced by code structure and documented in [claude.md](claude.md) and [docs/architecture.md](docs/architecture.md).
+The kubectl adapter exposes only specific named functions. There is no "run any kubectl" interface. Create/write/edit cluster commands must never be added. This invariant is enforced by code structure and documented in [docs/rules/security.md](docs/rules/security.md) and [docs/architecture.md](docs/architecture.md).
 
 ## Audit log
 
