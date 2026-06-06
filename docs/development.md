@@ -22,7 +22,7 @@ mise install # install the pinned Bun version
 
 ### Installing kwokctl
 
-[kwok](https://kwok.sigs.k8s.io) is only needed to run the manual-testing scenarios under [`docs/manual-testing/`](docs/manual-testing/) and the smoke/e2e tests; Karse itself does not require it. A kwok release ships two binaries (`kwok` and `kwokctl`); the test scripts only use `kwokctl`.
+[kwok](https://kwok.sigs.k8s.io) is only needed to run the testing manual's KWOK fixtures under [`docs/testing-manual/_fixtures-kwok/`](docs/testing-manual/_fixtures-kwok/FIXTURES.md) and the smoke/e2e tests; Karse itself does not require it. A kwok release ships two binaries (`kwok` and `kwokctl`); the test scripts only use `kwokctl`.
 
 Install `kwokctl` manually (pinned to `v0.7.0`):
 
@@ -42,10 +42,10 @@ On macOS you can instead use Homebrew, which installs both binaries:
 brew install kwok
 ```
 
-To remove every test cluster at once (after running scenarios, or to clean up leftovers from an interrupted run), use [`docs/manual-testing/kwok/teardown-all.sh`](docs/manual-testing/kwok/teardown-all.sh), which deletes all `karse-test*` clusters:
+To remove every test cluster at once (after running fixtures, or to clean up leftovers from an interrupted run), use [`docs/testing-manual/_fixtures-kwok/teardown-all.sh`](docs/testing-manual/_fixtures-kwok/teardown-all.sh), which deletes all `karse-test*` clusters:
 
 ```sh
-./docs/manual-testing/kwok/teardown-all.sh
+./docs/testing-manual/_fixtures-kwok/teardown-all.sh
 ```
 
 ## Setting up
@@ -219,7 +219,7 @@ Font Awesome via `@fortawesome/react-fontawesome`. Import the icon objects you n
 
 Every backend non-React TypeScript module has unit tests under `backend/src/tests/` mirroring the source tree. The sole exception is `index.ts` (pure bootstrap wiring, covered by `scripts/smoke-tests.sh`).
 
-Frontend React components are not unit-tested per project policy; their behaviour is exercised by the Playwright e2e suite (`bun run e2e`) and by `scripts/smoke-tests.sh`. Pure utility functions in `frontend/src/lib/*.ts` (e.g. `fuzzy-filter.ts`, `guided-commands.ts`) are unit-tested, using the same Jest + `@swc/jest` setup as the backend: tests live under `frontend/src/tests/` mirroring the source tree, run via `bun run --filter 'karse-frontend' test`, and are included in `bun run test` and `bun run tests:all`. Modules that are only side-effecting wiring (e.g. `query-client.ts`, `font-awesome.ts`) or React context/hooks (`.tsx`) are not unit-tested. The manual testing scenarios under `docs/manual-testing/` are useful for exploratory testing.
+Frontend React components are not unit-tested per project policy; their behaviour is exercised by the Playwright e2e suite (`bun run e2e`) and by `scripts/smoke-tests.sh`. Pure utility functions in `frontend/src/lib/*.ts` (e.g. `fuzzy-filter.ts`, `guided-commands.ts`) are unit-tested, using the same Jest + `@swc/jest` setup as the backend: tests live under `frontend/src/tests/` mirroring the source tree, run via `bun run --filter 'karse-frontend' test`, and are included in `bun run test` and `bun run tests:all`. Modules that are only side-effecting wiring (e.g. `query-client.ts`, `font-awesome.ts`) or React context/hooks (`.tsx`) are not unit-tested. The manual testing guides under `docs/testing-manual/` (with their KWOK fixtures under `docs/testing-manual/_fixtures-kwok/`) are useful for exploratory testing.
 
 Tests must:
 
@@ -256,6 +256,6 @@ Every kubectl call is logged to `logs/<YYYY>/<MM>/<DD>/<HH>.log` at the repo roo
 
 - [docs/architecture.md](docs/architecture.md): system layers, module seams, local-only threat model.
 - [docs/api.md](docs/api.md): every HTTP endpoint with request/response shapes and curl examples.
-- [docs/manual-testing/](docs/manual-testing/): manual testing scenarios using KWOK to simulate clusters.
+- [docs/testing-manual/](docs/testing-manual/index.md): manual testing guides (mirroring `docs/spec/` by feature ID), with reusable KWOK cluster fixtures under [docs/testing-manual/_fixtures-kwok/](docs/testing-manual/_fixtures-kwok/FIXTURES.md).
 - [docs/audit-log.md](docs/audit-log.md): audit log format, path, and retention.
 - [docs/roadmap.md](docs/roadmap.md): upcoming features and what has shipped.

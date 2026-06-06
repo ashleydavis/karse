@@ -14,7 +14,7 @@ Test setup for Karse. Every change must follow every rule below.
 
 These apply to every change.
 
-- **Every new feature or code change must add or update**: backend unit tests (Jest), smoke tests (`scripts/smoke-tests.sh`), e2e tests (`e2e/src/e2e.test.ts`), and the e2e/manual testing manual under `docs/manual-testing/`. No feature is done until these tests and documentation have been updated/extended.
+- **Every new feature or code change must add or update**: backend unit tests (Jest), smoke tests (`scripts/smoke-tests.sh`), e2e tests (`e2e/src/e2e.test.ts`), and the e2e/manual testing manual under `docs/testing-manual/` (the matching feature's `detail.md`; reusable kwok fixtures live under `docs/testing-manual/_fixtures-kwok/`). No feature is done until these tests and documentation have been updated/extended.
 - **Every new frontend feature must have e2e test coverage.** New pages, components, and interactions are not considered done until `e2e/src/e2e.test.ts` has a `test.describe` block covering them. Add `data-test-id` attributes to new elements as needed to make assertions reliable. Do not ship frontend code without corresponding e2e tests.
 - Tests **never** use `test.skip` or `describe.skip`.
 - Tests **always** use `describe` and `test`, never `it`.

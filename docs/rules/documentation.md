@@ -12,12 +12,12 @@ These live in `docs/` and must stay in sync with the code.
 - `docs/security.md`: the project's security posture.
 - `docs/roadmap.md`: planned work.
 - `docs/faq.md`: frequently asked questions.
-- `docs/manual-testing/`: the kwok-based manual/e2e testing manual (one scenario per directory).
+- `docs/testing-manual/`: the manual/e2e testing manual. Mirrors `docs/spec/` by feature ID (an `index.md` + `detail.md` per feature); the reusable kwok cluster fixtures (`setup.sh`/`teardown.sh`) live under `docs/testing-manual/_fixtures-kwok/`.
 
 ## Documentation rules
 
 These apply to every change.
 
-- Keep `docs/` guides and the manual-testing manual in sync with code changes. Any change that affects behaviour, the API, the architecture, or how the project is run must update the matching document(s) in the same change.
-- The testing manual under `docs/manual-testing/` must gain or update a scenario for every new feature (see the testing rules).
+- Keep `docs/` guides and the testing manual in sync with code changes. Any change that affects behaviour, the API, the architecture, or how the project is run must update the matching document(s) in the same change.
+- The testing manual under `docs/testing-manual/` must gain or update the matching feature's `detail.md` for every new feature, and a new `docs/testing-manual/<id>/` (mirroring `docs/spec/<id>/`) when a feature is added (see the testing rules).
 - Keep the required documents above current with every change that affects them.
