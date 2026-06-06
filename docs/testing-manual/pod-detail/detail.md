@@ -38,7 +38,7 @@ Three pods: `single-container` (1 container), `web-with-sidecars` (3 containers)
 - **Sorting**: click the `Containers` column header. Rows sort ascending by container count, then descending on a second click.
 - **Drill down - many containers**: click the `web-with-sidecars` row. On the pod detail page the Containers table lists all three containers (`app`, `envoy`, `log-shipper`) with their image, state chip, ready Yes/No, and restart count.
 - **Drill down - init container**: click the `with-init-container` row. The Containers table shows `app` and `metrics`; a separate Init Containers table shows `setup`.
-- **Per-container logs**: on `web-with-sidecars`, click "Show logs". A Container selector appears (only shown when more than one container). Switch between `app`, `envoy`, and `log-shipper` and confirm the log viewer refetches. (Under kwok, run with `KARSE_FAKE_LOGS=1` to see sample log lines.)
+- **Per-container logs**: on `web-with-sidecars`, open the Logs tab. The log viewer loads and streams automatically (no load/start button). A Container selector appears (only shown when more than one container). Switch between `app`, `envoy`, and `log-shipper` and confirm the stream restarts for the selected container. (Under kwok, run with `KARSE_FAKE_LOGS=1` to see sample log lines.)
 
 ## Scenario C: Pod detail tabs (Detail / Status, Containers, Logs)
 
@@ -70,10 +70,10 @@ One multi-container pod plus an init container.
 
 ### Logs tab
 - Click the "Logs" tab.
-- The log viewer appears and shows nginx-format log lines including `kube-probe` health check entries and worker process notices.
-- A container selector dropdown is visible with `nginx`, `sidecar`, and `init-config` options. Switching containers re-fetches logs.
-- Change the tail-line selector from 100 to 50. Confirm a new request fires and the viewer updates.
-- Click the refresh icon. Confirm a new log fetch is triggered.
+- The log viewer appears and immediately loads and streams nginx-format log lines including `kube-probe` health check entries and worker process notices, with no load/start button.
+- A container selector dropdown is visible with `nginx`, `sidecar`, and `init-config` options. Switching containers restarts the stream for that container.
+- Change the tail-line selector from 100 to 50. Confirm the stream restarts and the viewer updates.
+- The refresh icon restarts the stream (disabled while live; enabled once the stream ends).
 
 ### Tab switching
 - Switch back to "Detail / Status". Confirm the detail cards reappear and the log viewer disappears.

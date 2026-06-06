@@ -9,17 +9,18 @@ import {
     MenuItem,
     FormControl,
     InputLabel,
-    FormControlLabel,
-    Switch,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faRotate } from "@fortawesome/free-solid-svg-icons";
-import { useQuery } from "@tanstack/react-query";
 import { useKubeContext } from "../../../lib/kube-context";
-import { fetchPodLogs, streamPodLogs } from "../../../lib/api-client";
+import { streamPodLogs } from "../../../lib/api-client";
 
 // Fetches and displays logs for a pod, with container and tail-line selectors plus
-// a Live toggle that follows the log via `kubectl logs -f` streamed over SSE.
+// a refresh button. Logs load and follow live automatically when the panel mounts:
+// the backend stream (`kubectl logs -f --tail=<n>`) delivers the recent backlog and
+// then appends new lines as the cluster produces them, with no button to start it.
+// The refresh button restarts the stream (re-fetching the backlog) and is disabled
+// while the live stream is already running.
 export function PodLogsPanel({ namespace, podName, containers }: {
     namespace: string;
     podName: string;
@@ -28,28 +29,24 @@ export function PodLogsPanel({ namespace, podName, containers }: {
     const { current } = useKubeContext();
     const [selectedContainer, setSelectedContainer] = useState(containers[0] ?? "");
     const [tail, setTail] = useState(100);
-    const [live, setLive] = useState(false);
-    const [liveLines, setLiveLines] = useState<string[]>([]);
-    const [liveError, setLiveError] = useState<string | null>(null);
+    const [lines, setLines] = useState<string[]>([]);
+    const [error, setError] = useState<string | null>(null);
+    const [streaming, setStreaming] = useState(false);
+    // Bumped by the refresh button to restart the stream from scratch.
+    const [refreshKey, setRefreshKey] = useState(0);
     const viewerRef = useRef<HTMLDivElement | null>(null);
 
-    const { data, error, isLoading, refetch } = useQuery({
-        queryKey: ["logs", current, namespace, podName, selectedContainer, tail],
-        queryFn: () => fetchPodLogs(current!, namespace, podName, selectedContainer || undefined, tail),
-        // While live streaming is active the snapshot query is paused so the two
-        // sources do not fight over the viewer contents.
-        enabled: containers.length > 0 && !live,
-    });
-
-    // Opens a live log stream while `live` is on and tears it down when toggled off
-    // or when the container/tail selection changes. Appends each incoming line and
-    // surfaces stream errors.
+    // Opens the live log stream on mount and whenever the context, container, tail,
+    // or refresh key changes, tearing the previous stream down first. The stream
+    // sends the recent backlog and then follows live; an error or the backend ending
+    // the stream flips `streaming` off so the refresh button re-enables.
     useEffect(() => {
-        if (!live || current === null || containers.length === 0) {
+        if (current === null || containers.length === 0) {
             return;
         }
-        setLiveLines([]);
-        setLiveError(null);
+        setLines([]);
+        setError(null);
+        setStreaming(true);
         const handle = streamPodLogs(
             current,
             namespace,
@@ -58,43 +55,34 @@ export function PodLogsPanel({ namespace, podName, containers }: {
             tail,
             {
                 onLine: (line) => {
-                    setLiveLines((prev) => [...prev, line]);
+                    setLines((prev) => [...prev, line]);
                 },
                 onError: (message) => {
-                    setLiveError(message);
+                    setError(message);
+                    setStreaming(false);
+                },
+                onEnd: () => {
+                    setStreaming(false);
                 },
             },
         );
         return () => {
             handle.close();
         };
-    }, [live, current, namespace, podName, selectedContainer, tail, containers.length]);
+    }, [current, namespace, podName, selectedContainer, tail, containers.length, refreshKey]);
 
-    // When live is turned off, force a fresh snapshot fetch so the viewer shows
-    // current logs rather than whatever react-query cached before streaming began.
-    const wasLiveRef = useRef(false);
+    // Auto-scrolls the viewer to the bottom as new lines arrive.
     useEffect(() => {
-        if (wasLiveRef.current && !live) {
-            refetch();
-        }
-        wasLiveRef.current = live;
-    }, [live, refetch]);
-
-    // Auto-scrolls the viewer to the bottom as new live lines arrive.
-    useEffect(() => {
-        if (!live) {
-            return;
-        }
         const el = viewerRef.current;
         if (el !== null) {
             el.scrollTop = el.scrollHeight;
         }
-    }, [liveLines, live]);
+    }, [lines]);
 
     // Streamed lines arrive newline-stripped, so they are rejoined with newlines.
-    const liveContent = liveLines.length > 0 ? liveLines.join("\n") : "(waiting for logs...)";
-    const displayError = live ? liveError : (error ? (error as Error).message : null);
-    const displayContent = live ? liveContent : (isLoading ? "Loading..." : (data?.logs || "(no logs)"));
+    const content = lines.length > 0
+        ? lines.join("\n")
+        : (streaming ? "(waiting for logs...)" : "(no logs)");
 
     return (
         <Box data-test-id="pod-logs-panel">
@@ -130,24 +118,20 @@ export function PodLogsPanel({ namespace, podName, containers }: {
                     </FormControl>
                 </div>
                 <Tooltip title="Refresh logs">
-                    <IconButton size="small" onClick={() => refetch()} disabled={isLoading || live} aria-label="refresh logs" data-test-id="log-refresh">
-                        <FontAwesomeIcon icon={faRotate} />
-                    </IconButton>
-                </Tooltip>
-                <FormControlLabel
-                    control={
-                        <Switch
-                            checked={live}
-                            onChange={(e) => setLive(e.target.checked)}
+                    <span>
+                        <IconButton
                             size="small"
-                            slotProps={{ input: { "aria-label": "live logs" } }}
-                        />
-                    }
-                    label="Live"
-                    data-test-id="log-live-toggle"
-                />
+                            onClick={() => setRefreshKey((k) => k + 1)}
+                            disabled={streaming || containers.length === 0}
+                            aria-label="refresh logs"
+                            data-test-id="log-refresh"
+                        >
+                            <FontAwesomeIcon icon={faRotate} />
+                        </IconButton>
+                    </span>
+                </Tooltip>
             </Box>
-            {displayError && <Alert severity="error">{displayError}</Alert>}
+            {error && <Alert severity="error">{error}</Alert>}
             <Paper
                 ref={viewerRef}
                 variant="outlined"
@@ -164,7 +148,7 @@ export function PodLogsPanel({ namespace, podName, containers }: {
                 }}
                 data-test-id="log-viewer"
             >
-                {displayContent}
+                {content}
             </Paper>
         </Box>
     );

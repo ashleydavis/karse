@@ -135,10 +135,13 @@ export async function fetchPodLogs(
 // Handle for an open live log stream; call close() to stop streaming.
 export type LogStreamHandle = { close: () => void };
 
-// Callbacks delivering incremental output from a live log stream.
+// Callbacks delivering incremental output from a live log stream. onEnd fires once
+// when the backend signals the stream has finished (its `kubectl logs -f` exited),
+// so the caller can fall back from live mode to a static snapshot.
 export type LogStreamHandlers = {
     onLine: (line: string) => void;
     onError: (message: string) => void;
+    onEnd?: () => void;
 };
 
 // Opens a live (follow) log stream for a pod container via Server-Sent Events.
@@ -178,6 +181,7 @@ export function streamPodLogs(
     });
     source.addEventListener("end", () => {
         source.close();
+        handlers.onEnd?.();
     });
 
     return {

@@ -1258,12 +1258,22 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-panel-containers']")).toHaveCount(0);
         });
 
-        test("clicking the Logs tab reveals the log viewer with realistic log content", async () => {
+        test("clicking the Logs tab auto-loads and streams the log viewer with realistic content", async () => {
+            // Opening the Logs tab starts the live stream automatically: no button to
+            // load logs or start streaming, and the stream request fires on mount.
+            const streamRequest = page.waitForRequest((req) => req.url().includes("/logs/stream"));
             await page.locator("[data-test-id='pod-tab-logs']").click();
+            await streamRequest;
             await expect(page.locator("[data-test-id='pod-panel-logs']")).toBeVisible();
             await expect(page.locator("[data-test-id='log-viewer']")).toBeVisible();
             await expect(page.locator("[data-test-id='log-viewer']")).toContainText("kube-probe/1.29");
             await expect(page.locator("[data-test-id='log-viewer']")).toContainText("start worker processes");
+        });
+
+        test("there is no load-logs or start-stream button", async () => {
+            // Logs auto-load and auto-stream, so no explicit load/start control exists.
+            await expect(page.locator("[data-test-id='log-load']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='log-live-toggle']")).toHaveCount(0);
         });
 
         test("container selector is visible and lists both containers", async () => {
@@ -1276,40 +1286,29 @@ test.describe("karse e2e", () => {
             await page.keyboard.press("Escape");
         });
 
-        test("switching container fires a new logs request with the correct container param", async () => {
-            const requestPromise = page.waitForRequest((req) => req.url().includes("/logs") && req.url().includes("container=sidecar"));
+        test("switching container restarts the stream with the correct container param", async () => {
+            const requestPromise = page.waitForRequest((req) => req.url().includes("/logs/stream") && req.url().includes("container=sidecar"));
             await page.locator("[data-test-id='log-container-select'] [role='combobox']").click();
             await page.locator("[data-test-id='log-container-option']").filter({ hasText: "sidecar" }).click();
             await requestPromise;
         });
 
-        test("changing tail lines fires a new logs request with the correct tail param", async () => {
-            const requestPromise = page.waitForRequest((req) => req.url().includes("/logs") && req.url().includes("tail=50"));
+        test("changing tail lines restarts the stream with the correct tail param", async () => {
+            const requestPromise = page.waitForRequest((req) => req.url().includes("/logs/stream") && req.url().includes("tail=50"));
             await page.locator("[data-test-id='log-tail-select'] [role='combobox']").click();
             await page.locator("[data-test-id='log-tail-option']").filter({ hasText: /^50$/ }).click();
             await requestPromise;
         });
 
-        test("refresh button fires a new logs request", async () => {
-            const requestPromise = page.waitForRequest((req) => req.url().includes("/logs") && !req.url().includes("/stream"));
-            await page.locator("[data-test-id='log-refresh']").click();
+        test("refresh button re-opens the log stream", async () => {
+            // The fake-logs backend closes the stream after emitting its lines, so the
+            // refresh button re-enables. Clicking it restarts the stream from scratch.
+            const refresh = page.locator("[data-test-id='log-refresh']");
+            await expect(refresh).toBeEnabled();
+            const requestPromise = page.waitForRequest((req) => req.url().includes("/logs/stream"));
+            await refresh.click();
             await requestPromise;
-        });
-
-        test("enabling live opens a streaming request and appends live log lines", async () => {
-            const streamRequest = page.waitForRequest((req) => req.url().includes("/logs/stream"));
-            await page.locator("[data-test-id='log-live-toggle'] input").check();
-            await streamRequest;
-            // The fake-logs backend streams realistic lines one at a time over SSE.
             await expect(page.locator("[data-test-id='log-viewer']")).toContainText("start worker processes");
-            await expect(page.locator("[data-test-id='log-viewer']")).toContainText("kube-probe/1.29");
-        });
-
-        test("disabling live restores the snapshot log viewer", async () => {
-            const snapshotRequest = page.waitForRequest((req) => req.url().includes("/logs") && !req.url().includes("/stream"));
-            await page.locator("[data-test-id='log-live-toggle'] input").uncheck();
-            await snapshotRequest;
-            await expect(page.locator("[data-test-id='log-viewer']")).toBeVisible();
         });
 
         test("commands tab shows the read-only guided commands", async () => {
