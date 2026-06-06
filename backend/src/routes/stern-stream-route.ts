@@ -8,6 +8,15 @@ import * as stern from "../kubectl/stern-adapter";
 // aggregation entirely to stern, which is what stern is built for.
 export const sternStreamRouter = Router();
 
+// Bounded backpressure for the stern firehose. Incoming lines are buffered in a
+// bounded ring and flushed to the client on a timer rather than written
+// synchronously per line. This caps memory (an unbounded coalescing buffer
+// OOM-crashed the backend under the firehose during Debug item stern-all-logs-1)
+// and keeps a runaway producer from starving the event loop with per-line writes.
+// When the buffer is full the OLDEST line is dropped (tail logs: newest matter most).
+const STERN_BUFFER_MAX_LINES = 5000;
+const STERN_FLUSH_INTERVAL_MS = 100;
+
 // Writes a single named SSE event with a JSON-encoded data payload.
 function sendEvent(res: Response, event: string, data: unknown): void {
     res.write(`event: ${event}\n`);
@@ -52,12 +61,43 @@ sternStreamRouter.get("/stern/stream", async (req, res) => {
     sendEvent(res, "started", { query, namespace: namespace ?? null });
 
     let closed = false;
+
+    // Bounded ring buffer of pending lines (drop-oldest when full). Lines are
+    // accumulated here and flushed on a timer so the firehose can never grow the
+    // buffer without bound or starve the event loop with synchronous per-line writes.
+    const pending: string[] = [];
+    let dropped = 0;
+
+    const flush = (): void => {
+        if (closed || pending.length === 0) {
+            return;
+        }
+        // If lines were dropped since the last flush, tell the client so the gap
+        // is visible rather than silently swallowed.
+        if (dropped > 0) {
+            sendEvent(res, "dropped", { count: dropped });
+            dropped = 0;
+        }
+        const batch = pending.splice(0, pending.length);
+        for (const line of batch) {
+            sendEvent(res, "line", { line });
+        }
+    };
+
+    const flushTimer = setInterval(flush, STERN_FLUSH_INTERVAL_MS);
+
     const handle = stern.streamStern(context, namespace, query, tail, {
         onLine: (line) => {
             if (closed) {
                 return;
             }
-            sendEvent(res, "line", { line });
+            pending.push(line);
+            // Drop the oldest line(s) once the bound is exceeded; the buffer never
+            // grows past STERN_BUFFER_MAX_LINES regardless of producer rate.
+            while (pending.length > STERN_BUFFER_MAX_LINES) {
+                pending.shift();
+                dropped++;
+            }
         },
         onError: (err) => {
             if (closed) {
@@ -66,16 +106,19 @@ sternStreamRouter.get("/stern/stream", async (req, res) => {
             sendEvent(res, "error", { message: err.message });
         },
         onClose: () => {
-            // stern ending (e.g. fake mode) is expected; the connection can close.
+            // stern ending (e.g. fake mode) is expected. Flush any tail so the last
+            // lines reach the client before the connection can be torn down.
+            flush();
         },
     });
 
-    // Tears down the stern process once, on client disconnect.
+    // Tears down the stern process and the flush timer once, on client disconnect.
     req.on("close", () => {
         if (closed) {
             return;
         }
         closed = true;
+        clearInterval(flushTimer);
         handle.stop();
     });
 });

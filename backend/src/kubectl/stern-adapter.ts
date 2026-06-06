@@ -5,6 +5,23 @@ import { audit, formatLocalISO } from "../audit-log";
 // Mirrors the kubectl adapter so stern invocations are audited the same way.
 const LOGS_DIR = process.env.KARSE_LOGS_DIR ?? "../logs";
 
+// Cap on the number of concurrent per-pod log watches stern opens. stern's own
+// default is 50, which on a busy cluster fans out into an unbounded log firehose
+// that the single backend event-loop thread cannot ingest without pegging a CPU
+// core (proven in Debug item stern-all-logs-1). We pass an explicit, modest cap
+// so the firehose is bounded at the source. Overridable via
+// KARSE_STERN_MAX_LOG_REQUESTS for operators who knowingly want more.
+export const STERN_MAX_LOG_REQUESTS = (() => {
+    const raw = process.env.KARSE_STERN_MAX_LOG_REQUESTS;
+    if (raw !== undefined && /^\d+$/.test(raw)) {
+        const n = parseInt(raw, 10);
+        if (n > 0) {
+            return n;
+        }
+    }
+    return 10;
+})();
+
 // Canned stern-style output emitted when KARSE_FAKE_STERN=1 is set, so the
 // Stern page can be exercised without the real binary or a live cluster.
 // Each line is already prefixed with "namespace pod" the way stern's default
@@ -70,6 +87,9 @@ function buildSternArgs(context: string, namespace: string | undefined, query: s
         "--context", context,
         ...nsArgs,
         "--tail", String(tail),
+        // Cap concurrent per-pod watches so an all-namespaces stream cannot fan
+        // out into an unbounded firehose that pegs the backend's event-loop thread.
+        "--max-log-requests", String(STERN_MAX_LOG_REQUESTS),
         "--color", "never",
         "--template", "{{.Namespace}} {{.PodName}} {{.Message}}",
         query,

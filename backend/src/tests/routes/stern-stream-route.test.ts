@@ -128,6 +128,43 @@ describe("GET /api/stern/stream", () => {
         );
     });
 
+    test("bounds the buffer with drop-oldest backpressure and emits a dropped event", async () => {
+        sternMocks.isSternAvailable.mockResolvedValue(true);
+        // Push far more lines synchronously than the bounded buffer can hold, before
+        // any flush has had a chance to run. The buffer must drop the oldest lines
+        // and surface a "dropped" event rather than delivering all of them.
+        const total = 12000;
+        sternMocks.streamStern.mockImplementation(
+            (_ctx: string, _ns: string | undefined, _q: string, _t: number, handlers: any) => {
+                for (let i = 0; i < total; i++) {
+                    handlers.onLine(`default nginx line-${i}`);
+                }
+                handlers.onClose();
+                return { stop: jest.fn() };
+            }
+        );
+
+        // The flush (triggered on close) emits the "dropped" event first, then the
+        // retained lines in order. Reading a bounded slice is enough to prove the
+        // buffer dropped the oldest lines and never delivered the full 12000.
+        const text = await readStream(
+            `http://127.0.0.1:${port}/api/stern/stream?context=my-ctx&query=nginx`,
+            150_000
+        );
+
+        // A dropped event must appear, accounting for the overflow lines.
+        expect(text).toContain("event: dropped");
+        // The oldest lines were dropped: line-0 must NOT have been delivered.
+        expect(text).not.toContain("\"default nginx line-0\"");
+        // Lines from the retained tail (after the drop point) are delivered in order.
+        expect(text).toContain("\"default nginx line-7000\"");
+        // The number of delivered line events is bounded by the buffer cap (5000),
+        // never the full 12000 the producer pushed.
+        const delivered = (text.match(/event: line/g) ?? []).length;
+        expect(delivered).toBeLessThanOrEqual(5000);
+        expect(delivered).toBeGreaterThan(0);
+    });
+
     test("client disconnect stops the stern stream", async () => {
         sternMocks.isSternAvailable.mockResolvedValue(true);
         const stop = jest.fn();

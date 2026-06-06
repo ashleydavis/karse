@@ -50,6 +50,22 @@ One node, three pods (`nginx-one`, `nginx-two`, `redis-main`).
 ### Read-only invariant
 - Tail `logs/audit-*.log` while streaming and confirm only `logs -f` and `get` kubectl commands are recorded. No mutating verbs ever appear.
 
+## Scenario: Whole-cluster firehose stays bounded (CPU/memory)
+
+This guards against the regression proven in Debug item `stern-all-logs-1`: an unbounded all-namespaces `.*` stream pegged a CPU core (and an unbounded coalescing buffer OOM-crashed the backend). The fix caps stern fan-out at the source and adds bounded drop-oldest backpressure.
+
+This is a profiling/load check, run against the real backend SSE path with a fake high-volume `stern`. The reusable harness and method are captured in the work item's evidence (`stern-all-logs-2/evidence/`: `fake-stern.sh`, `cpu-before-after.txt`).
+
+1. Build a fake `stern` that emits stern-template lines at a high, controllable rate, with its total firehose rate scaling with `--max-log-requests` (each request models one concurrent pod watch). Put it first on `PATH`.
+2. Start the real backend and `curl` the production SSE path: `GET /api/stern/stream?context=x&query=.*&tail=10` (whole-cluster, all namespaces, bare `.*`).
+3. Watch backend CPU via `top -b` (the backend event loop is single-threaded, so ~100% of one core = a pegged core).
+
+Expected:
+- With the fix's default cap (`--max-log-requests 10`), backend CPU stays well below a pegged core (observed ~20-25% of one core) under the same firehose the Debug item saturated.
+- Backend RSS holds flat (~100-110MB) under the full firehose; it does not grow without bound (no OOM).
+- The SSE stream emits `event: dropped` events when the buffer is full, proving the bounded drop-oldest buffer sheds the oldest lines instead of growing.
+- `KARSE_STERN_MAX_LOG_REQUESTS=50` reproduces the old uncapped fan-out for an explicit before/after comparison.
+
 Teardown:
 
 ```sh

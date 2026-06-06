@@ -50,3 +50,4 @@ Karse currently ships a single cluster home page (overview tiles plus a read-onl
 - **Pod detail page**: a `/pods/:namespace/:name` route showing containers, status, restarts, and events.
 - **Node detail page**: a `/nodes/:name` route with conditions, capacity/allocatable, and the pods scheduled on it.
 - **Log viewer**: stream a pod/container's logs read-only (`kubectl logs`), with container selector and tail-line controls.
+- **Stern firehose bounding (hardening)**: a whole-cluster `.*` all-namespaces stern stream no longer pegs a CPU core. Stern fan-out is capped at the source via an explicit `--max-log-requests` (default 10, overridable via `KARSE_STERN_MAX_LOG_REQUESTS`), and the backend buffers incoming lines in a bounded drop-oldest ring flushed on a timer so a runaway producer cannot OOM the backend. See `docs/spec/stern-live-logs/detail.md`.

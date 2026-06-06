@@ -66,6 +66,7 @@ describe("streamStern", () => {
                 "--context", "ctx",
                 "--namespace", "default",
                 "--tail", "50",
+                "--max-log-requests", "10",
                 "--color", "never",
                 "--template", "{{.Namespace}} {{.PodName}} {{.Message}}",
                 "nginx-*",
@@ -84,6 +85,23 @@ describe("streamStern", () => {
         const args = stream.mock.calls[0][1] as string[];
         expect(args).toContain("--all-namespaces");
         expect(args).not.toContain("--namespace");
+    });
+
+    test("caps stern fan-out with an explicit --max-log-requests to bound the firehose", () => {
+        captureStream();
+        streamStern("ctx", undefined, ".*", 100, {
+            onLine: jest.fn(),
+            onError: jest.fn(),
+            onClose: jest.fn(),
+        });
+        const args = stream.mock.calls[0][1] as string[];
+        const idx = args.indexOf("--max-log-requests");
+        expect(idx).toBeGreaterThanOrEqual(0);
+        // The cap must be a positive integer well below stern's default of 50.
+        const cap = parseInt(args[idx + 1] ?? "", 10);
+        expect(Number.isInteger(cap)).toBe(true);
+        expect(cap).toBeGreaterThan(0);
+        expect(cap).toBeLessThan(50);
     });
 
     test("splits streamed chunks into complete lines", () => {
