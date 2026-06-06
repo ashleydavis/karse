@@ -4,7 +4,7 @@
 **Spec:** Settled
 **Implementation:** Complete
 
-In-table search and sorting, shared across every resource table. A search box fuzzy-filters rows (subsequence, separator-tolerant, case-insensitive) and column headers sort. This is per-table search over the loaded rows, not a global cross-kind search.
+In-table search and sorting, present on every resource table. The nodes, pods, deployments, stateful sets and daemon sets tables fuzzy-filter rows (subsequence, separator-tolerant, case-insensitive); the events and errors tables use a plain substring match. Column headers sort. This is per-table search over the loaded rows, not a global cross-kind search.
 
 ## Sub-features
 None.

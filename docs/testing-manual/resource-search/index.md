@@ -2,7 +2,7 @@
 
 **Feature:** [resource-search](../../spec/resource-search/index.md)
 
-Manual tests for the shared fuzzy (subsequence, typo-tolerant) search across resource tables, and column sorting.
+Manual tests for in-table search (fuzzy/subsequence on most tables, plain substring on events and errors) and column sorting.
 
 ## Fixtures
 - [29-fuzzy-search](../_fixtures-kwok/29-fuzzy-search/)

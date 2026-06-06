@@ -25,7 +25,7 @@ The spec is reverse-engineered from the shipped code and the prose docs (`docs/a
 | [stern-live-logs](./stern-live-logs/index.md) | Settled | Complete | Multi-pod live log streaming via the `stern` binary. |
 | [events-feed](./events-feed/index.md) | Settled | Complete | Recent cluster events view, sorted newest-first. |
 | [errors-feed](./errors-feed/index.md) | Settled | Complete | Unified view of Warning events and problem pods. |
-| [resource-search](./resource-search/index.md) | Settled | Complete | In-table fuzzy search and column sorting, shared across all tables. |
+| [resource-search](./resource-search/index.md) | Settled | Complete | In-table search and column sorting; fuzzy on most tables, plain substring on events and errors. |
 | [quick-find](./quick-find/index.md) | Settled | Partial | Header quick-pickers for context and namespace. Global cross-kind quick-find is not yet shipped. |
 | [guided-commands](./guided-commands/index.md) | Settled | Complete | Copy-only kubectl command suggestions per resource; never executed. |
 | [yaml-viewer](./yaml-viewer/index.md) | Settled | Complete | View the raw YAML of a viewable resource in a dialog. |
