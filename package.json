@@ -11,6 +11,7 @@
     "tests:all": "bun run compile && bun run test && bun run smoke && bun run e2e",
     "smoke": "bash scripts/smoke-tests.sh",
     "fixtures": "bash scripts/test-fixture-discipline.sh",
+    "reap": "bash scripts/reap-test-clusters.sh",
     "e2e": "bash scripts/e2e-tests.sh",
     "e": "bun run e2e",
     "d": "bun run dev",

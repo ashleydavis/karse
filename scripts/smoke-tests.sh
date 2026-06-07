@@ -5,28 +5,42 @@ for tool in jq curl kwokctl kubectl; do
     command -v "$tool" >/dev/null 2>&1 || { echo "smoke-tests.sh requires '$tool' on PATH" >&2; exit 1; }
 done
 
+# Shared kwok helpers: reserve_port / release_ports / create_cluster / retry / apply_manifest.
+source "$(dirname "${BASH_SOURCE[0]}")/kwok-lib.sh"
+
 BACKEND_PID=""
-KWOK_CLUSTER="karse-smoke"
-PORT_FILE="$(mktemp)"
+# Unique per-run cluster name + an isolated kubeconfig so concurrent smoke runs
+# (parallel worktrees under pb:next) never collide on a shared cluster name or on
+# the shared ~/.kube/config current-context. $$ is unique among live processes;
+# $RANDOM guards against fast PID reuse across sequential runs.
+RUN_ID="$$-${RANDOM}"
+KWOK_CLUSTER="karse-smoke-${RUN_ID}"
+# Per-run scratch lives under the kwok state dir (KARSE_KWOK_STATE_DIR from
+# kwok-lib.sh), never /tmp (project rule). RUN_ID keeps them unique per run.
+PORT_FILE="$KARSE_KWOK_STATE_DIR/smoke-$RUN_ID.port"
+# kwokctl writes its context here and the backend (a child of this exported env)
+# reads it, so this run never touches the developer's real ~/.kube/config.
+KUBECONFIG="$KARSE_KWOK_STATE_DIR/smoke-$RUN_ID.kubeconfig"
+export KUBECONFIG
 
 cleanup() {
     if [[ -n "$BACKEND_PID" ]] && kill -0 "$BACKEND_PID" 2>/dev/null; then
         kill "$BACKEND_PID"
     fi
-    rm -f "$PORT_FILE"
+    rm -f "$PORT_FILE" "$KUBECONFIG"
     kwokctl delete cluster --name "$KWOK_CLUSTER" 2>/dev/null || true
+    release_ports
 }
 trap cleanup EXIT
 
 echo "--- Creating kwok cluster ---"
-# Single-cluster discipline: tear down any leftover smoke cluster from an
-# interrupted prior run (whose EXIT trap never fired) before building it fresh.
-# Deletes only this script's own named cluster, never a host-wide sweep.
-kwokctl delete cluster --name "$KWOK_CLUSTER" 2>/dev/null || true
+# Unique name + isolated kubeconfig mean nothing of this run's can pre-exist, so
+# there is no leftover to tear down up front. Orphaned clusters from a hard-killed
+# run (whose EXIT trap never fired) are cleaned by scripts/reap-test-clusters.sh.
 mkdir -p "$HOME/.kwok/clusters/$KWOK_CLUSTER/logs"
 # Restrict kwok node management to annotated nodes so fake-node-notready (which
 # omits the annotation) keeps its patched Ready=False status and stays NotReady.
-kwokctl create cluster --name "$KWOK_CLUSTER" --runtime binary --wait 60s \
+create_cluster "$KWOK_CLUSTER" \
     --extra-args=kwok-controller=manage-all-nodes=false \
     --extra-args=kwok-controller=manage-nodes-with-annotation-selector=kwok.x-k8s.io/node=fake
 
@@ -36,10 +50,16 @@ kwokctl create cluster --name "$KWOK_CLUSTER" --runtime binary --wait 60s \
 # stale leftover cluster.
 kubectl config use-context "kwok-$KWOK_CLUSTER"
 
-# Wait until the apiserver accepts requests before applying (avoids a kwok readiness race).
-for _ in $(seq 1 30); do kubectl get --raw=/readyz >/dev/null 2>&1 && break; sleep 0.5; done
+# Wait until the apiserver actually serves (not just readyz) before applying.
+# Under parallel load readyz can flip green before the server is stably serving,
+# so require a real `get nodes` to succeed, polled up to 60s.
+for _ in $(seq 1 60); do
+    kubectl get --raw=/readyz >/dev/null 2>&1 \
+        && kubectl get nodes >/dev/null 2>&1 && break
+    sleep 1
+done
 
-kubectl apply -f - <<'EOF'
+apply_manifest <<'EOF'
 apiVersion: v1
 kind: Node
 metadata:
@@ -72,14 +92,14 @@ metadata:
 spec: {}
 EOF
 
-kubectl wait --for=condition=Ready node/fake-node-1 node/fake-node-2 --timeout=30s
+kubectl wait --for=condition=Ready node/fake-node-1 node/fake-node-2 --timeout=120s
 
 # fake-node-notready has no kwok annotation, so kwok leaves it alone. Patch a
 # Ready=False condition that sticks, giving a genuinely NotReady node.
-kubectl patch node fake-node-notready --subresource=status --type=merge -p \
+retry kubectl patch node fake-node-notready --subresource=status --type=merge -p \
   '{"status":{"conditions":[{"type":"Ready","status":"False","reason":"KubeletNotReady","message":"Simulated NotReady node","lastHeartbeatTime":"2024-01-01T00:00:00Z","lastTransitionTime":"2024-01-01T00:00:00Z"}],"nodeInfo":{"kubeletVersion":"fake"}}}'
 
-kubectl apply -f - <<'EOF'
+apply_manifest <<'EOF'
 apiVersion: v1
 kind: ServiceAccount
 metadata:

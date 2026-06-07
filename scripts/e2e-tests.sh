@@ -5,53 +5,71 @@ for tool in jq curl kwokctl kubectl bun; do
     command -v "$tool" >/dev/null 2>&1 || { echo "e2e-tests.sh requires '$tool' on PATH" >&2; exit 1; }
 done
 
+# Shared kwok helpers: reserve_port / release_ports / create_cluster / retry / apply_manifest.
+source "$(dirname "${BASH_SOURCE[0]}")/kwok-lib.sh"
+
 BACKEND_PID=""
 FRONTEND_PID=""
-KWOK_CLUSTER_1="karse-e2e-1"
-KWOK_CLUSTER_2="karse-e2e-2"
-PREV_CONTEXT=""
-PORT_FILE="$(mktemp)"
-FRONTEND_LOG="$(mktemp)"
+# Unique per-run cluster names so concurrent runs (e.g. parallel worktrees under
+# pb:next) never collide on a shared cluster name. $$ is unique among live
+# processes; $RANDOM guards against fast PID reuse across sequential runs.
+RUN_ID="$$-${RANDOM}"
+KWOK_CLUSTER_1="karse-e2e-${RUN_ID}-1"
+KWOK_CLUSTER_2="karse-e2e-${RUN_ID}-2"
+# Per-run scratch lives under the kwok state dir (KARSE_KWOK_STATE_DIR from
+# kwok-lib.sh), never /tmp (project rule). RUN_ID keeps them unique per run.
+PORT_FILE="$KARSE_KWOK_STATE_DIR/e2e-$RUN_ID.port"
+FRONTEND_LOG="$KARSE_KWOK_STATE_DIR/e2e-$RUN_ID.frontend.log"
+# Isolate this run's kubeconfig. kwokctl writes its contexts here, and the backend
+# plus the e2e test's `kubectl config use-context` (all children of this exported
+# env) read/write ONLY this file, never the developer's real ~/.kube/config. This
+# is what lets concurrent runs each switch their own current-context without
+# racing on the single shared kubeconfig.
+KUBECONFIG="$KARSE_KWOK_STATE_DIR/e2e-$RUN_ID.kubeconfig"
+export KUBECONFIG
 
 cleanup() {
     [[ -n "$FRONTEND_PID" ]] && kill "$FRONTEND_PID" 2>/dev/null || true
     [[ -n "$BACKEND_PID" ]]  && kill "$BACKEND_PID"  2>/dev/null || true
-    rm -f "$PORT_FILE" "$FRONTEND_LOG"
+    rm -f "$PORT_FILE" "$FRONTEND_LOG" "$KUBECONFIG"
     kwokctl delete cluster --name "$KWOK_CLUSTER_1" 2>/dev/null || true
     kwokctl delete cluster --name "$KWOK_CLUSTER_2" 2>/dev/null || true
-    [[ -n "$PREV_CONTEXT" ]] && kubectl config use-context "$PREV_CONTEXT" 2>/dev/null || true
+    release_ports
 }
 trap cleanup EXIT
 
-PREV_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "")
-
-# Single-cluster discipline: tear down any leftover e2e clusters from an
-# interrupted prior run (whose EXIT trap never fired) before building fresh ones.
-# Deletes only this script's own named clusters, never a host-wide sweep.
-kwokctl delete cluster --name "$KWOK_CLUSTER_1" 2>/dev/null || true
-kwokctl delete cluster --name "$KWOK_CLUSTER_2" 2>/dev/null || true
+# Reserved ports (via create_cluster) + an isolated kubeconfig mean nothing of this
+# run's can pre-exist, so there is no leftover to tear down up front. Orphaned
+# clusters from a hard-killed run (whose EXIT trap never fired) are cleaned by
+# scripts/reap-test-clusters.sh.
 
 echo "--- Creating kwok cluster 1 ($KWOK_CLUSTER_1) ---"
 # kwok manages all nodes and keeps them Ready by default. Restrict management to
 # nodes carrying the kwok.x-k8s.io/node=fake annotation so a node without it can
 # stay genuinely NotReady (see node-notready below).
-kwokctl create cluster --name "$KWOK_CLUSTER_1" --runtime binary --wait 60s \
+create_cluster "$KWOK_CLUSTER_1" \
     --extra-args=kwok-controller=manage-all-nodes=false \
     --extra-args=kwok-controller=manage-nodes-with-annotation-selector=kwok.x-k8s.io/node=fake
 
 echo "--- Creating kwok cluster 2 ($KWOK_CLUSTER_2) ---"
-kwokctl create cluster --name "$KWOK_CLUSTER_2" --runtime binary --wait 60s
+create_cluster "$KWOK_CLUSTER_2"
 
-# Wait until each apiserver accepts requests before applying (avoids a kwok readiness race).
+# Wait until each apiserver actually serves (not just readyz) before applying.
+# Under parallel load readyz can flip green before the server is stably serving,
+# so require a real `get nodes` to succeed, polled up to 60s per cluster.
 for ctx in "kwok-$KWOK_CLUSTER_1" "kwok-$KWOK_CLUSTER_2"; do
-    for _ in $(seq 1 30); do kubectl --context "$ctx" get --raw=/readyz >/dev/null 2>&1 && break; sleep 0.5; done
+    for _ in $(seq 1 60); do
+        kubectl --context "$ctx" get --raw=/readyz >/dev/null 2>&1 \
+            && kubectl --context "$ctx" get nodes >/dev/null 2>&1 && break
+        sleep 1
+    done
 done
 
 # ── Cluster 1 nodes ──────────────────────────────────────────────────────────
 echo "--- Populating cluster 1 ---"
 kubectl config use-context "kwok-$KWOK_CLUSTER_1"
 
-kubectl apply -f - <<'EOF'
+apply_manifest "" <<'EOF'
 apiVersion: v1
 kind: Node
 metadata:
@@ -83,16 +101,16 @@ metadata:
 spec: {}
 EOF
 
-kubectl wait --for=condition=Ready node/node-cp node/node-worker --timeout=30s
+kubectl wait --for=condition=Ready node/node-cp node/node-worker --timeout=120s
 
 # node-notready has no kwok annotation, so kwok does not manage it. Patch a
 # Ready=False condition that will stick, making the node genuinely NotReady.
-kubectl patch node node-notready --subresource=status --type=merge -p \
+retry kubectl patch node node-notready --subresource=status --type=merge -p \
   '{"status":{"conditions":[{"type":"Ready","status":"False","reason":"KubeletNotReady","message":"Simulated NotReady node","lastHeartbeatTime":"2024-01-01T00:00:00Z","lastTransitionTime":"2024-01-01T00:00:00Z"}],"nodeInfo":{"kubeletVersion":"fake"}}}'
 
 # ── Cluster 2 nodes ──────────────────────────────────────────────────────────
 echo "--- Populating cluster 2 ---"
-kubectl apply --context "kwok-$KWOK_CLUSTER_2" -f - <<'EOF'
+apply_manifest "kwok-$KWOK_CLUSTER_2" <<'EOF'
 apiVersion: v1
 kind: Node
 metadata:
@@ -117,7 +135,7 @@ spec: {}
 EOF
 
 kubectl wait --context "kwok-$KWOK_CLUSTER_2" \
-    --for=condition=Ready node/node-alpha node/node-beta --timeout=30s
+    --for=condition=Ready node/node-alpha node/node-beta --timeout=120s
 
 # Leave cluster 1 as the active context for the tests
 kubectl config use-context "kwok-$KWOK_CLUSTER_1"
@@ -149,7 +167,10 @@ echo "--- Starting frontend dev server (OS-assigned free port) ---"
 # NO_COLOR keeps Vite's banner plain so the port scrape below works. In CI
 # (CI=true) Vite would otherwise colorize, inserting an ANSI escape between
 # "localhost:" and the port. Only affects the test run; normal `dev` stays colored.
-(cd frontend && NO_COLOR=true KARSE_NO_OPEN=1 KARSE_FRONTEND_PORT=0 KARSE_PORT="$BACKEND_PORT" bun run dev) > "$FRONTEND_LOG" 2>&1 &
+# KARSE_NO_WATCH=1 disables Vite's file watcher: e2e needs no hot reload, and it
+# avoids exhausting the host inotify instance limit when several runs (parallel
+# worktrees under pb:next) each start a dev server at once.
+(cd frontend && NO_COLOR=true KARSE_NO_WATCH=1 KARSE_NO_OPEN=1 KARSE_FRONTEND_PORT=0 KARSE_PORT="$BACKEND_PORT" bun run dev) > "$FRONTEND_LOG" 2>&1 &
 FRONTEND_PID=$!
 
 FRONTEND_PORT=""
