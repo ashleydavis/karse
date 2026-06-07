@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Multi-cluster fixture: tear down its own test clusters before building them fresh.
+for i in $(seq 1 5); do
+    kwokctl delete cluster --name "karse-test-$i" 2>/dev/null || true
+done
+
 for i in $(seq 1 5); do
     kwokctl create cluster --name "karse-test-$i" --runtime binary --wait 60s
+
+    # Wait until the apiserver accepts requests before applying (avoids a kwok readiness race).
+    for _ in $(seq 1 30); do kwokctl --name "karse-test-$i" kubectl get --raw=/readyz >/dev/null 2>&1 && break; sleep 0.5; done
 
     kwokctl --name "karse-test-$i" kubectl apply -f - <<EOF
 apiVersion: v1

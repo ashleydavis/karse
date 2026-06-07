@@ -25,6 +25,12 @@ trap cleanup EXIT
 
 PREV_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "")
 
+# Single-cluster discipline: tear down any leftover e2e clusters from an
+# interrupted prior run (whose EXIT trap never fired) before building fresh ones.
+# Deletes only this script's own named clusters, never a host-wide sweep.
+kwokctl delete cluster --name "$KWOK_CLUSTER_1" 2>/dev/null || true
+kwokctl delete cluster --name "$KWOK_CLUSTER_2" 2>/dev/null || true
+
 echo "--- Creating kwok cluster 1 ($KWOK_CLUSTER_1) ---"
 # kwok manages all nodes and keeps them Ready by default. Restrict management to
 # nodes carrying the kwok.x-k8s.io/node=fake annotation so a node without it can
@@ -35,6 +41,11 @@ kwokctl create cluster --name "$KWOK_CLUSTER_1" --runtime binary --wait 60s \
 
 echo "--- Creating kwok cluster 2 ($KWOK_CLUSTER_2) ---"
 kwokctl create cluster --name "$KWOK_CLUSTER_2" --runtime binary --wait 60s
+
+# Wait until each apiserver accepts requests before applying (avoids a kwok readiness race).
+for ctx in "kwok-$KWOK_CLUSTER_1" "kwok-$KWOK_CLUSTER_2"; do
+    for _ in $(seq 1 30); do kubectl --context "$ctx" get --raw=/readyz >/dev/null 2>&1 && break; sleep 0.5; done
+done
 
 # ── Cluster 1 nodes ──────────────────────────────────────────────────────────
 echo "--- Populating cluster 1 ---"

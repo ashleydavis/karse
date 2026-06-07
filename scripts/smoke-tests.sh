@@ -19,12 +19,25 @@ cleanup() {
 trap cleanup EXIT
 
 echo "--- Creating kwok cluster ---"
+# Single-cluster discipline: tear down any leftover smoke cluster from an
+# interrupted prior run (whose EXIT trap never fired) before building it fresh.
+# Deletes only this script's own named cluster, never a host-wide sweep.
+kwokctl delete cluster --name "$KWOK_CLUSTER" 2>/dev/null || true
 mkdir -p "$HOME/.kwok/clusters/$KWOK_CLUSTER/logs"
 # Restrict kwok node management to annotated nodes so fake-node-notready (which
 # omits the annotation) keeps its patched Ready=False status and stays NotReady.
 kwokctl create cluster --name "$KWOK_CLUSTER" --runtime binary --wait 60s \
     --extra-args=kwok-controller=manage-all-nodes=false \
     --extra-args=kwok-controller=manage-nodes-with-annotation-selector=kwok.x-k8s.io/node=fake
+
+# kwokctl does not switch the current context to a newly-created cluster when other
+# clusters already exist, so target the new cluster explicitly. Otherwise the bare
+# kubectl calls below (and the backend, which reads the current context) could hit a
+# stale leftover cluster.
+kubectl config use-context "kwok-$KWOK_CLUSTER"
+
+# Wait until the apiserver accepts requests before applying (avoids a kwok readiness race).
+for _ in $(seq 1 30); do kubectl get --raw=/readyz >/dev/null 2>&1 && break; sleep 0.5; done
 
 kubectl apply -f - <<'EOF'
 apiVersion: v1
