@@ -4,7 +4,7 @@ Manual tests for the pod/container log viewer. See the spec: [log-viewer](../../
 
 Multi-pod streaming on the dedicated Logs page is a separate feature: see [stern-live-logs](../stern-live-logs/detail.md).
 
-Run Karse with `bun run dev:test` so `KARSE_FAKE_LOGS=1` emits simulated log lines (kwok runs no real containers).
+Start the app first: run `bun run dev:test` from the repo root (the `dev:test` variant of `bun run dev` sets `KARSE_FAKE_LOGS=1` so simulated log lines are emitted, since kwok runs no real containers) and open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
 
 ## Scenario A: Log viewer auto-loads and streams (selectors, refresh)
 

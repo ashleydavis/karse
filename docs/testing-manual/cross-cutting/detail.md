@@ -2,6 +2,8 @@
 
 App-wide manual tests with no single dedicated spec feature. Each scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse. Run the matching `teardown.sh` when done.
 
+Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. Then run the scenario's `setup.sh`, test, and run its `teardown.sh` when done.
+
 ## Long resource names
 
 A node, namespace, and pod each with names near the Kubernetes length limits. Verifies the UI handles long strings without breaking layout (truncation, overflow, wrapping).

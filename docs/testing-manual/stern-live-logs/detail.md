@@ -4,6 +4,8 @@ Manual tests for the Logs page (`/logs`): stern-style multi-pod streaming. See t
 
 Streaming uses `kubectl logs -f` (read-only follow) on the backend, aggregated and pushed to the browser over Server-Sent Events. With `KARSE_FAKE_LOGS=1` (set by `bun run dev:test`) each pod stream emits simulated log lines so the page can be exercised against a kwok cluster that has no real container runtime.
 
+Start the app first: run `bun run dev:test` from the repo root (the `dev:test` variant of `bun run dev` sets `KARSE_FAKE_LOGS=1` for simulated log lines) and open the frontend at `http://127.0.0.1:5173`. The scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
+
 ## Scenario: Multi-pod streaming
 
 One node, three pods (`nginx-one`, `nginx-two`, `redis-main`).

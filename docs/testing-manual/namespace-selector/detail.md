@@ -4,7 +4,7 @@ Manual tests for namespace scoping. See the spec: [namespace-selector](../../spe
 
 Namespace scoping is exercised by the pods fixtures. The full pods-side steps live in [pods-view](../pods-view/detail.md); the namespace-specific checks are collected here. The dropdown-picker placement and keyboard shortcuts are covered under [quick-find](../quick-find/detail.md).
 
-Each fixture stands up a `karse-test` KWOK cluster; select the `kwok-karse-test` context in Karse. Run the matching `teardown.sh` when done.
+Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. Each fixture stands up a `karse-test` KWOK cluster; select the `kwok-karse-test` context in Karse. Run the matching `teardown.sh` when done.
 
 ## Scenario A: Single-namespace scoping
 

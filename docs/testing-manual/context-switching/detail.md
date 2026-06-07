@@ -4,6 +4,8 @@ Manual tests for context listing and switching. See the spec: [context-switching
 
 The dropdown-picker placement and keyboard shortcuts for the context picker are covered under [quick-find](../quick-find/detail.md). Run the matching `teardown.sh` when done.
 
+Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. (Scenario A below needs a custom kubeconfig, so it overrides this with its own start command.)
+
 ## Scenario A: No contexts
 
 A kubeconfig with no clusters or contexts configured.

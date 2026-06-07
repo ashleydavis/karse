@@ -4,6 +4,8 @@ Manual tests for the daemon sets page (`/daemonsets`). See the spec: [daemonsets
 
 Drilling into a daemon set's detail page is covered under [workload-detail](../workload-detail/detail.md).
 
+Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
+
 ## Scenario: DaemonSets table
 
 **Fixture:** [_fixtures-kwok/15-workloads-views](../_fixtures-kwok/15-workloads-views/) (one deployment, one stateful set, one daemon set)

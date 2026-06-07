@@ -2,6 +2,8 @@
 
 Manual tests for the cluster home page overview tiles. See the spec: [cluster-overview](../../spec/cluster-overview/detail.md).
 
+Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
+
 ## Scenario A: Empty cluster with two nodes
 
 Baseline that the overview tiles render correctly with minimal data.

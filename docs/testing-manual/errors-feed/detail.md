@@ -2,6 +2,8 @@
 
 Manual tests for the Errors page. See the spec: [errors-feed](../../spec/errors-feed/detail.md).
 
+Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. The scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
+
 ## Scenario: Errors view
 
 A cluster seeded with one error condition from each source the Errors page surfaces: a pod stuck in `ImagePullBackOff` (a problem pod) and a `Warning` event (`FailedScheduling`). A healthy pod is also created and must never appear. Note: kwok does not generate lifecycle events or container states on its own, so the setup script patches the broken pod's container state and creates the `Warning` `Event` object by hand.

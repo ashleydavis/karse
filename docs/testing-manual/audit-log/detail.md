@@ -4,6 +4,8 @@ Manual tests for the on-disk audit log. See the spec: [audit-log](../../spec/aud
 
 Every kubectl call Karse makes is appended to a rolling, human-readable text file (one file per local hour) under `logs/` before the process is spawned. An in-UI audit-log viewer is on the roadmap and not yet shipped, so this is verified on disk.
 
+Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. Then run the scenario's `setup.sh`, test, and run its `teardown.sh` when done.
+
 ## Scenario: Audit lines are written for every kubectl call
 
 **Fixture:** any KWOK fixture works; [_fixtures-kwok/01-empty-cluster-two-nodes](../_fixtures-kwok/01-empty-cluster-two-nodes/) is a simple choice.
@@ -12,7 +14,7 @@ Every kubectl call Karse makes is appended to a rolling, human-readable text fil
 ./docs/testing-manual/_fixtures-kwok/01-empty-cluster-two-nodes/setup.sh
 ```
 
-`kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse, started with `bun run dev:test`.
+`kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse.
 
 ### What to check
 - Confirm a `logs/` directory exists at the repo root with a file named for the current local hour (e.g. `logs/audit-YYYY-MM-DD-HH.log`).

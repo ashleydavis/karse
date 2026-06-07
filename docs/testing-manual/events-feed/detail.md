@@ -2,6 +2,8 @@
 
 Manual tests for the Events page (`/events`). See the spec: [events-feed](../../spec/events-feed/detail.md).
 
+Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. The scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
+
 ## Scenario: Events view
 
 A cluster seeded with a few events (one Warning, two Normal) across two namespaces. Note: kwok does not generate lifecycle events on its own, so the setup script creates representative `Event` objects by hand.

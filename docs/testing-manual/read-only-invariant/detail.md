@@ -6,6 +6,8 @@ Karse never runs a mutating kubectl subcommand against a cluster (the one write 
 
 These checks ride along with other scenarios rather than needing their own cluster shape.
 
+Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. Each check then runs the referenced scenario's `setup.sh`, exercises it, and runs that scenario's `teardown.sh` when done.
+
 ## Check A: YAML view issues only reads
 
 **Fixture:** [_fixtures-kwok/17-raw-yaml-view](../_fixtures-kwok/17-raw-yaml-view/)

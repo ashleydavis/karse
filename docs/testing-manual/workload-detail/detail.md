@@ -2,6 +2,8 @@
 
 Manual tests for the workload detail pages. See the spec: [workload-detail](../../spec/workload-detail/detail.md).
 
+Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. The scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
+
 ## Scenario: Deployment / StatefulSet / DaemonSet detail pages
 
 One deployment, one stateful set, one daemon set.

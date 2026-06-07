@@ -2,6 +2,8 @@
 
 Manual tests for clickable resource rows and consistent table row hover. See the spec: [clickable-resource-rows](../../spec/clickable-resource-rows/detail.md).
 
+Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
+
 ## Scenario A: Rows navigate to detail pages
 
 **Fixture:** [_fixtures-kwok/16-detail-pages-and-logs](../_fixtures-kwok/16-detail-pages-and-logs/) (one node, one multi-container pod)

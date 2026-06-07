@@ -4,6 +4,8 @@ Manual tests for the header quick-pickers. See the spec: [quick-find](../../spec
 
 The spec notes a global cross-kind quick-find is not yet shipped; these tests cover the shipped header context and namespace pickers.
 
+Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. The scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
+
 ## Scenario: Nav-bar dropdown pickers
 
 Two KWOK clusters run simultaneously so the context picker has more than one entry. Cluster 1 (`kwok-karse-test-1`) has two extra namespaces (`team-alpha`, `team-beta`) so the namespace picker has rows to filter and select.

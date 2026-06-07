@@ -2,7 +2,7 @@
 
 Manual tests for the pod detail page. See the spec: [pod-detail](../../spec/pod-detail/detail.md).
 
-The log viewer on this page is specified and tested under [log-viewer](../log-viewer/detail.md). Each fixture stands up a `karse-test` KWOK cluster; select the `kwok-karse-test` context in Karse. Run the matching `teardown.sh` when done.
+Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. The log viewer on this page is specified and tested under [log-viewer](../log-viewer/detail.md). Each fixture stands up a `karse-test` KWOK cluster; select the `kwok-karse-test` context in Karse. Run the matching `teardown.sh` when done.
 
 ## Scenario A: Pod detail page (single multi-container pod)
 

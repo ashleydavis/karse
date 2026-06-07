@@ -4,6 +4,8 @@ Manual tests for in-table fuzzy search and column sorting. See the spec: [resour
 
 The search boxes on the pods, nodes, deployments, statefulsets, daemonsets, namespaces, and contexts tables share one fuzzy filter. A query matches a row when every character of the query appears, in order, somewhere in the row's text. Matching is case-insensitive, so a typo that drops or reorders a character (`ngnx`) and a query with gaps (`ng-x`) both still match `nginx-deployment-abc`. The events and errors tables do not use the fuzzy filter: their search boxes use a plain case-insensitive substring match.
 
+Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. The scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
+
 ## Scenario: Fuzzy search
 
 Several pods whose names share characters.
