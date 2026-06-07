@@ -1,7 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Single-cluster discipline: tear down any existing test cluster before building the new one.
+kwokctl delete cluster --name karse-test 2>/dev/null || true
+
 kwokctl create cluster --name karse-test --runtime binary --wait 60s
+
+# kwokctl does not switch the current context to a newly-created cluster when other
+# clusters already exist, so target the new cluster explicitly. This also leaves the
+# 'kwok-karse-test' context current for the manual Karse workflow.
+kubectl config use-context kwok-karse-test
+
+# Wait until the apiserver accepts requests before applying (avoids a kwok readiness race).
+for _ in $(seq 1 30); do kubectl get --raw=/readyz >/dev/null 2>&1 && break; sleep 0.5; done
 
 kubectl apply -f - <<'EOF'
 apiVersion: v1
