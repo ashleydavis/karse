@@ -1681,14 +1681,62 @@ test.describe("karse e2e", () => {
 
     // ── YAML viewer ───────────────────────────────────────────────────────────
 
-    test.describe("yaml viewer", () => {
-        const FAKE_PODS = {
+    test.describe("yaml sub tab", () => {
+        const FAKE_POD_DETAIL = {
+            name: "nginx-abc",
+            namespace: "default",
+            phase: "Running",
+            node: "node-worker",
+            podIP: "10.0.0.1",
+            createdAt: new Date().toISOString(),
+            labels: { app: "nginx" },
+            containers: [
+                { name: "nginx", image: "nginx:latest", ready: true, restarts: 0, state: "Running", stateReason: "" },
+            ],
+            initContainers: [],
+            events: [],
+        };
+
+        const FAKE_POD_YAML = "apiVersion: v1\nkind: Pod\nmetadata:\n  name: nginx-abc\n  namespace: default\n";
+
+        const FAKE_NODE_DETAIL = {
+            name: "node-cp",
+            status: "Ready",
+            roles: ["control-plane"],
+            version: "v1.29.0",
+            createdAt: new Date().toISOString(),
+            conditions: [],
+            capacity: { cpu: "4", memory: "8Gi", pods: "110" },
+            allocatable: { cpu: "3900m", memory: "7Gi", pods: "110" },
+            addresses: [],
+            labels: {},
+            pods: [],
+            events: [],
+        };
+
+        const FAKE_NODE_YAML = "apiVersion: v1\nkind: Node\nmetadata:\n  name: node-cp\n";
+
+        const FAKE_WORKLOAD_DETAIL = {
+            name: "web-deploy",
+            namespace: "default",
+            createdAt: new Date().toISOString(),
+            stats: [],
+            selector: { app: "web" },
+            labels: { app: "web" },
+            pods: [],
+            events: [],
+        };
+
+        const FAKE_WORKLOAD_YAML = "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web-deploy\n  namespace: default\n";
+
+        const FAKE_PODS_LIST = {
             pods: [
                 {
                     name: "nginx-abc",
                     namespace: "default",
                     phase: "Running",
                     ready: "1/1",
+                    containerCount: 1,
                     restarts: 0,
                     createdAt: new Date().toISOString(),
                     node: "node-worker",
@@ -1696,52 +1744,82 @@ test.describe("karse e2e", () => {
             ],
         };
 
-        const FAKE_YAML = "apiVersion: v1\nkind: Pod\nmetadata:\n  name: nginx-abc\n  namespace: default\n";
-
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
-            await page.route("**/api/pods*", async (route) => {
-                await route.fulfill({ json: FAKE_PODS });
+            await page.route("**/api/pods/default/nginx-abc*", async (route) => {
+                await route.fulfill({ json: FAKE_POD_DETAIL });
             });
             await page.route("**/api/yaml/pods/nginx-abc*", async (route) => {
-                await route.fulfill({ json: { yaml: FAKE_YAML } });
+                await route.fulfill({ json: { yaml: FAKE_POD_YAML } });
             });
-            await page.goto("/pods", { waitUntil: "networkidle" });
-            await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+            await page.route("**/api/nodes/node-cp*", async (route) => {
+                await route.fulfill({ json: FAKE_NODE_DETAIL });
+            });
+            await page.route("**/api/yaml/nodes/node-cp*", async (route) => {
+                await route.fulfill({ json: { yaml: FAKE_NODE_YAML } });
+            });
+            await page.route("**/api/deployments/default/web-deploy*", async (route) => {
+                await route.fulfill({ json: FAKE_WORKLOAD_DETAIL });
+            });
+            await page.route("**/api/yaml/deployments/web-deploy*", async (route) => {
+                await route.fulfill({ json: { yaml: FAKE_WORKLOAD_YAML } });
+            });
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: FAKE_PODS_LIST });
+            });
         });
 
         test.afterAll(async () => {
-            await page.unroute("**/api/pods*");
+            await page.unroute("**/api/pods/default/nginx-abc*");
             await page.unroute("**/api/yaml/pods/nginx-abc*");
+            await page.unroute("**/api/nodes/node-cp*");
+            await page.unroute("**/api/yaml/nodes/node-cp*");
+            await page.unroute("**/api/deployments/default/web-deploy*");
+            await page.unroute("**/api/yaml/deployments/web-deploy*");
+            await page.unroute("**/api/pods*");
             setContext(CLUSTER_1);
         });
 
-        test("each pod row has a YAML button", async () => {
-            const row = page.locator("[data-test-id='pod-row']").filter({ hasText: "nginx-abc" });
-            await expect(row.locator("[data-test-id='yaml-button']")).toBeVisible();
-        });
-
-        test("clicking the YAML button requests yaml with the namespace param", async () => {
+        test("pod detail page exposes a YAML tab that renders the pod yaml", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-tab-yaml']")).toBeVisible();
             const requestPromise = page.waitForRequest((req) =>
                 req.url().includes("/api/yaml/pods/nginx-abc") && req.url().includes("namespace=default"));
-            const row = page.locator("[data-test-id='pod-row']").filter({ hasText: "nginx-abc" });
-            await row.locator("[data-test-id='yaml-button']").click();
+            await page.locator("[data-test-id='pod-tab-yaml']").click();
             await requestPromise;
-        });
-
-        test("the dialog shows the raw yaml content", async () => {
-            await expect(page.locator("[data-test-id='yaml-dialog']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-panel-yaml']")).toBeVisible();
             await expect(page.locator("[data-test-id='yaml-content']")).toContainText("kind: Pod");
             await expect(page.locator("[data-test-id='yaml-content']")).toContainText("name: nginx-abc");
         });
 
-        test("clicking the YAML button does not navigate to the pod detail page", async () => {
-            await expect(page).toHaveURL(/\/pods$/);
+        test("node detail page exposes a YAML tab that renders the node yaml", async () => {
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='node-tab-yaml']")).toBeVisible();
+            await page.locator("[data-test-id='node-tab-yaml']").click();
+            await expect(page.locator("[data-test-id='node-panel-yaml']")).toBeVisible();
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("kind: Node");
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("name: node-cp");
         });
 
-        test("the close button dismisses the dialog", async () => {
-            await page.locator("[data-test-id='yaml-close']").click();
-            await expect(page.locator("[data-test-id='yaml-dialog']")).not.toBeVisible();
+        test("workload detail page exposes a YAML tab that renders the workload yaml", async () => {
+            await page.goto("/deployments/default/web-deploy", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='workload-tab-yaml']")).toBeVisible();
+            await page.locator("[data-test-id='workload-tab-yaml']").click();
+            await expect(page.locator("[data-test-id='workload-panel-yaml']")).toBeVisible();
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("kind: Deployment");
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("name: web-deploy");
+        });
+
+        test("the old YAML dialog and button are gone everywhere", async () => {
+            // Detail pages no longer render a YAML button or dialog.
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='yaml-button']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='yaml-dialog']")).toHaveCount(0);
+            // Pods table rows no longer carry a per-row YAML button.
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+            await expect(page.locator("[data-test-id='yaml-button']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='yaml-dialog']")).toHaveCount(0);
         });
     });
 

@@ -23,7 +23,7 @@ import type { PodPhase, KubeEvent } from "karse-types";
 import { useKubeContext } from "../../lib/kube-context";
 import { useShareableNavigate } from "../../lib/nav-state";
 import { fetchPodDetail } from "../../lib/api-client";
-import { YamlButton } from "../../components/yaml-dialog";
+import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
 import { PodContainersPanel, PodInitContainersPanel } from "./components/pod-containers-panel";
 import { PodLogsPanel } from "./components/pod-logs-panel";
@@ -76,12 +76,12 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
 }
 
 // The set of tabs available on the pod detail page.
-type PodDetailTab = "detail" | "containers" | "init-containers" | "logs" | "commands";
+type PodDetailTab = "detail" | "containers" | "init-containers" | "logs" | "commands" | "yaml";
 
 // Reads the active tab from the URL, falling back to the Detail tab for any
 // missing or unrecognized value so the page always has a valid selection.
 function parseTab(value: string | null): PodDetailTab {
-    if (value === "containers" || value === "init-containers" || value === "logs" || value === "commands") {
+    if (value === "containers" || value === "init-containers" || value === "logs" || value === "commands" || value === "yaml") {
         return value;
     }
     return "detail";
@@ -143,7 +143,6 @@ export function PodDetailPage() {
                 </Typography>
                 <PhaseChip phase={data.phase} />
                 <Box sx={{ flexGrow: 1 }} />
-                <YamlButton type="pods" name={data.name} namespace={data.namespace} />
             </Box>
 
             <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
@@ -163,6 +162,7 @@ export function PodDetailPage() {
                     )}
                     <Tab label="Logs" value="logs" data-test-id="pod-tab-logs" />
                     <Tab label="Commands" value="commands" data-test-id="pod-tab-commands" />
+                    <Tab label="YAML" value="yaml" data-test-id="pod-tab-yaml" />
                 </Tabs>
             </Box>
 
@@ -259,6 +259,15 @@ export function PodDetailPage() {
             {effectiveTab === "commands" && (
                 <Box data-test-id="pod-panel-commands">
                     <CommandsTab target={{ kind: "pod", name: data.name, namespace: data.namespace }} />
+                </Box>
+            )}
+
+            {effectiveTab === "yaml" && (
+                <Box data-test-id="pod-panel-yaml">
+                    <YamlTabPanel
+                        target={{ type: "pods", name: data.name, namespace: data.namespace }}
+                        active={effectiveTab === "yaml"}
+                    />
                 </Box>
             )}
         </Box>

@@ -28,7 +28,6 @@ import type { DaemonSet } from "karse-types";
 import { useKubeContext } from "../../../lib/kube-context";
 import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { fetchDaemonSets } from "../../../lib/api-client";
-import { YamlButton } from "../../../components/yaml-dialog";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 
@@ -63,18 +62,6 @@ const columns: ColumnDef<DaemonSet>[] = [
         cell: (info) => formatAge(info.getValue<string>()),
         sortingFn: (a, b) =>
             new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
-    },
-    {
-        id: "actions",
-        header: "",
-        enableSorting: false,
-        cell: (info) => (
-            <YamlButton
-                type="daemonsets"
-                name={info.row.original.name}
-                namespace={info.row.original.namespace}
-            />
-        ),
     },
 ];
 

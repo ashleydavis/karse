@@ -26,7 +26,6 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import type { Namespace } from "karse-types";
-import { YamlButton } from "../../../components/yaml-dialog";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 
@@ -84,7 +83,6 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
                                 {name === terminalDefault ? "Clear default" : "Set as default"}
                             </Button>
                         )}
-                        <YamlButton type="namespaces" name={name} />
                     </span>
                 );
             },

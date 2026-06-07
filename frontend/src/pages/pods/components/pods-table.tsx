@@ -30,7 +30,6 @@ import { useKubeContext } from "../../../lib/kube-context";
 import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { useShareableNavigate } from "../../../lib/nav-state";
 import { fetchPods } from "../../../lib/api-client";
-import { YamlButton } from "../../../components/yaml-dialog";
 import { StatusFilter } from "../../../components/status-filter";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
@@ -167,18 +166,6 @@ function buildColumns(): ColumnDef<Pod>[] {
             cell: (info) => formatAge(info.getValue<string>()),
             sortingFn: (a, b) =>
                 new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
-        },
-        {
-            id: "actions",
-            header: "",
-            enableSorting: false,
-            cell: (info) => (
-                <YamlButton
-                    type="pods"
-                    name={info.row.original.name}
-                    namespace={info.row.original.namespace}
-                />
-            ),
         },
     );
 

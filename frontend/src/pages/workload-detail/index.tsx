@@ -25,7 +25,7 @@ import type { GuidedResourceKind } from "../../lib/guided-commands";
 import { useKubeContext } from "../../lib/kube-context";
 import { useShareableNavigate } from "../../lib/nav-state";
 import { fetchWorkloadDetail } from "../../lib/api-client";
-import { YamlButton } from "../../components/yaml-dialog";
+import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
 import { tableRowSx } from "../../lib/table-row-style";
 
@@ -67,7 +67,7 @@ const KIND_LABEL: Record<WorkloadKind, string> = {
 };
 
 // The set of tabs available on the workload detail page.
-type WorkloadDetailTab = "detail" | "commands";
+type WorkloadDetailTab = "detail" | "commands" | "yaml";
 
 // Maps the plural URL/UI workload token to the singular kind the Commands tab expects.
 const COMMAND_KIND: Record<WorkloadKind, GuidedResourceKind> = {
@@ -77,8 +77,10 @@ const COMMAND_KIND: Record<WorkloadKind, GuidedResourceKind> = {
 };
 
 // Detail page for a single deployment, stateful set, or daemon set. Shows the
-// workload's status counters, labels, selector, selected pods, and events. The kind
-// is fixed per route so the three workload types share one page implementation.
+// workload's status counters, labels, selector, selected pods, and events on the
+// Detail tab, the guided commands on the Commands tab, and the raw YAML on the YAML
+// tab. The kind is fixed per route so the three workload types share one page
+// implementation.
 export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
     const { namespace, name } = useParams<{ namespace: string; name: string }>();
     const { current } = useKubeContext();
@@ -112,7 +114,6 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                 </Typography>
                 <Chip label={KIND_LABEL[kind]} size="small" variant="outlined" />
                 <Box sx={{ flexGrow: 1 }} />
-                <YamlButton type={kind} name={data.name} namespace={data.namespace} />
             </Box>
 
             <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
@@ -123,6 +124,7 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                 >
                     <Tab label="Detail" value="detail" data-test-id="workload-tab-detail" />
                     <Tab label="Commands" value="commands" data-test-id="workload-tab-commands" />
+                    <Tab label="YAML" value="yaml" data-test-id="workload-tab-yaml" />
                 </Tabs>
             </Box>
 
@@ -255,6 +257,15 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
             {activeTab === "commands" && (
                 <Box data-test-id="workload-panel-commands">
                     <CommandsTab target={{ kind: COMMAND_KIND[kind], name: data.name, namespace: data.namespace }} />
+                </Box>
+            )}
+
+            {activeTab === "yaml" && (
+                <Box data-test-id="workload-panel-yaml">
+                    <YamlTabPanel
+                        target={{ type: kind, name: data.name, namespace: data.namespace }}
+                        active={activeTab === "yaml"}
+                    />
                 </Box>
             )}
         </Box>

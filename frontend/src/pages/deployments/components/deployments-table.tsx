@@ -28,7 +28,6 @@ import type { Deployment } from "karse-types";
 import { useKubeContext } from "../../../lib/kube-context";
 import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { fetchDeployments } from "../../../lib/api-client";
-import { YamlButton } from "../../../components/yaml-dialog";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 
@@ -61,18 +60,6 @@ const columns: ColumnDef<Deployment>[] = [
         cell: (info) => formatAge(info.getValue<string>()),
         sortingFn: (a, b) =>
             new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
-    },
-    {
-        id: "actions",
-        header: "",
-        enableSorting: false,
-        cell: (info) => (
-            <YamlButton
-                type="deployments"
-                name={info.row.original.name}
-                namespace={info.row.original.namespace}
-            />
-        ),
     },
 ];
 

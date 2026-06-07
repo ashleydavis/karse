@@ -29,7 +29,6 @@ import { useQuery } from "@tanstack/react-query";
 import type { Node, NodeStatus } from "karse-types";
 import { useKubeContext } from "../../../lib/kube-context";
 import { fetchNodes } from "../../../lib/api-client";
-import { YamlButton } from "../../../components/yaml-dialog";
 import { StatusFilter } from "../../../components/status-filter";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
@@ -120,14 +119,6 @@ const columns: ColumnDef<Node>[] = [
         cell: (info) => formatAge(info.getValue<string>()),
         sortingFn: (a, b) =>
             new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
-    },
-    {
-        id: "actions",
-        header: "",
-        enableSorting: false,
-        cell: (info) => (
-            <YamlButton type="nodes" name={info.row.original.name} />
-        ),
     },
 ];
 

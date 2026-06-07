@@ -1,6 +1,9 @@
 # yaml-viewer manual tests
 
-Manual tests for the raw-YAML dialog. See the spec: [yaml-viewer](../../spec/yaml-viewer/detail.md).
+Manual tests for the raw-YAML sub tab. See the spec: [yaml-viewer](../../spec/yaml-viewer/detail.md).
+
+YAML is shown on a "YAML" sub tab of each resource detail page. There is no YAML
+dialog and no per-row or per-page YAML button anywhere in the app.
 
 ## Scenario: Raw YAML view
 
@@ -14,28 +17,25 @@ One node and a pod, deployment, stateful set, and daemon set in `default`.
 
 `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse.
 
-### Pods
-- Navigate to `/pods`. Each pod row has a "YAML" button in the last column.
-- Click the YAML button on the `web` row. A dialog opens titled with the pod name.
-- The dialog body shows the raw YAML beginning with `apiVersion:` and `kind: Pod`, including the `metadata`, `spec`, and `status` sections.
-- Clicking the YAML button does NOT navigate to the pod detail page (the click is contained to the dialog).
-- Close the dialog with the X button. Confirm it dismisses.
-
-### Workloads
-- Navigate to `/deployments`, `/statefulsets`, and `/daemonsets` in turn. Each row has a "YAML" button.
-- Open the YAML dialog for `web-deploy`, `db`, and `agent`. Confirm each shows the matching `kind:` (`Deployment`, `StatefulSet`, `DaemonSet`).
-
-### Nodes
-- Navigate to `/nodes`. Each node row has a "YAML" button.
-- Open the YAML for `fake-node-1`. Confirm it shows `kind: Node` with no namespace in `metadata`.
-- Open a node detail page (`/nodes/fake-node-1`) and confirm the "YAML" button at the top right opens the same content.
-
-### Namespaces
-- Navigate to `/namespaces`. Each namespace row has a "YAML" button alongside the "Set as active" / "Set as default" buttons.
-- Open the YAML for `default`. Confirm it shows `kind: Namespace`.
-
 ### Pod detail page
-- Navigate to `/pods/default/web`. Confirm a "YAML" button appears at the top right next to the phase chip and opens the pod YAML.
+- Navigate to `/pods`, then click the `web` pod row to open its detail page.
+- The detail page shows a "YAML" tab alongside the other tabs (Detail / Status, Containers, Logs).
+- Click the "YAML" tab. The panel shows the raw YAML beginning with `apiVersion:` and `kind: Pod`, including the `metadata`, `spec`, and `status` sections.
+- Confirm there is NO "YAML" button in the page header and NO dialog/modal opens.
+
+### Workload detail pages
+- Open the detail page for `web-deploy` (`/deployments`, click the row), `db` (`/statefulsets`), and `agent` (`/daemonsets`).
+- Each detail page has a "Detail" tab and a "YAML" tab.
+- Click the "YAML" tab on each and confirm the panel shows the matching `kind:` (`Deployment`, `StatefulSet`, `DaemonSet`).
+
+### Node detail page
+- Navigate to `/nodes`, then click `fake-node-1` to open its detail page.
+- The detail page has Status / Details, Pods, Events, and "YAML" tabs.
+- Click the "YAML" tab. Confirm it shows `kind: Node` with no namespace in `metadata`.
+
+### Tables and namespaces
+- On `/pods`, `/nodes`, `/deployments`, `/statefulsets`, `/daemonsets`, and `/namespaces`, confirm NO row has a "YAML" button. YAML is reachable only from the detail-page sub tab.
+- Namespaces have no detail page yet, so they have no YAML view until the namespace detail page lands.
 
 ### Error handling / read-only
 - The YAML is read-only; there is no edit or apply control. Confirm only `kubectl get ... -o yaml` style reads are issued (check `logs/` audit output: every line should be a `get` command).

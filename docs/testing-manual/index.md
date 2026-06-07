@@ -42,7 +42,7 @@ Single-test-cluster discipline (per `readme.md`): there is only ever ONE test cl
 | [resource-search](./resource-search/index.md) | Fuzzy search and column sorting. |
 | [quick-find](./quick-find/index.md) | Header context and namespace dropdown pickers. |
 | [guided-commands](./guided-commands/index.md) | Copy-only kubectl command suggestions. |
-| [yaml-viewer](./yaml-viewer/index.md) | Raw YAML dialog for viewable resources. |
+| [yaml-viewer](./yaml-viewer/index.md) | Raw YAML sub tab on resource detail pages. |
 | [audit-log](./audit-log/index.md) | On-disk kubectl audit log. |
 
 ## Cross-cutting guides

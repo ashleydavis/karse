@@ -24,7 +24,7 @@ import type { NodeStatus, NodeCondition, KubeEvent } from "karse-types";
 import { useKubeContext } from "../../lib/kube-context";
 import { useShareableNavigate } from "../../lib/nav-state";
 import { fetchNodeDetail } from "../../lib/api-client";
-import { YamlButton } from "../../components/yaml-dialog";
+import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
 import { tableRowSx } from "../../lib/table-row-style";
 
@@ -79,7 +79,7 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
 }
 
 // The set of tabs available on the node detail page.
-type NodeDetailTab = "detail" | "pods" | "events" | "commands";
+type NodeDetailTab = "detail" | "pods" | "events" | "commands" | "yaml";
 
 // Detail page for a single node, organizing its content into Status/Details, Pods, and Events tabs.
 export function NodeDetailPage() {
@@ -115,7 +115,6 @@ export function NodeDetailPage() {
                 </Typography>
                 <StatusChip status={data.status} />
                 <Box sx={{ flexGrow: 1 }} />
-                <YamlButton type="nodes" name={data.name} />
             </Box>
 
             <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
@@ -128,6 +127,7 @@ export function NodeDetailPage() {
                     <Tab label="Pods" value="pods" data-test-id="node-tab-pods" />
                     <Tab label="Events" value="events" data-test-id="node-tab-events" />
                     <Tab label="Commands" value="commands" data-test-id="node-tab-commands" />
+                    <Tab label="YAML" value="yaml" data-test-id="node-tab-yaml" />
                 </Tabs>
             </Box>
 
@@ -322,6 +322,15 @@ export function NodeDetailPage() {
             {activeTab === "commands" && (
                 <Box data-test-id="node-panel-commands">
                     <CommandsTab target={{ kind: "node", name: data.name }} />
+                </Box>
+            )}
+
+            {activeTab === "yaml" && (
+                <Box data-test-id="node-panel-yaml">
+                    <YamlTabPanel
+                        target={{ type: "nodes", name: data.name }}
+                        active={activeTab === "yaml"}
+                    />
                 </Box>
             )}
         </Box>
