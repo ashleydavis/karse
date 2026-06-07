@@ -14,19 +14,18 @@ import {
     TableContainer,
     IconButton,
     Tooltip,
-    Button,
     Tabs,
     Tab,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleCheck, faCircleXmark, faCircleQuestion, faTriangleExclamation, faArrowLeft, faTerminal, faTag } from "@fortawesome/free-solid-svg-icons";
+import { faCircleCheck, faCircleXmark, faCircleQuestion, faTriangleExclamation, faArrowLeft, faTag } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { NodeStatus, NodeCondition, KubeEvent } from "karse-types";
 import { useKubeContext } from "../../lib/kube-context";
 import { useShareableNavigate } from "../../lib/nav-state";
 import { fetchNodeDetail } from "../../lib/api-client";
 import { YamlButton } from "../../components/yaml-dialog";
-import { CommandsDialog } from "../../components/commands-dialog";
+import { CommandsTab } from "../../components/commands-tab";
 import { tableRowSx } from "../../lib/table-row-style";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
@@ -80,7 +79,7 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
 }
 
 // The set of tabs available on the node detail page.
-type NodeDetailTab = "detail" | "pods" | "events";
+type NodeDetailTab = "detail" | "pods" | "events" | "commands";
 
 // Detail page for a single node, organizing its content into Status/Details, Pods, and Events tabs.
 export function NodeDetailPage() {
@@ -88,7 +87,6 @@ export function NodeDetailPage() {
     const { current } = useKubeContext();
     const navigate = useShareableNavigate();
     const [activeTab, setActiveTab] = useState<NodeDetailTab>("detail");
-    const [showCommands, setShowCommands] = useState(false);
 
     const { data, error, isLoading } = useQuery({
         queryKey: ["node-detail", current, name],
@@ -118,22 +116,7 @@ export function NodeDetailPage() {
                 <StatusChip status={data.status} />
                 <Box sx={{ flexGrow: 1 }} />
                 <YamlButton type="nodes" name={data.name} />
-                <Button
-                    size="small"
-                    variant="outlined"
-                    startIcon={<FontAwesomeIcon icon={faTerminal} />}
-                    onClick={() => setShowCommands(true)}
-                    data-test-id="commands-button"
-                >
-                    Commands
-                </Button>
             </Box>
-
-            <CommandsDialog
-                open={showCommands}
-                onClose={() => setShowCommands(false)}
-                target={{ kind: "node", name: data.name }}
-            />
 
             <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
                 <Tabs
@@ -144,6 +127,7 @@ export function NodeDetailPage() {
                     <Tab label="Status / Details" value="detail" data-test-id="node-tab-detail" />
                     <Tab label="Pods" value="pods" data-test-id="node-tab-pods" />
                     <Tab label="Events" value="events" data-test-id="node-tab-events" />
+                    <Tab label="Commands" value="commands" data-test-id="node-tab-commands" />
                 </Tabs>
             </Box>
 
@@ -332,6 +316,12 @@ export function NodeDetailPage() {
                             )
                         }
                     </Paper>
+                </Box>
+            )}
+
+            {activeTab === "commands" && (
+                <Box data-test-id="node-panel-commands">
+                    <CommandsTab target={{ kind: "node", name: data.name }} />
                 </Box>
             )}
         </Box>

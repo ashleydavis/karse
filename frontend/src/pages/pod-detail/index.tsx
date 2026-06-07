@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import {
     Box,
@@ -14,19 +13,18 @@ import {
     TableContainer,
     IconButton,
     Tooltip,
-    Button,
     Tabs,
     Tab,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft, faCircleCheck, faCirclePause, faCircleQuestion, faCircleXmark, faTag, faTerminal, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
+import { faArrowLeft, faCircleCheck, faCirclePause, faCircleQuestion, faCircleXmark, faTag, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { PodPhase, KubeEvent } from "karse-types";
 import { useKubeContext } from "../../lib/kube-context";
 import { useShareableNavigate } from "../../lib/nav-state";
 import { fetchPodDetail } from "../../lib/api-client";
 import { YamlButton } from "../../components/yaml-dialog";
-import { CommandsDialog } from "../../components/commands-dialog";
+import { CommandsTab } from "../../components/commands-tab";
 import { PodContainersPanel, PodInitContainersPanel } from "./components/pod-containers-panel";
 import { PodLogsPanel } from "./components/pod-logs-panel";
 
@@ -78,12 +76,12 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
 }
 
 // The set of tabs available on the pod detail page.
-type PodDetailTab = "detail" | "containers" | "init-containers" | "logs";
+type PodDetailTab = "detail" | "containers" | "init-containers" | "logs" | "commands";
 
 // Reads the active tab from the URL, falling back to the Detail tab for any
 // missing or unrecognized value so the page always has a valid selection.
 function parseTab(value: string | null): PodDetailTab {
-    if (value === "containers" || value === "init-containers" || value === "logs") {
+    if (value === "containers" || value === "init-containers" || value === "logs" || value === "commands") {
         return value;
     }
     return "detail";
@@ -96,7 +94,6 @@ export function PodDetailPage() {
     const navigate = useShareableNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const activeTab = parseTab(searchParams.get("tab"));
-    const [showCommands, setShowCommands] = useState(false);
 
     // Persists the active tab in the URL so the breadcrumb can show it and the
     // view stays shareable.
@@ -147,22 +144,7 @@ export function PodDetailPage() {
                 <PhaseChip phase={data.phase} />
                 <Box sx={{ flexGrow: 1 }} />
                 <YamlButton type="pods" name={data.name} namespace={data.namespace} />
-                <Button
-                    size="small"
-                    variant="outlined"
-                    startIcon={<FontAwesomeIcon icon={faTerminal} />}
-                    onClick={() => setShowCommands(true)}
-                    data-test-id="commands-button"
-                >
-                    Commands
-                </Button>
             </Box>
-
-            <CommandsDialog
-                open={showCommands}
-                onClose={() => setShowCommands(false)}
-                target={{ kind: "pod", name: data.name, namespace: data.namespace }}
-            />
 
             <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
                 <Tabs
@@ -180,6 +162,7 @@ export function PodDetailPage() {
                         />
                     )}
                     <Tab label="Logs" value="logs" data-test-id="pod-tab-logs" />
+                    <Tab label="Commands" value="commands" data-test-id="pod-tab-commands" />
                 </Tabs>
             </Box>
 
@@ -270,6 +253,12 @@ export function PodDetailPage() {
                         podName={data.name}
                         containers={allContainerNames}
                     />
+                </Box>
+            )}
+
+            {effectiveTab === "commands" && (
+                <Box data-test-id="pod-panel-commands">
+                    <CommandsTab target={{ kind: "pod", name: data.name, namespace: data.namespace }} />
                 </Box>
             )}
         </Box>

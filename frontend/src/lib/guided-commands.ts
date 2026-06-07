@@ -2,6 +2,8 @@
 // Karse is strictly READ-ONLY: these strings are shown for the user to copy and
 // run themselves. Nothing in this module executes or wires commands to any adapter.
 
+import { fuzzyMatch } from "./fuzzy-filter";
+
 // The resource kinds for which guided commands can be generated.
 export type GuidedResourceKind = "pod" | "node" | "deployment" | "statefulset" | "daemonset";
 
@@ -132,4 +134,15 @@ export function buildGuidedCommands(target: GuidedResourceTarget): GuidedCommand
         return buildNodeCommands(target.name);
     }
     return buildWorkloadCommands(target.kind, target.name, target.namespace);
+}
+
+// Filters a list of guided commands by a search query, fuzzy-matching the query
+// against each command's label and command text. An empty/blank query returns
+// the list unchanged. Pure: used by the Commands tab's search box.
+export function filterGuidedCommands(commands: GuidedCommand[], query: string): GuidedCommand[] {
+    if (query.trim().length === 0)
+    {
+        return commands;
+    }
+    return commands.filter((c) => fuzzyMatch(c.label, query) || fuzzyMatch(c.command, query));
 }

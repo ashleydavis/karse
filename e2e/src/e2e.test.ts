@@ -940,6 +940,17 @@ test.describe("karse e2e", () => {
             await expect(page).toHaveURL(/\/pods\/default\/nginx-abc/);
             await page.goto("/deployments", { waitUntil: "networkidle" });
         });
+
+        test("the deployment detail Commands tab lists read-only kubectl suggestions", async () => {
+            await page.goto("/deployments/default/nginx", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='workload-tab-commands']").click();
+            await expect(page.locator("[data-test-id='commands-tab']")).toBeVisible();
+            await expect(page.locator("[data-test-id='commands-readonly-note']")).toBeVisible();
+            const commands = await page.locator("[data-test-id='command-text']").allTextContents();
+            expect(commands).toContain("kubectl describe deployment nginx -n default");
+            expect(commands).toContain("kubectl rollout restart deployment/nginx -n default");
+            await page.goto("/deployments", { waitUntil: "networkidle" });
+        });
     });
 
     test.describe("stateful sets page", () => {
@@ -1293,25 +1304,41 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='log-viewer']")).toBeVisible();
         });
 
-        test("commands button opens the guided commands dialog", async () => {
-            await page.locator("[data-test-id='commands-button']").click();
-            await expect(page.locator("[data-test-id='commands-dialog']")).toBeVisible();
+        test("commands tab shows the read-only guided commands", async () => {
+            await page.locator("[data-test-id='pod-tab-commands']").click();
+            await expect(page.locator("[data-test-id='commands-tab']")).toBeVisible();
             await expect(page.locator("[data-test-id='commands-readonly-note']")).toBeVisible();
         });
 
-        test("commands dialog lists kubectl suggestions for the pod", async () => {
+        test("commands tab lists kubectl suggestions for the pod", async () => {
             const commands = await page.locator("[data-test-id='command-text']").allTextContents();
             expect(commands).toContain("kubectl describe pod nginx-abc -n default");
             expect(commands).toContain("kubectl logs nginx-abc -n default");
             expect(commands).toContain("kubectl delete pod nginx-abc -n default");
         });
 
-        test("commands dialog has a copy button per command", async () => {
+        test("commands tab has a copy button per command", async () => {
             const rowCount = await page.locator("[data-test-id='command-row']").count();
             const copyCount = await page.locator("[data-test-id='command-copy']").count();
             expect(rowCount).toBeGreaterThan(0);
             expect(copyCount).toBe(rowCount);
-            await page.keyboard.press("Escape");
+        });
+
+        test("commands tab copies a command to the clipboard", async () => {
+            await page.locator("[data-test-id='command-copy']").first().click();
+            const clip = await page.evaluate(() => navigator.clipboard.readText());
+            expect(clip).toBe("kubectl describe pod nginx-abc -n default");
+        });
+
+        test("commands tab search filters the command list", async () => {
+            const before = await page.locator("[data-test-id='command-row']").count();
+            await page.locator("[data-test-id='commands-search'] input").fill("delete");
+            const after = await page.locator("[data-test-id='command-row']").count();
+            expect(after).toBeLessThan(before);
+            const commands = await page.locator("[data-test-id='command-text']").allTextContents();
+            expect(commands).toContain("kubectl delete pod nginx-abc -n default");
+            expect(commands).not.toContain("kubectl describe pod nginx-abc -n default");
+            await page.locator("[data-test-id='commands-search'] input").fill("");
         });
     });
 
@@ -1498,13 +1525,12 @@ test.describe("karse e2e", () => {
             await page.unroute("**/api/pods/kube-system/coredns-abc*");
         });
 
-        test("commands button opens guided commands for the node", async () => {
-            await page.locator("[data-test-id='commands-button']").click();
-            await expect(page.locator("[data-test-id='commands-dialog']")).toBeVisible();
+        test("commands tab shows guided commands for the node", async () => {
+            await page.locator("[data-test-id='node-tab-commands']").click();
+            await expect(page.locator("[data-test-id='commands-tab']")).toBeVisible();
             const commands = await page.locator("[data-test-id='command-text']").allTextContents();
             expect(commands).toContain("kubectl describe node node-cp");
             expect(commands).toContain("kubectl drain node-cp --ignore-daemonsets --delete-emptydir-data");
-            await page.keyboard.press("Escape");
         });
     });
 

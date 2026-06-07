@@ -14,10 +14,11 @@ import {
     TableContainer,
     IconButton,
     Tooltip,
-    Button,
+    Tabs,
+    Tab,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTriangleExclamation, faArrowLeft, faTerminal, faTag } from "@fortawesome/free-solid-svg-icons";
+import { faTriangleExclamation, faArrowLeft, faTag } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { WorkloadKind, KubeEvent } from "karse-types";
 import type { GuidedResourceKind } from "../../lib/guided-commands";
@@ -25,7 +26,7 @@ import { useKubeContext } from "../../lib/kube-context";
 import { useShareableNavigate } from "../../lib/nav-state";
 import { fetchWorkloadDetail } from "../../lib/api-client";
 import { YamlButton } from "../../components/yaml-dialog";
-import { CommandsDialog } from "../../components/commands-dialog";
+import { CommandsTab } from "../../components/commands-tab";
 import { tableRowSx } from "../../lib/table-row-style";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
@@ -65,7 +66,10 @@ const KIND_LABEL: Record<WorkloadKind, string> = {
     daemonsets: "DaemonSet",
 };
 
-// Maps the plural URL/UI workload token to the singular kind the CommandsDialog expects.
+// The set of tabs available on the workload detail page.
+type WorkloadDetailTab = "detail" | "commands";
+
+// Maps the plural URL/UI workload token to the singular kind the Commands tab expects.
 const COMMAND_KIND: Record<WorkloadKind, GuidedResourceKind> = {
     deployments: "deployment",
     statefulsets: "statefulset",
@@ -79,7 +83,7 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
     const { namespace, name } = useParams<{ namespace: string; name: string }>();
     const { current } = useKubeContext();
     const navigate = useShareableNavigate();
-    const [showCommands, setShowCommands] = useState(false);
+    const [activeTab, setActiveTab] = useState<WorkloadDetailTab>("detail");
 
     const { data, error, isLoading } = useQuery({
         queryKey: ["workload-detail", kind, current, namespace, name],
@@ -109,143 +113,149 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                 <Chip label={KIND_LABEL[kind]} size="small" variant="outlined" />
                 <Box sx={{ flexGrow: 1 }} />
                 <YamlButton type={kind} name={data.name} namespace={data.namespace} />
-                <Button
-                    size="small"
-                    variant="outlined"
-                    startIcon={<FontAwesomeIcon icon={faTerminal} />}
-                    onClick={() => setShowCommands(true)}
-                    data-test-id="commands-button"
-                >
-                    Commands
-                </Button>
             </Box>
 
-            <CommandsDialog
-                open={showCommands}
-                onClose={() => setShowCommands(false)}
-                target={{ kind: COMMAND_KIND[kind], name: data.name, namespace: data.namespace }}
-            />
+            <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+                <Tabs
+                    value={activeTab}
+                    onChange={(_, value) => setActiveTab(value)}
+                    data-test-id="workload-detail-tabs"
+                >
+                    <Tab label="Detail" value="detail" data-test-id="workload-tab-detail" />
+                    <Tab label="Commands" value="commands" data-test-id="workload-tab-commands" />
+                </Tabs>
+            </Box>
 
-            <Paper variant="outlined" sx={{ p: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Details</Typography>
-                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 1.5 }}>
-                    {[
-                        ["Namespace", data.namespace],
-                        ["Age", formatAge(data.createdAt)],
-                        ...data.stats.map((stat): [string, string] => [stat.label, stat.value]),
-                    ].map(([label, value]) => (
-                        <Box key={label} data-test-id="workload-stat">
-                            <Typography variant="caption" color="text.secondary">{label}</Typography>
-                            <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{value}</Typography>
+            {activeTab === "detail" && (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }} data-test-id="workload-panel-detail">
+                    <Paper variant="outlined" sx={{ p: 2 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Details</Typography>
+                        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 1.5 }}>
+                            {[
+                                ["Namespace", data.namespace],
+                                ["Age", formatAge(data.createdAt)],
+                                ...data.stats.map((stat): [string, string] => [stat.label, stat.value]),
+                            ].map(([label, value]) => (
+                                <Box key={label} data-test-id="workload-stat">
+                                    <Typography variant="caption" color="text.secondary">{label}</Typography>
+                                    <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{value}</Typography>
+                                </Box>
+                            ))}
                         </Box>
-                    ))}
-                </Box>
-            </Paper>
+                    </Paper>
 
-            {Object.keys(data.selector).length > 0 && (
-                <Paper variant="outlined" sx={{ p: 2 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Selector</Typography>
-                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                        {Object.entries(data.selector).map(([k, v]) => (
-                            <Chip
-                                key={k}
-                                label={`${k}=${v}`}
-                                size="small"
-                                variant="outlined"
-                                icon={<FontAwesomeIcon icon={faTag} />}
-                            />
-                        ))}
-                    </Box>
-                </Paper>
-            )}
-
-            <Paper variant="outlined" sx={{ p: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                    Pods ({data.pods.length})
-                </Typography>
-                {data.pods.length === 0
-                    ? (
-                        <Typography color="text.secondary">No pods selected by this workload.</Typography>
-                    )
-                    : (
-                        <TableContainer>
-                            <Table size="small">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Name</TableCell>
-                                        <TableCell>Status</TableCell>
-                                        <TableCell>Ready</TableCell>
-                                        <TableCell>Restarts</TableCell>
-                                        <TableCell>Node</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {data.pods.map((pod) => (
-                                        <TableRow
-                                            key={pod.namespace + "/" + pod.name}
-                                            data-test-id="workload-pod-row"
-                                            onClick={() => navigate(`/pods/${pod.namespace}/${pod.name}`)}
-                                            sx={tableRowSx(true)}
-                                        >
-                                            <TableCell sx={{ fontFamily: "monospace" }}>{pod.name}</TableCell>
-                                            <TableCell>{pod.phase}</TableCell>
-                                            <TableCell>{pod.ready}</TableCell>
-                                            <TableCell>{pod.restarts}</TableCell>
-                                            <TableCell>{pod.node || "-"}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    )
-                }
-            </Paper>
-
-            {Object.keys(data.labels).length > 0 && (
-                <Paper variant="outlined" sx={{ p: 2 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Labels</Typography>
-                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                        {Object.entries(data.labels).map(([k, v]) => (
-                            <Chip
-                                key={k}
-                                label={`${k}=${v}`}
-                                size="small"
-                                variant="outlined"
-                                icon={<FontAwesomeIcon icon={faTag} />}
-                            />
-                        ))}
-                    </Box>
-                </Paper>
-            )}
-
-            {data.events.length > 0 && (
-                <Paper variant="outlined" sx={{ p: 2 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Events</Typography>
-                    <TableContainer>
-                        <Table size="small">
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Type</TableCell>
-                                    <TableCell>Reason</TableCell>
-                                    <TableCell>Message</TableCell>
-                                    <TableCell>Count</TableCell>
-                                    <TableCell>Last Seen</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {data.events.map((ev, i) => (
-                                    <TableRow key={i} data-test-id="event-row">
-                                        <TableCell><EventTypeChip type={ev.type} /></TableCell>
-                                        <TableCell>{ev.reason}</TableCell>
-                                        <TableCell sx={{ maxWidth: 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.message}</TableCell>
-                                        <TableCell>{ev.count}</TableCell>
-                                        <TableCell>{ev.lastSeen ? formatAge(ev.lastSeen) : "-"}</TableCell>
-                                    </TableRow>
+                    {Object.keys(data.selector).length > 0 && (
+                        <Paper variant="outlined" sx={{ p: 2 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Selector</Typography>
+                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                                {Object.entries(data.selector).map(([k, v]) => (
+                                    <Chip
+                                        key={k}
+                                        label={`${k}=${v}`}
+                                        size="small"
+                                        variant="outlined"
+                                        icon={<FontAwesomeIcon icon={faTag} />}
+                                    />
                                 ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                </Paper>
+                            </Box>
+                        </Paper>
+                    )}
+
+                    <Paper variant="outlined" sx={{ p: 2 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                            Pods ({data.pods.length})
+                        </Typography>
+                        {data.pods.length === 0
+                            ? (
+                                <Typography color="text.secondary">No pods selected by this workload.</Typography>
+                            )
+                            : (
+                                <TableContainer>
+                                    <Table size="small">
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell>Name</TableCell>
+                                                <TableCell>Status</TableCell>
+                                                <TableCell>Ready</TableCell>
+                                                <TableCell>Restarts</TableCell>
+                                                <TableCell>Node</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {data.pods.map((pod) => (
+                                                <TableRow
+                                                    key={pod.namespace + "/" + pod.name}
+                                                    data-test-id="workload-pod-row"
+                                                    onClick={() => navigate(`/pods/${pod.namespace}/${pod.name}`)}
+                                                    sx={tableRowSx(true)}
+                                                >
+                                                    <TableCell sx={{ fontFamily: "monospace" }}>{pod.name}</TableCell>
+                                                    <TableCell>{pod.phase}</TableCell>
+                                                    <TableCell>{pod.ready}</TableCell>
+                                                    <TableCell>{pod.restarts}</TableCell>
+                                                    <TableCell>{pod.node || "-"}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            )
+                        }
+                    </Paper>
+
+                    {Object.keys(data.labels).length > 0 && (
+                        <Paper variant="outlined" sx={{ p: 2 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Labels</Typography>
+                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                                {Object.entries(data.labels).map(([k, v]) => (
+                                    <Chip
+                                        key={k}
+                                        label={`${k}=${v}`}
+                                        size="small"
+                                        variant="outlined"
+                                        icon={<FontAwesomeIcon icon={faTag} />}
+                                    />
+                                ))}
+                            </Box>
+                        </Paper>
+                    )}
+
+                    {data.events.length > 0 && (
+                        <Paper variant="outlined" sx={{ p: 2 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Events</Typography>
+                            <TableContainer>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell>Type</TableCell>
+                                            <TableCell>Reason</TableCell>
+                                            <TableCell>Message</TableCell>
+                                            <TableCell>Count</TableCell>
+                                            <TableCell>Last Seen</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {data.events.map((ev, i) => (
+                                            <TableRow key={i} data-test-id="event-row">
+                                                <TableCell><EventTypeChip type={ev.type} /></TableCell>
+                                                <TableCell>{ev.reason}</TableCell>
+                                                <TableCell sx={{ maxWidth: 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.message}</TableCell>
+                                                <TableCell>{ev.count}</TableCell>
+                                                <TableCell>{ev.lastSeen ? formatAge(ev.lastSeen) : "-"}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Paper>
+                    )}
+                </Box>
+            )}
+
+            {activeTab === "commands" && (
+                <Box data-test-id="workload-panel-commands">
+                    <CommandsTab target={{ kind: COMMAND_KIND[kind], name: data.name, namespace: data.namespace }} />
+                </Box>
             )}
         </Box>
     );

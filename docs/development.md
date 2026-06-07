@@ -209,7 +209,7 @@ State that lives above the pages (currently the selected kubectl context) is own
 
 ### Routing
 
-React Router 7. Routes are declared centrally in `src/app.tsx`. Each page is colocated with its page-only components in its own directory: `src/pages/<page>/index.tsx` for the route-level component plus `src/pages/<page>/components/` for components used only by that page. Components shared across multiple pages (the app shell, header, sidebar, breadcrumbs, context/namespace pickers, and the YAML and commands dialogs) live under `src/components/`.
+React Router 7. Routes are declared centrally in `src/app.tsx`. Each page is colocated with its page-only components in its own directory: `src/pages/<page>/index.tsx` for the route-level component plus `src/pages/<page>/components/` for components used only by that page. Components shared across multiple pages (the app shell, header, sidebar, breadcrumbs, context/namespace pickers, the YAML dialog, and the guided-commands tab) live under `src/components/`.
 
 ### Icons
 

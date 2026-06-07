@@ -1,4 +1,4 @@
-import { buildGuidedCommands } from "../../lib/guided-commands";
+import { buildGuidedCommands, filterGuidedCommands } from "../../lib/guided-commands";
 
 describe("buildGuidedCommands for pods", () => {
     test("includes a namespace flag on every command when a namespace is given", () => {
@@ -98,5 +98,39 @@ describe("buildGuidedCommands for workloads", () => {
         const commands = buildGuidedCommands({ kind: "statefulset", name: "db" });
         expect(commands[0].label).toBe("Describe statefulset");
         expect(commands[commands.length - 1].label).toBe("Delete statefulset");
+    });
+});
+
+describe("filterGuidedCommands", () => {
+    const commands = buildGuidedCommands({ kind: "pod", name: "web-0", namespace: "prod" });
+
+    test("returns the full list for an empty query", () => {
+        expect(filterGuidedCommands(commands, "")).toEqual(commands);
+    });
+
+    test("returns the full list for a whitespace-only query", () => {
+        expect(filterGuidedCommands(commands, "   ")).toEqual(commands);
+    });
+
+    test("filters by command text", () => {
+        const result = filterGuidedCommands(commands, "delete");
+        expect(result).toHaveLength(1);
+        expect(result[0].command).toBe("kubectl delete pod web-0 -n prod");
+    });
+
+    test("filters by label, case-insensitively", () => {
+        const result = filterGuidedCommands(commands, "OPEN A SHELL");
+        expect(result).toHaveLength(1);
+        expect(result[0].label).toBe("Open a shell");
+    });
+
+    test("returns an empty list when nothing matches", () => {
+        expect(filterGuidedCommands(commands, "zzzzz")).toHaveLength(0);
+    });
+
+    test("can match more than one command", () => {
+        const result = filterGuidedCommands(commands, "logs");
+        expect(result.length).toBeGreaterThan(1);
+        expect(result.every((c) => c.command.includes("logs"))).toBe(true);
     });
 });
