@@ -10,6 +10,7 @@ import {
     setContextNamespace,
     listNodes,
     getNodeDetail,
+    getNamespaceDetail,
     getWorkloadDetail,
     isWorkloadKind,
     getClusterOverview,
@@ -673,6 +674,145 @@ describe("getNodeDetail", () => {
             [EVENTS_KEY]: () => ok(JSON.stringify({ items: [] })),
         });
         await expect(getNodeDetail("test-ctx", "node-1")).rejects.toThrow("not found");
+    });
+});
+
+describe("getNamespaceDetail", () => {
+    // Argv keys for the seven parallel reads getNamespaceDetail performs.
+    const NS_KEY = "--context test-ctx get namespace ns-1 -o json";
+    const PODS_KEY = "--context test-ctx -n ns-1 get pods -o json";
+    const DEPLOYS_KEY = "--context test-ctx -n ns-1 get deployments -o json";
+    const STATEFUL_KEY = "--context test-ctx -n ns-1 get statefulsets -o json";
+    const DAEMON_KEY = "--context test-ctx -n ns-1 get daemonsets -o json";
+    const QUOTA_KEY = "--context test-ctx -n ns-1 get resourcequotas -o json";
+    const LIMIT_KEY = "--context test-ctx -n ns-1 get limitranges -o json";
+
+    // A minimal namespace item shape with the fields getNamespaceDetail reads.
+    function makeNsItem(): object {
+        return {
+            metadata: {
+                name: "ns-1",
+                creationTimestamp: "2024-01-01T00:00:00Z",
+                labels: { "kubernetes.io/metadata.name": "ns-1", team: "backend" },
+                annotations: { "owner": "platform" },
+            },
+            status: { phase: "Active" },
+        };
+    }
+
+    // A minimal pod item as returned by the namespace-scoped pod query.
+    function makePodItem(name: string): object {
+        return {
+            metadata: { name, namespace: "ns-1", creationTimestamp: "2024-06-01T00:00:00Z" },
+            spec: { nodeName: "node-1", containers: [{ name: "c" }] },
+            status: { phase: "Running", containerStatuses: [{ ready: true, restartCount: 0 }] },
+        };
+    }
+
+    // Installs handlers returning empty item lists for every sub-read, so a test
+    // only has to override the reads it cares about.
+    function emptyHandlers(): Record<string, () => CommandResult> {
+        return {
+            [NS_KEY]: () => ok(JSON.stringify(makeNsItem())),
+            [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [DEPLOYS_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [STATEFUL_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [DAEMON_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [QUOTA_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [LIMIT_KEY]: () => ok(JSON.stringify({ items: [] })),
+        };
+    }
+
+    test("parses namespace metadata: phase, labels, annotations, age", async () => {
+        setRunnerHandlers(emptyHandlers());
+        const result = await getNamespaceDetail("test-ctx", "ns-1");
+        expect(result.name).toBe("ns-1");
+        expect(result.phase).toBe("Active");
+        expect(result.createdAt).toBe("2024-01-01T00:00:00Z");
+        expect(result.labels).toEqual({ "kubernetes.io/metadata.name": "ns-1", team: "backend" });
+        expect(result.annotations).toEqual({ owner: "platform" });
+        expect(result.resources).toEqual([]);
+        expect(result.quotas).toEqual([]);
+        expect(result.limits).toEqual([]);
+    });
+
+    test("lists contained resources (pods, deployments, stateful sets, daemon sets) with detail paths", async () => {
+        setRunnerHandlers({
+            ...emptyHandlers(),
+            [PODS_KEY]: () => ok(JSON.stringify({ items: [makePodItem("web-abc")] })),
+            [DEPLOYS_KEY]: () => ok(JSON.stringify({
+                items: [{ metadata: { name: "web" }, spec: { replicas: 3 }, status: { readyReplicas: 2 } }],
+            })),
+            [STATEFUL_KEY]: () => ok(JSON.stringify({
+                items: [{ metadata: { name: "db" }, spec: { replicas: 1 }, status: { readyReplicas: 1 } }],
+            })),
+            [DAEMON_KEY]: () => ok(JSON.stringify({
+                items: [{ metadata: { name: "agent" }, status: { desiredNumberScheduled: 4, numberReady: 4 } }],
+            })),
+        });
+        const result = await getNamespaceDetail("test-ctx", "ns-1");
+        expect(result.resources).toEqual([
+            { kind: "Pod", name: "web-abc", status: "Running", detailPath: "/pods/ns-1/web-abc" },
+            { kind: "Deployment", name: "web", status: "2/3 ready", detailPath: "/deployments/ns-1/web" },
+            { kind: "StatefulSet", name: "db", status: "1/1 ready", detailPath: "/statefulsets/ns-1/db" },
+            { kind: "DaemonSet", name: "agent", status: "4/4 ready", detailPath: "/daemonsets/ns-1/agent" },
+        ]);
+    });
+
+    test("parses resource quotas and limit ranges", async () => {
+        setRunnerHandlers({
+            ...emptyHandlers(),
+            [QUOTA_KEY]: () => ok(JSON.stringify({
+                items: [{ metadata: { name: "compute" }, spec: { hard: { "requests.cpu": "4", pods: "10" } } }],
+            })),
+            [LIMIT_KEY]: () => ok(JSON.stringify({
+                items: [{
+                    metadata: { name: "mem-limit" },
+                    spec: {
+                        limits: [{
+                            type: "Container",
+                            min: { memory: "64Mi" },
+                            max: { memory: "1Gi" },
+                            default: { memory: "256Mi" },
+                            defaultRequest: { memory: "128Mi" },
+                        }],
+                    },
+                }],
+            })),
+        });
+        const result = await getNamespaceDetail("test-ctx", "ns-1");
+        expect(result.quotas).toEqual([
+            { name: "compute", hard: { "requests.cpu": "4", pods: "10" } },
+        ]);
+        expect(result.limits).toEqual([
+            {
+                name: "mem-limit",
+                type: "Container",
+                resource: "memory",
+                min: "64Mi",
+                max: "1Gi",
+                defaultRequest: "128Mi",
+                default: "256Mi",
+            },
+        ]);
+    });
+
+    test("tolerates a failing sub-read and still returns namespace detail", async () => {
+        setRunnerHandlers({
+            ...emptyHandlers(),
+            [PODS_KEY]: () => fail("forbidden"),
+        });
+        const result = await getNamespaceDetail("test-ctx", "ns-1");
+        expect(result.name).toBe("ns-1");
+        expect(result.resources).toEqual([]);
+    });
+
+    test("throws when the namespace call fails", async () => {
+        setRunnerHandlers({
+            ...emptyHandlers(),
+            [NS_KEY]: () => fail("not found"),
+        });
+        await expect(getNamespaceDetail("test-ctx", "ns-1")).rejects.toThrow("not found");
     });
 });
 

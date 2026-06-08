@@ -11,6 +11,7 @@ The spec is reverse-engineered from the shipped code and the prose docs (`docs/a
 | [read-only-invariant](./read-only-invariant/index.md) | Settled | Complete | Karse never runs a mutating kubectl subcommand against a cluster. |
 | [context-switching](./context-switching/index.md) | Settled | Complete | List kubeconfig contexts and switch the active one (tab-local and persisted). |
 | [namespace-selector](./namespace-selector/index.md) | Settled | Complete | Scope views to a chosen namespace; tab-local active vs persisted default. |
+| [namespace-detail](./namespace-detail/index.md) | Settled | Complete | `/namespaces/:name` page: phase, labels, annotations, quotas/limits, contained resources, commands, YAML. |
 | [cluster-overview](./cluster-overview/index.md) | Settled | Complete | Cluster home page with four stat tiles for the active context. |
 | [nodes-view](./nodes-view/index.md) | Settled | Complete | Read-only, sortable, searchable nodes table. |
 | [node-detail](./node-detail/index.md) | Settled | Complete | `/nodes/:name` page: conditions, capacity/allocatable, addresses, pods, events. |

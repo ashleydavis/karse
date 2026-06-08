@@ -39,9 +39,10 @@ type Props = {
     error: Error | null;
     onUse: (name: string | null) => void;
     onSetDefault?: (name: string | null) => void;
+    onOpen?: (name: string) => void;
 };
 
-export function NamespaceList({ namespaces, active, terminalDefault, isLoading, error, onUse, onSetDefault }: Props) {
+export function NamespaceList({ namespaces, active, terminalDefault, isLoading, error, onUse, onSetDefault, onOpen }: Props) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
 
@@ -76,8 +77,10 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
             enableSorting: false,
             cell: (info) => {
                 const name = info.row.original.name;
+                // Stop propagation so clicking an action button does not also trigger
+                // the row's navigate-to-detail handler.
                 return (
-                    <span style={{ display: "inline-flex", gap: 8 }}>
+                    <span style={{ display: "inline-flex", gap: 8 }} onClick={(e) => e.stopPropagation()}>
                         <Button
                             size="small"
                             variant="outlined"
@@ -186,7 +189,12 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
                             </TableRow>
                         )}
                         {rows.map((row) => (
-                            <TableRow key={row.id} data-test-id="namespace-row" sx={tableRowSx(false)}>
+                            <TableRow
+                                key={row.id}
+                                data-test-id="namespace-row"
+                                onClick={onOpen ? () => onOpen(row.original.name) : undefined}
+                                sx={tableRowSx(onOpen !== undefined)}
+                            >
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell key={cell.id}>
                                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

@@ -71,6 +71,15 @@ function buildCrumbs(
         ];
     }
 
+    // Namespace detail: /namespaces/:name -> Namespaces > <name>
+    if (root === "namespaces" && params.name)
+    {
+        return [
+            { label: "Namespaces", to: "/namespaces" },
+            { label: params.name },
+        ];
+    }
+
     // Any other top-level list page is a single, current crumb.
     return [{ label: listLabel }];
 }

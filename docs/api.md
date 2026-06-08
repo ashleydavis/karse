@@ -139,6 +139,35 @@ curl -fsS 'http://127.0.0.1:5172/api/namespaces?context=my-ctx'
 }
 ```
 
+## GET /api/namespaces/:name
+
+Returns the detailed view of a single namespace: its phase, labels, annotations, the resources contained in it, and any resource quotas and limit ranges. Backs the namespace detail page (`/namespaces/:name`).
+
+- **Request query**: `context` (required) — the kubeconfig context name.
+- **Response 200**: `NamespaceDetail` — `name`, `phase`, `createdAt`, `labels`, `annotations`, `resources[]` (each `{ kind, name, status, detailPath }`), `quotas[]` (each `{ name, hard }`), `limits[]` (each `{ name, type, resource, min, max, defaultRequest, default }`).
+- **Response 400**: `{ "error": "context query parameter is required" }` when `context` is missing or blank.
+- **Response 500**: `{ "error": "<kubectl stderr>" }` when the namespace read fails. The contained-resource and quota/limit sub-reads are tolerant: a failing sub-read contributes an empty list rather than failing the request.
+
+```sh
+curl -fsS 'http://127.0.0.1:5172/api/namespaces/team-a?context=my-ctx'
+```
+
+```json
+{
+  "name": "team-a",
+  "phase": "Active",
+  "createdAt": "2024-01-01T00:00:00Z",
+  "labels": { "team": "alpha" },
+  "annotations": { "owner": "platform" },
+  "resources": [
+    { "kind": "Pod", "name": "web-abc", "status": "Running", "detailPath": "/pods/team-a/web-abc" },
+    { "kind": "Deployment", "name": "web", "status": "2/3 ready", "detailPath": "/deployments/team-a/web" }
+  ],
+  "quotas": [{ "name": "compute", "hard": { "pods": "10" } }],
+  "limits": []
+}
+```
+
 ## POST /api/namespaces/default
 
 Sets or clears the default namespace for the given context in the local kubeconfig (`kubectl config set-context --namespace=<ns>` or `kubectl config unset contexts.<ctx>.namespace` for empty).

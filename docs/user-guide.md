@@ -98,6 +98,16 @@ A table of namespaces for the active context.
 - **Set as default / Clear default**: writes or removes the default namespace for this context in your kubeconfig.
 - **active** chip: this namespace is currently active in the tab.
 - **default** chip: this is the kubeconfig default namespace for the active context.
+- **Click a row** (anywhere except the action buttons) to open that namespace's detail page.
+
+## Namespace detail page (`/namespaces/:name`)
+
+Reached by clicking a namespace row. Organised into four tabs:
+
+- **Details**: the namespace's phase, age, labels, annotations, and any resource quotas and limit ranges.
+- **Resources**: a searchable, sortable table of the resources in the namespace (pods, deployments, stateful sets, daemon sets). Click a row to open that resource's own detail page.
+- **Commands**: copy-only `kubectl` command suggestions for the namespace. Karse never runs them.
+- **YAML**: the namespace's raw YAML.
 
 ## Pods page (`/pods`)
 

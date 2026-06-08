@@ -9,9 +9,10 @@ Backed by: the per-page table components under `frontend/src/pages/*/components/
 ## Behaviour
 
 - Nodes table rows link to `/nodes/:name`.
+- Namespaces table rows link to `/namespaces/:name` (clicking an action button on a row does not navigate).
 - Pods table rows link to `/pods/:namespace/:name`.
 - Deployments / stateful sets / daemon sets table rows link to `/<kind>/:namespace/:name`.
-- Pods listed on a node, pod, or workload detail page link to the relevant pod detail page.
+- Pods listed on a node, pod, or workload detail page link to the relevant pod detail page; resources listed on a namespace detail page link to their own detail page.
 - Clickable rows share a common hover/cursor style (`table-row-style.ts`) so they look and behave consistently.
 
 ## Acceptance Criteria

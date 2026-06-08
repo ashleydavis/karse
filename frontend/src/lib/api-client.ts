@@ -2,7 +2,7 @@ import axios from "axios";
 import type {
     ContextsResponse, ClusterOverview, Node, NamespacesResponse, PodsResponse,
     DeploymentsResponse, StatefulSetsResponse, DaemonSetsResponse,
-    WorkloadKind, WorkloadDetail,
+    WorkloadKind, WorkloadDetail, NamespaceDetail,
     PodDetail, NodeDetail, YamlResourceType, YamlResponse,
     LogStreamLine, LogStreamStarted, EventsResponse, ErrorsResponse,
     SternStreamLine, SternStreamStarted,
@@ -41,6 +41,13 @@ export async function fetchNodes(context: string): Promise<{ nodes: Node[] }> {
 // Fetches the list of namespaces in the cluster for the given context.
 export async function fetchNamespaces(context: string): Promise<NamespacesResponse> {
     const response = await http.get<NamespacesResponse>("/namespaces", { params: { context } });
+    return response.data;
+}
+
+// Fetches the full detail for a single namespace including its phase, labels,
+// annotations, contained resources, quotas, and limit ranges.
+export async function fetchNamespaceDetail(context: string, name: string): Promise<NamespaceDetail> {
+    const response = await http.get<NamespaceDetail>(`/namespaces/${name}`, { params: { context } });
     return response.data;
 }
 

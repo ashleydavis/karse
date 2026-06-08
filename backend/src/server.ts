@@ -3,6 +3,7 @@ import type { ErrorRequestHandler } from "express";
 import { contextsRouter } from "./routes/contexts-route";
 import { clusterRouter } from "./routes/cluster-route";
 import { namespacesRouter } from "./routes/namespaces-route";
+import { namespaceDetailRouter } from "./routes/namespace-detail-route";
 import { podsRouter } from "./routes/pods-route";
 import { podDetailRouter } from "./routes/pod-detail-route";
 import { nodeDetailRouter } from "./routes/node-detail-route";
@@ -21,6 +22,9 @@ export function createServer(): express.Express {
     app.use(express.json());
     app.use("/api", contextsRouter);
     app.use("/api", clusterRouter);
+    // Namespace detail (GET /namespaces/:name) must come before the list router so
+    // the parameterised detail route is matched before any later catch-all.
+    app.use("/api", namespaceDetailRouter);
     app.use("/api", namespacesRouter);
     // Pod detail + logs must come before the list route to avoid param conflicts.
     app.use("/api", podDetailRouter);

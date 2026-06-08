@@ -576,6 +576,29 @@ test.describe("karse e2e", () => {
             await expect(list.locator("button", { hasText: "Clear default" }).first()).toBeVisible();
         });
 
+        test("clicking a namespace row navigates to its detail page", async () => {
+            await page.locator("[data-test-id='namespaces-filter'] input").fill("");
+            const defaultRow = page.locator("[data-test-id='namespace-row']").filter({ hasText: /^default/ }).first();
+            // Click the Name cell (not an action button) to navigate to the detail page.
+            await defaultRow.locator("td:first-child").click();
+            await expect(page).toHaveURL(/\/namespaces\/default/);
+            await expect(page.locator("[data-test-id='namespace-detail']")).toBeVisible();
+            // Return to the list so later tests in this block start from /namespaces.
+            await page.goto("/namespaces", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='namespace-row']").first()).toBeVisible();
+        });
+
+        test("clicking an action button does not navigate to the detail page", async () => {
+            const defaultRow = page.locator("[data-test-id='namespace-row']").filter({ hasText: /^default/ }).first();
+            await defaultRow.locator("button", { hasText: /Set as active|Clear active/ }).click();
+            // Still on the list page; the action button's click did not navigate to a
+            // detail page. The button may append a ?namespace=... query, so allow a
+            // query string but require the path to remain the bare list path (no
+            // /namespaces/<name> segment).
+            await expect(page).toHaveURL(/\/namespaces(\?|$)/);
+            await expect(page.locator("[data-test-id='namespace-detail']")).toHaveCount(0);
+        });
+
         test("namespaces page redirects to /contexts when no context is selected", async () => {
             unsetContext();
             await page.goto("/namespaces", { waitUntil: "networkidle" });
@@ -1541,6 +1564,138 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Namespace detail page ───────────────────────────────────────────────────
+
+    test.describe("namespace detail page", () => {
+        const FAKE_NAMESPACE_DETAIL = {
+            name: "team-a",
+            phase: "Active",
+            createdAt: new Date().toISOString(),
+            labels: { "kubernetes.io/metadata.name": "team-a", team: "alpha" },
+            annotations: { owner: "platform" },
+            resources: [
+                { kind: "Pod", name: "web-abc", status: "Running", detailPath: "/pods/team-a/web-abc" },
+                { kind: "Deployment", name: "web", status: "2/3 ready", detailPath: "/deployments/team-a/web" },
+            ],
+            quotas: [{ name: "compute", hard: { "requests.cpu": "4", pods: "10" } }],
+            limits: [
+                {
+                    name: "mem-limit",
+                    type: "Container",
+                    resource: "memory",
+                    min: "64Mi",
+                    max: "1Gi",
+                    defaultRequest: "128Mi",
+                    default: "256Mi",
+                },
+            ],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/namespaces/team-a*", async (route) => {
+                await route.fulfill({ json: FAKE_NAMESPACE_DETAIL });
+            });
+            await page.goto("/namespaces/team-a", { waitUntil: "networkidle" });
+        });
+
+        test.beforeEach(async () => {
+            // Reset to the default Details tab between tests.
+            await page.goto("/namespaces/team-a", { waitUntil: "networkidle" });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/namespaces/team-a*");
+        });
+
+        test("shows the namespace name as heading and an Active phase chip", async () => {
+            await expect(page.getByRole("heading", { name: "team-a" })).toBeVisible();
+            await expect(page.locator("[data-test-id='namespace-phase-chip']")).toHaveText("Active");
+        });
+
+        test("breadcrumb trail starts at Namespaces", async () => {
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Namespaces");
+        });
+
+        test("shows the four tabs and defaults to Details", async () => {
+            await expect(page.locator("[data-test-id='namespace-tab-detail']")).toBeVisible();
+            await expect(page.locator("[data-test-id='namespace-tab-resources']")).toBeVisible();
+            await expect(page.locator("[data-test-id='namespace-tab-commands']")).toBeVisible();
+            await expect(page.locator("[data-test-id='namespace-tab-yaml']")).toBeVisible();
+            await expect(page.locator("[data-test-id='namespace-panel-detail']")).toBeVisible();
+            await expect(page.locator("[data-test-id='namespace-panel-resources']")).toHaveCount(0);
+        });
+
+        test("Details tab shows labels, annotations, quotas, and limit ranges", async () => {
+            await expect(page.locator("[data-test-id='namespace-labels']")).toBeVisible();
+            await expect(page.locator("[data-test-id='namespace-labels']")).toContainText("team=alpha");
+            await expect(page.locator("[data-test-id='namespace-annotations']")).toContainText("owner");
+            await expect(page.locator("[data-test-id='namespace-quota-row']").first()).toContainText("requests.cpu");
+            await expect(page.locator("[data-test-id='namespace-limit-row']").first()).toContainText("memory");
+        });
+
+        test("Resources tab lists the contained resources with search and sort", async () => {
+            await page.locator("[data-test-id='namespace-tab-resources']").click();
+            await expect(page.locator("[data-test-id='namespace-resources-table']")).toBeVisible();
+            await expect(page.locator("[data-test-id='namespace-resource-row']")).toHaveCount(2);
+            // Search narrows to the deployment only.
+            await page.locator("[data-test-id='namespace-resources-filter'] input").fill("web ");
+            // Both rows contain "web" so both remain; narrow to the Deployment kind.
+            await page.locator("[data-test-id='namespace-resources-filter'] input").fill("Deployment");
+            await expect(page.locator("[data-test-id='namespace-resource-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='namespace-resource-row']").first()).toContainText("web");
+            // Clearing the filter restores both rows.
+            await page.locator("[data-test-id='namespace-resources-filter'] input").fill("");
+            await expect(page.locator("[data-test-id='namespace-resource-row']")).toHaveCount(2);
+            // The Kind header sorts the table.
+            await page.locator("[data-test-id='namespace-resources-table'] thead th").filter({ hasText: "Kind" }).click();
+            const kinds = await page.locator("[data-test-id='namespace-resource-row'] td:first-child").allTextContents();
+            expect(kinds[0]).toBe("Deployment");
+        });
+
+        test("clicking a resource row navigates to that resource's detail page", async () => {
+            await page.route("**/api/pods/team-a/web-abc*", async (route) => {
+                await route.fulfill({
+                    json: {
+                        name: "web-abc",
+                        namespace: "team-a",
+                        phase: "Running",
+                        node: "node-cp",
+                        podIP: "10.0.0.5",
+                        createdAt: new Date().toISOString(),
+                        labels: {},
+                        containers: [],
+                        initContainers: [],
+                        events: [],
+                    },
+                });
+            });
+            await page.locator("[data-test-id='namespace-tab-resources']").click();
+            await page.locator("[data-test-id='namespace-resource-row']").filter({ hasText: "web-abc" }).click();
+            await expect(page).toHaveURL(/\/pods\/team-a\/web-abc/);
+            await page.unroute("**/api/pods/team-a/web-abc*");
+        });
+
+        test("Commands tab shows guided commands for the namespace", async () => {
+            await page.locator("[data-test-id='namespace-tab-commands']").click();
+            await expect(page.locator("[data-test-id='commands-tab']")).toBeVisible();
+            const commands = await page.locator("[data-test-id='command-text']").allTextContents();
+            expect(commands).toContain("kubectl describe namespace team-a");
+            expect(commands).toContain("kubectl get all -n team-a");
+        });
+
+        test("YAML tab renders the namespace yaml", async () => {
+            await page.route("**/api/yaml/namespaces/team-a*", async (route) => {
+                await route.fulfill({ json: { yaml: "apiVersion: v1\nkind: Namespace\nmetadata:\n  name: team-a\n" } });
+            });
+            await page.locator("[data-test-id='namespace-tab-yaml']").click();
+            await expect(page.locator("[data-test-id='namespace-panel-yaml']")).toBeVisible();
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("kind: Namespace");
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("name: team-a");
+            await page.unroute("**/api/yaml/namespaces/team-a*");
+        });
+    });
+
     // ── Pods page ─────────────────────────────────────────────────────────────
 
     test.describe("pods page", () => {
@@ -2361,12 +2516,14 @@ test.describe("karse e2e", () => {
             expect(await rowCursor("[data-test-id='context-row']")).toBe("default");
         });
 
-        test("static namespace rows highlight on hover with the default cursor", async () => {
+        test("clickable namespace rows highlight on hover and show a pointer cursor", async () => {
             await page.goto("/namespaces", { waitUntil: "networkidle" });
             await expect(page.locator("[data-test-id='namespace-row']").first()).toBeVisible();
             const { before, after } = await hoverBackgrounds("[data-test-id='namespace-row']");
             expect(after).not.toBe(before);
-            expect(await rowCursor("[data-test-id='namespace-row']")).toBe("default");
+            // Namespace rows now navigate to the namespace detail page, so they carry
+            // the same pointer-cursor affordance as the other clickable resource rows.
+            expect(await rowCursor("[data-test-id='namespace-row']")).toBe("pointer");
         });
 
         test("node and context rows share the same hover background color", async () => {

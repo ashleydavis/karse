@@ -5,7 +5,7 @@
 import { fuzzyMatch } from "./fuzzy-filter";
 
 // The resource kinds for which guided commands can be generated.
-export type GuidedResourceKind = "pod" | "node" | "deployment" | "statefulset" | "daemonset";
+export type GuidedResourceKind = "pod" | "node" | "namespace" | "deployment" | "statefulset" | "daemonset";
 
 // Identifies a single resource for which to build command suggestions.
 export type GuidedResourceTarget = {
@@ -89,6 +89,36 @@ function buildNodeCommands(name: string): GuidedCommand[] {
     ];
 }
 
+// Builds the kubectl command suggestions for a single namespace.
+function buildNamespaceCommands(name: string): GuidedCommand[] {
+    return [
+        {
+            label: "Describe namespace",
+            command: `kubectl describe namespace ${name}`,
+        },
+        {
+            label: "Get namespace YAML",
+            command: `kubectl get namespace ${name} -o yaml`,
+        },
+        {
+            label: "List all resources",
+            command: `kubectl get all -n ${name}`,
+        },
+        {
+            label: "List events",
+            command: `kubectl get events -n ${name}`,
+        },
+        {
+            label: "Show resource quotas",
+            command: `kubectl get resourcequotas -n ${name}`,
+        },
+        {
+            label: "Delete namespace",
+            command: `kubectl delete namespace ${name}`,
+        },
+    ];
+}
+
 // Builds the kubectl command suggestions for a workload (deployment, statefulset, daemonset).
 function buildWorkloadCommands(kind: string, name: string, namespace?: string): GuidedCommand[] {
     const commands: GuidedCommand[] = [
@@ -132,6 +162,10 @@ export function buildGuidedCommands(target: GuidedResourceTarget): GuidedCommand
     if (target.kind === "node")
     {
         return buildNodeCommands(target.name);
+    }
+    if (target.kind === "namespace")
+    {
+        return buildNamespaceCommands(target.name);
     }
     return buildWorkloadCommands(target.kind, target.name, target.namespace);
 }

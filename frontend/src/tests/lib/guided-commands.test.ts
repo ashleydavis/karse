@@ -55,6 +55,25 @@ describe("buildGuidedCommands for nodes", () => {
     });
 });
 
+describe("buildGuidedCommands for namespaces", () => {
+    test("never appends a namespace flag (the namespace is the target itself)", () => {
+        const commands = buildGuidedCommands({ kind: "namespace", name: "prod" });
+        expect(commands.some((c) => c.command.includes(" -n prod -n "))).toBe(false);
+    });
+
+    test("produces the expected namespace command set", () => {
+        const commands = buildGuidedCommands({ kind: "namespace", name: "prod" });
+        expect(commands.map((c) => c.command)).toEqual([
+            "kubectl describe namespace prod",
+            "kubectl get namespace prod -o yaml",
+            "kubectl get all -n prod",
+            "kubectl get events -n prod",
+            "kubectl get resourcequotas -n prod",
+            "kubectl delete namespace prod",
+        ]);
+    });
+});
+
 describe("buildGuidedCommands for workloads", () => {
     test("deployment includes a scale-replicas command", () => {
         const commands = buildGuidedCommands({ kind: "deployment", name: "api", namespace: "prod" });

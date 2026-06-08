@@ -3,6 +3,7 @@ import { AppLayout } from "./components/app-layout";
 import { ClusterHomePage } from "./pages/cluster-home";
 import { ContextsPage } from "./pages/contexts";
 import { NamespacesPage } from "./pages/namespaces";
+import { NamespaceDetailPage } from "./pages/namespace-detail";
 import { NodesPage } from "./pages/nodes";
 import { PodsPage } from "./pages/pods";
 import { DeploymentsPage } from "./pages/deployments";
@@ -32,6 +33,7 @@ export function App() {
                 <Route path="nodes" element={<NodesPage />} />
                 <Route path="nodes/:name" element={<NodeDetailPage />} />
                 <Route path="namespaces" element={<NamespacesPage />} />
+                <Route path="namespaces/:name" element={<NamespaceDetailPage />} />
                 <Route path="pods" element={<PodsPage />} />
                 <Route path="pods/:namespace/:name" element={<PodDetailPage />} />
                 <Route path="deployments" element={<DeploymentsPage />} />

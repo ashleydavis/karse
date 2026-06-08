@@ -279,6 +279,51 @@ export type WorkloadDetail = {
     events: KubeEvent[];
 };
 
+// One resource living inside a namespace, shown on the namespace detail page's
+// Resources tab. kind is the singular resource kind ("Pod", "Deployment", etc.);
+// detailPath, when set, is the in-app route to that resource's own detail page so
+// the row can link through. status is a short human-readable summary (phase or
+// ready count) shown in the table.
+export type NamespaceResource = {
+    kind: string;
+    name: string;
+    status: string;
+    detailPath: string | null;
+};
+
+// A resource quota declared in the namespace, with its hard limits. Each entry
+// pairs a quota resource name (e.g. "cpu", "pods") with its hard value.
+export type NamespaceQuota = {
+    name: string;
+    hard: Record<string, string>;
+};
+
+// A LimitRange item declared in the namespace, summarising the default/min/max
+// constraints it places on a resource type (e.g. Container cpu defaults).
+export type NamespaceLimit = {
+    name: string;
+    type: string;             // e.g. "Container", "Pod"
+    resource: string;         // e.g. "cpu", "memory"
+    min: string;
+    max: string;
+    defaultRequest: string;
+    default: string;
+};
+
+// Detailed view of a single namespace, returned by GET /api/namespaces/:name.
+// Carries the namespace's own metadata (phase, labels, annotations), the
+// resources contained in it, and any resource quotas / limit ranges that apply.
+export type NamespaceDetail = {
+    name: string;
+    phase: string;            // status.phase, e.g. "Active" / "Terminating"
+    createdAt: string;        // ISO timestamp; UI computes age
+    labels: Record<string, string>;
+    annotations: Record<string, string>;
+    resources: NamespaceResource[];
+    quotas: NamespaceQuota[];
+    limits: NamespaceLimit[];
+};
+
 // The resource types whose raw YAML can be viewed in the dashboard.
 export type YamlResourceType =
     "nodes" | "pods" | "deployments" | "daemonsets" | "statefulsets" | "namespaces";

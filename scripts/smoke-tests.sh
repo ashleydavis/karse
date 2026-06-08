@@ -189,6 +189,14 @@ curl -fsS "$BASE/api/namespaces?context=$CURRENT_CTX" \
     > /dev/null
 echo "OK"
 
+echo "--- GET /api/namespaces/:name (drill down into a namespace) ---"
+NS_DETAIL=$(curl -fsS "$BASE/api/namespaces/default?context=$CURRENT_CTX")
+echo "$NS_DETAIL" | jq -e '.name == "default" and has("phase") and has("labels") and has("annotations") and (.resources | type == "array") and (.quotas | type == "array") and (.limits | type == "array")' > /dev/null
+# default holds smoke-pod and smoke-deploy, so its resource list must include them.
+echo "$NS_DETAIL" | jq -e '.resources | any(.kind == "Pod" and .name == "smoke-pod" and .detailPath == "/pods/default/smoke-pod")' > /dev/null
+echo "$NS_DETAIL" | jq -e '.resources | any(.kind == "Deployment" and .name == "smoke-deploy" and .detailPath == "/deployments/default/smoke-deploy")' > /dev/null
+echo "OK"
+
 echo "--- GET /api/pods (all namespaces) ---"
 curl -fsS "$BASE/api/pods?context=$CURRENT_CTX" \
     | jq -e 'has("pods")' \

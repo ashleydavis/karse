@@ -6,6 +6,7 @@ import type {
     ContainerInfo, ContainerState, KubeEvent, PodDetail,
     NodeCondition, NodeAddress, ResourceAmounts, NodeDetail,
     ClusterEvent, WorkloadKind, WorkloadStat, WorkloadDetail, ClusterError,
+    NamespaceDetail, NamespaceResource, NamespaceQuota, NamespaceLimit,
 } from "karse-types";
 
 // Base directory for the rolling audit log; overridable via KARSE_LOGS_DIR.
@@ -686,6 +687,133 @@ export async function getWorkloadDetail(
         stats: workloadStats(kind, item),
         pods,
         events,
+    };
+}
+
+// Returns detailed information for a single namespace: its own metadata (phase,
+// labels, annotations) plus the resources contained in it (pods, deployments,
+// stateful sets, daemon sets) and any resource quotas / limit ranges that apply.
+// READ-ONLY. The namespace read is authoritative and re-throws on failure; the
+// contained-resource and quota/limit sub-reads are tolerant and degrade to empty
+// lists so a single failing kind does not fail the whole page.
+export async function getNamespaceDetail(context: string, name: string): Promise<NamespaceDetail> {
+    const ctx = ["--context", context];
+    const [
+        nsResult, podsResult, deploysResult, statefulResult, daemonResult, quotaResult, limitResult,
+    ] = await Promise.all([
+        kubectl([...ctx, "get", "namespace", name, "-o", "json"]),
+        kubectl([...ctx, "-n", name, "get", "pods", "-o", "json"]),
+        kubectl([...ctx, "-n", name, "get", "deployments", "-o", "json"]),
+        kubectl([...ctx, "-n", name, "get", "statefulsets", "-o", "json"]),
+        kubectl([...ctx, "-n", name, "get", "daemonsets", "-o", "json"]),
+        kubectl([...ctx, "-n", name, "get", "resourcequotas", "-o", "json"]),
+        kubectl([...ctx, "-n", name, "get", "limitranges", "-o", "json"]),
+    ]);
+    if (nsResult.exitCode !== 0) {
+        throw new Error(nsResult.stderr);
+    }
+    const ns = JSON.parse(nsResult.stdout);
+
+    const resources: NamespaceResource[] = [];
+
+    // Pods in the namespace, summarised by phase, linking to the pod detail page.
+    if (podsResult.exitCode === 0) {
+        for (const item of (JSON.parse(podsResult.stdout).items as any[])) {
+            const pod = mapPodListItem(item);
+            resources.push({
+                kind: "Pod",
+                name: pod.name,
+                status: pod.phase,
+                detailPath: `/pods/${pod.namespace}/${pod.name}`,
+            });
+        }
+    }
+    // Deployments, summarised by ready count, linking to the workload detail page.
+    if (deploysResult.exitCode === 0) {
+        for (const item of (JSON.parse(deploysResult.stdout).items as any[])) {
+            const desired: number = item.spec?.replicas ?? 0;
+            const ready: number = item.status?.readyReplicas ?? 0;
+            resources.push({
+                kind: "Deployment",
+                name: item.metadata.name,
+                status: `${ready}/${desired} ready`,
+                detailPath: `/deployments/${name}/${item.metadata.name}`,
+            });
+        }
+    }
+    // Stateful sets, summarised by ready count.
+    if (statefulResult.exitCode === 0) {
+        for (const item of (JSON.parse(statefulResult.stdout).items as any[])) {
+            const desired: number = item.spec?.replicas ?? 0;
+            const ready: number = item.status?.readyReplicas ?? 0;
+            resources.push({
+                kind: "StatefulSet",
+                name: item.metadata.name,
+                status: `${ready}/${desired} ready`,
+                detailPath: `/statefulsets/${name}/${item.metadata.name}`,
+            });
+        }
+    }
+    // Daemon sets, summarised by ready/desired scheduled count.
+    if (daemonResult.exitCode === 0) {
+        for (const item of (JSON.parse(daemonResult.stdout).items as any[])) {
+            const desired: number = item.status?.desiredNumberScheduled ?? 0;
+            const ready: number = item.status?.numberReady ?? 0;
+            resources.push({
+                kind: "DaemonSet",
+                name: item.metadata.name,
+                status: `${ready}/${desired} ready`,
+                detailPath: `/daemonsets/${name}/${item.metadata.name}`,
+            });
+        }
+    }
+
+    // Resource quotas declared in the namespace, with their hard limits.
+    const quotas: NamespaceQuota[] = [];
+    if (quotaResult.exitCode === 0) {
+        for (const item of (JSON.parse(quotaResult.stdout).items as any[])) {
+            quotas.push({
+                name: item.metadata.name,
+                hard: (item.spec?.hard ?? item.status?.hard ?? {}) as Record<string, string>,
+            });
+        }
+    }
+
+    // Limit ranges declared in the namespace, flattened to one row per limit.
+    const limits: NamespaceLimit[] = [];
+    if (limitResult.exitCode === 0) {
+        for (const item of (JSON.parse(limitResult.stdout).items as any[])) {
+            for (const lim of (item.spec?.limits ?? []) as any[]) {
+                const resourceNames = new Set<string>([
+                    ...Object.keys(lim.min ?? {}),
+                    ...Object.keys(lim.max ?? {}),
+                    ...Object.keys(lim.default ?? {}),
+                    ...Object.keys(lim.defaultRequest ?? {}),
+                ]);
+                for (const resource of resourceNames) {
+                    limits.push({
+                        name: item.metadata.name,
+                        type: lim.type ?? "",
+                        resource,
+                        min: lim.min?.[resource] ?? "-",
+                        max: lim.max?.[resource] ?? "-",
+                        defaultRequest: lim.defaultRequest?.[resource] ?? "-",
+                        default: lim.default?.[resource] ?? "-",
+                    });
+                }
+            }
+        }
+    }
+
+    return {
+        name: ns.metadata.name,
+        phase: ns.status?.phase ?? "Unknown",
+        createdAt: ns.metadata.creationTimestamp,
+        labels: ns.metadata.labels ?? {},
+        annotations: ns.metadata.annotations ?? {},
+        resources,
+        quotas,
+        limits,
     };
 }
 
