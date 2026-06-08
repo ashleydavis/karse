@@ -31,6 +31,7 @@ Conventions for Karse (Bun + TypeScript backend, Vite + React frontend). Every c
 
 - ESM only. Never use `require(...)`. Never use dynamic `import(...)`.
 - All imports are static `import` statements at the top of the file.
+- **No re-exports.** A module exports only the symbols it defines. Never re-export another module's symbol, in any form: `export { x } from "./y"`, `export * from "./y"`, or `import { x } from "./y"; export { x }`. Every call site imports a symbol directly from the module that defines it. No barrel/index re-export files.
 
 ## Frontend conventions
 
