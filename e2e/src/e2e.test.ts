@@ -3750,26 +3750,40 @@ test.describe("karse e2e", () => {
 
     // ── Column configuration ────────────────────────────────────────────────────
 
-    // Simulates an HTML5 drag-and-drop from one element onto another by dispatching the
-    // native drag event sequence. Playwright's mouse-based dragTo does not trigger native
-    // draggable elements reliably, so the events are dispatched directly. The same
-    // DataTransfer is shared across the events, as a real drag would.
+    // Simulates a pointer-driven drag-and-drop from one element onto another, as dnd-kit's
+    // PointerSensor expects: press on the source, move in small steps to the target (dnd-kit
+    // only starts tracking once the pointer moves after the press), then release. Stepped moves
+    // are needed so the sensor registers the drag and the collision detection settles on the
+    // target before the drop.
     async function dragColumnOnto(sourceTestId: string, targetTestId: string): Promise<void> {
-        await page.evaluate(
-            ({ sourceTestId, targetTestId }) => {
-                const source = document.querySelector(`[data-test-id='${sourceTestId}']`);
-                const target = document.querySelector(`[data-test-id='${targetTestId}']`);
-                if (source === null || target === null) {
-                    throw new Error("drag source or target not found");
-                }
-                const dataTransfer = new DataTransfer();
-                source.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer }));
-                target.dispatchEvent(new DragEvent("dragover", { bubbles: true, dataTransfer }));
-                target.dispatchEvent(new DragEvent("drop", { bubbles: true, dataTransfer }));
-                source.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer }));
-            },
-            { sourceTestId, targetTestId },
-        );
+        const source = page.locator(`[data-test-id='${sourceTestId}']`);
+        const target = page.locator(`[data-test-id='${targetTestId}']`);
+        const sourceBox = await source.boundingBox();
+        const targetBox = await target.boundingBox();
+        if (sourceBox === null || targetBox === null) {
+            throw new Error("drag source or target not found");
+        }
+        const startX = sourceBox.x + sourceBox.width / 2;
+        const startY = sourceBox.y + sourceBox.height / 2;
+        const endX = targetBox.x + targetBox.width / 2;
+        const endY = targetBox.y + targetBox.height / 2;
+        await page.mouse.move(startX, startY);
+        await page.mouse.down();
+        // Step the pointer towards the target so dnd-kit starts and tracks the drag.
+        const steps = 10;
+        for (let step = 1; step <= steps; step++) {
+            const x = startX + ((endX - startX) * step) / steps;
+            const y = startY + ((endY - startY) * step) / steps;
+            await page.mouse.move(x, y);
+        }
+        // A final settle move on the target, then release to drop.
+        await page.mouse.move(endX, endY);
+        await page.mouse.up();
+        // dnd-kit suppresses the single click that a browser synthesises right after a pointer
+        // drag (so a drag never doubles as a click). Absorb that one suppressed click with a
+        // neutral click on the modal's instructional text, so the test's next real click (e.g.
+        // Close) lands.
+        await page.locator("[data-test-id='column-config-modal']").getByText("Drag columns to reorder").click();
     }
 
     // Returns the visible nodes-table column header texts (excluding the empty actions header).

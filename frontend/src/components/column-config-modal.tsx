@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import {
     Dialog,
     DialogTitle,
@@ -12,6 +12,23 @@ import {
     List,
     ListItem,
 } from "@mui/material";
+import {
+    DndContext,
+    PointerSensor,
+    KeyboardSensor,
+    useSensor,
+    useSensors,
+    closestCenter,
+    useDroppable,
+} from "@dnd-kit/core";
+import type { DragEndEvent } from "@dnd-kit/core";
+import {
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+    useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTableColumns, faXmark, faGripVertical } from "@fortawesome/free-solid-svg-icons";
 import type { ColumnConfig, ConfigurableColumn } from "../lib/column-config";
@@ -19,30 +36,32 @@ import type { ColumnConfig, ConfigurableColumn } from "../lib/column-config";
 // Which section of the modal a draggable item currently lives in.
 type Section = "visible" | "hidden";
 
-// A single draggable column row in the modal. Carries its id so the drop handler can
-// reorder/move it. Uses native HTML5 drag and drop (no extra dependency).
+// A single sortable column row in the modal. Wired to dnd-kit's useSortable so it can be
+// dragged to reorder within its section or moved to the other section. Carries its id as the
+// sortable id so the drag-end handler can resolve what was dragged and where it landed.
 function ColumnItem({
     column,
     section,
-    onDragStart,
-    onDragOver,
-    onDrop,
 }: {
     column: ConfigurableColumn;
     section: Section;
-    onDragStart: (id: string) => void;
-    onDragOver: (e: React.DragEvent) => void;
-    onDrop: (targetId: string | null) => void;
 }) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+        id: column.id,
+    });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
     return (
         <ListItem
-            draggable
-            onDragStart={() => onDragStart(column.id)}
-            onDragOver={onDragOver}
-            onDrop={(e) => {
-                e.stopPropagation();
-                onDrop(column.id);
-            }}
+            ref={setNodeRef}
+            style={style}
+            {...attributes}
+            {...listeners}
             data-test-id={`column-config-item-${column.id}`}
             data-section={section}
             sx={{
@@ -53,6 +72,7 @@ function ColumnItem({
                 cursor: "grab",
                 bgcolor: "background.paper",
                 gap: 1,
+                touchAction: "none",
             }}
         >
             <FontAwesomeIcon icon={faGripVertical} style={{ opacity: 0.5 }} />
@@ -61,78 +81,63 @@ function ColumnItem({
     );
 }
 
-// A drop-target section (Visible or Hidden) holding an ordered list of column items.
-// Dropping on the section's empty area appends the dragged column to the end.
+// A drop-target section (Visible or Hidden) holding a sortable list of column items. Registered
+// as a dnd-kit droppable so a column can be dropped onto the section's empty area (appending it),
+// and wraps its items in a SortableContext so they can be reordered among themselves.
 function ColumnSection({
     title,
     section,
     columns,
-    onDragStart,
-    onDropOnItem,
-    onDropOnSection,
 }: {
     title: string;
     section: Section;
     columns: ConfigurableColumn[];
-    onDragStart: (id: string) => void;
-    onDropOnItem: (section: Section, targetId: string) => void;
-    onDropOnSection: (section: Section) => void;
 }) {
-    function handleDragOver(e: React.DragEvent): void {
-        e.preventDefault();
-    }
+    const { setNodeRef } = useDroppable({
+        id: `section-${section}`,
+    });
 
     return (
         <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
                 {title}
             </Typography>
-            <Paper
-                variant="outlined"
-                onDragOver={handleDragOver}
-                onDrop={() => onDropOnSection(section)}
-                data-test-id={`column-config-section-${section}`}
-                sx={{
-                    p: 1,
-                    minHeight: 200,
-                    bgcolor: "action.hover",
-                }}
-            >
-                <List dense disablePadding>
-                    {columns.length === 0 && (
-                        <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{ p: 1 }}
-                            data-test-id={`column-config-empty-${section}`}
-                        >
-                            (none)
-                        </Typography>
-                    )}
-                    {columns.map((column) => (
-                        <ColumnItem
-                            key={column.id}
-                            column={column}
-                            section={section}
-                            onDragStart={onDragStart}
-                            onDragOver={handleDragOver}
-                            onDrop={(targetId) => {
-                                if (targetId !== null) {
-                                    onDropOnItem(section, targetId);
-                                }
-                            }}
-                        />
-                    ))}
-                </List>
-            </Paper>
+            <SortableContext items={columns.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+                <Paper
+                    ref={setNodeRef}
+                    variant="outlined"
+                    data-test-id={`column-config-section-${section}`}
+                    sx={{
+                        p: 1,
+                        minHeight: 200,
+                        bgcolor: "action.hover",
+                    }}
+                >
+                    <List dense disablePadding>
+                        {columns.length === 0 && (
+                            <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{ p: 1 }}
+                                data-test-id={`column-config-empty-${section}`}
+                            >
+                                (none)
+                            </Typography>
+                        )}
+                        {columns.map((column) => (
+                            <ColumnItem key={column.id} column={column} section={section} />
+                        ))}
+                    </List>
+                </Paper>
+            </SortableContext>
         </Box>
     );
 }
 
 // Modal that lets the user configure a table's columns: a Visible section (ordered,
-// drag-to-reorder) and a Hidden section. Columns drag between the two sections. Changes
-// are applied immediately via onChange so the table updates live; the config is persisted
-// by the caller's hook.
+// drag-to-reorder) and a Hidden section. Columns drag between the two sections via dnd-kit.
+// Changes are applied immediately via onChange so the table updates live; the config is
+// persisted by the caller's hook.
 export function ColumnConfigModal({
     open,
     onClose,
@@ -146,15 +151,13 @@ export function ColumnConfigModal({
     config: ColumnConfig;
     onChange: (next: ColumnConfig) => void;
 }) {
-    // The id of the column currently being dragged, or null when no drag is in progress.
-    // Held in a ref (not state) so the drop handler can read it synchronously within the
-    // same render, even when dragstart and drop fire in the same tick.
-    const dragIdRef = useRef<string | null>(null);
-
-    // Records which column the user has begun dragging.
-    function startDrag(id: string): void {
-        dragIdRef.current = id;
-    }
+    // dnd-kit sensors: pointer for mouse/touch, keyboard for accessible drag-and-drop.
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        }),
+    );
 
     // Look up a configurable column by id.
     function columnById(id: string): ConfigurableColumn | undefined {
@@ -171,13 +174,42 @@ export function ColumnConfigModal({
         .map(columnById)
         .filter((c): c is ConfigurableColumn => c !== undefined);
 
-    // Rebuilds the config so the dragged column sits in `targetSection`, ordered
-    // immediately before `beforeId` (or at the end when beforeId is null).
-    function moveColumn(targetSection: Section, beforeId: string | null): void {
-        const dragId = dragIdRef.current;
-        if (dragId === null) {
+    // Resolves which section a drop target belongs to. A target is either a section's droppable
+    // id (`section-visible`/`section-hidden`) or another column's id (dropped onto that item).
+    function sectionOf(overId: string): Section | null {
+        if (overId === "section-visible") {
+            return "visible";
+        }
+        if (overId === "section-hidden") {
+            return "hidden";
+        }
+        if (hiddenSet.has(overId)) {
+            return "hidden";
+        }
+        if (config.order.includes(overId)) {
+            return "visible";
+        }
+        return null;
+    }
+
+    // Rebuilds the config when a drag ends, placing the dragged column into the section it was
+    // dropped on, ordered immediately before the column it was dropped onto (or at the end when
+    // dropped on a section's empty area).
+    function handleDragEnd(event: DragEndEvent): void {
+        const { active, over } = event;
+        if (over === null) {
             return;
         }
+        const dragId = String(active.id);
+        const overId = String(over.id);
+        const targetSection = sectionOf(overId);
+        if (targetSection === null) {
+            return;
+        }
+        // A column dropped onto another column lands immediately before it; one dropped onto a
+        // section's empty area is appended to the end of the order.
+        const beforeId = overId === `section-${targetSection}` ? null : overId;
+
         // Build the new order: remove the dragged id, then reinsert it relative to beforeId.
         const order = config.order.filter((id) => id !== dragId);
         if (beforeId === null || beforeId === dragId) {
@@ -201,7 +233,6 @@ export function ColumnConfigModal({
             order,
             hidden,
         });
-        dragIdRef.current = null;
     }
 
     return (
@@ -223,24 +254,12 @@ export function ColumnConfigModal({
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                     Drag columns to reorder them, or between sections to show or hide them.
                 </Typography>
-                <Box sx={{ display: "flex", gap: 2 }}>
-                    <ColumnSection
-                        title="Visible"
-                        section="visible"
-                        columns={visibleColumns}
-                        onDragStart={startDrag}
-                        onDropOnItem={(section, targetId) => moveColumn(section, targetId)}
-                        onDropOnSection={(section) => moveColumn(section, null)}
-                    />
-                    <ColumnSection
-                        title="Hidden"
-                        section="hidden"
-                        columns={hiddenColumns}
-                        onDragStart={startDrag}
-                        onDropOnItem={(section, targetId) => moveColumn(section, targetId)}
-                        onDropOnSection={(section) => moveColumn(section, null)}
-                    />
-                </Box>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                    <Box sx={{ display: "flex", gap: 2 }}>
+                        <ColumnSection title="Visible" section="visible" columns={visibleColumns} />
+                        <ColumnSection title="Hidden" section="hidden" columns={hiddenColumns} />
+                    </Box>
+                </DndContext>
             </DialogContent>
         </Dialog>
     );

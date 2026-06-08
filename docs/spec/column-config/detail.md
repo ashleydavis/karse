@@ -6,7 +6,7 @@ A shared, per-table column configuration: which columns are visible and the orde
 
 Backed by:
 - `frontend/src/lib/column-config.tsx`: the `useColumnConfig(tableId, columns)` hook that derives TanStack Table's `columnOrder` and `columnVisibility` state from a persisted config and exposes the configurable columns and a setter.
-- `frontend/src/components/column-config-modal.tsx`: the `ColumnConfigButton` (toolbar entry point) and the `ColumnConfigModal` (Visible / Hidden drag-and-drop modal).
+- `frontend/src/components/column-config-modal.tsx`: the `ColumnConfigButton` (toolbar entry point) and the `ColumnConfigModal` (Visible / Hidden drag-and-drop modal). Drag-and-drop is provided by **dnd-kit** (`@dnd-kit/core` + `@dnd-kit/sortable`), which also gives keyboard and touch support.
 - The per-page table components under `frontend/src/pages/*/components/` wire the hook and button in.
 
 ## Behaviour
