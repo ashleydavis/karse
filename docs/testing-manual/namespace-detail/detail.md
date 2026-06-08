@@ -23,9 +23,9 @@ A namespace `team-a` with labels and annotations, holding a deployment and a sta
 ### Header
 - The namespace name `team-a` appears as the heading.
 - A green `Active` phase chip appears next to the name.
-- A tab bar shows four tabs: "Details", "Resources", "Commands", "YAML". "Details" is selected by default.
+- A tab bar shows four tabs: "Status", "Resources", "Commands", "YAML". "Status" is selected by default.
 
-### Details tab (default)
+### Status tab (default)
 - The Details card shows Name, Phase (`Active`), Age, and a Resources count.
 - The Labels card shows `team=alpha` and `tier=backend`.
 - The Annotations table shows `owner` (= `platform-team`) and `description`.
@@ -49,4 +49,4 @@ A namespace `team-a` with labels and annotations, holding a deployment and a sta
 - The raw namespace YAML renders, including `kind: Namespace` and `name: team-a`.
 
 ### Tab switching
-- Switch back to "Details". Confirm the Details cards reappear and the Resources table disappears.
+- Switch back to "Status". Confirm the Details cards reappear and the Resources table disappears.

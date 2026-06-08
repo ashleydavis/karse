@@ -31,7 +31,7 @@ EOF
 kubectl wait --for=condition=Ready node/fake-node-1 --timeout=30s
 
 # A namespace with labels and annotations, holding a deployment (and pods) plus a
-# resource quota and a limit range, so every section of the Details tab is populated.
+# resource quota and a limit range, so every section of the Status tab is populated.
 kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: Namespace

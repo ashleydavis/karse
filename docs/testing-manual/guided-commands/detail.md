@@ -54,7 +54,7 @@ One node and one pod.
 
 ### Workload commands
 - Navigate to `/deployments` and open any deployment's detail page.
-- The detail page has "Detail" and "Commands" tabs. Click "Commands".
+- The detail page has "Status" and "Commands" tabs. Click "Commands".
 - The list includes describe, get YAML, restart rollout, rollout status, scale, and delete suggestions, each with a copy button and the read-only banner.
 
 ### Read-only invariant
