@@ -10,6 +10,7 @@ import { ContextPicker } from "./context-picker";
 import { ContextQuickPicker } from "./context-quick-picker";
 import { NamespaceQuickPicker } from "./namespace-quick-picker";
 import { Breadcrumbs } from "./breadcrumbs";
+import { TOP_BAR_HEIGHT } from "../lib/layout";
 
 export function Header() {
     const { contexts, current, isLoading, error, switchTo } = useKubeContext();
@@ -57,7 +58,7 @@ export function Header() {
     return (
         <>
             <AppBar position="static" color="default" elevation={0}>
-                <Toolbar variant="dense" sx={{ gap: 1, minHeight: 56 }}>
+                <Toolbar variant="dense" sx={{ gap: 1, minHeight: TOP_BAR_HEIGHT }}>
                     <Breadcrumbs />
                     {namespace !== null && (
                         <Chip

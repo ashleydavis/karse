@@ -5,6 +5,7 @@ import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import { faLink, faDharmachakra, faServer, faLayerGroup, faCube, faCubes, faDatabase, faSitemap, faBell, faStream, faTowerBroadcast, faCircleExclamation, faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation } from "react-router-dom";
 import { useShareableTo } from "../lib/nav-state";
+import { TOP_BAR_HEIGHT } from "../lib/layout";
 
 const NAV_ITEMS = [
     { to: "/contexts",     icon: faLink,          label: "Contexts"     },
@@ -87,7 +88,7 @@ export function Sidebar() {
                 overflow: "hidden",
             }}
         >
-            <Box sx={{ px: collapsed ? 0 : 2.5, height: 48, display: "flex", alignItems: "center", gap: 1.5, justifyContent: collapsed ? "center" : "flex-start" }}>
+            <Box sx={{ px: collapsed ? 0 : 2.5, height: TOP_BAR_HEIGHT, display: "flex", alignItems: "center", gap: 1.5, justifyContent: collapsed ? "center" : "flex-start" }}>
                 <Box sx={{ color: "primary.main", flexShrink: 0 }}>
                     <FontAwesomeIcon icon={faDharmachakra} />
                 </Box>
