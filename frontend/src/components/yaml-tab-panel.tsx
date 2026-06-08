@@ -1,4 +1,7 @@
-import { Box, Alert, Paper } from "@mui/material";
+import { useState } from "react";
+import { Box, Alert, Paper, Tooltip, IconButton } from "@mui/material";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCopy, faCheck } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { YamlResourceType } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
@@ -16,6 +19,7 @@ type YamlTarget = {
 // Fetching is gated on `active` so the request only fires when the tab is open.
 export function YamlTabPanel({ target, active }: { target: YamlTarget; active: boolean }) {
     const { current } = useKubeContext();
+    const [copied, setCopied] = useState(false);
 
     const { data, error, isLoading } = useQuery({
         queryKey: ["yaml", current, target.type, target.namespace ?? "", target.name],
@@ -23,25 +27,50 @@ export function YamlTabPanel({ target, active }: { target: YamlTarget; active: b
         enabled: active && current !== null,
     });
 
+    const yaml = data?.yaml ?? "";
+    // Copy the displayed YAML to the clipboard, briefly flipping the button to a
+    // "Copied" confirmation. Matches the shareable-link copy pattern in header.tsx.
+    async function handleCopy(): Promise<void> {
+        await navigator.clipboard.writeText(yaml);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1500);
+    }
+
     return (
         <Box data-test-id="yaml-panel">
             {error && <Alert severity="error">{(error as Error).message}</Alert>}
-            <Paper
-                variant="outlined"
-                sx={{
-                    p: 1.5,
-                    bgcolor: "grey.900",
-                    color: "grey.100",
-                    fontFamily: "monospace",
-                    fontSize: "0.75rem",
-                    overflow: "auto",
-                    maxHeight: "70vh",
-                    whiteSpace: "pre",
-                }}
-                data-test-id="yaml-content"
-            >
-                {isLoading ? "Loading..." : (data?.yaml || "(no yaml)")}
-            </Paper>
+            <Box sx={{ position: "relative" }}>
+                <Tooltip title={copied ? "Copied" : "Copy YAML"}>
+                    <span style={{ position: "absolute", top: 8, right: 8, zIndex: 1 }}>
+                        <IconButton
+                            size="small"
+                            onClick={handleCopy}
+                            disabled={!yaml}
+                            aria-label="copy yaml"
+                            data-test-id="yaml-copy-button"
+                            sx={{ color: "grey.100", bgcolor: "grey.800", "&:hover": { bgcolor: "grey.700" } }}
+                        >
+                            <FontAwesomeIcon icon={copied ? faCheck : faCopy} />
+                        </IconButton>
+                    </span>
+                </Tooltip>
+                <Paper
+                    variant="outlined"
+                    sx={{
+                        p: 1.5,
+                        bgcolor: "grey.900",
+                        color: "grey.100",
+                        fontFamily: "monospace",
+                        fontSize: "0.75rem",
+                        overflow: "auto",
+                        maxHeight: "70vh",
+                        whiteSpace: "pre",
+                    }}
+                    data-test-id="yaml-content"
+                >
+                    {isLoading ? "Loading..." : (data?.yaml || "(no yaml)")}
+                </Paper>
+            </Box>
         </Box>
     );
 }

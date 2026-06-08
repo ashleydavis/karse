@@ -2009,6 +2009,8 @@ test.describe("karse e2e", () => {
 
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
+            // The copy button writes to the clipboard, which needs explicit permission.
+            await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
             await page.route("**/api/pods/default/nginx-abc*", async (route) => {
                 await route.fulfill({ json: FAKE_POD_DETAIL });
             });
@@ -2071,6 +2073,27 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='workload-panel-yaml']")).toBeVisible();
             await expect(page.locator("[data-test-id='yaml-content']")).toContainText("kind: Deployment");
             await expect(page.locator("[data-test-id='yaml-content']")).toContainText("name: web-deploy");
+        });
+
+        test("the YAML tab has a copy button that copies the displayed YAML to the clipboard", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-yaml']").click();
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("kind: Pod");
+            const copyButton = page.locator("[data-test-id='yaml-copy-button']");
+            await expect(copyButton).toBeVisible();
+            await copyButton.click();
+            const copied = await page.evaluate(() => navigator.clipboard.readText());
+            expect(copied).toBe(FAKE_POD_YAML);
+        });
+
+        test("the copy button shows brief 'Copied' feedback after clicking", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-yaml']").click();
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("kind: Pod");
+            const copyButton = page.locator("[data-test-id='yaml-copy-button']");
+            await copyButton.click();
+            // The icon flips to a check mark as the success confirmation.
+            await expect(copyButton.locator("svg[data-icon='check']")).toBeVisible();
         });
 
         test("the old YAML dialog and button are gone everywhere", async () => {

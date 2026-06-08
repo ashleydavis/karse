@@ -41,6 +41,12 @@ One node and a pod, deployment, stateful set, and daemon set in `default`.
 - The detail page has Status / Details, Pods, Events, and "YAML" tabs.
 - Click the "YAML" tab. Confirm it shows `kind: Node` with no namespace in `metadata`.
 
+### Copy button
+- On any detail page's "YAML" tab, find the copy button at the top-right corner of the YAML panel.
+- Click it. The button icon briefly flips to a check mark and the tooltip reads "Copied" for about 1.5 seconds, then reverts.
+- Paste into a text editor and confirm the pasted text matches the displayed YAML exactly.
+- Before the YAML loads (or when there is none), the copy button is disabled.
+
 ### Tables and namespaces
 - On `/pods`, `/nodes`, `/deployments`, `/statefulsets`, `/daemonsets`, and `/namespaces`, confirm NO row has a "YAML" button. YAML is reachable only from the detail-page sub tab.
 - Namespaces have no detail page yet, so they have no YAML view until the namespace detail page lands.
