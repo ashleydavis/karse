@@ -31,7 +31,11 @@ Repeat a couple of the queries on the **Nodes page** search box (for example `nw
 Column sorting is shared across all tables. See the sort checks in [nodes-view](../nodes-view/detail.md) (many-nodes scenario) and [pods-view](../pods-view/detail.md) (many-pods scenario): clicking a column header reorders rows, and clicking again reverses.
 
 ### Status filtering
-Tables whose kind has a status field share one status-filter dropdown (the same `status-filter.tsx` component and `status-filter-state.ts` column-filter wiring). The dropdown sits beside the search box, has one checkbox per status value, defaults to all selected, hides rows whose status is unchecked, and shows the table's no-match message when every status is unchecked. It composes with the search box. See the dedicated scenarios: pods by phase in [pods-view](../pods-view/detail.md) (Scenario E) and nodes by status in [nodes-view](../nodes-view/detail.md) (Scenario G).
+Tables whose kind has a status field share one status-filter dropdown (the same `status-filter.tsx` component and `status-filter-state.ts` column-filter wiring). The dropdown sits beside the search box, has one checkbox per status value, defaults to all selected, hides rows whose status is unchecked, and shows the table's no-match message when every status is unchecked. It composes with the search box.
+
+The dropdown also has "Select all" and "Deselect all" controls at the top (above the checkboxes). "Deselect all" unticks every status at once (hiding all rows and showing the no-match message); "Select all" ticks every status at once (showing all rows again). "Select all" is greyed out when everything is already ticked, and "Deselect all" is greyed out when nothing is ticked.
+
+See the dedicated scenarios: pods by phase in [pods-view](../pods-view/detail.md) (Scenario E) and nodes by status in [nodes-view](../nodes-view/detail.md) (Scenario G).
 
 Teardown:
 

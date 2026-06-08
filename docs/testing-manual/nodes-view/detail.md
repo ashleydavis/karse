@@ -106,6 +106,7 @@ A Ready node, a NotReady node, and a cordoned (Ready) node, so at least two dist
 - **Check only `Ready`**: uncheck the others until just `Ready` remains. Only the Ready nodes (`fake-node-ready`, `fake-node-cordoned`) are listed and the button reads `Status: 1 selected`.
 - **Uncheck every status**: the table shows the "No nodes match the search." message.
 - **Re-check all statuses**: all three rows return and the button reads `Status: All`.
+- **Deselect all / Select all**: open the dropdown and click **Deselect all** (top of the dropdown): every status unticks, the table shows the "No nodes match the search." message, and the button reads `Status: 0 selected`. Click **Select all**: every status re-ticks, all three rows return, and the button reads `Status: All`. With everything ticked, **Select all** is greyed out; with nothing ticked, **Deselect all** is greyed out.
 - The status filter combines with the search box: searching while a subset of statuses is selected narrows results further.
 
 Teardown:

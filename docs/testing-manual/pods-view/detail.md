@@ -82,6 +82,7 @@ Five pods in `default`, one each in Running, Pending, Succeeded, Failed, Unknown
 - **Check only one phase**: uncheck the others until just `Running` remains. Only `pod-running` is listed and the button reads `Phase: 1 selected`.
 - **Uncheck every phase**: the table shows the "No pods match the search." message.
 - **Re-check all phases**: all five rows return and the button reads `Phase: All`.
+- **Deselect all / Select all**: open the dropdown and click **Deselect all** (top of the dropdown): every phase unticks, the table shows the "No pods match the search." message, and the button reads `Phase: 0 selected`. Click **Select all**: every phase re-ticks, all five rows return, and the button reads `Phase: All`. With everything ticked, **Select all** is greyed out; with nothing ticked, **Deselect all** is greyed out.
 - The phase filter combines with the search box: searching while a subset of phases is selected narrows results further.
 - If KWOK overrides a patched terminal phase back to `Running`, re-run the patch commands from the setup script and reload.
 

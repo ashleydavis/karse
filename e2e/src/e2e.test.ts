@@ -2205,6 +2205,21 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(5);
             await expect(page.locator("[data-test-id='pods-phase-filter-button']")).toHaveText("Phase: All");
         });
+
+        test("deselect all hides every pod, then select all restores them", async () => {
+            await page.locator("[data-test-id='pods-phase-filter-button']").click();
+            await page.locator("[data-test-id='pods-phase-filter-deselect-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-pods-match']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pods-phase-filter-button']")).toHaveText("Phase: 0 selected");
+
+            await page.locator("[data-test-id='pods-phase-filter-button']").click();
+            await page.locator("[data-test-id='pods-phase-filter-select-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(5);
+            await expect(page.locator("[data-test-id='pods-phase-filter-button']")).toHaveText("Phase: All");
+        });
     });
 
     // ── Nodes page: status filter ───────────────────────────────────────────────
@@ -2293,6 +2308,21 @@ test.describe("karse e2e", () => {
             for (const status of ["Ready", "NotReady", "Unknown"]) {
                 await page.locator(`[data-test-id='nodes-status-filter-item-${status}']`).click();
             }
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='nodes-status-filter-button']")).toHaveText("Status: All");
+        });
+
+        test("deselect all hides every node, then select all restores them", async () => {
+            await page.locator("[data-test-id='nodes-status-filter-button']").click();
+            await page.locator("[data-test-id='nodes-status-filter-deselect-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-nodes-match']")).toBeVisible();
+            await expect(page.locator("[data-test-id='nodes-status-filter-button']")).toHaveText("Status: 0 selected");
+
+            await page.locator("[data-test-id='nodes-status-filter-button']").click();
+            await page.locator("[data-test-id='nodes-status-filter-select-all']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='node-row']")).toHaveCount(3);
             await expect(page.locator("[data-test-id='nodes-status-filter-button']")).toHaveText("Status: All");

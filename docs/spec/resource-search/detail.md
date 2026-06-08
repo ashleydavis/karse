@@ -21,6 +21,7 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-s
 - Every resource table whose kind has a status field has a status-filter dropdown beside the search box, with one checkbox per status value (pods: Running/Pending/Succeeded/Failed/Unknown; nodes: Ready/NotReady/Unknown).
 - All statuses are selected by default; the button reads `<Label>: All` (e.g. "Phase: All", "Status: All"). With a partial selection it reads `<Label>: N selected`.
 - Unchecking a status hides every row with that status. Unchecking every status hides all rows and shows the table's no-match message.
+- The dropdown has "Select all" and "Deselect all" controls at the top (above the per-status checkboxes). "Select all" ticks every status (showing all rows); "Deselect all" unticks every status (showing the no-match message). "Select all" is disabled when everything is already selected; "Deselect all" is disabled when nothing is selected.
 - The dropdown drives a TanStack Table column filter on the status column. A full selection clears the filter (every row passes); the status filter and the search box compose (both must match for a row to show).
 - The dropdown and its column-filter wiring are shared (`status-filter.tsx` and `status-filter-state.ts`) so behaviour is identical across tables. There is no per-table duplicate.
 
@@ -35,6 +36,7 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-s
 - [x] Every table whose kind has a status field has a status-filter dropdown with one checkbox per status value; all selected by default.
 - [x] Unchecking a status hides rows with that status; unchecking all shows the no-match message.
 - [x] The status-filter dropdown and its column-filter wiring are shared across tables, with no per-table duplicate.
+- [x] The status-filter dropdown has "Select all" and "Deselect all" controls that tick or untick every status at once, shared across the pods phase filter and the nodes status filter.
 
 ## Open Questions
 
