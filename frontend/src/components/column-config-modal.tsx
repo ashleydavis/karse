@@ -205,33 +205,7 @@ export function ColumnConfigModal({
     }
 
     return (
-        <Dialog
-            open={open}
-            onClose={onClose}
-            maxWidth="sm"
-            fullWidth
-            data-test-id="column-config-modal"
-            // Render the modal solid and immediate: skip the fade transition (which left the
-            // panel/backdrop looking nearly transparent) and force an opaque panel surface plus
-            // a clear dimming backdrop so the modal always stands out from the table behind it.
-            transitionDuration={0}
-            slotProps={{
-                paper: {
-                    sx: {
-                        // Opaque surface (not see-through), independent of theme elevation.
-                        bgcolor: "background.paper",
-                        backgroundImage: "none",
-                        boxShadow: 24,
-                    },
-                },
-                backdrop: {
-                    sx: {
-                        // Proper dimming behind the modal.
-                        backgroundColor: "rgba(0, 0, 0, 0.5)",
-                    },
-                },
-            }}
-        >
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth data-test-id="column-config-modal">
             <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <FontAwesomeIcon icon={faTableColumns} />

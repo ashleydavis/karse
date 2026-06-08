@@ -20,7 +20,7 @@ A cluster with several nodes so the table has stable columns to reorder and hide
 
 Open the **Nodes page**. The table shows the columns: Name, Status, Roles, Version, Age (plus the YAML action button at the end).
 
-1. **Entry point**: a **Columns** button is shown beside the search box. Click it. A "Configure columns" modal opens with two sections: **Visible** (listing Name, Status, Roles, Version, Age) and **Hidden** (empty). The modal panel is solid and opaque over a dimmed backdrop: it stands out clearly and the table behind it is not visible through it.
+1. **Entry point**: a **Columns** button is shown beside the search box. Click it. A "Configure columns" modal opens with two sections: **Visible** (listing Name, Status, Roles, Version, Age) and **Hidden** (empty).
 2. **Hide a column**: drag **Roles** from the Visible section onto the Hidden section. Close the modal. The Roles column is gone from the table; the other columns remain.
 3. **Reorder a column**: open the modal again and drag **Version** so it sits above **Status** in the Visible section. Close the modal. In the table, the Version column now appears before the Status column.
 4. **Persistence**: reload the page (or navigate away and back). The Roles column is still hidden and Version still appears before Status: the configuration was saved.

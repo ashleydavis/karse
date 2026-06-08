@@ -12,7 +12,6 @@ Backed by:
 ## Behaviour
 
 - Every resource table renders a "Columns" button beside its search box. Clicking it opens the configuration modal.
-- The modal renders as a solid, opaque panel over a dimmed backdrop, so it stands out clearly from the table behind it.
 - The modal has two sections: **Visible** (ordered) and **Hidden**.
 - Within Visible, columns are reordered by drag and drop. Dropping a dragged column onto another column places it immediately before that column; dropping onto the section's empty area appends it to the end.
 - Dragging a column from Visible onto the Hidden section hides it; dragging a column from Hidden back onto Visible shows it again.
