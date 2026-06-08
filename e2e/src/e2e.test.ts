@@ -1339,7 +1339,7 @@ test.describe("karse e2e", () => {
             await expect(page.locator(".MuiChip-label", { hasText: "Running" }).first()).toBeVisible();
         });
 
-        test("defaults to the Detail / Status tab showing the events table", async () => {
+        test("defaults to the Status tab showing the events table", async () => {
             await expect(page.locator("[data-test-id='pod-panel-detail']")).toBeVisible();
             await expect(page.locator("[data-test-id='event-row']")).toHaveCount(1);
             await expect(page.locator("[data-test-id='pod-panel-containers']")).toHaveCount(0);
@@ -1566,7 +1566,7 @@ test.describe("karse e2e", () => {
         });
 
         test.beforeEach(async () => {
-            // Reset to the default Status / Details tab between tests.
+            // Reset to the default Status tab between tests.
             await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
         });
 
@@ -1597,7 +1597,7 @@ test.describe("karse e2e", () => {
             await expect(page.getByRole("cell", { name: "pods" })).toBeVisible();
         });
 
-        test("shows the three tabs and defaults to Status / Details", async () => {
+        test("shows the three tabs and defaults to Status", async () => {
             await expect(page.locator("[data-test-id='node-tab-detail']")).toBeVisible();
             await expect(page.locator("[data-test-id='node-tab-pods']")).toBeVisible();
             await expect(page.locator("[data-test-id='node-tab-events']")).toBeVisible();
@@ -2409,7 +2409,7 @@ test.describe("karse e2e", () => {
             await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
             await expect(page.locator("[data-test-id='breadcrumbs']")).toBeVisible();
             const items = await page.locator("[data-test-id='breadcrumb-item']").allTextContents();
-            expect(items).toEqual(["Pods", "default", "nginx-abc", "Detail / Status"]);
+            expect(items).toEqual(["Pods", "default", "nginx-abc", "Status"]);
         });
 
         test("updates the sub-tab breadcrumb when switching pod tabs", async () => {

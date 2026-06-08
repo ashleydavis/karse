@@ -28,7 +28,7 @@ const LIST_LABELS: Record<string, string> = {
 // Maps a pod detail tab value (from the "tab" query param) to its display label,
 // so the breadcrumb trail reflects the currently selected sub tab.
 const POD_TAB_LABELS: Record<string, string> = {
-    detail: "Detail / Status",
+    detail: "Status",
     containers: "Containers",
     "init-containers": "Init Containers",
     logs: "Logs",

@@ -122,7 +122,7 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                     onChange={(_, value) => setActiveTab(value)}
                     data-test-id="workload-detail-tabs"
                 >
-                    <Tab label="Detail" value="detail" data-test-id="workload-tab-detail" />
+                    <Tab label="Status" value="detail" data-test-id="workload-tab-detail" />
                     <Tab label="Commands" value="commands" data-test-id="workload-tab-commands" />
                     <Tab label="YAML" value="yaml" data-test-id="workload-tab-yaml" />
                 </Tabs>

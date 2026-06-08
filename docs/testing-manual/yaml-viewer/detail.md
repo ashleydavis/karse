@@ -27,18 +27,18 @@ One node and a pod, deployment, stateful set, and daemon set in `default`.
 
 ### Pod detail page
 - Navigate to `/pods`, then click the `web` pod row to open its detail page.
-- The detail page shows a "YAML" tab alongside the other tabs (Detail / Status, Containers, Logs).
+- The detail page shows a "YAML" tab alongside the other tabs (Status, Containers, Logs).
 - Click the "YAML" tab. The panel shows the raw YAML beginning with `apiVersion:` and `kind: Pod`, including the `metadata`, `spec`, and `status` sections.
 - Confirm there is NO "YAML" button in the page header and NO dialog/modal opens.
 
 ### Workload detail pages
 - Open the detail page for `web-deploy` (`/deployments`, click the row), `db` (`/statefulsets`), and `agent` (`/daemonsets`).
-- Each detail page has a "Detail" tab and a "YAML" tab.
+- Each detail page has a "Status" tab and a "YAML" tab.
 - Click the "YAML" tab on each and confirm the panel shows the matching `kind:` (`Deployment`, `StatefulSet`, `DaemonSet`).
 
 ### Node detail page
 - Navigate to `/nodes`, then click `fake-node-1` to open its detail page.
-- The detail page has Status / Details, Pods, Events, and "YAML" tabs.
+- The detail page has Status, Pods, Events, and "YAML" tabs.
 - Click the "YAML" tab. Confirm it shows `kind: Node` with no namespace in `metadata`.
 
 ### Copy button

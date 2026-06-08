@@ -87,7 +87,7 @@ function parseTab(value: string | null): PodDetailTab {
     return "detail";
 }
 
-// Detail page for a single pod, organizing its content into Detail/Status, Containers, and Logs tabs.
+// Detail page for a single pod, organizing its content into Status, Containers, and Logs tabs.
 export function PodDetailPage() {
     const { namespace, name } = useParams<{ namespace: string; name: string }>();
     const { current } = useKubeContext();
@@ -151,7 +151,7 @@ export function PodDetailPage() {
                     onChange={(_, value) => selectTab(value)}
                     data-test-id="pod-detail-tabs"
                 >
-                    <Tab label="Detail / Status" value="detail" data-test-id="pod-tab-detail" />
+                    <Tab label="Status" value="detail" data-test-id="pod-tab-detail" />
                     <Tab label="Containers" value="containers" data-test-id="pod-tab-containers" />
                     {hasInitContainers && (
                         <Tab

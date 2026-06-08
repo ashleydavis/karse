@@ -27,7 +27,7 @@ Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stand
 - The Pods section header shows a count and the table lists only the pods scheduled on this node (the `web` pod), with Name, Namespace, Status, Ready, and Restarts columns. Pods on other nodes must not appear. Click the pod row and confirm navigation to the pod detail page.
 - The back arrow navigates back to `/nodes`.
 
-## Scenario B: Node detail tabs (Status / Details, Pods, Events)
+## Scenario B: Node detail tabs (Status, Pods, Events)
 
 A node with two pods scheduled on it and a couple of node-scoped events.
 
@@ -40,9 +40,9 @@ A node with two pods scheduled on it and a couple of node-scoped events.
 ### What to check
 - Navigate to `/nodes`. Click the `fake-node-1` row. Confirm navigation to `/nodes/fake-node-1` and the page title shows "Node".
 - The node name and a status chip (Ready) appear at the top, above a tab bar.
-- A tab bar shows three tabs: "Status / Details", "Pods", and "Events".
+- A tab bar shows three tabs: "Status", "Pods", and "Events".
 
-### Status / Details tab (default)
+### Status tab (default)
 - This tab is selected by default.
 - The Details card shows roles `control-plane`, version, and age.
 - The Addresses card lists the node's addresses (if any).
@@ -64,5 +64,5 @@ A node with two pods scheduled on it and a couple of node-scoped events.
 - The Details, Conditions, and Pods cards are NOT visible on this tab.
 
 ### Tab switching
-- Switch back to "Status / Details". Confirm the status cards reappear and the Pods and Events tables disappear.
+- Switch back to "Status". Confirm the status cards reappear and the Pods and Events tables disappear.
 - The back arrow navigates back to `/nodes`.

@@ -81,7 +81,7 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
 // The set of tabs available on the node detail page.
 type NodeDetailTab = "detail" | "pods" | "events" | "commands" | "yaml";
 
-// Detail page for a single node, organizing its content into Status/Details, Pods, and Events tabs.
+// Detail page for a single node, organizing its content into Status, Pods, and Events tabs.
 export function NodeDetailPage() {
     const { name } = useParams<{ name: string }>();
     const { current } = useKubeContext();
@@ -123,7 +123,7 @@ export function NodeDetailPage() {
                     onChange={(_, value) => setActiveTab(value)}
                     data-test-id="node-detail-tabs"
                 >
-                    <Tab label="Status / Details" value="detail" data-test-id="node-tab-detail" />
+                    <Tab label="Status" value="detail" data-test-id="node-tab-detail" />
                     <Tab label="Pods" value="pods" data-test-id="node-tab-pods" />
                     <Tab label="Events" value="events" data-test-id="node-tab-events" />
                     <Tab label="Commands" value="commands" data-test-id="node-tab-commands" />

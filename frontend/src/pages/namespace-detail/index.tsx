@@ -97,7 +97,7 @@ export function NamespaceDetailPage() {
                     onChange={(_, value) => setActiveTab(value)}
                     data-test-id="namespace-detail-tabs"
                 >
-                    <Tab label="Details" value="detail" data-test-id="namespace-tab-detail" />
+                    <Tab label="Status" value="detail" data-test-id="namespace-tab-detail" />
                     <Tab label="Resources" value="resources" data-test-id="namespace-tab-resources" />
                     <Tab label="Commands" value="commands" data-test-id="namespace-tab-commands" />
                     <Tab label="YAML" value="yaml" data-test-id="namespace-tab-yaml" />

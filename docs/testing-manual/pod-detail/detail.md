@@ -46,7 +46,7 @@ Three pods: `single-container` (1 container), `web-with-sidecars` (3 containers)
 - **Drill down - init container**: click the `with-init-container` row. The Containers table shows `app` and `metrics`; a separate Init Containers table shows `setup`.
 - **Per-container logs**: on `web-with-sidecars`, open the Logs tab. The log viewer loads and streams automatically (no load/start button). A Container selector appears (only shown when more than one container). Switch between `app`, `envoy`, and `log-shipper` and confirm the stream restarts for the selected container. (Under kwok, run with `KARSE_FAKE_LOGS=1` to see sample log lines.)
 
-## Scenario C: Pod detail tabs (Detail / Status, Containers, Logs)
+## Scenario C: Pod detail tabs (Status, Containers, Logs)
 
 One multi-container pod plus an init container.
 
@@ -59,9 +59,9 @@ One multi-container pod plus an init container.
 ### What to check
 - Navigate to `/pods`. Click the `web` row. Confirm navigation to `/pods/default/web` and the page title shows "Pod".
 - The pod name and a phase chip appear at the top, above a tab bar.
-- A tab bar shows three tabs: "Detail / Status", "Containers", and "Logs".
+- A tab bar shows three tabs: "Status", "Containers", and "Logs".
 
-### Detail / Status tab (default)
+### Status tab (default)
 - This tab is selected by default.
 - The Details card shows namespace `default`, node `fake-node-1`, pod IP, and age.
 - The Labels card shows `app=web`.
@@ -82,5 +82,5 @@ One multi-container pod plus an init container.
 - The refresh icon restarts the stream (disabled while live; enabled once the stream ends).
 
 ### Tab switching
-- Switch back to "Detail / Status". Confirm the detail cards reappear and the log viewer disappears.
+- Switch back to "Status". Confirm the detail cards reappear and the log viewer disappears.
 - The back arrow navigates back to `/pods`.
