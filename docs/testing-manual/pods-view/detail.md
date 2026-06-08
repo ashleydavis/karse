@@ -2,7 +2,13 @@
 
 Manual tests for the pods page (`/pods`). See the spec: [pods-view](../../spec/pods-view/detail.md).
 
-Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. Namespace scoping is exercised here but specified under [namespace-selector](../namespace-selector/detail.md). Each scenario's fixture stands up a `karse-test` KWOK cluster; `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse. Run the matching `teardown.sh` when done.
+Start the app first. From the repo root run:
+
+```sh
+bun run dev
+```
+
+Then open the frontend at `http://127.0.0.1:5173`. Namespace scoping is exercised here but specified under [namespace-selector](../namespace-selector/detail.md). Each scenario's fixture stands up a `karse-test` KWOK cluster; `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse. Run the matching `teardown.sh` when done.
 
 ## Scenario A: Two pods in one namespace
 

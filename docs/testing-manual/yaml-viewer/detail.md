@@ -5,7 +5,13 @@ Manual tests for the raw-YAML sub tab. See the spec: [yaml-viewer](../../spec/ya
 YAML is shown on a "YAML" sub tab of each resource detail page. There is no YAML
 dialog and no per-row or per-page YAML button anywhere in the app.
 
-Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. The scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
+Start the app first. From the repo root run:
+
+```sh
+bun run dev
+```
+
+Then open the frontend at `http://127.0.0.1:5173`. The scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
 
 ## Scenario: Raw YAML view
 

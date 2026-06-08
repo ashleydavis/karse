@@ -2,7 +2,13 @@
 
 Manual tests for the nodes page (`/nodes`). See the spec: [nodes-view](../../spec/nodes-view/detail.md).
 
-Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stands up a `karse-test` KWOK cluster; `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse. Run the matching `teardown.sh` when done.
+Start the app first. From the repo root run:
+
+```sh
+bun run dev
+```
+
+Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stands up a `karse-test` KWOK cluster; `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse. Run the matching `teardown.sh` when done.
 
 ## Scenario A: Two nodes (baseline)
 

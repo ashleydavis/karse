@@ -4,7 +4,13 @@ Manual tests for the guided-commands tab. See the spec: [guided-commands](../../
 
 Karse is strictly READ-ONLY. These commands are NEVER executed by Karse: the Commands tab only shows command strings for the user to copy and run themselves.
 
-Start the app first: run `bun run dev` from the repo root and open the frontend at `http://127.0.0.1:5173`. The scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
+Start the app first. From the repo root run:
+
+```sh
+bun run dev
+```
+
+Then open the frontend at `http://127.0.0.1:5173`. The scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
 
 ## Scenario: Guided commands
 
