@@ -19,6 +19,7 @@ function makePod(name: string, phase: Pod["phase"]): Pod {
         restarts: 0,
         createdAt: "2024-01-01T00:00:00Z",
         node: "node-1",
+        labels: {},
     };
 }
 
@@ -30,6 +31,7 @@ function makeNode(name: string, status: Node["status"]): Node {
         roles: [],
         version: "v1.29.0",
         createdAt: "2024-01-01T00:00:00Z",
+        labels: {},
     };
 }
 
@@ -42,6 +44,7 @@ function makeDeployment(name: string, ready: string): Deployment {
         upToDate: 0,
         available: 0,
         createdAt: "2024-01-01T00:00:00Z",
+        labels: {},
     };
 }
 
@@ -52,6 +55,7 @@ function makeStatefulSet(name: string, ready: string): StatefulSet {
         namespace: "default",
         ready,
         createdAt: "2024-01-01T00:00:00Z",
+        labels: {},
     };
 }
 
@@ -66,6 +70,7 @@ function makeDaemonSet(name: string, desired: number, ready: number): DaemonSet 
         upToDate: desired,
         available: ready,
         createdAt: "2024-01-01T00:00:00Z",
+        labels: {},
     };
 }
 
