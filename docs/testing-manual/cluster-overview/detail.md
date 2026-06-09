@@ -8,7 +8,7 @@ Start the app first. From the repo root run:
 bun run dev
 ```
 
-Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
+Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse. Tear each cluster down with the Teardown step at the end of this doc.
 
 ## Scenario A: Empty cluster with two nodes
 
@@ -55,3 +55,12 @@ Teardown:
 ## Related coverage
 
 The "Select a context to see cluster overview." empty state (when no context is selected) is verified under [context-switching](../context-switching/detail.md) (no-contexts scenario). Tile counts also appear after a context switch in [context-switching](../context-switching/detail.md).
+
+## Teardown
+
+Tear down any cluster you stood up while testing this doc:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/01-empty-cluster-two-nodes/teardown.sh
+./docs/testing-manual/_fixtures-kwok/02-empty-cluster-no-nodes/teardown.sh
+```

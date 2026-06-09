@@ -2,7 +2,7 @@
 
 Manual tests for context listing and switching. See the spec: [context-switching](../../spec/context-switching/detail.md).
 
-The dropdown-picker placement and keyboard shortcuts for the context picker are covered under [quick-find](../quick-find/detail.md). Run the matching `teardown.sh` when done.
+The dropdown-picker placement and keyboard shortcuts for the context picker are covered under [quick-find](../quick-find/detail.md). Tear each cluster down with the Teardown step at the end of this doc.
 
 Start the app first. From the repo root run:
 
@@ -70,3 +70,11 @@ Five KWOK clusters running simultaneously.
 - **Switching**: use the quick picker or Contexts page to select each context in turn. Confirm the overview tiles and nodes table update to show that cluster's data.
 - **Sidebar collapsed**: collapse the sidebar to icon-only mode using the chevron at the bottom. Confirm navigation still works via icon tooltips.
 - **active vs default**: switch active context in the tab to `kwok-karse-test-3` while keeping the terminal default on `kwok-karse-test-1`. Confirm the `active` and `default` chips are on different rows.
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/12-no-contexts/teardown.sh
+./docs/testing-manual/_fixtures-kwok/13-two-contexts/teardown.sh
+./docs/testing-manual/_fixtures-kwok/14-many-contexts/teardown.sh
+```

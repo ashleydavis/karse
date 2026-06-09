@@ -10,7 +10,7 @@ Start the app first. From the repo root run:
 bun run dev
 ```
 
-Then open the frontend at `http://127.0.0.1:5173`. Then run the scenario's `setup.sh`, test, and run its `teardown.sh` when done.
+Then open the frontend at `http://127.0.0.1:5173`. Then run each scenario's `setup.sh` and test it. Tear each cluster down with the Teardown step at the end of this doc.
 
 ## Scenario: Audit lines are written for every kubectl call
 

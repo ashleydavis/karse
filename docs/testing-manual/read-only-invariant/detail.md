@@ -12,7 +12,7 @@ Start the app first. From the repo root run:
 bun run dev
 ```
 
-Then open the frontend at `http://127.0.0.1:5173`. Each check then runs the referenced scenario's `setup.sh`, exercises it, and runs that scenario's `teardown.sh` when done.
+Then open the frontend at `http://127.0.0.1:5173`. Each check then runs the referenced scenario's `setup.sh` and exercises it. Tear the clusters down with the Teardown step at the end of this doc.
 
 ## Check A: YAML view issues only reads
 
@@ -38,3 +38,11 @@ Then open the frontend at `http://127.0.0.1:5173`. Each check then runs the refe
 ## Check D: The only write is the context switch
 
 - Switch the active context (see [context-switching](../context-switching/detail.md), set-as-default). Confirm the only mutating-looking audit entry is `kubectl config use-context <name>`, which writes the local kubeconfig, not the cluster. No cluster object is ever mutated.
+
+Teardown the fixtures used by checks A, B, and C:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/17-raw-yaml-view/teardown.sh
+./docs/testing-manual/_fixtures-kwok/18-guided-commands/teardown.sh
+./docs/testing-manual/_fixtures-kwok/25-live-logs/teardown.sh
+```

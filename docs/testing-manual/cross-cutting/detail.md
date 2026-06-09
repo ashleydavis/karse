@@ -1,6 +1,6 @@
 # cross-cutting manual tests
 
-App-wide manual tests with no single dedicated spec feature. Each scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse. Run the matching `teardown.sh` when done.
+App-wide manual tests with no single dedicated spec feature. Each scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse. Tear each one down with the Teardown step at the end of this doc.
 
 Start the app first. From the repo root run:
 
@@ -8,7 +8,7 @@ Start the app first. From the repo root run:
 bun run dev
 ```
 
-Then open the frontend at `http://127.0.0.1:5173`. Then run the scenario's `setup.sh`, test, and run its `teardown.sh` when done.
+Then open the frontend at `http://127.0.0.1:5173`. Then run each scenario's `setup.sh` and test it. Tear each cluster down with the Teardown step at the end of this doc.
 
 ## Long resource names
 
@@ -106,3 +106,11 @@ The URL should already contain everything: the page and resource in the path, an
 - **Reload preserves state**: with params in the address bar, F5 keeps the same context, namespace, page, and resource (no reset to the terminal default).
 - **Params survive navigation**: with a context/namespace selected, click around the sidebar and into/out of detail pages. The query params stay attached the whole time.
 - **Backward compatible default**: open `/cluster` with no query params. The app falls back to the terminal's current context (cluster 1) and "all namespaces".
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/11-long-resource-names/teardown.sh
+./docs/testing-manual/_fixtures-kwok/22-breadcrumbs/teardown.sh
+./docs/testing-manual/_fixtures-kwok/23-shareable-url-state/teardown.sh
+```

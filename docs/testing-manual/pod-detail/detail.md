@@ -8,7 +8,7 @@ Start the app first. From the repo root run:
 bun run dev
 ```
 
-Then open the frontend at `http://127.0.0.1:5173`. The log viewer on this page is specified and tested under [log-viewer](../log-viewer/detail.md). Each fixture stands up a `karse-test` KWOK cluster; select the `kwok-karse-test` context in Karse. Run the matching `teardown.sh` when done.
+Then open the frontend at `http://127.0.0.1:5173`. The log viewer on this page is specified and tested under [log-viewer](../log-viewer/detail.md). Each fixture stands up a `karse-test` KWOK cluster; select the `kwok-karse-test` context in Karse. Tear each one down with the Teardown step at the end of this doc.
 
 ## Scenario A: Pod detail page (single multi-container pod)
 
@@ -84,3 +84,11 @@ One multi-container pod plus an init container.
 ### Tab switching
 - Switch back to "Status". Confirm the detail cards reappear and the log viewer disappears.
 - The back arrow navigates back to `/pods`.
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/16-detail-pages-and-logs/teardown.sh
+./docs/testing-manual/_fixtures-kwok/19-multi-container-pods/teardown.sh
+./docs/testing-manual/_fixtures-kwok/20-pod-detail-tabs/teardown.sh
+```

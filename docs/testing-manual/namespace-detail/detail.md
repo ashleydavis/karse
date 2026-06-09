@@ -2,7 +2,7 @@
 
 Manual tests for the namespace detail page. See the spec: [namespace-detail](../../spec/namespace-detail/detail.md).
 
-The fixture stands up a `karse-test` KWOK cluster; `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse. Run the matching `teardown.sh` when done.
+The fixture stands up a `karse-test` KWOK cluster; `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse. Tear it down with the Teardown step at the end of this doc.
 
 ## Scenario: Namespace detail page and its tabs
 
@@ -51,3 +51,9 @@ A namespace `team-a` with labels and annotations, holding a deployment and a sta
 
 ### Tab switching
 - Switch back to "Status". Confirm the Details cards reappear and the Resources table disappears.
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/34-namespace-detail/teardown.sh
+```

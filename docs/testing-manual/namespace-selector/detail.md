@@ -10,7 +10,7 @@ Start the app first. From the repo root run:
 bun run dev
 ```
 
-Then open the frontend at `http://127.0.0.1:5173`. Each fixture stands up a `karse-test` KWOK cluster; select the `kwok-karse-test` context in Karse. Run the matching `teardown.sh` when done.
+Then open the frontend at `http://127.0.0.1:5173`. Each fixture stands up a `karse-test` KWOK cluster; select the `kwok-karse-test` context in Karse. Tear each one down with the Teardown step at the end of this doc.
 
 ## Scenario A: Single-namespace scoping
 
@@ -65,3 +65,11 @@ Then open the frontend at `http://127.0.0.1:5173`. Each fixture stands up a `kar
 - Clicking the **Resources** header sorts the table by count.
 - The column does not block the table: namespaces render even before/if the pod count is unavailable. When a count cannot be determined the cell shows an em-dash (`—`) rather than breaking the row.
 - The count is consistent with the namespace detail page: clicking into a namespace, the Details-tab Resources count shows the same pods-only number (see [namespace-detail](../namespace-detail/detail.md)).
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/07-two-pods-one-namespace/teardown.sh
+./docs/testing-manual/_fixtures-kwok/08-two-pods-two-namespaces/teardown.sh
+./docs/testing-manual/_fixtures-kwok/09-many-pods-many-namespaces/teardown.sh
+```

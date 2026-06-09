@@ -8,7 +8,7 @@ Start the app first. From the repo root run:
 bun run dev
 ```
 
-Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stands up a `karse-test` KWOK cluster; `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse. Run the matching `teardown.sh` when done.
+Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stands up a `karse-test` KWOK cluster; `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse. Tear each one down with the Teardown step at the end of this doc.
 
 ## Scenario A: Two nodes (baseline)
 
@@ -115,8 +115,13 @@ A Ready node, a NotReady node, and a cordoned (Ready) node, so at least two dist
 - **Deselect all / Select all**: open the dropdown and click **Deselect all** (top of the dropdown): every status unticks, the table shows the "No nodes match the search." message, and the button reads `Status: 0 selected`. Click **Select all**: every status re-ticks, all three rows return, and the button reads `Status: All`. With everything ticked, **Select all** is greyed out; with nothing ticked, **Deselect all** is greyed out.
 - The status filter combines with the search box: searching while a subset of statuses is selected narrows results further.
 
-Teardown:
+Teardown each cluster you stood up while testing this doc:
 
 ```sh
+./docs/testing-manual/_fixtures-kwok/01-empty-cluster-two-nodes/teardown.sh
+./docs/testing-manual/_fixtures-kwok/02-empty-cluster-no-nodes/teardown.sh
+./docs/testing-manual/_fixtures-kwok/03-many-nodes/teardown.sh
 ./docs/testing-manual/_fixtures-kwok/04-mixed-node-statuses/teardown.sh
+./docs/testing-manual/_fixtures-kwok/05-nodes-with-no-roles/teardown.sh
+./docs/testing-manual/_fixtures-kwok/06-nodes-with-multiple-roles/teardown.sh
 ```

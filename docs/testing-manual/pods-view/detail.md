@@ -8,7 +8,7 @@ Start the app first. From the repo root run:
 bun run dev
 ```
 
-Then open the frontend at `http://127.0.0.1:5173`. Namespace scoping is exercised here but specified under [namespace-selector](../namespace-selector/detail.md). Each scenario's fixture stands up a `karse-test` KWOK cluster; `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse. Run the matching `teardown.sh` when done.
+Then open the frontend at `http://127.0.0.1:5173`. Namespace scoping is exercised here but specified under [namespace-selector](../namespace-selector/detail.md). Each scenario's fixture stands up a `karse-test` KWOK cluster; `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse. Tear each one down with the Teardown step at the end of this doc.
 
 ## Scenario A: Two pods in one namespace
 
@@ -107,3 +107,14 @@ Two pods in `default`: `web-pod` (labels `app=web`, `tier=frontend`) and `db-pod
 - **Search by label value**: type `tier=frontend` in the search box. Only `web-pod` remains.
 - **Search by label key/value shared form**: type `app=db`. Only `db-pod` remains. Clear the search to restore both rows.
 - **Deployments page** (`/deployments`): the `web-deploy` row shows `app=web` and `tier=frontend` chips in its Labels column.
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/07-two-pods-one-namespace/teardown.sh
+./docs/testing-manual/_fixtures-kwok/08-two-pods-two-namespaces/teardown.sh
+./docs/testing-manual/_fixtures-kwok/09-many-pods-many-namespaces/teardown.sh
+./docs/testing-manual/_fixtures-kwok/10-mixed-pod-phases/teardown.sh
+./docs/testing-manual/_fixtures-kwok/21-pod-phase-filter/teardown.sh
+./docs/testing-manual/_fixtures-kwok/33-labels-column/teardown.sh
+```

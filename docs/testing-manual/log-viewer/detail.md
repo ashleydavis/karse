@@ -10,7 +10,7 @@ Start the app first. From the repo root run the `dev:test` variant of `bun run d
 bun run dev:test
 ```
 
-Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
+Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse. Tear each cluster down with the Teardown step at the end of this doc.
 
 ## Scenario A: Log viewer auto-loads and streams (selectors, refresh)
 
@@ -56,4 +56,9 @@ One node, one multi-container pod. The panel streams `kubectl logs -f` via Serve
 ### Against a real cluster
 - On a cluster with real running containers, repeat with `bun run dev` (no fake logs). New log lines from the container should append in real time as they are produced, with no user action. The backend stops the `kubectl logs -f` process when the log view is left (the SSE connection closes).
 
-Teardown the fixture you used with its `teardown.sh`.
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/16-detail-pages-and-logs/teardown.sh
+./docs/testing-manual/_fixtures-kwok/27-live-pod-logs/teardown.sh
+```

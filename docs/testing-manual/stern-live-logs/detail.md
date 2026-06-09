@@ -10,7 +10,7 @@ Start the app first. From the repo root run the `dev:test` variant of `bun run d
 bun run dev:test
 ```
 
-Then open the frontend at `http://127.0.0.1:5173`. The scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
+Then open the frontend at `http://127.0.0.1:5173`. The scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse. Tear each cluster down with the Teardown step at the end of this doc.
 
 ## Scenario: Multi-pod streaming
 

@@ -8,7 +8,7 @@ Start the app first. From the repo root run:
 bun run dev
 ```
 
-Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stands up a `karse-test` KWOK cluster; `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse. Run the matching `teardown.sh` when done.
+Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stands up a `karse-test` KWOK cluster; `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse. Tear each one down with the Teardown step at the end of this doc.
 
 ## Scenario A: Node detail page (single node, one pod)
 
@@ -66,3 +66,10 @@ A node with two pods scheduled on it and a couple of node-scoped events.
 ### Tab switching
 - Switch back to "Status". Confirm the status cards reappear and the Pods and Events tables disappear.
 - The back arrow navigates back to `/nodes`.
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/16-detail-pages-and-logs/teardown.sh
+./docs/testing-manual/_fixtures-kwok/31-node-detail-tabs/teardown.sh
+```

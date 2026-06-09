@@ -2,7 +2,7 @@
 
 Manual tests for the per-page stats header on each resource list page. See the spec: [resource-stats](../../spec/resource-stats/detail.md).
 
-Each scenario's fixture stands up a `karse-test` KWOK cluster; select its `kwok-karse-test` context in Karse. Run the matching `teardown.sh` when done.
+Each scenario's fixture stands up a `karse-test` KWOK cluster; select its `kwok-karse-test` context in Karse. Tear each one down with the Teardown step at the end of this doc.
 
 ## Scenario A: Node stats (mixed statuses)
 
@@ -41,3 +41,16 @@ Reuse any fixture that creates a deployment, stateful set, or daemon set (for ex
 - **Deployments / StatefulSets pages**: `Healthy` counts workloads whose ready ratio is `x/x` (all desired replicas ready); `Error` counts those at `0/x`. A `0/0` workload is counted in the total only.
 - **DaemonSets page**: `Healthy` counts daemon sets where `ready === desired`; `Error` counts those with `ready === 0` and `desired > 0`.
 - On every page the three counts are consistent with the rows and update when the context or namespace changes.
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/04-mixed-node-statuses/teardown.sh
+./docs/testing-manual/_fixtures-kwok/10-mixed-pod-phases/teardown.sh
+```
+
+If you reused a workload fixture for Scenario C, also tear that one down, e.g.:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/30-workload-detail-pages/teardown.sh
+```

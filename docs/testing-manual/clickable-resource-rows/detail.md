@@ -8,7 +8,7 @@ Start the app first. From the repo root run:
 bun run dev
 ```
 
-Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse and run the matching `teardown.sh` when done.
+Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stands up a KWOK cluster; select the `kwok-karse-test` context in Karse. Tear each cluster down with the Teardown step at the end of this doc.
 
 ## Scenario A: Rows navigate to detail pages
 
@@ -63,4 +63,9 @@ For each of these pages, hover a data row and confirm the row background lighten
 ### Consistency check
 Confirm the highlight colour looks identical across all of the above tables. They all use the same `action.hover` background, so a clickable node row and a static context row should highlight to the same shade.
 
-Teardown the fixture you used with its `teardown.sh`.
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/16-detail-pages-and-logs/teardown.sh
+./docs/testing-manual/_fixtures-kwok/26-table-row-hover/teardown.sh
+```
