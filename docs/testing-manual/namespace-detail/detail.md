@@ -27,6 +27,7 @@ A namespace `team-a` with labels and annotations, holding a deployment and a sta
 
 ### Status tab (default)
 - The Details card shows Name, Phase (`Active`), Age, and a Resources count.
+- The Resources count is the **pod count only** (3: the two `web` deployment pods plus the one `db` stateful set pod), not the total of all kinds. It must match the number shown in the `team-a` row's Resources column on the `/namespaces` list page. Cross-check: note the Resources count on the `/namespaces` list for `team-a`, open the detail page, and confirm the Details-tab Resources count is the same number.
 - The Labels card shows `team=alpha` and `tier=backend`.
 - The Annotations table shows `owner` (= `platform-team`) and `description`.
 - The Resource Quotas table shows the `compute-quota` rows: `requests.cpu` = `4`, `requests.memory` = `8Gi`, `pods` = `10`.

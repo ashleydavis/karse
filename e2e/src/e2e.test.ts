@@ -539,6 +539,27 @@ test.describe("karse e2e", () => {
             expect(counts.every((c) => c === "—" || /^\d+$/.test(c.trim()))).toBe(true);
         });
 
+        test("Resources count agrees between the list column and the detail page", async () => {
+            // Read the list-column Resources count for the kube-system row (a
+            // namespace that always has pods), then open its detail page and
+            // confirm the Details-tab Resources stat shows the same number.
+            await page.locator("[data-test-id='namespaces-filter'] input").fill("kube-system");
+            const row = page.locator("[data-test-id='namespace-row']")
+                .filter({ hasText: "kube-system" }).first();
+            const listCount = (
+                await row.locator("[data-test-id='namespace-resource-count']").textContent()
+            )?.trim();
+            await page.locator("[data-test-id='namespaces-filter'] input").fill("");
+            await page.goto("/namespaces/kube-system", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='namespace-detail']")).toBeVisible();
+            await expect(
+                page.locator("[data-test-id='namespace-stat'][data-stat='resources']")
+            ).toContainText(listCount!);
+            // Return to the list so later tests in this block start from /namespaces.
+            await page.goto("/namespaces", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='namespace-row']").first()).toBeVisible();
+        });
+
         // Every namespace carries the auto-applied kubernetes.io/metadata.name
         // label, and the Labels column participates in the search, so a bare
         // "kube" now matches every row. Filter on "kube-system" instead: that
@@ -1719,6 +1740,15 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='namespace-annotations']")).toContainText("owner");
             await expect(page.locator("[data-test-id='namespace-quota-row']").first()).toContainText("requests.cpu");
             await expect(page.locator("[data-test-id='namespace-limit-row']").first()).toContainText("memory");
+        });
+
+        test("Details tab Resources stat counts pods only, matching the list column", async () => {
+            // The fixture has one Pod and one Deployment. The headline Resources
+            // stat counts pods only (1), so it agrees with the namespaces list
+            // column (also pods only), even though the Resources tab lists both.
+            await expect(
+                page.locator("[data-test-id='namespace-stat'][data-stat='resources']")
+            ).toContainText("1");
         });
 
         test("Resources tab lists the contained resources with search and sort", async () => {

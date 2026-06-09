@@ -64,3 +64,4 @@ Then open the frontend at `http://127.0.0.1:5173`. Each fixture stands up a `kar
 - With the fixture above, each `team-N` namespace shows `4`; namespaces with no pods show `0`.
 - Clicking the **Resources** header sorts the table by count.
 - The column does not block the table: namespaces render even before/if the pod count is unavailable. When a count cannot be determined the cell shows an em-dash (`—`) rather than breaking the row.
+- The count is consistent with the namespace detail page: clicking into a namespace, the Details-tab Resources count shows the same pods-only number (see [namespace-detail](../namespace-detail/detail.md)).

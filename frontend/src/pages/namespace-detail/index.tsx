@@ -27,6 +27,7 @@ import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
 import { tableRowSx } from "../../lib/table-row-style";
 import { ResourcesTable } from "./components/resources-table";
+import { namespaceResourceCount } from "../../lib/namespace-resource-count";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -76,6 +77,12 @@ export function NamespaceDetailPage() {
         return null;
     }
 
+    // "Resources" means pods, matching the namespaces list column. The Resources
+    // tab still lists every kind (pods, deployments, stateful sets, daemon sets),
+    // but the headline Resources stat counts pods only so the same namespace shows
+    // the same number on the list and the detail page.
+    const podCount = namespaceResourceCount(data.resources);
+
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }} data-test-id="namespace-detail">
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -113,9 +120,13 @@ export function NamespaceDetailPage() {
                                 ["Name", data.name],
                                 ["Phase", data.phase],
                                 ["Age", formatAge(data.createdAt)],
-                                ["Resources", `${data.resources.length}`],
+                                ["Resources", `${podCount}`],
                             ].map(([label, value]) => (
-                                <Box key={label} data-test-id="namespace-stat">
+                                <Box
+                                    key={label}
+                                    data-test-id="namespace-stat"
+                                    data-stat={label.toLowerCase()}
+                                >
                                     <Typography variant="caption" color="text.secondary">{label}</Typography>
                                     <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{value}</Typography>
                                 </Box>
