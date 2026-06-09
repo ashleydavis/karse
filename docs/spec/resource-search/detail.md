@@ -2,9 +2,9 @@
 
 ## Overview
 
-A per-table search and sort behaviour. Resource tables use a search box plus TanStack Table sorting. The fuzzy subsequence global filter (`fuzzyGlobalFilter`) is used by the nodes, pods, deployments, stateful sets and daemon sets tables. The events and errors tables instead use TanStack's built-in plain substring match (`globalFilterFn: "includesString"`). Tables whose kind has a status field (pods by phase, nodes by Ready/NotReady/Unknown) additionally share a status-filter dropdown. Every table that shows a Healthy/Error stats header (pods, nodes, deployments, stateful sets, daemon sets) also shares a health-filter dropdown that filters by the same derived Healthy/Error health used by the stats header (see `resource-stats`).
+A per-table search and sort behaviour. Resource tables use a search box plus TanStack Table sorting. The fuzzy subsequence global filter (`fuzzyGlobalFilter`) is used by the nodes, pods, deployments, stateful sets and daemon sets tables. The events and errors tables instead use TanStack's built-in plain substring match (`globalFilterFn: "includesString"`). Tables whose kind has a status field (pods by phase, nodes by Ready/NotReady/Unknown) additionally share a status-filter dropdown. Every table that shows a Healthy/Error stats header (pods, nodes, deployments, stateful sets, daemon sets) also shares a health-filter dropdown that filters by the same derived Healthy/Error health used by the stats header (see `resource-stats`). Every table whose kind carries labels (nodes, pods, deployments, stateful sets, daemon sets, namespaces) also shares a structured label-filter dropdown.
 
-Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-state.ts`, `frontend/src/components/status-filter.tsx`, and the per-page table components under `frontend/src/pages/*/components/`.
+Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-state.ts`, `frontend/src/components/status-filter.tsx`, `frontend/src/lib/label-filter-state.ts`, `frontend/src/components/label-filter.tsx`, and the per-page table components under `frontend/src/pages/*/components/`.
 
 ## Behaviour
 
@@ -35,6 +35,17 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-s
 - The health filter reuses the same shared dropdown (`status-filter.tsx`) and column-filter wiring (`status-filter-state.ts`) as the status filter, driving a hidden TanStack "health" column whose accessor returns the derived health. There is no per-table duplicate. The health column is excluded from the fuzzy search (`enableGlobalFilter: false`) so its values never affect the search box.
 - The health filter composes with the search box and (where present) the status filter: a row must pass all active filters to show.
 
+### Label filtering
+
+- Every resource table whose kind carries labels (nodes, pods, deployments, stateful sets, daemon sets, namespaces) has a label-filter dropdown beside the search box (and, where present, beside the status and health filters).
+- The dropdown lists every label key present on the loaded resources. Under each key it shows one checkbox per distinct value that key has across the loaded resources. Keys and values are sorted for a stable order.
+- Picking one or more values for a key narrows the table to resources whose label for that key is one of the picked values. Within a single key the picked values are OR'd; across different keys the constraints are AND'd (a row must satisfy every key that has any value picked).
+- By default nothing is selected and every resource is shown; the button reads `Labels: All`. With any values picked it reads `Labels: N selected`, where N is the total number of picked values across all keys.
+- A "Deselect all" control at the top of the dropdown clears every label selection at once, returning to showing everything. It is greyed out when nothing is selected.
+- When a selection matches no rows, the table shows its existing no-match message.
+- The label filter drives a TanStack Table column filter on the `labels` column. An empty selection clears the filter (every row passes), so the filter, the status filter, the health filter, and the search box all compose (a row must satisfy all active ones).
+- The dropdown and its column-filter wiring are shared (`label-filter.tsx` and `label-filter-state.ts`) so behaviour is identical across tables. There is no per-table duplicate.
+
 ## Acceptance Criteria
 
 - [x] Each resource table has a search box that filters its rows.
@@ -50,6 +61,10 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-s
 - [x] Every table with a Healthy/Error stats header (pods, nodes, deployments, stateful sets, daemon sets) has a Healthy/Error health-filter dropdown; both checked by default (shows all).
 - [x] Checking only "Error" shows just error rows; checking only "Healthy" shows just healthy rows; "Deselect all" hides all rows.
 - [x] The health filter reuses the shared dropdown and column-filter wiring (no per-table duplicate) and uses the same derived health as the stats header.
+- [x] Every table whose kind carries labels (nodes, pods, deployments, stateful sets, daemon sets, namespaces) has a label-filter dropdown listing the label keys present on the loaded resources.
+- [x] Selecting a label key's value(s) narrows the table to matching resources (OR within a key, AND across keys); the default empty selection shows everything.
+- [x] A "Deselect all" control clears every label selection and returns to showing everything.
+- [x] The label-filter dropdown and its column-filter wiring are shared across tables, with no per-table duplicate, and compose with the search box and the status filter.
 
 ## Open Questions
 

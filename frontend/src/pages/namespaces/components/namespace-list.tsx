@@ -7,6 +7,7 @@ import {
     flexRender,
     type ColumnDef,
     type SortingState,
+    type ColumnFiltersState,
 } from "@tanstack/react-table";
 import {
     Table,
@@ -30,6 +31,8 @@ import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
+import { LabelFilter } from "../../../components/label-filter";
+import { labelColumnFilterFn, makeLabelFilterController } from "../../../lib/label-filter-state";
 
 type Props = {
     namespaces: Namespace[];
@@ -45,6 +48,10 @@ type Props = {
 export function NamespaceList({ namespaces, active, terminalDefault, isLoading, error, onUse, onSetDefault, onOpen }: Props) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+
+    // The label-filter selection lives in the table's "labels" column filter; an absent filter means "no selection" (all rows show).
+    const labelFilterController = makeLabelFilterController("labels", namespaces, columnFilters, setColumnFilters);
 
     const columns: ColumnDef<Namespace>[] = [
         {
@@ -70,6 +77,10 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
             header: "Labels",
             cell: (info) => <LabelsCell labels={info.row.original.labels} />,
             enableSorting: false,
+            // Keeps a row only when its labels satisfy the label-filter selection.
+            // An empty selection clears this filter (set by the label-filter controller),
+            // so every row passes by default.
+            filterFn: labelColumnFilterFn,
         },
         {
             accessorKey: "resourceCount",
@@ -118,9 +129,10 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
     const table = useReactTable({
         data: namespaces,
         columns,
-        state: { sorting, globalFilter },
+        state: { sorting, globalFilter, columnFilters },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
+        onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -147,20 +159,30 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
 
     return (
         <div className="flex flex-col gap-2">
-            <TextField
-                size="small"
-                placeholder="Search namespaces..."
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                data-test-id="namespaces-filter"
-                slotProps={{
-                    input: {
-                        startAdornment: (
-                            <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                        ),
-                    },
-                }}
-            />
+            <div className="flex flex-row gap-2 items-center">
+                <TextField
+                    size="small"
+                    placeholder="Search namespaces..."
+                    value={globalFilter}
+                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    data-test-id="namespaces-filter"
+                    slotProps={{
+                        input: {
+                            startAdornment: (
+                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
+                            ),
+                        },
+                    }}
+                />
+                <LabelFilter
+                    available={labelFilterController.available}
+                    selection={labelFilterController.selection}
+                    onToggle={labelFilterController.toggleValue}
+                    onDeselectAll={labelFilterController.deselectAll}
+                    selectedCount={labelFilterController.selectedCount}
+                    testIdPrefix="namespaces-label-filter"
+                />
+            </div>
             <TableContainer component={Paper} data-test-id="namespaces-list">
                 <Table size="small">
                     <TableHead>

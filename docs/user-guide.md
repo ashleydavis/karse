@@ -90,7 +90,7 @@ A read-only table of the cluster's nodes:
 
 - **Name**, **Status** (Ready/NotReady/Unknown chip), **Roles**, **Version**, **Age**.
 
-Click a column header to sort; type in the search box to filter rows. Use the **Status** dropdown (filter icon, beside the search box) to show only nodes with the statuses you check; all statuses are shown by default. Use the **Health** dropdown to show only **Healthy** or only **Error** nodes (matching the Healthy/Error counts in the stats header); both are shown by default.
+Click a column header to sort; type in the search box to filter rows. Use the **Status** dropdown (filter icon, beside the search box) to show only nodes with the statuses you check; all statuses are shown by default. Use the **Health** dropdown to show only **Healthy** or only **Error** nodes (matching the Healthy/Error counts in the stats header); both are shown by default. Use the **Labels** dropdown (tags icon) to filter by label: pick a key, then tick one or more of its values; "Deselect all" clears the label filter. See [Label filtering](#label-filtering) below.
 
 ## Namespaces page (`/namespaces`)
 
@@ -116,9 +116,19 @@ Reached by clicking a namespace row. Organised into four tabs:
 
 A table of pods for the active context. When a namespace is active, pods are scoped to that namespace; when no namespace is selected, all pods across all namespaces are shown. The Namespace column is always shown regardless of the active namespace.
 
-Type in the search box to filter rows. Use the **Phase** dropdown (filter icon, beside the search box) to show only pods with the phases you check; all phases are shown by default. Use the **Health** dropdown to show only **Healthy** or only **Error** pods (matching the Healthy/Error counts in the stats header); both are shown by default. The Deployments, StatefulSets, and DaemonSets pages have the same **Health** dropdown.
+Type in the search box to filter rows. Use the **Phase** dropdown (filter icon, beside the search box) to show only pods with the phases you check; all phases are shown by default. Use the **Health** dropdown to show only **Healthy** or only **Error** pods (matching the Healthy/Error counts in the stats header); both are shown by default. The Deployments, StatefulSets, and DaemonSets pages have the same **Health** dropdown. Use the **Labels** dropdown (tags icon) to filter by label. See [Label filtering](#label-filtering) below.
 
 A Labels column shows each resource's labels as compact `key=value` chips (also present on the Nodes, Deployments, StatefulSets, DaemonSets, and Namespaces tables). The chips participate in the table's search, so typing a label key or value filters the rows.
+
+### Label filtering
+
+Every resource table that carries labels (Nodes, Pods, Deployments, StatefulSets, DaemonSets, Namespaces) has a **Labels** dropdown (tags icon) beside its search box. It lists every label key on the currently loaded resources; under each key it shows one checkbox per value that key has. Tick one or more values to narrow the table:
+
+- Within one key, ticking several values shows resources matching any of them.
+- Across different keys, the table shows only resources that match every key you have picked a value for.
+- Nothing is selected by default, so all resources show and the button reads "Labels: All". Once you pick values it reads "Labels: N selected".
+- "Deselect all" at the top of the dropdown clears every label selection and returns to showing everything.
+- The label filter works together with the search box and the status/phase/health filter: a row must satisfy all of them.
 
 Click a pod row to open its detail page (`/pods/:namespace/:name`), with tabs for Status, Containers, Init Containers (when present), Logs, Commands, and YAML.
 

@@ -36,6 +36,8 @@ import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
+import { LabelFilter } from "../../../components/label-filter";
+import { labelColumnFilterFn, makeLabelFilterController } from "../../../lib/label-filter-state";
 import { ResourceStatsHeader } from "../../../components/resource-stats-header";
 import { computeStatefulSetStats, statefulSetHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
 
@@ -75,6 +77,10 @@ const columns: ColumnDef<StatefulSet>[] = [
         header: "Labels",
         cell: (info) => <LabelsCell labels={info.row.original.labels} />,
         enableSorting: false,
+        // Keeps a row only when its labels satisfy the label-filter selection.
+        // An empty selection clears this filter (set by the label-filter controller),
+        // so every row passes by default.
+        filterFn: labelColumnFilterFn,
     },
     {
         // Hidden column carrying each stateful set's derived health ("Healthy"/
@@ -106,6 +112,9 @@ export function StatefulSetsTable() {
 
     // The selected health states live in the hidden "health" column filter; an absent filter means "all".
     const healthFilterController = makeStatusFilterController("health", HEALTH_FILTER_OPTIONS, columnFilters, setColumnFilters);
+
+    // The label-filter selection lives in the table's "labels" column filter; an absent filter means "no selection" (all rows show).
+    const labelFilterController = makeLabelFilterController("labels", data?.statefulSets ?? [], columnFilters, setColumnFilters);
 
     const table = useReactTable({
         data: data?.statefulSets ?? [],
@@ -176,6 +185,14 @@ export function StatefulSetsTable() {
                     onChange={healthFilterController.setSelected}
                     label="Health"
                     testIdPrefix="statefulsets-health-filter"
+                />
+                <LabelFilter
+                    available={labelFilterController.available}
+                    selection={labelFilterController.selection}
+                    onToggle={labelFilterController.toggleValue}
+                    onDeselectAll={labelFilterController.deselectAll}
+                    selectedCount={labelFilterController.selectedCount}
+                    testIdPrefix="statefulsets-label-filter"
                 />
             </div>
             <TableContainer component={Paper} data-test-id="statefulsets-table">

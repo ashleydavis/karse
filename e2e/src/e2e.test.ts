@@ -3753,4 +3753,125 @@ test.describe("karse e2e", () => {
             await page.locator("[data-test-id='pods-search'] input").fill("");
         });
     });
+
+    // ── Pods page: label filter dropdown ────────────────────────────────────────
+
+    test.describe("pods page label filter", () => {
+        // Three pods with overlapping label keys so each key/value checkbox is
+        // independently observable and AND-across-keys can be verified.
+        const FAKE_PODS = {
+            pods: [
+                { name: "web-pod", namespace: "default", phase: "Running", ready: "1/1", containerCount: 1, restarts: 0, node: "node-worker", createdAt: new Date().toISOString(), labels: { app: "web", tier: "frontend" } },
+                { name: "api-pod", namespace: "default", phase: "Running", ready: "1/1", containerCount: 1, restarts: 0, node: "node-worker", createdAt: new Date().toISOString(), labels: { app: "api", tier: "frontend" } },
+                { name: "db-pod", namespace: "default", phase: "Running", ready: "1/1", containerCount: 1, restarts: 0, node: "node-worker", createdAt: new Date().toISOString(), labels: { app: "db", tier: "backend" } },
+            ],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: FAKE_PODS });
+            });
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']").first()).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+            setContext(CLUSTER_1);
+        });
+
+        test("shows all pods by default with the filter reading All", async () => {
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='pods-label-filter-button']")).toHaveText("Labels: All");
+        });
+
+        test("the dropdown lists the label keys present on the pods", async () => {
+            await page.locator("[data-test-id='pods-label-filter-button']").click();
+            await expect(page.locator("[data-test-id='pods-label-filter-key-app']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pods-label-filter-key-tier']")).toBeVisible();
+            await page.keyboard.press("Escape");
+        });
+
+        test("selecting a label value narrows the table to matching pods", async () => {
+            await page.locator("[data-test-id='pods-label-filter-button']").click();
+            await page.locator("[data-test-id='pods-label-filter-item-app-web']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("web-pod");
+            await expect(page.locator("[data-test-id='pods-label-filter-button']")).toHaveText("Labels: 1 selected");
+        });
+
+        test("selecting a second value for the same key widens to the union (OR within a key)", async () => {
+            await page.locator("[data-test-id='pods-label-filter-button']").click();
+            await page.locator("[data-test-id='pods-label-filter-item-app-api']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "db-pod" })).toHaveCount(0);
+            await expect(page.locator("[data-test-id='pods-label-filter-button']")).toHaveText("Labels: 2 selected");
+        });
+
+        test("adding a value on a second key narrows by AND across keys", async () => {
+            await page.locator("[data-test-id='pods-label-filter-button']").click();
+            await page.locator("[data-test-id='pods-label-filter-item-tier-backend']").click();
+            await page.keyboard.press("Escape");
+            // app in {web,api} AND tier=backend matches no pod (web/api are frontend).
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-pods-match']")).toBeVisible();
+        });
+
+        test("deselect all clears every filter and restores the full list", async () => {
+            await page.locator("[data-test-id='pods-label-filter-button']").click();
+            await page.locator("[data-test-id='pods-label-filter-deselect-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='pods-label-filter-button']")).toHaveText("Labels: All");
+        });
+    });
+
+    // ── Deployments page: label filter dropdown (other resource kinds) ───────────
+
+    test.describe("deployments page label filter", () => {
+        // Two deployments with distinct app labels so the filter is observable on a
+        // non-pod, non-node resource table.
+        const FAKE_DEPLOYMENTS = {
+            deployments: [
+                { name: "web-deploy", namespace: "default", ready: "1/1", upToDate: 1, available: 1, createdAt: new Date().toISOString(), labels: { app: "web" } },
+                { name: "db-deploy", namespace: "default", ready: "1/1", upToDate: 1, available: 1, createdAt: new Date().toISOString(), labels: { app: "db" } },
+            ],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/deployments*", async (route) => {
+                await route.fulfill({ json: FAKE_DEPLOYMENTS });
+            });
+            await page.goto("/deployments", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='deployment-row']").first()).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/deployments*");
+            setContext(CLUSTER_1);
+        });
+
+        test("has a label-filter dropdown and shows all by default", async () => {
+            await expect(page.locator("[data-test-id='deployment-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='deployments-label-filter-button']")).toHaveText("Labels: All");
+        });
+
+        test("selecting a label value narrows the table; deselect all restores it", async () => {
+            await page.locator("[data-test-id='deployments-label-filter-button']").click();
+            await page.locator("[data-test-id='deployments-label-filter-item-app-web']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='deployment-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='deployment-row'] td:first-child")).toHaveText("web-deploy");
+
+            await page.locator("[data-test-id='deployments-label-filter-button']").click();
+            await page.locator("[data-test-id='deployments-label-filter-deselect-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='deployment-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='deployments-label-filter-button']")).toHaveText("Labels: All");
+        });
+    });
 });

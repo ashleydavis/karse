@@ -50,8 +50,38 @@ Every table that shows a Healthy/Error stats header (pods, nodes, deployments, s
 
 Checking only **Error** shows just the error rows; checking only **Healthy** shows just the healthy rows. The same "Select all" / "Deselect all" controls apply, and the health filter composes with the search box and the status filter. See the dedicated scenarios: pods in [pods-view](../pods-view/detail.md) (Scenario E.2) and nodes in [nodes-view](../nodes-view/detail.md) (Scenario G.2).
 
-Teardown:
+### Label filtering
+
+Every resource table whose kind carries labels (nodes, pods, deployments, statefulsets, daemonsets, namespaces) shares one structured label-filter dropdown (the same `label-filter.tsx` component and `label-filter-state.ts` column-filter wiring). The dropdown sits beside the search box (and beside the status and health filters where present). It lists every label key present on the loaded resources, with one checkbox per distinct value under each key. Nothing is selected by default and all resources show; the button reads `Labels: All`. Picking values for a key narrows the table to resources matching one of those values (OR within a key); picking values across different keys requires a row to match every key (AND across keys). A "Deselect all" control clears every selection. It composes with the search box and the status filter.
+
+Teardown the fuzzy-search fixture, then stand up the labels fixture below:
 
 ```sh
 ./docs/testing-manual/_fixtures-kwok/29-fuzzy-search/teardown.sh
+```
+
+**Fixture:** [_fixtures-kwok/33-labels-column](../_fixtures-kwok/33-labels-column/)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/33-labels-column/setup.sh
+```
+
+`kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse.
+
+#### What to check
+Open the **Pods page** (default namespace). Two pods are present: `web-pod` (labels `app=web`, `tier=frontend`) and `db-pod` (label `app=db`).
+
+- **Default**: both pods show; the label-filter button reads `Labels: All`.
+- **Lists keys**: click the label-filter button. The dropdown lists the keys `app` and `tier`, each with its values as checkboxes.
+- **Filter by value**: tick `app` → `web`. Only `web-pod` remains; the button reads `Labels: 1 selected`.
+- **OR within a key**: also tick `app` → `db`. Both pods reappear (the table shows any pod whose `app` is `web` or `db`); the button reads `Labels: 2 selected`.
+- **AND across keys**: with `app` still on `web` and `db`, tick `tier` → `frontend`. Only `web-pod` remains (it is the only pod that is both in the app set and `tier=frontend`).
+- **Deselect all**: click "Deselect all" at the top of the dropdown. Every selection clears, both pods show again, and the button reads `Labels: All`.
+
+Repeat a value filter on the **Deployments page** (or another workload table) to confirm the same dropdown works on the other resource kinds.
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/33-labels-column/teardown.sh
 ```
