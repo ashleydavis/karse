@@ -28,6 +28,7 @@ import type { ClusterEvent } from "karse-types";
 import { useKubeContext } from "../../../lib/kube-context";
 import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { fetchEvents } from "../../../lib/api-client";
+import { LoadingIndicator } from "../../../components/loading-indicator";
 
 // Formats a Kubernetes timestamp into a human-readable age string.
 function formatAge(lastSeen: string): string {
@@ -140,7 +141,7 @@ export function EventsTable() {
     }
 
     if (isLoading) {
-        return null;
+        return <LoadingIndicator />;
     }
 
     const rows = table.getRowModel().rows;

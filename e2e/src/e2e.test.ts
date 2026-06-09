@@ -2928,6 +2928,43 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Loading indicator ──────────────────────────────────────────────────────
+
+    test.describe("loading indicator", () => {
+        // A single deterministic pod so the table renders rows once data arrives.
+        const FAKE_PODS = {
+            pods: [
+                { name: "nginx-loading", namespace: "default", phase: "Running", ready: "1/1", restarts: 0, node: "node-worker", createdAt: new Date().toISOString() },
+            ],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+        });
+
+        test("shows the loading indicator before data appears, then removes it", async () => {
+            // Delay the pods response so the loading state is observable.
+            await page.route("**/api/pods*", async (route) => {
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+                await route.fulfill({ json: FAKE_PODS });
+            });
+
+            await page.goto("/pods");
+
+            // The indicator is visible while the (delayed) query is in flight.
+            await expect(page.locator("[data-test-id='loading-indicator']")).toBeVisible();
+
+            // Once data loads, the indicator is gone and rows are shown.
+            await expect(page.locator("[data-test-id='pod-row']").first()).toBeVisible();
+            await expect(page.locator("[data-test-id='loading-indicator']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("nginx-loading");
+        });
+    });
+
     // ── Labels column ──────────────────────────────────────────────────────────
 
     test.describe("labels column", () => {

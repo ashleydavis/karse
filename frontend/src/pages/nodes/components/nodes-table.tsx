@@ -29,6 +29,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { Node, NodeStatus } from "karse-types";
 import { useKubeContext } from "../../../lib/kube-context";
 import { fetchNodes } from "../../../lib/api-client";
+import { LoadingIndicator } from "../../../components/loading-indicator";
 import { StatusFilter } from "../../../components/status-filter";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
@@ -168,7 +169,9 @@ export function NodesTable() {
         return <Alert severity="error">{(error as Error).message}</Alert>;
     }
 
-    if (isLoading) return null;
+    if (isLoading) {
+        return <LoadingIndicator />;
+    }
 
     const rows = table.getRowModel().rows;
     const allNodes = data?.nodes ?? [];

@@ -44,6 +44,8 @@ The left sidebar has collapsible navigation. Click the chevron at the bottom to 
 - **Namespaces**: list and select namespaces.
 - **Pods**: list pods for the active context and namespace.
 
+While a page is fetching its data from the cluster, it shows a large, clearly visible loading spinner alone (no text) in place of the content. The spinner is replaced by the data once it loads, or by an error message if the request fails. This applies to every resource list page and detail page.
+
 ## Active context and namespace
 
 Karse tracks two independent selections:

@@ -28,6 +28,7 @@ import type { StatefulSet } from "karse-types";
 import { useKubeContext } from "../../../lib/kube-context";
 import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { fetchStatefulSets } from "../../../lib/api-client";
+import { LoadingIndicator } from "../../../components/loading-indicator";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { LabelsCell } from "../../../components/labels-cell";
@@ -109,7 +110,7 @@ export function StatefulSetsTable() {
     }
 
     if (isLoading) {
-        return null;
+        return <LoadingIndicator />;
     }
 
     const rows = table.getRowModel().rows;

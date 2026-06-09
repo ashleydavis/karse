@@ -20,7 +20,6 @@ import {
     TextField,
     Typography,
     Button,
-    CircularProgress,
     Alert,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -28,6 +27,7 @@ import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/fr
 import type { Namespace } from "karse-types";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
+import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
 
@@ -128,7 +128,7 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
     });
 
     if (isLoading) {
-        return <CircularProgress size={24} />;
+        return <LoadingIndicator />;
     }
 
     if (error) {

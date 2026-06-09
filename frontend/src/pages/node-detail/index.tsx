@@ -26,6 +26,7 @@ import { useShareableNavigate } from "../../lib/nav-state";
 import { fetchNodeDetail } from "../../lib/api-client";
 import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
+import { LoadingIndicator } from "../../components/loading-indicator";
 import { tableRowSx } from "../../lib/table-row-style";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
@@ -99,7 +100,7 @@ export function NodeDetailPage() {
     }
 
     if (isLoading || !data) {
-        return null;
+        return <LoadingIndicator />;
     }
 
     return (

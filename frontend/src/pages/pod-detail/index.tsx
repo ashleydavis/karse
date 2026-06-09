@@ -25,6 +25,7 @@ import { useShareableNavigate } from "../../lib/nav-state";
 import { fetchPodDetail } from "../../lib/api-client";
 import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
+import { LoadingIndicator } from "../../components/loading-indicator";
 import { PodContainersPanel, PodInitContainersPanel } from "./components/pod-containers-panel";
 import { PodLogsPanel } from "./components/pod-logs-panel";
 
@@ -116,7 +117,7 @@ export function PodDetailPage() {
     }
 
     if (isLoading || !data) {
-        return null;
+        return <LoadingIndicator />;
     }
 
     const allContainerNames = [

@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { useKubeContext } from "../../../lib/kube-context";
 import { useShareableTo } from "../../../lib/nav-state";
 import { fetchClusterOverview } from "../../../lib/api-client";
+import { LoadingIndicator } from "../../../components/loading-indicator";
 
 type StatTileProps = {
     icon: IconProp;
@@ -115,7 +116,7 @@ export function ClusterOverview() {
     }
 
     if (isLoading || !data) {
-        return null;
+        return <LoadingIndicator />;
     }
 
     const allNodesReady = data.readyNodeCount === data.nodeCount;
