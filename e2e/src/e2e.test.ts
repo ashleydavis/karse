@@ -3756,8 +3756,22 @@ test.describe("karse e2e", () => {
     // are needed so the sensor registers the drag and the collision detection settles on the
     // target before the drop.
     async function dragColumnOnto(sourceTestId: string, targetTestId: string): Promise<void> {
-        const source = page.locator(`[data-test-id='${sourceTestId}']`);
-        const target = page.locator(`[data-test-id='${targetTestId}']`);
+        // Resolve the live in-list element, not the DragOverlay copy. While a drag is in flight (or
+        // its drop animation is settling) dnd-kit renders a free-floating overlay copy of the row
+        // with the SAME data-test-id but OUTSIDE both section lists, so a bare data-test-id selector
+        // can match two elements. Scoping to the section droppables (which a column id always lives
+        // in, and the overlay never does) keeps the lookup unambiguous; a section target id is not
+        // inside a section, so fall back to the bare selector for those.
+        function inList(testId: string): ReturnType<typeof page.locator> {
+            if (testId.startsWith("column-config-section-")) {
+                return page.locator(`[data-test-id='${testId}']`);
+            }
+            return page.locator(
+                `[data-test-id^='column-config-section-'] [data-test-id='${testId}']`,
+            );
+        }
+        const source = inList(sourceTestId);
+        const target = inList(targetTestId);
         const sourceBox = await source.boundingBox();
         const targetBox = await target.boundingBox();
         if (sourceBox === null || targetBox === null) {
@@ -3861,6 +3875,57 @@ test.describe("karse e2e", () => {
             await page.locator("[data-test-id='column-config-close']").click();
             const headers = await getNodeHeaders();
             expect(headers).toContain("Roles");
+        });
+
+        test("a cross-section drop lands at the insertion point, not the end", async () => {
+            // Start clean and deterministic.
+            await page.evaluate(() => localStorage.removeItem("karse-columns-nodes"));
+            await page.reload({ waitUntil: "networkidle" });
+            await waitForNodeRows();
+            await page.locator("[data-test-id='column-config-button']").click();
+            // Hide Roles so the Hidden section has a column to drop ONTO (its insertion point).
+            await dragColumnOnto("column-config-item-roles", "column-config-section-hidden");
+            await expect(
+                page.locator("[data-test-id='column-config-section-hidden'] [data-test-id='column-config-item-roles']"),
+            ).toBeVisible();
+            // Drag Age onto Roles in the Hidden section. The drop must land Age BEFORE Roles (the
+            // insertion point under the cursor), not appended after it. This is the cross-section
+            // mid-insertion case the preview/gap shows; the committed order must match.
+            await dragColumnOnto("column-config-item-age", "column-config-item-roles");
+            const hiddenItems = page.locator(
+                "[data-test-id='column-config-section-hidden'] [data-test-id^='column-config-item-']",
+            );
+            await expect(hiddenItems).toHaveCount(2);
+            // Age sits before Roles in the Hidden list (index 0), proving the drop honoured the
+            // insertion point rather than appending to the end.
+            await expect(hiddenItems.first()).toHaveAttribute("data-test-id", "column-config-item-age");
+            await expect(hiddenItems.last()).toHaveAttribute("data-test-id", "column-config-item-roles");
+            await page.locator("[data-test-id='column-config-close']").click();
+        });
+
+        test("a cross-section drop into the MIDDLE of the destination lands there", async () => {
+            // Deterministic start: Roles and Age hidden (in that order); Visible has Version.
+            await page.evaluate(() => {
+                localStorage.setItem(
+                    "karse-columns-nodes",
+                    JSON.stringify({ order: ["name", "status", "version", "roles", "age"], hidden: ["roles", "age"] }),
+                );
+            });
+            await page.reload({ waitUntil: "networkidle" });
+            await waitForNodeRows();
+            await page.locator("[data-test-id='column-config-button']").click();
+            // Drag Version (Visible) onto Age, which sits BETWEEN Roles and the section end. Version
+            // must land BEFORE Age (the insertion point under the cursor) → Hidden = Roles, Version,
+            // Age — NOT appended to the end (Roles, Age, Version), which was the reported bug.
+            await dragColumnOnto("column-config-item-version", "column-config-item-age");
+            const hiddenItems = page.locator(
+                "[data-test-id='column-config-section-hidden'] [data-test-id^='column-config-item-']",
+            );
+            await expect(hiddenItems).toHaveCount(3);
+            await expect(hiddenItems.nth(0)).toHaveAttribute("data-test-id", "column-config-item-roles");
+            await expect(hiddenItems.nth(1)).toHaveAttribute("data-test-id", "column-config-item-version");
+            await expect(hiddenItems.nth(2)).toHaveAttribute("data-test-id", "column-config-item-age");
+            await page.locator("[data-test-id='column-config-close']").click();
         });
 
         test.afterAll(async () => {

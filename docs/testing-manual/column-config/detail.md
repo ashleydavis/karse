@@ -31,7 +31,8 @@ Open the **Nodes page**. The table shows the columns: Name, Status, Roles, Versi
 3. **Reorder a column**: open the modal again and drag **Version** so it sits above **Status** in the Visible section. As you drag, the rows shift to open a gap at the insertion point, marking where Version will land. Close the modal. In the table, the Version column now appears before the Status column.
 4. **Persistence**: reload the page (or navigate away and back). The Roles column is still hidden and Version still appears before Status: the configuration was saved.
 5. **Show it again**: open the modal and drag **Roles** from Hidden back into Visible. The lifted preview again follows the cursor as it crosses back. Close the modal. The Roles column reappears in the table.
-6. **Per table**: open the **Pods page** (or any other resource table). Its columns are unaffected by the nodes configuration: configuration is stored independently per table.
+6. **Cross-section drop lands where the gap shows**: with at least two columns already in the Hidden section, drag a Visible column and drop it onto a column in the **middle** of the Hidden list (so the gap opens between two hidden columns). On release, the dropped column lands at that middle position, exactly where the gap showed, not appended to the end of the Hidden list.
+7. **Per table**: open the **Pods page** (or any other resource table). Its columns are unaffected by the nodes configuration: configuration is stored independently per table.
 
 Any non-configurable columns (those marked `enableHiding: false`) are intentionally not listed in the modal and always stay at the end of the row.
 

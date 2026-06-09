@@ -21,9 +21,11 @@ import {
     useSensor,
     useSensors,
     closestCenter,
+    pointerWithin,
+    rectIntersection,
     useDroppable,
 } from "@dnd-kit/core";
-import type { DragEndEvent, DragOverEvent, DragStartEvent } from "@dnd-kit/core";
+import type { CollisionDetection, DragEndEvent, DragOverEvent, DragStartEvent } from "@dnd-kit/core";
 import {
     SortableContext,
     sortableKeyboardCoordinates,
@@ -195,6 +197,24 @@ export function ColumnConfigModal({
         }),
     );
 
+    // Collision detection tuned for two side-by-side droppable sections. `closestCenter` alone is
+    // unstable here: while the cursor sits near the boundary it can flip the resolved target back
+    // and forth between a column in one section and a column in the other, which (because drag-over
+    // relocates the dragged column on each flip) makes the lists oscillate and a drop onto the empty
+    // section never settle. `pointerWithin`/`rectIntersection` resolve which SECTION the pointer is
+    // actually inside first (stable per pointer position); we then defer to `closestCenter` to pick
+    // the row within that section so the within-section gap still tracks the cursor.
+    const collisionDetection: CollisionDetection = (args) => {
+        const within = pointerWithin(args);
+        const intersections = within.length > 0 ? within : rectIntersection(args);
+        if (intersections.length === 0) {
+            return closestCenter(args);
+        }
+        // Prefer a column collision when the pointer is over one; else fall back to the section.
+        const overColumn = intersections.find((c) => !String(c.id).startsWith("section-"));
+        return overColumn === undefined ? intersections : [overColumn];
+    };
+
     // The id of the column currently being dragged, or null when nothing is dragging. It drives
     // the DragOverlay, which renders a free-floating copy of the row that follows the cursor.
     // Without the overlay, dnd-kit's sortable transform only animates the dragged row within its
@@ -264,46 +284,97 @@ export function ColumnConfigModal({
         return against.hidden.includes(id) ? "hidden" : "visible";
     }
 
-    // Returns `base` with `dragId` placed immediately before `beforeId` within `order`, or appended
-    // when `beforeId` is null. Pure; does not change which section the column belongs to.
-    function reorderBefore(order: string[], dragId: string, beforeId: string | null): string[] {
-        const next = order.filter((id) => id !== dragId);
-        if (beforeId === null || beforeId === dragId) {
-            next.push(dragId);
-            return next;
-        }
-        const idx = next.indexOf(beforeId);
-        if (idx === -1) {
-            next.push(dragId);
-        }
-        else {
-            next.splice(idx, 0, dragId);
-        }
-        return next;
+    // Returns the column ids of `targetSection` within `against`, in display order.
+    function idsInSection(against: ColumnConfig, targetSection: Section): string[] {
+        const hiddenSet = new Set(against.hidden);
+        return against.order.filter((id) =>
+            targetSection === "hidden" ? hiddenSet.has(id) : !hiddenSet.has(id),
+        );
     }
 
-    // Moves `dragId` into `targetSection` (within-section ordering is left to the drop handler /
-    // the sortable strategy). Used by drag-over to open the gap in the OTHER section the moment the
-    // cursor enters it.
-    function moveToSection(base: ColumnConfig, dragId: string, targetSection: Section, overId: string): ColumnConfig {
-        // Position it before the column it is over, or at the section's end when over the bare area.
-        const beforeId = overId === `section-${targetSection}` ? null : overId;
-        const order = reorderBefore(base.order, dragId, beforeId);
-        const hidden = base.hidden.filter((id) => id !== dragId);
-        if (targetSection === "hidden") {
-            hidden.push(dragId);
+    // Places `dragId` into `targetSection` at the slot indicated by `overId`, returning a new
+    // config. `overId` is either the section's droppable id (drop on the bare area → append to the
+    // end of that section) or another column's id (drop onto that item → take its slot).
+    //
+    // `isReorder` distinguishes the two gestures, because they place differently relative to the over
+    // column and must match what the user saw:
+    //   - A genuine WITHIN-section reorder (the column started in this section) mirrors dnd-kit's
+    //     verticalListSortingStrategy: arrayMove to the over column's index, so a downward move lands
+    //     AFTER the over column and an upward move BEFORE it — matching the strategy's animated gap.
+    //   - A CROSS-section move inserts BEFORE the over column (the cursor's insertion point), so the
+    //     column lands exactly where the gap showed and not at the end. Crucially this is judged from
+    //     the column's ORIGINAL section (in the committed config), not its in-flight position: during
+    //     a cross move drag-over parks the column in the target section, so judging by the in-flight
+    //     position would wrongly treat the drop as a within-section reorder and arrayMove it past the
+    //     over column (the reported "lands at the end" bug).
+    // The result keeps `order` as the single source of truth for display order and only lists hidden
+    // ids in `hidden`. Pure.
+    function placeInSection(base: ColumnConfig, dragId: string, targetSection: Section, overId: string, isReorder: boolean): ColumnConfig {
+        // Over the dragged column itself: it is already where it should be, so leave `base` as-is
+        // rather than re-inserting (which would otherwise append it to the end).
+        if (overId === dragId) {
+            return base;
         }
+        // Section list WITH the dragged column (if already here) so we can mirror arrayMove's
+        // index-based move; otherwise the list of the other members to insert into.
+        const fullSectionIds = idsInSection(base, targetSection);
+        const sectionIds = fullSectionIds.filter((id) => id !== dragId);
+        let insertAt: number;
+        if (overId === `section-${targetSection}`) {
+            insertAt = sectionIds.length;
+        }
+        else if (isReorder && fullSectionIds.includes(dragId)) {
+            // Within-section reorder: mirror arrayMove(items, from, overIndex). The destination
+            // index is the over column's index in the list that STILL contains the dragged column,
+            // so a downward move lands AFTER the over column and an upward move lands BEFORE it,
+            // matching the strategy's center-crossing animation.
+            const overIdx = fullSectionIds.indexOf(overId);
+            insertAt = overIdx === -1 ? sectionIds.length : sectionIds.indexOf(overId) + (overIdx > fullSectionIds.indexOf(dragId) ? 1 : 0);
+        }
+        else {
+            // Cross-section move: insert before the over column.
+            const idx = sectionIds.indexOf(overId);
+            insertAt = idx === -1 ? sectionIds.length : idx;
+        }
+        sectionIds.splice(insertAt, 0, dragId);
+
+        // Rebuild the full order: the other section's ids in their existing relative order,
+        // spliced together with the rebuilt target section. We preserve the original interleaving
+        // of the two sections by walking the old order and substituting the rebuilt target run.
+        const otherSection: Section = targetSection === "hidden" ? "visible" : "hidden";
+        const otherIds = idsInSection(base, otherSection).filter((id) => id !== dragId);
+
+        // Visible columns come first, then hidden (the modal shows them as two lists; order within
+        // each is what matters and is what we persist).
+        const order = targetSection === "visible" ? [...sectionIds, ...otherIds] : [...otherIds, ...sectionIds];
+        const hidden = targetSection === "hidden" ? sectionIds : otherIds.filter((id) => base.hidden.includes(id));
+
         return {
             order,
-            hidden,
+            hidden: hidden.filter((id) => order.includes(id)),
         };
     }
 
-    // Live cross-section move: when the cursor enters the OTHER section, move the dragged column
-    // into it so a gap opens there (the drop-target indicator). Within the SAME section we do
-    // nothing: dnd-kit's verticalListSortingStrategy already animates the gap natively, and
-    // reordering the array on every pointer move would fight the strategy and never settle. The
-    // in-flight `dragConfig` is the working copy across the whole drag, so successive moves compose.
+    // True when two configs describe the same display order and hidden set.
+    function sameConfig(a: ColumnConfig, b: ColumnConfig): boolean {
+        if (a.order.length !== b.order.length || a.hidden.length !== b.hidden.length) {
+            return false;
+        }
+        return a.order.every((id, i) => id === b.order[i]) && a.hidden.every((id, i) => id === b.hidden[i]);
+    }
+
+    // Live placement for a CROSS-section move: keep the dragged column parked in the OTHER section at
+    // the cursor's current insertion point so the gap there tracks the cursor and the drop matches
+    // it. We treat the gesture as cross-section for the whole drag based on the column's ORIGINAL
+    // section in the committed `config` (not its in-flight position, which we keep moving), so:
+    //   - Over a ROW in the destination: re-insert the column before that row (the cursor's insertion
+    //     point). We do this every time the over row changes so the gap follows the cursor; the
+    //     `sameConfig` guard drops no-op updates so it settles. Over a row only — never the bare
+    //     section area — so it cannot loop over an empty section (which has no rows to be over).
+    //   - Over the destination's BARE area (e.g. an empty section, or below all rows): append.
+    // A genuine WITHIN-section reorder is left entirely to dnd-kit's verticalListSortingStrategy
+    // (mutating the array on every move would fight the strategy and oscillate); `handleDragEnd`
+    // resolves that final slot.
     function handleDragOver(event: DragOverEvent): void {
         const { active, over } = event;
         if (over === null) {
@@ -311,23 +382,38 @@ export function ColumnConfigModal({
         }
         const dragId = String(active.id);
         const overId = String(over.id);
+        // Within-section reorder (column started in the section it is now over): leave it to the
+        // strategy. Compared against the committed config so a parked cross-move is still "cross".
+        const originSection = sectionOfColumn(dragId, config);
         setDragConfig((current) => {
             const base = current ?? config;
             const targetSection = sectionOf(overId, base);
-            if (targetSection === null) {
+            if (targetSection === null || targetSection === originSection) {
                 return base;
             }
-            // Only act on a genuine section change; same-section moves are handled by the strategy.
-            if (sectionOfColumn(dragId, base) === targetSection) {
+            const overBareSection = overId === `section-${targetSection}`;
+            // Once parked in the destination, only re-place when over a ROW (so the gap follows the
+            // cursor); ignore bare-area events so the parked position is not yanked to the end and an
+            // empty section cannot loop.
+            if (overBareSection && sectionOfColumn(dragId, base) === targetSection) {
                 return base;
             }
-            return moveToSection(base, dragId, targetSection, overId);
+            const next = placeInSection(base, dragId, targetSection, overId, false);
+            return sameConfig(next, base) ? base : next;
         });
     }
 
-    // Commits the placement when the drag ends. Starts from the in-flight config (which already
-    // reflects any cross-section move from drag-over) and applies the final within-section order
-    // relative to the column dropped onto.
+    // Commits the placement when the drag ends, resolving the FINAL slot from `over` so the committed
+    // result matches the gap the user saw. The reported bug was that a cross-section drop appended to
+    // the END of the destination instead of landing at the cursor's insertion point. The fixes:
+    //   - The custom collision detection resolves `over` to the row under the cursor (not the section
+    //     droppable) whenever the pointer is over a row, so the drop targets that row's slot.
+    //   - `isReorder` is judged from the column's ORIGINAL section in the committed `config` (not its
+    //     in-flight position, which drag-over may have parked in the target section): a true reorder
+    //     uses arrayMove semantics; a cross-section move inserts BEFORE the over row, landing exactly
+    //     where the gap pointed instead of arrayMove-ing it past the row to the end.
+    //   - When `over` IS the section droppable (the cursor sits in the open gap, not on a row), we
+    //     keep the column where drag-over already previewed it in `base` rather than appending.
     function handleDragEnd(event: DragEndEvent): void {
         const { active, over } = event;
         const base = dragConfig ?? config;
@@ -342,7 +428,13 @@ export function ColumnConfigModal({
         if (targetSection === null) {
             return;
         }
-        onChange(moveToSection(base, dragId, targetSection, overId));
+        const isReorder = sectionOfColumn(dragId, config) === targetSection;
+        const next = overId === `section-${targetSection}`
+            ? base
+            : placeInSection(base, dragId, targetSection, overId, isReorder);
+        if (!sameConfig(next, config)) {
+            onChange(next);
+        }
     }
 
     return (
@@ -366,7 +458,7 @@ export function ColumnConfigModal({
                 </Typography>
                 <DndContext
                     sensors={sensors}
-                    collisionDetection={closestCenter}
+                    collisionDetection={collisionDetection}
                     onDragStart={handleDragStart}
                     onDragOver={handleDragOver}
                     onDragEnd={handleDragEnd}
