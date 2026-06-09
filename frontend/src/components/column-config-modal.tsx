@@ -23,7 +23,7 @@ import {
     closestCenter,
     useDroppable,
 } from "@dnd-kit/core";
-import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
+import type { DragEndEvent, DragOverEvent, DragStartEvent } from "@dnd-kit/core";
 import {
     SortableContext,
     sortableKeyboardCoordinates,
@@ -201,14 +201,28 @@ export function ColumnConfigModal({
     // own SortableContext, so dragging a column to the OTHER section showed no preview; the
     // overlay lifts the row out so the same preview follows the cursor across both sections.
     const [activeId, setActiveId] = useState<string | null>(null);
+
+    // The in-flight configuration while a drag is in progress, recomputed on every drag-over so
+    // the lists re-render with the dragged column already moved to where it would land. This is
+    // what produces the drop-target indicator: the sortable strategy shifts the other rows to
+    // open a gap at the insertion point, and the dragged row's original slot collapses (it is
+    // hidden via opacity while the overlay follows the cursor). It is null when not dragging, in
+    // which case the committed `config` drives the lists. Cleared on drag end/cancel.
+    const [dragConfig, setDragConfig] = useState<ColumnConfig | null>(null);
+
+    // While dragging, render from the in-flight config so the gap/indicator tracks the cursor;
+    // otherwise render from the committed config.
+    const viewConfig = dragConfig ?? config;
     const activeColumn = activeId === null ? undefined : columnById(activeId);
 
     function handleDragStart(event: DragStartEvent): void {
         setActiveId(String(event.active.id));
+        setDragConfig(config);
     }
 
     function handleDragCancel(): void {
         setActiveId(null);
+        setDragConfig(null);
     }
 
     // Look up a configurable column by id.
@@ -216,76 +230,119 @@ export function ColumnConfigModal({
         return configurable.find((c) => c.id === id);
     }
 
-    const hiddenSet = new Set(config.hidden);
-    const visibleColumns = config.order
-        .filter((id) => !hiddenSet.has(id))
+    const viewHiddenSet = new Set(viewConfig.hidden);
+    const visibleColumns = viewConfig.order
+        .filter((id) => !viewHiddenSet.has(id))
         .map(columnById)
         .filter((c): c is ConfigurableColumn => c !== undefined);
-    const hiddenColumns = config.order
-        .filter((id) => hiddenSet.has(id))
+    const hiddenColumns = viewConfig.order
+        .filter((id) => viewHiddenSet.has(id))
         .map(columnById)
         .filter((c): c is ConfigurableColumn => c !== undefined);
 
-    // Resolves which section a drop target belongs to. A target is either a section's droppable
-    // id (`section-visible`/`section-hidden`) or another column's id (dropped onto that item).
-    function sectionOf(overId: string): Section | null {
+    // Resolves which section a drop target belongs to, against a given config. A target is either
+    // a section's droppable id (`section-visible`/`section-hidden`) or another column's id
+    // (dropped onto that item).
+    function sectionOf(overId: string, against: ColumnConfig): Section | null {
         if (overId === "section-visible") {
             return "visible";
         }
         if (overId === "section-hidden") {
             return "hidden";
         }
-        if (hiddenSet.has(overId)) {
+        if (against.hidden.includes(overId)) {
             return "hidden";
         }
-        if (config.order.includes(overId)) {
+        if (against.order.includes(overId)) {
             return "visible";
         }
         return null;
     }
 
-    // Rebuilds the config when a drag ends, placing the dragged column into the section it was
-    // dropped on, ordered immediately before the column it was dropped onto (or at the end when
-    // dropped on a section's empty area).
-    function handleDragEnd(event: DragEndEvent): void {
-        setActiveId(null);
+    // Which section a column currently sits in, per a given config.
+    function sectionOfColumn(id: string, against: ColumnConfig): Section {
+        return against.hidden.includes(id) ? "hidden" : "visible";
+    }
+
+    // Returns `base` with `dragId` placed immediately before `beforeId` within `order`, or appended
+    // when `beforeId` is null. Pure; does not change which section the column belongs to.
+    function reorderBefore(order: string[], dragId: string, beforeId: string | null): string[] {
+        const next = order.filter((id) => id !== dragId);
+        if (beforeId === null || beforeId === dragId) {
+            next.push(dragId);
+            return next;
+        }
+        const idx = next.indexOf(beforeId);
+        if (idx === -1) {
+            next.push(dragId);
+        }
+        else {
+            next.splice(idx, 0, dragId);
+        }
+        return next;
+    }
+
+    // Moves `dragId` into `targetSection` (within-section ordering is left to the drop handler /
+    // the sortable strategy). Used by drag-over to open the gap in the OTHER section the moment the
+    // cursor enters it.
+    function moveToSection(base: ColumnConfig, dragId: string, targetSection: Section, overId: string): ColumnConfig {
+        // Position it before the column it is over, or at the section's end when over the bare area.
+        const beforeId = overId === `section-${targetSection}` ? null : overId;
+        const order = reorderBefore(base.order, dragId, beforeId);
+        const hidden = base.hidden.filter((id) => id !== dragId);
+        if (targetSection === "hidden") {
+            hidden.push(dragId);
+        }
+        return {
+            order,
+            hidden,
+        };
+    }
+
+    // Live cross-section move: when the cursor enters the OTHER section, move the dragged column
+    // into it so a gap opens there (the drop-target indicator). Within the SAME section we do
+    // nothing: dnd-kit's verticalListSortingStrategy already animates the gap natively, and
+    // reordering the array on every pointer move would fight the strategy and never settle. The
+    // in-flight `dragConfig` is the working copy across the whole drag, so successive moves compose.
+    function handleDragOver(event: DragOverEvent): void {
         const { active, over } = event;
         if (over === null) {
             return;
         }
         const dragId = String(active.id);
         const overId = String(over.id);
-        const targetSection = sectionOf(overId);
+        setDragConfig((current) => {
+            const base = current ?? config;
+            const targetSection = sectionOf(overId, base);
+            if (targetSection === null) {
+                return base;
+            }
+            // Only act on a genuine section change; same-section moves are handled by the strategy.
+            if (sectionOfColumn(dragId, base) === targetSection) {
+                return base;
+            }
+            return moveToSection(base, dragId, targetSection, overId);
+        });
+    }
+
+    // Commits the placement when the drag ends. Starts from the in-flight config (which already
+    // reflects any cross-section move from drag-over) and applies the final within-section order
+    // relative to the column dropped onto.
+    function handleDragEnd(event: DragEndEvent): void {
+        const { active, over } = event;
+        const base = dragConfig ?? config;
+        setActiveId(null);
+        setDragConfig(null);
+        if (over === null) {
+            return;
+        }
+        const dragId = String(active.id);
+        const overId = String(over.id);
+        const targetSection = sectionOf(overId, base);
         if (targetSection === null) {
             return;
         }
-        // A column dropped onto another column lands immediately before it; one dropped onto a
-        // section's empty area is appended to the end of the order.
-        const beforeId = overId === `section-${targetSection}` ? null : overId;
-
-        // Build the new order: remove the dragged id, then reinsert it relative to beforeId.
-        const order = config.order.filter((id) => id !== dragId);
-        if (beforeId === null || beforeId === dragId) {
-            order.push(dragId);
-        }
-        else {
-            const idx = order.indexOf(beforeId);
-            if (idx === -1) {
-                order.push(dragId);
-            }
-            else {
-                order.splice(idx, 0, dragId);
-            }
-        }
-        // Update the hidden set to match the target section.
-        const hidden = config.hidden.filter((id) => id !== dragId);
-        if (targetSection === "hidden") {
-            hidden.push(dragId);
-        }
-        onChange({
-            order,
-            hidden,
-        });
+        onChange(moveToSection(base, dragId, targetSection, overId));
     }
 
     return (
@@ -311,6 +368,7 @@ export function ColumnConfigModal({
                     sensors={sensors}
                     collisionDetection={closestCenter}
                     onDragStart={handleDragStart}
+                    onDragOver={handleDragOver}
                     onDragEnd={handleDragEnd}
                     onDragCancel={handleDragCancel}
                 >

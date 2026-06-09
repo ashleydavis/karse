@@ -16,6 +16,7 @@ Backed by:
 - Within Visible, columns are reordered by drag and drop. Dropping a dragged column onto another column places it immediately before that column; dropping onto the section's empty area appends it to the end.
 - Dragging a column from Visible onto the Hidden section hides it; dragging a column from Hidden back onto Visible shows it again.
 - While a column is being dragged, a lifted preview of the row (a dnd-kit `DragOverlay`) follows the cursor. The same preview is shown for a reorder within a section and for a drag between sections (Visible ↔ Hidden), so cross-section drags look the same as vertical reorders.
+- The destination shows a drop-target indicator: a gap opens at the insertion point marking where the column will land on release. For a reorder within a section, dnd-kit's sortable strategy shifts the other rows to open the gap. For a move between sections, the dragged column is placed live into the target section as the cursor enters it, so the gap appears in the destination section.
 - Changes apply to the table immediately (live), via TanStack Table's `columnOrder` and `columnVisibility` state.
 - The configuration is persisted per table in `localStorage` under the key `karse-columns-<tableId>` (e.g. `karse-columns-nodes`). It is reloaded on mount, so it survives navigation and a full page reload.
 - Non-configurable columns (any action/pinned cell) are excluded by setting `enableHiding: false`: they stay out of the modal and remain pinned at the end of the row.
