@@ -8,7 +8,7 @@ Start the app first. From the repo root run:
 bun run dev
 ```
 
-`bun run dev` opens the app for you in a brand-new Chrome window, using your normal Chrome profile (logins, extensions, and settings preserved). If Chrome is not installed it falls back to your OS default browser, and `KARSE_NO_OPEN=1` (set by the test harness) suppresses opening entirely. If a window did not open, browse to `http://127.0.0.1:5173` yourself. Then run each scenario's `setup.sh` and test it. Tear each cluster down with the Teardown step at the end of this doc.
+This interactive `bun run dev` opens the app for you in a brand-new Chrome window, using your normal Chrome profile (logins, extensions, and settings preserved). If Chrome is not installed it falls back to your OS default browser. Every launch the project drives non-interactively (the smoke harness, the e2e runner, any automated screenshot capture) sets `KARSE_NO_OPEN=1`, which suppresses opening entirely so no Chrome window appears; set it yourself for a one-off automated launch. If a window did not open, browse to `http://127.0.0.1:5173` yourself. Then run each scenario's `setup.sh` and test it. Tear each cluster down with the Teardown step at the end of this doc.
 
 ## Long resource names
 

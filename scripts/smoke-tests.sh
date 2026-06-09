@@ -418,5 +418,25 @@ echo "--- Frontend build ---"
 (cd frontend && bun run build)
 echo "OK"
 
+echo "--- Dev-launch browser-open suppression (KARSE_NO_OPEN=1) ---"
+# Every non-interactive launch must suppress the browser-open so no Chrome window
+# appears (otherwise repeated automated launches orphan windows in the developer's
+# profile). Assert the open-decision in frontend/vite-open.ts honours KARSE_NO_OPEN:
+# suppressed when set, and still opens when unset (interactive launch unchanged).
+# This evaluates the decision directly, so it never launches a browser.
+SUPPRESSED=$(cd frontend && KARSE_NO_OPEN=1 bun -e \
+    'import { shouldOpenBrowser } from "./vite-open"; process.stdout.write(String(shouldOpenBrowser()));')
+if [[ "$SUPPRESSED" != "false" ]]; then
+    echo "Expected KARSE_NO_OPEN=1 to suppress the browser-open, got open=$SUPPRESSED" >&2
+    exit 1
+fi
+INTERACTIVE=$(cd frontend && bun -e \
+    'delete process.env.KARSE_NO_OPEN; import("./vite-open").then(m => process.stdout.write(String(m.shouldOpenBrowser())));')
+if [[ "$INTERACTIVE" != "true" ]]; then
+    echo "Expected an interactive launch (no KARSE_NO_OPEN) to open the browser, got open=$INTERACTIVE" >&2
+    exit 1
+fi
+echo "OK"
+
 echo ""
 echo "All smoke tests passed."

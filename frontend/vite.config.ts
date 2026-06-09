@@ -1,8 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { existsSync } from "node:fs";
-import { delimiter, join } from "node:path";
+import { findChrome, shouldOpenBrowser } from "./vite-open";
 
 // Vite dev server configuration.
 // KARSE_FRONTEND_PORT sets the dev server port; "0" asks the OS for a free port
@@ -11,7 +10,11 @@ import { delimiter, join } from "node:path";
 // backend port so the proxy follows the backend onto a free port.
 // KARSE_NO_WATCH=1 disables the file watcher (set by `start`): no hot reload, and
 // it avoids exhausting the system inotify watch limit (ENOSPC). `dev` leaves it on.
-// KARSE_NO_OPEN=1 suppresses opening a browser (set by the e2e/smoke harness).
+// KARSE_NO_OPEN=1 suppresses opening a browser. Every non-interactive launch the
+// project drives (the smoke harness, the e2e runner, any screenshot-capture run)
+// sets it so no Chrome window appears; a plain interactive launch leaves it unset
+// and a window opens. The decision lives in ./vite-open.ts so the smoke harness
+// can assert on it without loading Vite.
 
 // Open the app in a brand-new Chrome window each launch (developer's normal
 // profile, so logins/extensions/settings are preserved), instead of reusing an
@@ -20,19 +23,7 @@ import { delimiter, join } from "node:path";
 // makes it spawn `<chrome> --new-window <url>`. We only set them when not
 // already overridden, and only when a Chrome binary is actually present; if
 // none is found we fall back to Vite's default (open the OS default browser).
-function findChrome(): string | undefined {
-    const dirs = (process.env.PATH ?? "").split(delimiter).filter(Boolean);
-    for (const name of ["google-chrome", "google-chrome-stable"]) {
-        for (const dir of dirs) {
-            if (existsSync(join(dir, name))) {
-                return name;
-            }
-        }
-    }
-    return undefined;
-}
-
-const open = process.env.KARSE_NO_OPEN !== "1";
+const open = shouldOpenBrowser();
 if (open && process.env.BROWSER === undefined) {
     const chrome = findChrome();
     if (chrome !== undefined) {
