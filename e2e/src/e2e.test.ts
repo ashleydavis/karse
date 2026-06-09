@@ -316,6 +316,77 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Expanded search criteria (labels, node, namespace) ─────────────────────
+
+    test.describe("expanded search criteria (labels, node, namespace)", () => {
+        // Two pods that differ by label, node, and namespace so each criterion
+        // narrows the table to exactly one row. Routed so the assertions are stable.
+        const FAKE_PODS = {
+            pods: [
+                {
+                    name: "nginx-deployment-abc",
+                    namespace: "default",
+                    phase: "Running",
+                    ready: "1/1",
+                    containerCount: 1,
+                    restarts: 0,
+                    node: "node-worker",
+                    createdAt: new Date().toISOString(),
+                    labels: { app: "nginx", tier: "frontend" },
+                },
+                {
+                    name: "redis-cache-xyz",
+                    namespace: "cache-system",
+                    phase: "Running",
+                    ready: "1/1",
+                    containerCount: 1,
+                    restarts: 0,
+                    node: "node-control",
+                    createdAt: new Date().toISOString(),
+                    labels: { app: "redis", tier: "backend" },
+                },
+            ],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: FAKE_PODS });
+            });
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
+        });
+
+        test.afterAll(async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("");
+            await page.unroute("**/api/pods*");
+        });
+
+        test("a label key=value pair narrows to the pod carrying that label", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("app=nginx");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("nginx-deployment-abc");
+        });
+
+        test("a label value alone narrows to the matching pod", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("backend");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("redis-cache-xyz");
+        });
+
+        test("a node name narrows to pods on that node", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("node-worker");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("nginx-deployment-abc");
+        });
+
+        test("a namespace narrows to pods in that namespace", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("cache-system");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("redis-cache-xyz");
+        });
+    });
+
     // ── Fuzzy search on the nodes table ────────────────────────────────────────
 
     test.describe("fuzzy search (nodes table)", () => {

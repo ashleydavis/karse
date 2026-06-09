@@ -123,6 +123,8 @@ Type in the search box to filter rows. Use the **Status** dropdown (filter icon,
 
 A Labels column shows each resource's labels as compact `key=value` chips (also present on the Nodes, Deployments, StatefulSets, DaemonSets, and Namespaces tables). The chips participate in the table's search, so typing a label key or value filters the rows.
 
+The search box matches across every column, not just the name. So you can also find resources by where they live: type a **node** name to keep the pods on that node, or a **namespace** to keep the resources in that namespace. Namespace search works on every namespaced table (pods, deployments, stateful sets, daemon sets, events, errors); node search applies to the pods table.
+
 ### Label filtering
 
 Every resource table that carries labels (Nodes, Pods, Deployments, StatefulSets, DaemonSets, Namespaces) has a **Labels** dropdown (tags icon) beside its search box. It lists every label key on the currently loaded resources; under each key it shows one checkbox per value that key has. Tick one or more values to narrow the table:

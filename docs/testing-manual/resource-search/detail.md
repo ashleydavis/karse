@@ -4,6 +4,8 @@ Manual tests for in-table fuzzy search and column sorting. See the spec: [resour
 
 The search boxes on the pods, nodes, deployments, statefulsets, daemonsets, namespaces, and contexts tables share one fuzzy filter. A query matches a row when every character of the query appears, in order, somewhere in the row's text. Matching is case-insensitive, so a typo that drops or reorders a character (`ngnx`) and a query with gaps (`ng-x`) both still match `nginx-deployment-abc`. The events and errors tables do not use the fuzzy filter: their search boxes use a plain case-insensitive substring match.
 
+Matching runs over every column, so the same box also searches a resource's **labels** (each fuzzy table has a Labels column; a query like `app=nginx`, a label key, or a label value all match), its **node** (pods), and its **namespace** (every namespaced table).
+
 Start the app first. From the repo root run:
 
 ```sh
@@ -25,7 +27,14 @@ Several pods whose names share characters.
 `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse.
 
 ### What to check
-Open the **Pods page** (default namespace). Four pods are present: `nginx-deployment-abc`, `redis-cache-xyz`, `postgres-primary-0`, `frontend-web-123`.
+Open the **Pods page** with **no namespace selected** (so all namespaces show). Four pods are present, spread across nodes and namespaces:
+
+| Pod | Namespace | Node | Labels |
+|---|---|---|---|
+| `nginx-deployment-abc` | `default` | `fake-node-1` | `app=nginx`, `tier=frontend` |
+| `redis-cache-xyz` | `cache-system` | `fake-node-2` | `app=redis`, `tier=backend` |
+| `postgres-primary-0` | `default` | `fake-node-1` | `app=postgres`, `tier=database` |
+| `frontend-web-123` | `default` | `fake-node-2` | `app=frontend`, `tier=frontend` |
 
 - **Typo tolerance**: type `ngnx` in the search box. `nginx-deployment-abc` still matches even though the letters are not contiguous.
 - **Non-contiguous query**: type `ng-x`. `nginx-deployment-abc` still matches because each character appears in order.
@@ -33,7 +42,17 @@ Open the **Pods page** (default namespace). Four pods are present: `nginx-deploy
 - **No match**: type `zzzqqq`. No rows match and the "No pods match the search." message appears.
 - **Clearing**: delete the query and confirm all four pods reappear.
 
-Repeat a couple of the queries on the **Nodes page** search box (for example `nwk` should fuzzy-match `node-worker` style names) to confirm the same behaviour applies to the other fuzzy-filtered tables. The same fuzzy filter backs the deployments, statefulsets, daemonsets, namespaces, and contexts searches as well. The **events** and **errors** tables behave differently: a query there is a plain substring match (the characters must appear contiguously), so `ngnx` would not match `nginx`.
+### Search by label, node, and namespace
+On the same **Pods page** (no namespace selected):
+
+- **Label pair**: type `app=redis`. Only `redis-cache-xyz` remains.
+- **Label value alone**: type `database`. Only `postgres-primary-0` remains (its `tier=database` label).
+- **Label key alone**: type `tier`. All four pods remain (every pod carries a `tier` label).
+- **Node**: type `fake-node-2`. Only `redis-cache-xyz` and `frontend-web-123` remain (the two pods on that node).
+- **Namespace**: type `cache-system`. Only `redis-cache-xyz` remains (the only pod in that namespace).
+- **Clearing**: delete the query and confirm all four pods reappear.
+
+Repeat a couple of the queries on the **Nodes page** search box (for example `nwk` should fuzzy-match `node-worker` style names) to confirm the same behaviour applies to the other fuzzy-filtered tables. The same fuzzy filter backs the deployments, statefulsets, daemonsets, namespaces, and contexts searches as well; label search works on each of them too, and namespace search works on every namespaced table. The **events** and **errors** tables behave differently: a query there is a plain substring match (the characters must appear contiguously), so `ngnx` would not match `nginx`, but a namespace substring still narrows them.
 
 ### Column sorting
 Column sorting is shared across all tables. See the sort checks in [nodes-view](../nodes-view/detail.md) (many-nodes scenario) and [pods-view](../pods-view/detail.md) (many-pods scenario): clicking a column header reorders rows, and clicking again reverses.

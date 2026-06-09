@@ -15,6 +15,7 @@ kubectl config use-context kwok-karse-test
 # Wait until the apiserver accepts requests before applying (avoids a kwok readiness race).
 for _ in $(seq 1 30); do kubectl get --raw=/readyz >/dev/null 2>&1 && break; sleep 0.5; done
 
+# Two nodes so a node-name search narrows the pods table to one node's pods.
 kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: Node
@@ -26,28 +27,55 @@ metadata:
   annotations:
     kwok.x-k8s.io/node: fake
 spec: {}
+---
+apiVersion: v1
+kind: Node
+metadata:
+  name: fake-node-2
+  labels:
+    node-role.kubernetes.io/worker: ""
+    kubernetes.io/hostname: fake-node-2
+  annotations:
+    kwok.x-k8s.io/node: fake
+spec: {}
 EOF
 
 kubectl wait --for=condition=Ready node/fake-node-1 --timeout=30s
+kubectl wait --for=condition=Ready node/fake-node-2 --timeout=30s
+
+# A second namespace so a namespace search narrows the pods table.
+kubectl create namespace cache-system
 
 # kwok runs no service-account controller, so the default SA each pod references
-# is never auto-created and the apiserver rejects the pods. Create it ourselves.
+# is never auto-created and the apiserver rejects the pods. Create it ourselves
+# in every namespace that holds pods.
 kubectl create serviceaccount default -n default
+kubectl create serviceaccount default -n cache-system
 
-# A spread of names so fuzzy (subsequence / typo-tolerant) matching is observable.
-for name in nginx-deployment-abc redis-cache-xyz postgres-primary-0 frontend-web-123; do
+# A spread of names (fuzzy matching), plus per-pod labels, node, and namespace
+# so a label/node/namespace search is observable. Fields, space-separated:
+#   name namespace node label-key label-value
+while read -r name ns node labelKey labelValue; do
     kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Pod
 metadata:
   name: $name
-  namespace: default
+  namespace: $ns
+  labels:
+    app: $labelValue
+    $labelKey: "$labelValue"
 spec:
-  nodeName: fake-node-1
+  nodeName: $node
   containers:
   - name: pause
     image: registry.k8s.io/pause:3.9
 EOF
-done
+done <<'PODS'
+nginx-deployment-abc default      fake-node-1 tier frontend
+redis-cache-xyz      cache-system fake-node-2 tier backend
+postgres-primary-0   default      fake-node-1 tier database
+frontend-web-123     default      fake-node-2 tier frontend
+PODS
 
 echo "Cluster ready. Select the 'kwok-karse-test' context in Karse."

@@ -11,7 +11,11 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-s
 - Typing in a fuzzy-filtered table's search box (nodes, pods, deployments, stateful sets, daemon sets) filters its rows by subsequence match: every meaningful character of the query must appear in a cell value in order (so "ngnx" or "ng-x" matches "nginx-deployment").
 - Separator characters in the query (anything that is not a letter or digit, e.g. `-` or space) are ignored, acting as gaps rather than literal characters. Matching is case-insensitive.
 - The fuzzy filter matches per cell, not against the whole concatenated row, so a query cannot span across unrelated columns.
-- The events and errors tables do not use the fuzzy filter; their search box uses a plain case-insensitive substring match (TanStack's `includesString`).
+- The search box matches more than the resource name. Because matching runs over every column cell, the same search box also filters by:
+  - **Label**: each fuzzy-filtered table has a Labels column whose searchable text is its labels flattened to space-joined `key=value` pairs (`labelsToPairs`), so typing a label key, a label value, or a `key=value` pair (e.g. `app=nginx`) filters to resources carrying that label. The separator-tolerant fuzzy match means `app nginx` matches `app=nginx` too.
+  - **Node**: the pods table has a Node column, so typing a node name filters to the pods running on that node (pods are the only listed kind that carries a node).
+  - **Namespace**: every namespaced table (pods, deployments, stateful sets, daemon sets, events, errors) has a Namespace column, so typing a namespace filters to the resources living in it. Nodes are cluster-scoped and have no namespace.
+- The events and errors tables do not use the fuzzy filter; their search box uses a plain case-insensitive substring match (TanStack's `includesString`). Namespace search on these tables is therefore a plain substring match on the Namespace column.
 - An empty/whitespace query keeps all rows.
 - Column headers sort the loaded rows.
 - Scope: this filters and sorts the rows already loaded for the current view. It is not a global search across resource kinds (a global all-resources browser and a cross-kind quick-find are on the roadmap; see `quick-find` and `docs/roadmap.md`).
@@ -64,6 +68,7 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-s
 
 - [x] Each resource table has a search box that filters its rows.
 - [x] For the fuzzy-filtered tables (nodes, pods, deployments, stateful sets, daemon sets), matching is subsequence-based, separator-tolerant, and case-insensitive, and matches per cell rather than across concatenated columns.
+- [x] The search box also filters by label (`key`, value, or `key=value` pair), by node (pods), and by namespace (every namespaced table), because matching runs over the Labels, Node, and Namespace cells alongside the resource name.
 - [x] The events and errors tables use a plain case-insensitive substring match instead of the fuzzy filter.
 - [x] An empty query keeps all rows.
 - [x] Column headers sort the table.

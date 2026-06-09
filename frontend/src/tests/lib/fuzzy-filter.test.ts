@@ -164,3 +164,67 @@ describe("fuzzyGlobalFilter", () => {
         expect(runFilter(row, "nginx")).toBe(true);
     });
 });
+
+// The resource tables feed labels into the filter as one cell holding the
+// space-joined "key=value" pairs (the same string the Labels column renders),
+// and node / namespace as their own plain cells. These cases prove a query on a
+// label pair, a node, or a namespace narrows the table, matching the per-cell
+// rows the tables actually build. See pods-table.tsx / nodes-table.tsx.
+describe("fuzzyGlobalFilter expanded criteria (labels, node, namespace)", () => {
+    // A pod row as the pods table builds it: name, namespace, node, then the
+    // joined labels cell.
+    function makePodRow(): Row<unknown> {
+        return makeRow([
+            "nginx-deployment-abc",
+            "default",
+            "node-worker",
+            "app=nginx tier=frontend",
+        ]);
+    }
+
+    test("matches a full label key=value pair", () => {
+        expect(runFilter(makePodRow(), "app=nginx")).toBe(true);
+    });
+
+    test("matches on a label key alone", () => {
+        expect(runFilter(makePodRow(), "tier")).toBe(true);
+    });
+
+    test("matches on a label value alone", () => {
+        expect(runFilter(makePodRow(), "frontend")).toBe(true);
+    });
+
+    test("matches a label pair fuzzily, ignoring the separator", () => {
+        // "app nginx" drops the "=" and still subsequence-matches "app=nginx".
+        expect(runFilter(makePodRow(), "app nginx")).toBe(true);
+    });
+
+    test("does not match a label value the row does not carry", () => {
+        expect(runFilter(makePodRow(), "backend")).toBe(false);
+    });
+
+    test("matches on the node the resource runs on", () => {
+        expect(runFilter(makePodRow(), "node-worker")).toBe(true);
+    });
+
+    test("matches the node fuzzily", () => {
+        expect(runFilter(makePodRow(), "nwk")).toBe(true);
+    });
+
+    test("does not match a node the row is not on", () => {
+        expect(runFilter(makePodRow(), "node-control")).toBe(false);
+    });
+
+    test("matches on the namespace the resource lives in", () => {
+        expect(runFilter(makePodRow(), "default")).toBe(true);
+    });
+
+    test("does not match a namespace the row is not in", () => {
+        expect(runFilter(makePodRow(), "kube-system")).toBe(false);
+    });
+
+    test("treats a resource with no labels (empty joined cell) as having nothing to match on", () => {
+        const row = makeRow(["redis-cache-xyz", "default", "node-worker", ""]);
+        expect(runFilter(row, "app=nginx")).toBe(false);
+    });
+});
