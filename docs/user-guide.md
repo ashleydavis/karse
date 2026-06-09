@@ -120,6 +120,19 @@ Type in the search box to filter rows. Use the **Phase** dropdown (filter icon, 
 
 A Labels column shows each resource's labels as compact `key=value` chips (also present on the Nodes, Deployments, StatefulSets, DaemonSets, and Namespaces tables). The chips participate in the table's search, so typing a label key or value filters the rows.
 
+Click a pod row to open its detail page (`/pods/:namespace/:name`), with tabs for Status, Containers, Init Containers (when present), Logs, Commands, and YAML.
+
+## Container detail page (`/pods/:namespace/:name/containers/:container`)
+
+On a pod's detail page, open the **Containers** (or **Init Containers**) tab and click a container row to drill into that single container. The container detail page has four tabs:
+
+- **Status**: the container's pod, namespace, image, state, ready, and restart count.
+- **Logs**: the log viewer scoped to that one container (auto-streams; no container selector since only one container is shown).
+- **Commands**: copy-only kubectl commands for the container, e.g. `kubectl logs <pod> -c <container>` and `kubectl exec -it <pod> -c <container> -- sh`.
+- **YAML**: the raw YAML of the parent pod (a container is part of the pod's spec).
+
+Breadcrumbs show the full trail: Pods > namespace > pod > container > tab.
+
 ## Environment variables
 
 | Variable | Default | Description |

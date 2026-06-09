@@ -1651,6 +1651,131 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Container detail page ───────────────────────────────────────────────────
+
+    test.describe("container detail page", () => {
+        const FAKE_POD_DETAIL = {
+            name: "nginx-abc",
+            namespace: "default",
+            phase: "Running",
+            node: "node-worker",
+            podIP: "10.0.0.1",
+            createdAt: new Date().toISOString(),
+            labels: { app: "nginx" },
+            containers: [
+                {
+                    name: "nginx",
+                    image: "nginx:latest",
+                    ready: true,
+                    restarts: 2,
+                    state: "Running",
+                    stateReason: "",
+                },
+                {
+                    name: "sidecar",
+                    image: "busybox:latest",
+                    ready: true,
+                    restarts: 0,
+                    state: "Running",
+                    stateReason: "",
+                },
+            ],
+            initContainers: [
+                {
+                    name: "init-setup",
+                    image: "busybox:1.36",
+                    ready: true,
+                    restarts: 0,
+                    state: "Terminated",
+                    stateReason: "Completed",
+                },
+            ],
+            events: [],
+        };
+
+        const FAKE_POD_YAML = "apiVersion: v1\nkind: Pod\nmetadata:\n  name: nginx-abc\n  namespace: default\n";
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+            await page.route("**/api/pods/default/nginx-abc*", async (route) => {
+                await route.fulfill({ json: FAKE_POD_DETAIL });
+            });
+            await page.route("**/api/yaml/pods/nginx-abc*", async (route) => {
+                await route.fulfill({ json: { yaml: FAKE_POD_YAML } });
+            });
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods/default/nginx-abc*");
+            await page.unroute("**/api/yaml/pods/nginx-abc*");
+        });
+
+        test("a container row in the Containers tab drills down to the container detail page", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-containers']").click();
+            await page.locator("[data-test-id='container-row']").filter({ hasText: "nginx" }).first().click();
+            await expect(page).toHaveURL(/\/pods\/default\/nginx-abc\/containers\/nginx/);
+            await expect(page.getByRole("heading", { name: "nginx" })).toBeVisible();
+        });
+
+        test("breadcrumbs reflect the pod -> container trail", async () => {
+            await page.goto("/pods/default/nginx-abc/containers/nginx", { waitUntil: "networkidle" });
+            const items = await page.locator("[data-test-id='breadcrumb-item']").allTextContents();
+            expect(items).toEqual(["Pods", "default", "nginx-abc", "nginx", "Status"]);
+        });
+
+        test("clicking the pod breadcrumb returns to the pod detail page", async () => {
+            await page.goto("/pods/default/nginx-abc/containers/nginx", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='breadcrumb-item']").filter({ hasText: "nginx-abc" }).click();
+            await expect(page).toHaveURL(/\/pods\/default\/nginx-abc$/);
+        });
+
+        test("defaults to the Status tab showing the container details", async () => {
+            await page.goto("/pods/default/nginx-abc/containers/nginx", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='container-panel-detail']")).toBeVisible();
+            await expect(page.locator("[data-test-id='container-panel-detail']")).toContainText("nginx:latest");
+            await expect(page.locator("[data-test-id='container-panel-detail']")).toContainText("Running");
+        });
+
+        test("Logs tab auto-streams logs for the selected container", async () => {
+            await page.goto("/pods/default/nginx-abc/containers/nginx", { waitUntil: "networkidle" });
+            const streamRequest = page.waitForRequest((req) =>
+                req.url().includes("/logs/stream") && req.url().includes("container=nginx"));
+            await page.locator("[data-test-id='container-tab-logs']").click();
+            await streamRequest;
+            await expect(page.locator("[data-test-id='container-panel-logs']")).toBeVisible();
+            await expect(page.locator("[data-test-id='log-viewer']")).toBeVisible();
+        });
+
+        test("Commands tab lists kubectl suggestions for the container", async () => {
+            await page.goto("/pods/default/nginx-abc/containers/nginx", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='container-tab-commands']").click();
+            await expect(page.locator("[data-test-id='commands-tab']")).toBeVisible();
+            const commands = await page.locator("[data-test-id='command-text']").allTextContents();
+            expect(commands).toContain("kubectl logs nginx-abc -c nginx -n default");
+            expect(commands).toContain("kubectl exec -it nginx-abc -c nginx -- sh -n default");
+        });
+
+        test("YAML tab renders the parent pod yaml", async () => {
+            await page.goto("/pods/default/nginx-abc/containers/nginx", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='container-tab-yaml']").click();
+            await expect(page.locator("[data-test-id='container-panel-yaml']")).toBeVisible();
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("kind: Pod");
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("name: nginx-abc");
+        });
+
+        test("an init container row also drills down to a container detail page", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-init-containers']").click();
+            await page.locator("[data-test-id='init-container-row']").filter({ hasText: "init-setup" }).first().click();
+            await expect(page).toHaveURL(/\/pods\/default\/nginx-abc\/containers\/init-setup/);
+            await expect(page.getByRole("heading", { name: "init-setup" })).toBeVisible();
+            await expect(page.locator(".MuiChip-label", { hasText: "Init Container" })).toBeVisible();
+        });
+    });
+
     // ── Node detail page ──────────────────────────────────────────────────────
 
     test.describe("node detail page", () => {

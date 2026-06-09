@@ -36,6 +36,45 @@ describe("buildGuidedCommands for pods", () => {
     });
 });
 
+describe("buildGuidedCommands for containers", () => {
+    test("targets the named container via the -c flag on every command", () => {
+        const commands = buildGuidedCommands({ kind: "container", name: "web-0", namespace: "prod", container: "app" });
+        expect(commands.filter((c) => c.command.includes("-c app")).length).toBeGreaterThan(0);
+    });
+
+    test("includes a namespace flag on every command when a namespace is given", () => {
+        const commands = buildGuidedCommands({ kind: "container", name: "web-0", namespace: "prod", container: "app" });
+        expect(commands.every((c) => c.command.endsWith(" -n prod"))).toBe(true);
+    });
+
+    test("omits the namespace flag when no namespace is given", () => {
+        const commands = buildGuidedCommands({ kind: "container", name: "web-0", container: "app" });
+        expect(commands.some((c) => c.command.includes(" -n "))).toBe(false);
+    });
+
+    test("produces the expected container command set", () => {
+        const commands = buildGuidedCommands({ kind: "container", name: "web-0", namespace: "prod", container: "app" });
+        expect(commands.map((c) => c.command)).toEqual([
+            "kubectl logs web-0 -c app -n prod",
+            "kubectl logs -f web-0 -c app -n prod",
+            "kubectl exec -it web-0 -c app -- sh -n prod",
+            "kubectl describe pod web-0 -n prod",
+            "kubectl get pod web-0 -o yaml -n prod",
+        ]);
+    });
+
+    test("labels match the command list one-to-one", () => {
+        const commands = buildGuidedCommands({ kind: "container", name: "web-0", container: "app" });
+        expect(commands.map((c) => c.label)).toEqual([
+            "View container logs",
+            "Follow container logs",
+            "Open a shell in the container",
+            "Describe pod (shows container status)",
+            "Get pod YAML",
+        ]);
+    });
+});
+
 describe("buildGuidedCommands for nodes", () => {
     test("never includes a namespace flag (nodes are cluster-scoped)", () => {
         const commands = buildGuidedCommands({ kind: "node", name: "node-1", namespace: "ignored" });

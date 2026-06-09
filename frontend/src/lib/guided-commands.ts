@@ -5,13 +5,16 @@
 import { fuzzyMatch } from "./fuzzy-filter";
 
 // The resource kinds for which guided commands can be generated.
-export type GuidedResourceKind = "pod" | "node" | "namespace" | "deployment" | "statefulset" | "daemonset";
+export type GuidedResourceKind = "pod" | "node" | "namespace" | "deployment" | "statefulset" | "daemonset" | "container";
 
 // Identifies a single resource for which to build command suggestions.
+// For the "container" kind, name is the pod name and container is the
+// container's name within that pod.
 export type GuidedResourceTarget = {
     kind: GuidedResourceKind;
     name: string;
     namespace?: string;
+    container?: string;
 };
 
 // A single suggested command with a short human-readable label.
@@ -153,8 +156,39 @@ function buildWorkloadCommands(kind: string, name: string, namespace?: string): 
     return commands;
 }
 
+// Builds the kubectl command suggestions for a single container within a pod.
+// Each command targets the named container in the pod via the `-c` flag.
+function buildContainerCommands(podName: string, container: string, namespace?: string): GuidedCommand[] {
+    return [
+        {
+            label: "View container logs",
+            command: withNamespace(`kubectl logs ${podName} -c ${container}`, namespace),
+        },
+        {
+            label: "Follow container logs",
+            command: withNamespace(`kubectl logs -f ${podName} -c ${container}`, namespace),
+        },
+        {
+            label: "Open a shell in the container",
+            command: withNamespace(`kubectl exec -it ${podName} -c ${container} -- sh`, namespace),
+        },
+        {
+            label: "Describe pod (shows container status)",
+            command: withNamespace(`kubectl describe pod ${podName}`, namespace),
+        },
+        {
+            label: "Get pod YAML",
+            command: withNamespace(`kubectl get pod ${podName} -o yaml`, namespace),
+        },
+    ];
+}
+
 // Returns the display-only kubectl command suggestions for the given resource.
 export function buildGuidedCommands(target: GuidedResourceTarget): GuidedCommand[] {
+    if (target.kind === "container")
+    {
+        return buildContainerCommands(target.name, target.container ?? "", target.namespace);
+    }
     if (target.kind === "pod")
     {
         return buildPodCommands(target.name, target.namespace);

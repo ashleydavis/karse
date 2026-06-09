@@ -13,6 +13,7 @@ Backed by: the per-page table components under `frontend/src/pages/*/components/
 - Pods table rows link to `/pods/:namespace/:name`.
 - Deployments / stateful sets / daemon sets table rows link to `/<kind>/:namespace/:name`.
 - Pods listed on a node, pod, or workload detail page link to the relevant pod detail page; resources listed on a namespace detail page link to their own detail page.
+- Container and init-container rows on the pod detail page link to that container's detail page (`/pods/:namespace/:name/containers/:container`; see `container-detail`).
 - Clickable rows share a common hover/cursor style (`table-row-style.ts`) so they look and behave consistently.
 
 ## Acceptance Criteria

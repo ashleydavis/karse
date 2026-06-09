@@ -237,13 +237,13 @@ export function PodDetailPage() {
 
             {effectiveTab === "containers" && (
                 <Box data-test-id="pod-panel-containers">
-                    <PodContainersPanel containers={data.containers} />
+                    <PodContainersPanel containers={data.containers} namespace={data.namespace} podName={data.name} />
                 </Box>
             )}
 
             {effectiveTab === "init-containers" && (
                 <Box data-test-id="pod-panel-init-containers">
-                    <PodInitContainersPanel initContainers={data.initContainers} />
+                    <PodInitContainersPanel initContainers={data.initContainers} namespace={data.namespace} podName={data.name} />
                 </Box>
             )}
 

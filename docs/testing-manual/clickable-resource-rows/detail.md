@@ -57,7 +57,7 @@ For each of these pages, hover a data row and confirm the row background lighten
 - `/namespaces` (namespace rows)
 
 ### Detail page sub-tables
-- Open the `web` pod detail page (`/pods/default/web`). Hover rows in the Containers table and confirm they highlight with the default (non-pointer) cursor.
+- Open the `web` pod detail page (`/pods/default/web`). Open the Containers tab, hover a container row, and confirm it highlights AND shows a pointer cursor (those rows now navigate to the container detail page; see `container-detail`).
 - Open the `fake-node-1` node detail page (`/nodes/fake-node-1`). Hover rows in the Capacity vs Allocatable and Conditions tables and confirm they highlight with the default cursor. Hover a row in the Pods section and confirm it highlights AND shows a pointer cursor (those rows navigate to the pod).
 
 ### Consistency check

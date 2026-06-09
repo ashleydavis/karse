@@ -30,6 +30,15 @@ const POD_TAB_LABELS: Record<string, string> = {
     logs: "Logs",
 };
 
+// Maps a container detail tab value (from the "tab" query param) to its display
+// label, so the breadcrumb trail reflects the currently selected container sub tab.
+const CONTAINER_TAB_LABELS: Record<string, string> = {
+    detail: "Status",
+    logs: "Logs",
+    commands: "Commands",
+    yaml: "YAML",
+};
+
 // Builds the breadcrumb trail from the current pathname, route params, and the
 // active sub tab (the "tab" query param, used by resources that have sub tabs).
 function buildCrumbs(
@@ -45,6 +54,20 @@ function buildCrumbs(
 
     const root = segments[0];
     const listLabel = LIST_LABELS[root] ?? root;
+
+    // Container detail: /pods/:namespace/:name/containers/:container ->
+    // Pods > <namespace> > <name> > <container> > <tab>
+    if (root === "pods" && params.namespace && params.name && params.container)
+    {
+        const tabLabel = CONTAINER_TAB_LABELS[tab ?? "detail"] ?? CONTAINER_TAB_LABELS.detail;
+        return [
+            { label: "Pods", to: "/pods" },
+            { label: params.namespace },
+            { label: params.name, to: `/pods/${params.namespace}/${params.name}` },
+            { label: params.container, to: `/pods/${params.namespace}/${params.name}/containers/${params.container}` },
+            { label: tabLabel },
+        ];
+    }
 
     // Pod detail: /pods/:namespace/:name -> Pods > <namespace> > <name> > <tab>
     if (root === "pods" && params.namespace && params.name)

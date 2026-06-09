@@ -31,6 +31,7 @@ Single-test-cluster discipline (per `readme.md`): there is only ever ONE test cl
 | [node-detail](./node-detail/index.md) | Node detail page and its tabs. |
 | [pods-view](./pods-view/index.md) | Read-only pods table with phase filter. |
 | [pod-detail](./pod-detail/index.md) | Pod detail page, tabs, containers, logs. |
+| [container-detail](./container-detail/index.md) | Container detail page: drill-down, Status, Logs, Commands, YAML tabs. |
 | [deployments-view](./deployments-view/index.md) | Read-only deployments table. |
 | [statefulsets-view](./statefulsets-view/index.md) | Read-only stateful sets table. |
 | [daemonsets-view](./daemonsets-view/index.md) | Read-only daemon sets table. |

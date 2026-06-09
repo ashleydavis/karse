@@ -17,6 +17,7 @@ The spec is reverse-engineered from the shipped code and the prose docs (`docs/a
 | [node-detail](./node-detail/index.md) | Settled | Complete | `/nodes/:name` page: conditions, capacity/allocatable, addresses, pods, events. |
 | [pods-view](./pods-view/index.md) | Settled | Complete | Read-only pods table, scoped to the active namespace or cluster-wide. |
 | [pod-detail](./pod-detail/index.md) | Settled | Complete | `/pods/:namespace/:name` page: containers, status, restarts, events, logs. |
+| [container-detail](./container-detail/index.md) | Settled | Complete | `/pods/:namespace/:name/containers/:container` page: a container's status, logs, commands, and the pod's YAML. |
 | [deployments-view](./deployments-view/index.md) | Settled | Complete | Read-only deployments table. |
 | [statefulsets-view](./statefulsets-view/index.md) | Settled | Complete | Read-only stateful sets table. |
 | [daemonsets-view](./daemonsets-view/index.md) | Settled | Complete | Read-only daemon sets table. |
