@@ -1,6 +1,6 @@
 import { Card, CardContent, CardActionArea, Typography, Alert, Grid, Box, Divider } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCube, faDharmachakra, faLayerGroup, faServer } from "@fortawesome/free-solid-svg-icons";
+import { faCircleExclamation, faCube, faDharmachakra, faLayerGroup, faServer } from "@fortawesome/free-solid-svg-icons";
 import type { IconProp } from "@fortawesome/fontawesome-svg-core";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -15,7 +15,7 @@ type StatTileProps = {
     value: string | number;
     sublabel?: string;
     sublabelColor?: string;
-    color: "primary" | "success" | "warning" | "info";
+    color: "primary" | "success" | "warning" | "info" | "error";
     to?: string;
     testId: string;
 };
@@ -126,7 +126,7 @@ export function ClusterOverview() {
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <Grid container spacing={2} data-test-id="stat-tiles">
-                <Grid size={3}>
+                <Grid size={2.4}>
                     <StatTile
                         icon={faServer}
                         label="Server version"
@@ -136,7 +136,7 @@ export function ClusterOverview() {
                         testId="stat-server-version"
                     />
                 </Grid>
-                <Grid size={3}>
+                <Grid size={2.4}>
                     <StatTile
                         icon={faDharmachakra}
                         label="Nodes"
@@ -148,7 +148,7 @@ export function ClusterOverview() {
                         testId="stat-nodes"
                     />
                 </Grid>
-                <Grid size={3}>
+                <Grid size={2.4}>
                     <StatTile
                         icon={faLayerGroup}
                         label="Namespaces"
@@ -158,7 +158,7 @@ export function ClusterOverview() {
                         testId="stat-namespaces"
                     />
                 </Grid>
-                <Grid size={3}>
+                <Grid size={2.4}>
                     <StatTile
                         icon={faCube}
                         label="Pods"
@@ -168,6 +168,18 @@ export function ClusterOverview() {
                         color="warning"
                         to="/pods"
                         testId="stat-pods"
+                    />
+                </Grid>
+                <Grid size={2.4}>
+                    <StatTile
+                        icon={faCircleExclamation}
+                        label="Errors"
+                        value={data.errorCount}
+                        sublabel={data.errorCount === 0 ? "none active" : "active"}
+                        sublabelColor={data.errorCount > 0 ? "error.main" : "success.main"}
+                        color={data.errorCount > 0 ? "error" : "info"}
+                        to="/errors"
+                        testId="stat-errors"
                     />
                 </Grid>
             </Grid>

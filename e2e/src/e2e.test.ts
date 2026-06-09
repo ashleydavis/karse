@@ -113,8 +113,8 @@ test.describe("karse e2e", () => {
             await waitForStatTiles();
         });
 
-        test("renders four tiles inside the stat-tiles container", async () => {
-            await expect(page.locator("[data-test-id='stat-tiles'] > div")).toHaveCount(4);
+        test("renders five tiles inside the stat-tiles container", async () => {
+            await expect(page.locator("[data-test-id='stat-tiles'] > div")).toHaveCount(5);
         });
 
         test("server version tile shows 'Server version' label", async () => {
@@ -131,6 +131,11 @@ test.describe("karse e2e", () => {
 
         test("pods tile shows 'Pods' label", async () => {
             await expect(page.locator("[data-test-id='stat-pods'] p")).toHaveText("Pods");
+        });
+
+        test("errors tile shows 'Errors' label and a count of 0 for the clean cluster", async () => {
+            await expect(page.locator("[data-test-id='stat-errors'] p")).toHaveText("Errors");
+            await expect(page.locator("[data-test-id='stat-errors'] h5")).toHaveText("0");
         });
     });
 

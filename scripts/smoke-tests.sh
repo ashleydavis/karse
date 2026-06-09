@@ -171,7 +171,7 @@ CURRENT_CTX=$(echo "$CONTEXTS_RESP" | jq -r '.current')
 
 echo "--- GET /api/cluster/overview ---"
 curl -fsS "$BASE/api/cluster/overview?context=$CURRENT_CTX" \
-    | jq -e 'has("serverVersion") and has("nodeCount") and has("namespaceCount") and has("podCount")' \
+    | jq -e 'has("serverVersion") and has("nodeCount") and has("namespaceCount") and has("podCount") and has("errorCount")' \
     > /dev/null
 echo "OK"
 

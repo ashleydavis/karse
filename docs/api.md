@@ -70,7 +70,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:5172/api/conte
 Returns the cluster overview for the current context.
 
 - **Request**: no body.
-- **Response 200**: `ClusterOverview`. `serverVersion` is `null` when the API server is unreachable (the context may exist in kubeconfig while the cluster is offline); the counts still reflect live queries.
+- **Response 200**: `ClusterOverview`. `serverVersion` is `null` when the API server is unreachable (the context may exist in kubeconfig while the cluster is offline); the counts still reflect live queries. `errorCount` is the active-error count: the number of Warning-type events plus the number of pods in a known problem state (the two sources the Errors feed unifies). The Warning-events read is tolerant of failure and contributes zero when it fails, so `errorCount` then counts problem pods alone.
 - **Response 500**: `{ "error": "<kubectl stderr>" }` when a node/namespace/pod count call fails.
 
 ```sh
@@ -87,7 +87,8 @@ curl -fsS http://127.0.0.1:5172/api/cluster/overview
   "podCount": 15,
   "runningPodCount": 12,
   "pendingPodCount": 1,
-  "failedPodCount": 0
+  "failedPodCount": 0,
+  "errorCount": 0
 }
 ```
 

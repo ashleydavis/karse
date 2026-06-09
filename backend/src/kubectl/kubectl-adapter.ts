@@ -398,6 +398,19 @@ export async function listClusterErrors(context: string, namespace?: string): Pr
     return errors;
 }
 
+// Counts pods in the given kubectl pod items that are in a known problem state,
+// reusing the same podProblem logic that drives the Errors feed. Used by the
+// cluster overview to compute its active-error count.
+function countProblemPods(items: any[]): number {
+    let count = 0;
+    for (const item of items) {
+        if (podProblem(item) !== null) {
+            count++;
+        }
+    }
+    return count;
+}
+
 // Maps a raw container status object from kubectl JSON output to a typed ContainerInfo.
 function parseContainerInfo(cs: any, spec: any): ContainerInfo {
     let state: ContainerState = "Unknown";
@@ -1110,11 +1123,13 @@ export async function getClusterOverview(context: string): Promise<ClusterOvervi
         kubectl([...ctxArgs, "get", "nodes", "-o", "json"]),
         kubectl([...ctxArgs, "get", "namespaces", "-o", "json"]),
         kubectl([...ctxArgs, "get", "pods", "-A", "-o", "json"]),
+        kubectl([...ctxArgs, "get", "events", "-A", "--field-selector=type=Warning", "-o", "json"]),
     ]);
     const versionResult = results[0]!;
     const nodesResult = results[1]!;
     const nsResult = results[2]!;
     const podsResult = results[3]!;
+    const eventsResult = results[4]!;
 
     let serverVersion: string | null = null;
     let clientVersion: string | null = null;
@@ -1156,6 +1171,17 @@ export async function getClusterOverview(context: string): Promise<ClusterOvervi
     const pendingPodCount = podItems.filter((p: any) => p.status?.phase === "Pending").length;
     const failedPodCount  = podItems.filter((p: any) => p.status?.phase === "Failed").length;
 
+    // Active-error count = Warning-type events + pods in a known problem state,
+    // the same two sources the Errors feed unifies. The events call is tolerant:
+    // a context can be valid while events are momentarily unavailable, and the
+    // landing page should still render its other tiles, so on failure that source
+    // contributes zero (it does not throw, unlike the node/namespace/pod calls).
+    let warningEventCount = 0;
+    if (eventsResult.status === "fulfilled" && eventsResult.value.exitCode === 0) {
+        warningEventCount = (JSON.parse(eventsResult.value.stdout).items ?? []).length;
+    }
+    const errorCount = warningEventCount + countProblemPods(podItems);
+
     return {
         serverVersion,
         clientVersion,
@@ -1166,5 +1192,6 @@ export async function getClusterOverview(context: string): Promise<ClusterOvervi
         runningPodCount,
         pendingPodCount,
         failedPodCount,
+        errorCount,
     };
 }

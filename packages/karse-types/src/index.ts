@@ -31,6 +31,10 @@ export type ClusterOverview = {
     runningPodCount: number;
     pendingPodCount: number;
     failedPodCount: number;
+    // Count of currently-active error conditions in the cluster: Warning-type
+    // events plus pods in a known problem state, matching the Errors feed's
+    // definition. See docs/spec/cluster-overview.
+    errorCount: number;
 };
 
 // A single Kubernetes namespace in the active cluster.

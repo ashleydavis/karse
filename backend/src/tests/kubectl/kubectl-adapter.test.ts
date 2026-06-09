@@ -1170,6 +1170,7 @@ describe("getClusterOverview", () => {
     const NODES_KEY = "--context test-ctx get nodes -o json";
     const NS_KEY = "--context test-ctx get namespaces -o json";
     const PODS_KEY = "--context test-ctx get pods -A -o json";
+    const EVENTS_KEY = "--context test-ctx get events -A --field-selector=type=Warning -o json";
 
     // Returns a kubectl JSON response body with n empty item objects.
     function makeItems(n: number): object {
@@ -1178,7 +1179,7 @@ describe("getClusterOverview", () => {
         };
     }
 
-    // Returns a full set of happy-path handlers for all four overview calls.
+    // Returns a full set of happy-path handlers for all five overview calls.
     function happyHandlers(
         nodeCount = 3,
         nsCount = 4,
@@ -1193,6 +1194,7 @@ describe("getClusterOverview", () => {
             [NODES_KEY]: () => ok(JSON.stringify(makeItems(nodeCount))),
             [NS_KEY]: () => ok(JSON.stringify(makeItems(nsCount))),
             [PODS_KEY]: () => ok(JSON.stringify(makeItems(podCount))),
+            [EVENTS_KEY]: () => ok(JSON.stringify({ items: [] })),
         };
     }
 
@@ -1209,7 +1211,58 @@ describe("getClusterOverview", () => {
             runningPodCount: 0,
             pendingPodCount: 0,
             failedPodCount: 0,
+            errorCount: 0,
         });
+    });
+
+    test("errorCount sums Warning events and problem pods", async () => {
+        setRunnerHandlers({
+            ...happyHandlers(),
+            // Two Warning events.
+            [EVENTS_KEY]: () => ok(JSON.stringify({
+                items: [
+                    { reason: "FailedScheduling", message: "0/3 nodes" },
+                    { reason: "BackOff", message: "back-off restarting" },
+                ],
+            })),
+            // Three pods: one CrashLoopBackOff, one Failed phase, one healthy.
+            [PODS_KEY]: () => ok(JSON.stringify({
+                items: [
+                    { status: { containerStatuses: [{ name: "c", state: { waiting: { reason: "CrashLoopBackOff" } } }] } },
+                    { status: { phase: "Failed" } },
+                    { status: { phase: "Running", containerStatuses: [{ name: "c", state: { running: {} } }] } },
+                ],
+            })),
+        });
+        const result = await getClusterOverview("test-ctx");
+        // 2 warning events + 2 problem pods (crash-loop + Failed phase) = 4.
+        expect(result.errorCount).toBe(4);
+        expect(result.podCount).toBe(3);
+        expect(result.failedPodCount).toBe(1);
+    });
+
+    test("tolerates the events call failing (errorCount counts only problem pods)", async () => {
+        setRunnerHandlers({
+            ...happyHandlers(),
+            [EVENTS_KEY]: () => fail("events forbidden"),
+            [PODS_KEY]: () => ok(JSON.stringify({
+                items: [
+                    { status: { phase: "Failed" } },
+                ],
+            })),
+        });
+        const result = await getClusterOverview("test-ctx");
+        expect(result.errorCount).toBe(1);
+    });
+
+    test("tolerates the events call rejecting", async () => {
+        setRunnerHandlers({
+            ...happyHandlers(),
+            [EVENTS_KEY]: () => Promise.reject(new Error("ENOENT")),
+        });
+        const result = await getClusterOverview("test-ctx");
+        expect(result.errorCount).toBe(0);
+        expect(result.nodeCount).toBe(3);
     });
 
     test("returns serverVersion: null when version call non-zero", async () => {
