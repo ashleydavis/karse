@@ -7,6 +7,7 @@ import {
     flexRender,
     type ColumnDef,
     type SortingState,
+    type ColumnFiltersState,
 } from "@tanstack/react-table";
 import {
     Table,
@@ -29,6 +30,18 @@ import { useKubeContext } from "../../../lib/kube-context";
 import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { fetchErrors } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
+import { TypeFilter } from "../../../components/type-filter";
+import { typeColumnFilterFn, makeTypeFilterController } from "../../../lib/type-filter-state";
+
+// The distinct error types (reasons) present in the data, in display order
+// (alphabetical). These are the checkboxes offered by the type filter.
+function distinctReasons(errors: ClusterError[]): string[] {
+    const seen = new Set<string>();
+    for (const e of errors) {
+        seen.add(e.reason);
+    }
+    return [...seen].sort((a, b) => a.localeCompare(b));
+}
 
 // Formats a Kubernetes timestamp into a human-readable age string.
 function formatAge(lastSeen: string): string {
@@ -91,7 +104,7 @@ const columns: ColumnDef<ClusterError>[] = [
         accessorFn: (row) => `${row.objectKind}/${row.objectName}`,
         cell: (info) => info.getValue<string>(),
     },
-    { accessorKey: "reason", header: "Reason" },
+    { accessorKey: "reason", header: "Reason", filterFn: typeColumnFilterFn },
     { accessorKey: "message", header: "Message" },
     { accessorKey: "count", header: "Count" },
     { accessorKey: "namespace", header: "Namespace" },
@@ -113,6 +126,11 @@ export function ErrorsTable() {
 
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+
+    // The checked error types live in the table's "reason" column filter; an
+    // empty selection means "show all" (the default).
+    const typeFilterController = makeTypeFilterController("reason", columnFilters, setColumnFilters);
 
     const table = useReactTable({
         data: data?.errors ?? [],
@@ -120,9 +138,11 @@ export function ErrorsTable() {
         state: {
             sorting,
             globalFilter,
+            columnFilters,
         },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
+        onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -139,6 +159,7 @@ export function ErrorsTable() {
 
     const rows = table.getRowModel().rows;
     const all = data?.errors ?? [];
+    const allReasons = distinctReasons(all);
 
     // Renders the appropriate sort direction icon for a column header.
     function SortIcon({ columnId }: { columnId: string }) {
@@ -155,20 +176,29 @@ export function ErrorsTable() {
 
     return (
         <div className="flex flex-col gap-2">
-            <TextField
-                size="small"
-                placeholder="Search errors..."
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                data-test-id="errors-search"
-                slotProps={{
-                    input: {
-                        startAdornment: (
-                            <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                        ),
-                    },
-                }}
-            />
+            <div className="flex flex-row gap-2 items-center">
+                <TextField
+                    size="small"
+                    placeholder="Search errors..."
+                    value={globalFilter}
+                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    data-test-id="errors-search"
+                    slotProps={{
+                        input: {
+                            startAdornment: (
+                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
+                            ),
+                        },
+                    }}
+                />
+                <TypeFilter
+                    all={allReasons}
+                    selected={typeFilterController.selected}
+                    onChange={typeFilterController.setSelected}
+                    label="Type"
+                    testIdPrefix="errors-type-filter"
+                />
+            </div>
             <TableContainer component={Paper} data-test-id="errors-table">
                 <Table size="small">
                     <TableHead>

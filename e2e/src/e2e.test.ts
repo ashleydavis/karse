@@ -3220,6 +3220,114 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Errors page: type filter ────────────────────────────────────────────────
+
+    test.describe("errors page type filter", () => {
+        // Three errors across three distinct reasons (types), so filtering by one
+        // reason narrows the table predictably.
+        const FAKE_ERRORS = {
+            errors: [
+                {
+                    source: "Pod",
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "crasher-abc",
+                    reason: "CrashLoopBackOff",
+                    message: "back-off restarting failed container",
+                    count: 1,
+                    lastSeen: new Date().toISOString(),
+                },
+                {
+                    source: "Pod",
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "puller-def",
+                    reason: "ImagePullBackOff",
+                    message: "Back-off pulling image",
+                    count: 2,
+                    lastSeen: new Date().toISOString(),
+                },
+                {
+                    source: "Event",
+                    namespace: "kube-system",
+                    objectKind: "Pod",
+                    objectName: "scheduler-xyz",
+                    reason: "FailedScheduling",
+                    message: "0/3 nodes are available",
+                    count: 4,
+                    lastSeen: new Date().toISOString(),
+                },
+            ],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/errors*", async (route) => {
+                await route.fulfill({ json: FAKE_ERRORS });
+            });
+            await page.goto("/errors", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='errors-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/errors*");
+            setContext(CLUSTER_1);
+        });
+
+        test("shows all errors by default with nothing checked", async () => {
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='errors-type-filter-button']")).toHaveText("Type: All");
+        });
+
+        test("lists every error type present in the dropdown", async () => {
+            await page.locator("[data-test-id='errors-type-filter-button']").click();
+            for (const reason of ["CrashLoopBackOff", "FailedScheduling", "ImagePullBackOff"]) {
+                await expect(page.locator(`[data-test-id='errors-type-filter-item-${reason}']`)).toBeVisible();
+            }
+            await page.keyboard.press("Escape");
+        });
+
+        test("checking one type narrows the table to that type", async () => {
+            await page.locator("[data-test-id='errors-type-filter-button']").click();
+            await page.locator("[data-test-id='errors-type-filter-item-CrashLoopBackOff']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='error-row']").filter({ hasText: "CrashLoopBackOff" })).toHaveCount(1);
+            await expect(page.locator("[data-test-id='errors-type-filter-button']")).toHaveText("Type: 1 selected");
+        });
+
+        test("checking a second type widens the table to both types", async () => {
+            await page.locator("[data-test-id='errors-type-filter-button']").click();
+            await page.locator("[data-test-id='errors-type-filter-item-ImagePullBackOff']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='error-row']").filter({ hasText: "FailedScheduling" })).toHaveCount(0);
+            await expect(page.locator("[data-test-id='errors-type-filter-button']")).toHaveText("Type: 2 selected");
+        });
+
+        test("deselect all clears the selection and restores all errors", async () => {
+            await page.locator("[data-test-id='errors-type-filter-button']").click();
+            await page.locator("[data-test-id='errors-type-filter-deselect-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='errors-type-filter-button']")).toHaveText("Type: All");
+        });
+
+        test("unchecking the last checked type also restores all errors", async () => {
+            await page.locator("[data-test-id='errors-type-filter-button']").click();
+            await page.locator("[data-test-id='errors-type-filter-item-FailedScheduling']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='errors-type-filter-button']")).toHaveText("Type: 1 selected");
+
+            await page.locator("[data-test-id='errors-type-filter-button']").click();
+            await page.locator("[data-test-id='errors-type-filter-item-FailedScheduling']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='errors-type-filter-button']")).toHaveText("Type: All");
+        });
+    });
+
     // ── Sidebar bottom nav ──────────────────────────────────────────────────────
 
     test.describe("sidebar bottom nav", () => {

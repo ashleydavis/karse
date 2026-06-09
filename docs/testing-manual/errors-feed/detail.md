@@ -32,6 +32,7 @@ A cluster seeded with one error condition from each source the Errors page surfa
 - **Namespace scoping**: select the `default` namespace; both error rows still appear.
 - **Search**: type `ImagePullBackOff` in the search box and confirm only the problem-pod row is shown. Type a non-matching string and confirm the "No errors match the search." message appears.
 - **Sort**: click the Source header and confirm the table re-sorts.
+- **Type filter**: a "Type: All" dropdown sits beside the search box. Open it and confirm it lists the error types present (`FailedScheduling` and `ImagePullBackOff`), each with a checkbox, all unchecked by default and both rows visible. Check `ImagePullBackOff` and confirm only the problem-pod row remains and the button reads "Type: 1 selected". Check `FailedScheduling` too and confirm both rows return ("Type: 2 selected"). Click "Deselect all" and confirm the selection clears, the button reads "Type: All" again, and both rows are shown.
 
 Teardown:
 
