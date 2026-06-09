@@ -30,7 +30,6 @@ import { useKubeContext } from "../../../lib/kube-context";
 import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { useShareableNavigate } from "../../../lib/nav-state";
 import { fetchPods } from "../../../lib/api-client";
-import { YamlButton } from "../../../components/yaml-dialog";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { StatusFilter } from "../../../components/status-filter";
 import { tableRowSx } from "../../../lib/table-row-style";
