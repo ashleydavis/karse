@@ -16,7 +16,7 @@ export function NamespacesPage() {
     const currentCtx = contexts.find((c) => c.name === context);
     const globalDefault = currentCtx?.namespace ?? null;
 
-    const { data, isLoading, error } = useQuery({
+    const { data, isLoading, error, refetch } = useQuery({
         queryKey: ["namespaces", context],
         queryFn: () => fetchNamespaces(context!),
         enabled: context !== null,
@@ -35,6 +35,7 @@ export function NamespacesPage() {
                 terminalDefault={globalDefault}
                 isLoading={isLoading}
                 error={(error as Error | null)}
+                onRetry={() => refetch()}
                 onUse={setNamespace}
                 onSetDefault={(ns) => setDefaultNamespace.mutate({ context: context!, namespace: ns })}
                 onOpen={(ns) => navigate(`/namespaces/${ns}`)}

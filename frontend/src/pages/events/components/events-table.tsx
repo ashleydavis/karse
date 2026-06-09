@@ -19,7 +19,6 @@ import {
     Chip,
     TextField,
     Typography,
-    Alert,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleInfo, faMagnifyingGlass, faSort, faSortDown, faSortUp, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
@@ -31,6 +30,7 @@ import { fetchEvents } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { EventTypeFilter } from "../../../components/event-type-filter";
 import { ALL_EVENT_TYPES, filterEventsByType } from "../../../lib/event-type-filter";
+import { LoadError } from "../../../components/load-error";
 
 // Formats a Kubernetes timestamp into a human-readable age string.
 function formatAge(lastSeen: string): string {
@@ -114,7 +114,7 @@ export function EventsTable() {
     const { current } = useKubeContext();
     const { namespace } = useKubeNamespace();
 
-    const { data, error, isLoading } = useQuery({
+    const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["events", current, namespace],
         queryFn: () => fetchEvents(current!, namespace ?? undefined),
         enabled: current !== null,
@@ -145,7 +145,7 @@ export function EventsTable() {
     });
 
     if (error) {
-        return <Alert severity="error">{(error as Error).message}</Alert>;
+        return <LoadError message={(error as Error).message} onRetry={() => refetch()} />;
     }
 
     if (isLoading) {

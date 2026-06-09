@@ -1,4 +1,5 @@
 import axios from "axios";
+import { LOAD_TIMEOUT_MS, loadErrorMessage } from "./load-error";
 import type {
     ContextsResponse, ClusterOverview, Node, NamespacesResponse, PodsResponse,
     DeploymentsResponse, StatefulSetsResponse, DaemonSetsResponse,
@@ -8,13 +9,22 @@ import type {
     SternStreamLine, SternStreamStarted,
 } from "karse-types";
 
-const http = axios.create({ baseURL: "/api", headers: { "Content-Type": "application/json" } });
+// Every data request times out after LOAD_TIMEOUT_MS. When the cluster is
+// unreachable (VPN/internet down) the request aborts at the timeout and surfaces a
+// connectivity error instead of leaving the page spinning forever.
+const http = axios.create({
+    baseURL: "/api",
+    headers: { "Content-Type": "application/json" },
+    timeout: LOAD_TIMEOUT_MS,
+});
 
 http.interceptors.response.use(
     (response) => response,
     (error) => {
-        const response = error.response;
-        throw new Error(response?.data?.error ?? response?.statusText ?? "Unknown error");
+        // A server that replied with an error keeps its own message; a timeout or
+        // unreachable cluster becomes a connectivity error carrying the VPN/internet hint.
+        const serverMessage = error.response?.data?.error ?? error.response?.statusText;
+        throw new Error(serverMessage ?? loadErrorMessage(error));
     }
 );
 

@@ -46,6 +46,8 @@ The left sidebar has collapsible navigation. Click the chevron at the bottom to 
 
 While a page is fetching its data from the cluster, it shows a large, clearly visible loading spinner alone (no text) in place of the content. The spinner is replaced by the data once it loads, or by an error message if the request fails. This applies to every resource list page and detail page.
 
+If the cluster does not respond within about 15 seconds (for example because your internet or VPN is down), the spinner stops and an error is shown instead of spinning forever. The error includes the note "Make sure your internet or VPN is connected" and a **Retry** button so you can re-attempt the load once connectivity is back.
+
 ## Active context and namespace
 
 Karse tracks two independent selections:

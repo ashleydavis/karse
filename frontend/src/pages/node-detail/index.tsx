@@ -4,7 +4,6 @@ import {
     Box,
     Typography,
     Chip,
-    Alert,
     Paper,
     Table,
     TableHead,
@@ -27,6 +26,7 @@ import { fetchNodeDetail } from "../../lib/api-client";
 import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
+import { LoadError } from "../../components/load-error";
 import { tableRowSx } from "../../lib/table-row-style";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
@@ -89,14 +89,14 @@ export function NodeDetailPage() {
     const navigate = useShareableNavigate();
     const [activeTab, setActiveTab] = useState<NodeDetailTab>("detail");
 
-    const { data, error, isLoading } = useQuery({
+    const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["node-detail", current, name],
         queryFn: () => fetchNodeDetail(current!, name!),
         enabled: current !== null && !!name,
     });
 
     if (error) {
-        return <Alert severity="error">{(error as Error).message}</Alert>;
+        return <LoadError message={(error as Error).message} onRetry={() => refetch()} />;
     }
 
     if (isLoading || !data) {

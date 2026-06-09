@@ -4,7 +4,6 @@ import {
     Box,
     Typography,
     Chip,
-    Alert,
     Paper,
     Table,
     TableHead,
@@ -28,6 +27,7 @@ import { fetchWorkloadDetail } from "../../lib/api-client";
 import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
+import { LoadError } from "../../components/load-error";
 import { ResourceStatsHeader } from "../../components/resource-stats-header";
 import { computePodStats } from "../../lib/resource-stats";
 import { tableRowSx } from "../../lib/table-row-style";
@@ -90,14 +90,14 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
     const navigate = useShareableNavigate();
     const [activeTab, setActiveTab] = useState<WorkloadDetailTab>("detail");
 
-    const { data, error, isLoading } = useQuery({
+    const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["workload-detail", kind, current, namespace, name],
         queryFn: () => fetchWorkloadDetail(current!, kind, namespace!, name!),
         enabled: current !== null && !!namespace && !!name,
     });
 
     if (error) {
-        return <Alert severity="error">{(error as Error).message}</Alert>;
+        return <LoadError message={(error as Error).message} onRetry={() => refetch()} />;
     }
 
     if (isLoading || !data) {

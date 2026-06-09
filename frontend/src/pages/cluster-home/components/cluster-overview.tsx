@@ -1,4 +1,4 @@
-import { Card, CardContent, CardActionArea, Typography, Alert, Grid, Box, Divider } from "@mui/material";
+import { Card, CardContent, CardActionArea, Typography, Grid, Box, Divider } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleExclamation, faCube, faDharmachakra, faLayerGroup, faServer } from "@fortawesome/free-solid-svg-icons";
 import type { IconProp } from "@fortawesome/fontawesome-svg-core";
@@ -8,6 +8,7 @@ import { useKubeContext } from "../../../lib/kube-context";
 import { useShareableTo } from "../../../lib/nav-state";
 import { fetchClusterOverview } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
+import { LoadError } from "../../../components/load-error";
 
 type StatTileProps = {
     icon: IconProp;
@@ -105,14 +106,14 @@ function PhaseCount({ label, count, color }: { label: string; count: number; col
 
 export function ClusterOverview() {
     const { current } = useKubeContext();
-    const { data, error, isLoading } = useQuery({
+    const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["cluster", "overview", current],
         queryFn: () => fetchClusterOverview(current!),
         enabled: current !== null,
     });
 
     if (error) {
-        return <Alert severity="error">{(error as Error).message}</Alert>;
+        return <LoadError message={(error as Error).message} onRetry={() => refetch()} />;
     }
 
     if (isLoading || !data) {

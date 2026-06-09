@@ -20,7 +20,6 @@ import {
     Chip,
     TextField,
     Typography,
-    Alert,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleCheck, faCirclePause, faCircleQuestion, faCircleXmark, faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
@@ -31,6 +30,7 @@ import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { useShareableNavigate } from "../../../lib/nav-state";
 import { fetchPods } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
+import { LoadError } from "../../../components/load-error";
 import { StatusFilter } from "../../../components/status-filter";
 import { LabelFilter } from "../../../components/label-filter";
 import { tableRowSx } from "../../../lib/table-row-style";
@@ -210,7 +210,7 @@ export function PodsTable() {
     const { namespace } = useKubeNamespace();
     const navigate = useShareableNavigate();
 
-    const { data, error, isLoading } = useQuery({
+    const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["pods", current, namespace],
         queryFn: () => fetchPods(current!, namespace ?? undefined),
         enabled: current !== null,
@@ -251,7 +251,7 @@ export function PodsTable() {
     });
 
     if (error) {
-        return <Alert severity="error">{(error as Error).message}</Alert>;
+        return <LoadError message={(error as Error).message} onRetry={() => refetch()} />;
     }
 
     if (isLoading) {

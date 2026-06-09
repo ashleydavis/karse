@@ -19,7 +19,6 @@ import {
     Paper,
     TextField,
     Typography,
-    Alert,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
@@ -32,6 +31,7 @@ import { fetchDaemonSets } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { StatusFilter } from "../../../components/status-filter";
 import { statusColumnFilterFn, makeStatusFilterController } from "../../../lib/status-filter-state";
+import { LoadError } from "../../../components/load-error";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { LabelsCell } from "../../../components/labels-cell";
@@ -104,7 +104,7 @@ export function DaemonSetsTable() {
     const { namespace } = useKubeNamespace();
     const navigate = useShareableNavigate();
 
-    const { data, error, isLoading } = useQuery({
+    const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["daemonsets", current, namespace],
         queryFn: () => fetchDaemonSets(current!, namespace ?? undefined),
         enabled: current !== null,
@@ -141,7 +141,7 @@ export function DaemonSetsTable() {
     });
 
     if (error) {
-        return <Alert severity="error">{(error as Error).message}</Alert>;
+        return <LoadError message={(error as Error).message} onRetry={() => refetch()} />;
     }
 
     if (isLoading) {

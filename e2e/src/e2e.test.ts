@@ -3699,6 +3699,37 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='loading-indicator']")).toHaveCount(0);
             await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("nginx-loading");
         });
+
+        test("shows the connectivity error instead of an endless spinner when the load fails, and retries", async () => {
+            // Simulate an unreachable cluster: the request never reaches a
+            // responding server, so it aborts instead of returning data.
+            await page.route("**/api/pods*", async (route) => {
+                await route.abort("connectionrefused");
+            });
+
+            await page.goto("/pods");
+
+            // The load fails: the spinner is gone and the connectivity error
+            // (carrying the VPN/internet hint) is shown instead.
+            const loadError = page.locator("[data-test-id='load-error']");
+            await expect(loadError).toBeVisible();
+            await expect(loadError).toContainText("Make sure your internet or VPN is connected");
+            await expect(page.locator("[data-test-id='loading-indicator']")).toHaveCount(0);
+
+            // The cluster comes back: clicking Retry re-attempts the load and the
+            // table renders, so the error state is a recoverable dead-end.
+            await page.unroute("**/api/pods*");
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: FAKE_PODS });
+            });
+            await page.locator("[data-test-id='load-error-retry']").click();
+
+            await expect(page.locator("[data-test-id='pod-row']").first()).toBeVisible();
+            await expect(page.locator("[data-test-id='load-error']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("nginx-loading");
+
+            await page.unroute("**/api/pods*");
+        });
     });
 
     // ── Labels column ──────────────────────────────────────────────────────────

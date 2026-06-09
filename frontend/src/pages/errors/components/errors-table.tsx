@@ -20,7 +20,6 @@ import {
     Chip,
     TextField,
     Typography,
-    Alert,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleExclamation, faTriangleExclamation, faSortUp, faSortDown, faSort, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
@@ -32,6 +31,7 @@ import { fetchErrors } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { TypeFilter } from "../../../components/type-filter";
 import { typeColumnFilterFn, makeTypeFilterController } from "../../../lib/type-filter-state";
+import { LoadError } from "../../../components/load-error";
 
 // The distinct error types (reasons) present in the data, in display order
 // (alphabetical). These are the checkboxes offered by the type filter.
@@ -118,7 +118,7 @@ export function ErrorsTable() {
     const { current } = useKubeContext();
     const { namespace } = useKubeNamespace();
 
-    const { data, error, isLoading } = useQuery({
+    const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["errors", current, namespace],
         queryFn: () => fetchErrors(current!, namespace ?? undefined),
         enabled: current !== null,
@@ -150,7 +150,7 @@ export function ErrorsTable() {
     });
 
     if (error) {
-        return <Alert severity="error">{(error as Error).message}</Alert>;
+        return <LoadError message={(error as Error).message} onRetry={() => refetch()} />;
     }
 
     if (isLoading) {

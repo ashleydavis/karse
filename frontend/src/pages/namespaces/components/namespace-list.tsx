@@ -21,7 +21,6 @@ import {
     TextField,
     Typography,
     Button,
-    Alert,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
@@ -29,6 +28,7 @@ import type { Namespace } from "karse-types";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { LoadingIndicator } from "../../../components/loading-indicator";
+import { LoadError } from "../../../components/load-error";
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
 import { LabelFilter } from "../../../components/label-filter";
@@ -40,12 +40,13 @@ type Props = {
     terminalDefault: string | null;
     isLoading: boolean;
     error: Error | null;
+    onRetry?: () => void;
     onUse: (name: string | null) => void;
     onSetDefault?: (name: string | null) => void;
     onOpen?: (name: string) => void;
 };
 
-export function NamespaceList({ namespaces, active, terminalDefault, isLoading, error, onUse, onSetDefault, onOpen }: Props) {
+export function NamespaceList({ namespaces, active, terminalDefault, isLoading, error, onRetry, onUse, onSetDefault, onOpen }: Props) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -144,7 +145,7 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
     }
 
     if (error) {
-        return <Alert severity="error">{error.message}</Alert>;
+        return <LoadError message={error.message} onRetry={onRetry} />;
     }
 
     const rows = table.getRowModel().rows;

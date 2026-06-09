@@ -4,7 +4,6 @@ import {
     Box,
     Typography,
     Chip,
-    Alert,
     Paper,
     Table,
     TableHead,
@@ -25,6 +24,7 @@ import { useShareableNavigate } from "../../lib/nav-state";
 import { fetchNamespaceDetail } from "../../lib/api-client";
 import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
+import { LoadError } from "../../components/load-error";
 import { tableRowSx } from "../../lib/table-row-style";
 import { ResourcesTable } from "./components/resources-table";
 import { namespaceResourceCount } from "../../lib/namespace-resource-count";
@@ -63,14 +63,14 @@ export function NamespaceDetailPage() {
     const navigate = useShareableNavigate();
     const [activeTab, setActiveTab] = useState<NamespaceDetailTab>("detail");
 
-    const { data, error, isLoading } = useQuery({
+    const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["namespace-detail", current, name],
         queryFn: () => fetchNamespaceDetail(current!, name!),
         enabled: current !== null && !!name,
     });
 
     if (error) {
-        return <Alert severity="error">{(error as Error).message}</Alert>;
+        return <LoadError message={(error as Error).message} onRetry={() => refetch()} />;
     }
 
     if (isLoading || !data) {

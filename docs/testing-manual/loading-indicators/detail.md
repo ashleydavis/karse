@@ -30,6 +30,12 @@ Open the browser dev tools, go to the Network tab, and set throttling to "Slow 3
 - On each page, confirm the spinner disappears once the data has loaded and the page content is shown.
 - Stop the backend (or point at an unreachable context) and reload a page. Confirm that on failure the spinner is replaced by an error alert, not left spinning forever.
 
+### Load timeout and connectivity error
+- In the dev tools Network tab, block the `/api/*` requests (right-click a request, "Block request URL"), or disconnect the network / VPN, then reload a page such as `/pods`. Within about 15 seconds confirm the spinner stops and a red error alert (`data-test-id="load-error"`) appears, with text ending "Make sure your internet or VPN is connected". Confirm the spinner is not left running forever.
+- Confirm the error alert shows a **Retry** button (`data-test-id="load-error-retry"`).
+- Restore the network (unblock the requests), then click **Retry**. Confirm the page re-attempts the load and renders the table content, replacing the error.
+- Spot-check the same timeout-then-error-then-retry behaviour on a detail page (for example open a pod from `/pods`, then block `/api/*` and reload).
+
 ## Teardown
 
 ```sh

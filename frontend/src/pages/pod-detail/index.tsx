@@ -3,7 +3,6 @@ import {
     Box,
     Typography,
     Chip,
-    Alert,
     Paper,
     Table,
     TableHead,
@@ -26,6 +25,7 @@ import { fetchPodDetail } from "../../lib/api-client";
 import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
+import { LoadError } from "../../components/load-error";
 import { PodContainersPanel, PodInitContainersPanel } from "./components/pod-containers-panel";
 import { PodLogsPanel } from "./components/pod-logs-panel";
 
@@ -106,14 +106,14 @@ export function PodDetailPage() {
         }, { replace: true });
     }
 
-    const { data, error, isLoading } = useQuery({
+    const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["pod-detail", current, namespace, name],
         queryFn: () => fetchPodDetail(current!, namespace!, name!),
         enabled: current !== null && !!namespace && !!name,
     });
 
     if (error) {
-        return <Alert severity="error">{(error as Error).message}</Alert>;
+        return <LoadError message={(error as Error).message} onRetry={() => refetch()} />;
     }
 
     if (isLoading || !data) {
