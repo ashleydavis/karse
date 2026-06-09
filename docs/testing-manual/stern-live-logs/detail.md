@@ -58,6 +58,13 @@ One node, three pods (`nginx-one`, `nginx-two`, `redis-main`).
 ### Read-only invariant
 - Tail `logs/audit-*.log` while streaming and confirm only `logs -f` and `get` kubectl commands are recorded. No mutating verbs ever appear.
 
+### Capped streaming-pod labels
+- This needs more than 8 streaming pods to exercise the cap. Use a namespace/fixture with at least 9 pods (for example scale the fixture up, or stream across all namespaces on a busier cluster).
+- Leave the filter empty and press "Stream".
+- The "Streaming N pod(s)" row shows at most 8 pod chips, followed by a "... +M more" chip (where M is the number of hidden pods). The row does not grow to list every pod.
+- Click the "... +M more" chip. The row expands to show a chip for every streaming pod, and the "..." chip is replaced by a "Show fewer" chip.
+- Click "Show fewer". The row collapses back to 8 chips with the "... +M more" chip again.
+
 ## Scenario: Whole-cluster firehose stays bounded (CPU/memory)
 
 This guards against the regression proven in Debug item `stern-all-logs-1`: an unbounded all-namespaces `.*` stream pegged a CPU core (and an unbounded coalescing buffer OOM-crashed the backend). The fix caps stern fan-out at the source and adds bounded drop-oldest backpressure.

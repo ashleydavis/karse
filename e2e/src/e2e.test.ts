@@ -3059,6 +3059,70 @@ test.describe("karse e2e", () => {
         });
     });
 
+    test.describe("live logs page pod-label cap", () => {
+        // Twelve fake pods, more than the page's 8-chip cap, to drive the
+        // "..." expander that reveals the full streaming-pod list.
+        const MANY_PODS = {
+            pods: Array.from({ length: 12 }, (_unused, i) => ({
+                name: `pod-${i}`,
+                namespace: "default",
+                phase: "Running",
+                ready: "1/1",
+                restarts: 0,
+                createdAt: new Date().toISOString(),
+                node: "node-1",
+            })),
+        };
+
+        // Builds an SSE body announcing every matched pod then one line per pod.
+        function buildManySseBody(podNames: string[]): string {
+            const started = `event: started\ndata: ${JSON.stringify({ pods: podNames.map((n) => ({ namespace: "default", name: n })) })}\n\n`;
+            const lines = podNames
+                .map((n) => `event: line\ndata: ${JSON.stringify({ namespace: "default", pod: n, line: `log line from ${n}` })}\n\n`)
+                .join("");
+            return started + lines;
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: MANY_PODS });
+            });
+            await page.route("**/api/logs/stream*", async (route) => {
+                await route.fulfill({
+                    headers: { "Content-Type": "text/event-stream" },
+                    body: buildManySseBody(MANY_PODS.pods.map((p) => p.name)),
+                });
+            });
+            await page.goto("/logs", { waitUntil: "networkidle" });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+            await page.unroute("**/api/logs/stream*");
+            setContext(CLUSTER_1);
+        });
+
+        test("caps visible pod chips and shows a '...' expander when there are more pods", async () => {
+            await page.locator("[data-test-id='live-logs-start']").click();
+            // 12 pods stream but only the first 8 chips render.
+            await expect(page.locator("[data-test-id='live-logs-matched-pod']")).toHaveCount(8);
+            const expander = page.locator("[data-test-id='live-logs-matched-expand']");
+            await expect(expander).toBeVisible();
+            await expect(expander).toContainText("+4 more");
+        });
+
+        test("clicking the '...' expander reveals the full streaming-pod list", async () => {
+            await page.locator("[data-test-id='live-logs-matched-expand']").click();
+            await expect(page.locator("[data-test-id='live-logs-matched-pod']")).toHaveCount(12);
+            await expect(page.locator("[data-test-id='live-logs-matched-expand']")).toHaveCount(0);
+            // A "Show fewer" control collapses the list back to the cap.
+            await page.locator("[data-test-id='live-logs-matched-collapse']").click();
+            await expect(page.locator("[data-test-id='live-logs-matched-pod']")).toHaveCount(8);
+            await expect(page.locator("[data-test-id='live-logs-matched-expand']")).toBeVisible();
+        });
+    });
+
     // ── Stern page (stern-powered live logs) ──────────────────────────────────
 
     test.describe("stern page", () => {

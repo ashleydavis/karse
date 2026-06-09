@@ -25,6 +25,10 @@ type RenderedLine = LogStreamLine & { key: number };
 // Palette used to color pod-name prefixes, cycling like stern does.
 const PREFIX_COLORS = ["#4fc3f7", "#81c784", "#ffb74d", "#ba68c8", "#e57373", "#4db6ac", "#f06292", "#9575cd"];
 
+// Maximum number of streaming-pod chips shown before the list is collapsed
+// behind a "..." expander, so a large stream does not eat vertical space.
+const MAX_VISIBLE_POD_CHIPS = 8;
+
 // Deterministically maps a pod name to one of the prefix colors.
 function colorForPod(pod: string): string {
     let hash = 0;
@@ -46,6 +50,8 @@ export function LiveLogsPage() {
     const [lines, setLines] = useState<RenderedLine[]>([]);
     const [matchedPods, setMatchedPods] = useState<string[]>([]);
     const [streamError, setStreamError] = useState<string | null>(null);
+    // Whether the full streaming-pod list is expanded past the chip cap.
+    const [showAllPods, setShowAllPods] = useState(false);
 
     // Holds the active stream's close function so it survives re-renders.
     const closeRef = useRef<(() => void) | null>(null);
@@ -102,6 +108,7 @@ export function LiveLogsPage() {
         stopStream();
         setLines([]);
         setMatchedPods([]);
+        setShowAllPods(false);
         setStreamError(null);
         keyRef.current = 0;
         setStreaming(true);
@@ -218,7 +225,7 @@ export function LiveLogsPage() {
                     <Typography variant="caption" color="text.secondary">
                         Streaming {matchedPods.length} pod(s):
                     </Typography>
-                    {matchedPods.map((name) => (
+                    {(showAllPods ? matchedPods : matchedPods.slice(0, MAX_VISIBLE_POD_CHIPS)).map((name) => (
                         <Chip
                             key={name}
                             size="small"
@@ -227,6 +234,24 @@ export function LiveLogsPage() {
                             sx={{ bgcolor: colorForPod(name), color: "#000" }}
                         />
                     ))}
+                    {matchedPods.length > MAX_VISIBLE_POD_CHIPS && !showAllPods && (
+                        <Chip
+                            size="small"
+                            label={`... +${matchedPods.length - MAX_VISIBLE_POD_CHIPS} more`}
+                            onClick={() => setShowAllPods(true)}
+                            data-test-id="live-logs-matched-expand"
+                            sx={{ fontWeight: 600 }}
+                        />
+                    )}
+                    {matchedPods.length > MAX_VISIBLE_POD_CHIPS && showAllPods && (
+                        <Chip
+                            size="small"
+                            label="Show fewer"
+                            onClick={() => setShowAllPods(false)}
+                            data-test-id="live-logs-matched-collapse"
+                            sx={{ fontWeight: 600 }}
+                        />
+                    )}
                 </Box>
             )}
 
