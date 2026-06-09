@@ -109,7 +109,7 @@ A table of namespaces for the active context.
 
 Reached by clicking a namespace row. Organised into four tabs:
 
-- **Details**: the namespace's phase, age, labels, annotations, and any resource quotas and limit ranges.
+- **Details**: the namespace's status (its lifecycle phase, e.g. Active/Terminating), age, labels, annotations, and any resource quotas and limit ranges.
 - **Resources**: a searchable, sortable table of the resources in the namespace (pods, deployments, stateful sets, daemon sets). Click a row to open that resource's own detail page.
 - **Commands**: copy-only `kubectl` command suggestions for the namespace. Karse never runs them.
 - **YAML**: the namespace's raw YAML.
@@ -118,7 +118,7 @@ Reached by clicking a namespace row. Organised into four tabs:
 
 A table of pods for the active context. When a namespace is active, pods are scoped to that namespace; when no namespace is selected, all pods across all namespaces are shown. The Namespace column is always shown regardless of the active namespace.
 
-Type in the search box to filter rows. Use the **Phase** dropdown (filter icon, beside the search box) to show only pods with the phases you check; all phases are shown by default. Use the **Health** dropdown to show only **Healthy** or only **Error** pods (matching the Healthy/Error counts in the stats header); both are shown by default. The Deployments, StatefulSets, and DaemonSets pages have the same **Health** dropdown. Use the **Labels** dropdown (tags icon) to filter by label. See [Label filtering](#label-filtering) below.
+Type in the search box to filter rows. Use the **Status** dropdown (filter icon, beside the search box) to show only pods with the statuses you check; all statuses are shown by default. Use the **Health** dropdown to show only **Healthy** or only **Error** pods (matching the Healthy/Error counts in the stats header); both are shown by default. The Deployments, StatefulSets, and DaemonSets pages have the same **Health** dropdown. Use the **Labels** dropdown (tags icon) to filter by label. See [Label filtering](#label-filtering) below.
 
 A Labels column shows each resource's labels as compact `key=value` chips (also present on the Nodes, Deployments, StatefulSets, DaemonSets, and Namespaces tables). The chips participate in the table's search, so typing a label key or value filters the rows.
 

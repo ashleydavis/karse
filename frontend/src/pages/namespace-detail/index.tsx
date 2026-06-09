@@ -118,7 +118,7 @@ export function NamespaceDetailPage() {
                         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 1.5 }}>
                             {[
                                 ["Name", data.name],
-                                ["Phase", data.phase],
+                                ["Status", data.phase],
                                 ["Age", formatAge(data.createdAt)],
                                 ["Resources", `${podCount}`],
                             ].map(([label, value]) => (

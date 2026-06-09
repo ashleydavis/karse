@@ -19,7 +19,7 @@ Then open the frontend at `http://127.0.0.1:5173`. Namespace scoping is exercise
 ```
 
 ### What to check
-- **Pods page**: two rows visible with no namespace selected (all-namespaces view). Both pods show a Running phase chip and the Namespace column shows `default`. Click either row to navigate to the pod detail page; confirm the pod name, phase chip, containers table, and log viewer button are shown.
+- **Pods page**: two rows visible with no namespace selected (all-namespaces view). Both pods show a Running status chip (under the **Status** column) and the Namespace column shows `default`. Click either row to navigate to the pod detail page; confirm the pod name, status chip, containers table, and log viewer button are shown.
 - **Namespace scoping**: open the namespace picker (layers icon or Ctrl+Shift+K), select `default`. Both pods are still shown and the Namespace column remains visible. Select a different namespace. The empty state appears.
 - **Namespaces page**: navigate to `/namespaces`, click "Set as active" on `default`. Confirm the `active` chip appears and the Pods page scopes to that namespace.
 - **Overview tiles**: pod count shows `2`.
@@ -68,10 +68,10 @@ Four pods in `default`, one each in Running, Pending, Failed, Succeeded.
 ```
 
 ### What to check
-- **Pods page**: four rows in `default`, one per phase. Each row shows the correct phase chip colour.
+- **Pods page**: four rows in `default`, one per phase. Each row shows the correct status chip colour (under the **Status** column).
 - If KWOK overrides the patched `Failed` or `Succeeded` status back to `Running`, re-run the patch commands from the setup script and reload.
 
-## Scenario E: Pod phase filter
+## Scenario E: Pod status filter
 
 Five pods in `default`, one each in Running, Pending, Succeeded, Failed, Unknown.
 
@@ -82,14 +82,14 @@ Five pods in `default`, one each in Running, Pending, Succeeded, Failed, Unknown
 ```
 
 ### What to check
-- **Pods page**: five rows in `default`, one per phase. The phase filter button reads `Phase: All`.
-- Click the **Phase** button (filter icon) to open the dropdown. All five phases are checked.
-- **Uncheck a phase** (for example `Pending`): the matching pod row disappears and the button updates to `Phase: 4 selected`.
-- **Check only one phase**: uncheck the others until just `Running` remains. Only `pod-running` is listed and the button reads `Phase: 1 selected`.
-- **Uncheck every phase**: the table shows the "No pods match the search." message.
-- **Re-check all phases**: all five rows return and the button reads `Phase: All`.
-- **Deselect all / Select all**: open the dropdown and click **Deselect all** (top of the dropdown): every phase unticks, the table shows the "No pods match the search." message, and the button reads `Phase: 0 selected`. Click **Select all**: every phase re-ticks, all five rows return, and the button reads `Phase: All`. With everything ticked, **Select all** is greyed out; with nothing ticked, **Deselect all** is greyed out.
-- The phase filter combines with the search box: searching while a subset of phases is selected narrows results further.
+- **Pods page**: five rows in `default`, one per phase. The status filter button reads `Status: All` (the filter is labelled **Status**, not "Phase").
+- Click the **Status** button (filter icon) to open the dropdown. All five statuses are checked.
+- **Uncheck a status** (for example `Pending`): the matching pod row disappears and the button updates to `Status: 4 selected`.
+- **Check only one status**: uncheck the others until just `Running` remains. Only `pod-running` is listed and the button reads `Status: 1 selected`.
+- **Uncheck every status**: the table shows the "No pods match the search." message.
+- **Re-check all statuses**: all five rows return and the button reads `Status: All`.
+- **Deselect all / Select all**: open the dropdown and click **Deselect all** (top of the dropdown): every status unticks, the table shows the "No pods match the search." message, and the button reads `Status: 0 selected`. Click **Select all**: every status re-ticks, all five rows return, and the button reads `Status: All`. With everything ticked, **Select all** is greyed out; with nothing ticked, **Deselect all** is greyed out.
+- The status filter combines with the search box: searching while a subset of statuses is selected narrows results further.
 - If KWOK overrides a patched terminal phase back to `Running`, re-run the patch commands from the setup script and reload.
 
 ## Scenario E.2: Pod health filter

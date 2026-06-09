@@ -296,8 +296,8 @@ export function PodsTable() {
                     all={ALL_PHASES}
                     selected={phaseFilterController.selected}
                     onChange={phaseFilterController.setSelected}
-                    label="Phase"
-                    testIdPrefix="pods-phase-filter"
+                    label="Status"
+                    testIdPrefix="pods-status-filter"
                 />
                 <StatusFilter
                     all={HEALTH_FILTER_OPTIONS}

@@ -15,8 +15,8 @@ import { faFilter } from "@fortawesome/free-solid-svg-icons";
 // Props for the shared StatusFilter dropdown. `all` is every status value in
 // display order; `selected` is the currently-visible subset; `onChange` is
 // called with the next subset whenever a checkbox is toggled. `label` names the
-// status dimension (e.g. "Phase" for pods, "Status" for nodes) and `testIdPrefix`
-// namespaces the data-test-id attributes so each table's filter is addressable.
+// status dimension ("Status" everywhere) and `testIdPrefix` namespaces the
+// data-test-id attributes so each table's filter is addressable.
 type StatusFilterProps = {
     all: string[];
     selected: string[];

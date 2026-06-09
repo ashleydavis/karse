@@ -2,7 +2,7 @@
 
 ## Overview
 
-A per-table search and sort behaviour. Resource tables use a search box plus TanStack Table sorting. The fuzzy subsequence global filter (`fuzzyGlobalFilter`) is used by the nodes, pods, deployments, stateful sets and daemon sets tables. The events and errors tables instead use TanStack's built-in plain substring match (`globalFilterFn: "includesString"`). Tables whose kind has a status field (pods by phase, nodes by Ready/NotReady/Unknown) additionally share a status-filter dropdown. Every table that shows a Healthy/Error stats header (pods, nodes, deployments, stateful sets, daemon sets) also shares a health-filter dropdown that filters by the same derived Healthy/Error health used by the stats header (see `resource-stats`). Every table whose kind carries labels (nodes, pods, deployments, stateful sets, daemon sets, namespaces) also shares a structured label-filter dropdown.
+A per-table search and sort behaviour. Resource tables use a search box plus TanStack Table sorting. The fuzzy subsequence global filter (`fuzzyGlobalFilter`) is used by the nodes, pods, deployments, stateful sets and daemon sets tables. The events and errors tables instead use TanStack's built-in plain substring match (`globalFilterFn: "includesString"`). Tables whose kind has a status field (pods by their phase, nodes by Ready/NotReady/Unknown) additionally share a status-filter dropdown, labelled "Status" everywhere (see **Status vs phase naming**). Every table that shows a Healthy/Error stats header (pods, nodes, deployments, stateful sets, daemon sets) also shares a health-filter dropdown that filters by the same derived Healthy/Error health used by the stats header (see `resource-stats`). Every table whose kind carries labels (nodes, pods, deployments, stateful sets, daemon sets, namespaces) also shares a structured label-filter dropdown.
 
 Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-state.ts`, `frontend/src/components/status-filter.tsx`, `frontend/src/lib/label-filter-state.ts`, `frontend/src/components/label-filter.tsx`, and the per-page table components under `frontend/src/pages/*/components/`.
 
@@ -19,7 +19,7 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-s
 ### Status filtering
 
 - Every resource table whose kind has a status field has a status-filter dropdown beside the search box, with one checkbox per status value (pods: Running/Pending/Succeeded/Failed/Unknown; nodes: Ready/NotReady/Unknown).
-- All statuses are selected by default; the button reads `<Label>: All` (e.g. "Phase: All", "Status: All"). With a partial selection it reads `<Label>: N selected`.
+- All statuses are selected by default; the button reads `Status: All`. With a partial selection it reads `Status: N selected`. Every status-filter button is labelled "Status" (see **Status vs phase naming** below).
 - Unchecking a status hides every row with that status. Unchecking every status hides all rows and shows the table's no-match message.
 - The dropdown has "Select all" and "Deselect all" controls at the top (above the per-status checkboxes). "Select all" ticks every status (showing all rows); "Deselect all" unticks every status (showing the no-match message). "Select all" is disabled when everything is already selected; "Deselect all" is disabled when nothing is selected.
 - The dropdown drives a TanStack Table column filter on the status column. A full selection clears the filter (every row passes); the status filter and the search box compose (both must match for a row to show).
@@ -55,6 +55,11 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-s
 - The labels modal has a search box that filters the listed labels by case-insensitive substring on the `key=value` text. Clearing the search restores the full list.
 - The table's own fuzzy search still indexes the full set of labels (all `key=value` pairs), not just the chips shown inline, so a row matches on any of its labels even when some are hidden behind the `...` control.
 
+### Status vs phase naming
+
+- For this read-only dashboard a pod's **phase** (the Kubernetes `status.phase`: Running/Pending/Succeeded/Failed/Unknown) and its **status** are the same concept to the user; there is no separate status the user might want to filter on. The same is true of a namespace's lifecycle phase (Active/Terminating). The app therefore standardizes on **"Status"** as the single user-facing name and shows no "Phase" label anywhere in the UI (column headers, the cluster-overview "Pod status" card, detail rows, and the pods status-filter button all read "Status").
+- The underlying data field keeps the Kubernetes name `phase` (`Pod.phase`, `NamespaceDetail.phase`, the `phase` column accessor, the `PodPhase` type, the `GET /api/pods` / namespace responses) so the code and API stay faithful to the Kubernetes API. The standardization is a UI-label rename only, not a data-model rename.
+
 ## Acceptance Criteria
 
 - [x] Each resource table has a search box that filters its rows.
@@ -66,7 +71,8 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-s
 - [x] Every table whose kind has a status field has a status-filter dropdown with one checkbox per status value; all selected by default.
 - [x] Unchecking a status hides rows with that status; unchecking all shows the no-match message.
 - [x] The status-filter dropdown and its column-filter wiring are shared across tables, with no per-table duplicate.
-- [x] The status-filter dropdown has "Select all" and "Deselect all" controls that tick or untick every status at once, shared across the pods phase filter and the nodes status filter.
+- [x] The status-filter dropdown has "Select all" and "Deselect all" controls that tick or untick every status at once, shared across the pods status filter and the nodes status filter.
+- [x] The app standardizes on "Status" as the single user-facing name (phase and status are the same concept here); no "Phase" label remains in the UI, while the data field keeps the Kubernetes name `phase`.
 - [x] Every table with a Healthy/Error stats header (pods, nodes, deployments, stateful sets, daemon sets) has a Healthy/Error health-filter dropdown; both checked by default (shows all).
 - [x] Checking only "Error" shows just error rows; checking only "Healthy" shows just healthy rows; "Deselect all" hides all rows.
 - [x] The health filter reuses the shared dropdown and column-filter wiring (no per-table duplicate) and uses the same derived health as the stats header.

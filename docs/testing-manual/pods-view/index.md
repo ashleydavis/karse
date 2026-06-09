@@ -2,7 +2,7 @@
 
 **Feature:** [pods-view](../../spec/pods-view/index.md)
 
-Manual tests for the pods table: rows, phase chips, the Containers column, sort, search, the phase filter, and empty states.
+Manual tests for the pods table: rows, status chips, the Containers column, sort, search, the status filter, and empty states.
 
 ## Fixtures
 - [07-two-pods-one-namespace](../_fixtures-kwok/07-two-pods-one-namespace/)

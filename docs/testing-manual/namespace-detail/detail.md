@@ -22,11 +22,11 @@ A namespace `team-a` with labels and annotations, holding a deployment and a sta
 
 ### Header
 - The namespace name `team-a` appears as the heading.
-- A green `Active` phase chip appears next to the name.
+- A green `Active` status chip appears next to the name.
 - A tab bar shows four tabs: "Status", "Resources", "Commands", "YAML". "Status" is selected by default.
 
 ### Status tab (default)
-- The Details card shows Name, Phase (`Active`), Age, and a Resources count.
+- The Details card shows Name, Status (`Active`), Age, and a Resources count.
 - The Resources count is the **pod count only** (3: the two `web` deployment pods plus the one `db` stateful set pod), not the total of all kinds. It must match the number shown in the `team-a` row's Resources column on the `/namespaces` list page. Cross-check: note the Resources count on the `/namespaces` list for `team-a`, open the detail page, and confirm the Details-tab Resources count is the same number.
 - The Labels card shows `team=alpha` and `tier=backend`.
 - The Annotations table shows `owner` (= `platform-team`) and `description`.
