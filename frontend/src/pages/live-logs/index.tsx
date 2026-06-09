@@ -19,6 +19,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { LogStreamLine } from "karse-types";
 import { useKubeContext } from "../../lib/kube-context";
 import { fetchNamespaces, fetchPods, openLogStream } from "../../lib/api-client";
+import { LoadingIndicator } from "../../components/loading-indicator";
 
 // A rendered log line tagged with a stable key for React reconciliation.
 type RenderedLine = LogStreamLine & { key: number };
@@ -307,9 +308,13 @@ export function LiveLogsPage() {
                 data-test-id="live-logs-viewer"
             >
                 {lines.length === 0 ? (
-                    <Typography component="span" sx={{ color: "grey.500", fontFamily: "monospace", fontSize: "0.75rem" }}>
-                        {streaming ? "Waiting for log lines..." : "Pick a pod or wildcard, then press Stream."}
-                    </Typography>
+                    streaming ? (
+                        <LoadingIndicator />
+                    ) : (
+                        <Typography component="span" sx={{ color: "grey.500", fontFamily: "monospace", fontSize: "0.75rem" }}>
+                            Pick a pod or wildcard, then press Stream.
+                        </Typography>
+                    )
                 ) : (
                     lines.map((entry) => (
                         <Box key={entry.key} component="div" data-test-id="live-logs-line">

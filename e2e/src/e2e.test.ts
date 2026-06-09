@@ -1525,6 +1525,32 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='log-live-toggle']")).toHaveCount(0);
         });
 
+        test("while streaming with no lines yet the log panel shows the progress indicator, not loading text", async () => {
+            // Intercept the stream and delay its first line so the pre-line streaming
+            // state is observable; the panel must show the spinner, not "(waiting for logs...)".
+            await page.route("**/api/pods/default/nginx-abc/logs/stream*", async (route) => {
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+                // The pod log stream uses the default SSE `message` event (raw lines).
+                await route.fulfill({
+                    headers: { "Content-Type": "text/event-stream" },
+                    body: `data: start worker processes\n\n`,
+                });
+            });
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-logs']").click();
+            // The spinner stands in for the loading state; no "(waiting for logs...)" text.
+            await expect(page.locator("[data-test-id='log-viewer'] [data-test-id='loading-indicator']")).toBeVisible();
+            await expect(page.locator("[data-test-id='log-viewer']")).not.toContainText("waiting for logs");
+            // Once a line arrives, the indicator is gone and the line is shown.
+            await expect(page.locator("[data-test-id='log-viewer']")).toContainText("start worker processes");
+            await expect(page.locator("[data-test-id='log-viewer'] [data-test-id='loading-indicator']")).toHaveCount(0);
+            // Restore the real backend stream and re-open the Logs tab for later tests.
+            await page.unroute("**/api/pods/default/nginx-abc/logs/stream*");
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-logs']").click();
+            await expect(page.locator("[data-test-id='log-viewer']")).toBeVisible();
+        });
+
         test("container selector is visible and lists both containers", async () => {
             await expect(page.locator("[data-test-id='log-viewer']")).toBeVisible();
             await expect(page.locator("[data-test-id='log-container-select']")).toBeVisible();
@@ -2376,6 +2402,26 @@ test.describe("karse e2e", () => {
             await expect(copyButton.locator("svg[data-icon='check']")).toBeVisible();
         });
 
+        test("while the YAML loads the progress indicator shows, not loading text", async () => {
+            // Delay the YAML response so the loading state is observable.
+            await page.route("**/api/yaml/pods/nginx-abc*", async (route) => {
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+                await route.fulfill({ json: { yaml: FAKE_POD_YAML } });
+            });
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-yaml']").click();
+            // The spinner stands in for the loading state; no "Loading..." text.
+            await expect(page.locator("[data-test-id='yaml-content'] [data-test-id='loading-indicator']")).toBeVisible();
+            await expect(page.locator("[data-test-id='yaml-content']")).not.toContainText("Loading");
+            // Once loaded, the indicator is gone and the YAML is rendered.
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("kind: Pod");
+            await expect(page.locator("[data-test-id='yaml-content'] [data-test-id='loading-indicator']")).toHaveCount(0);
+            // Restore the immediate response for later tests.
+            await page.route("**/api/yaml/pods/nginx-abc*", async (route) => {
+                await route.fulfill({ json: { yaml: FAKE_POD_YAML } });
+            });
+        });
+
         test("the old YAML dialog and button are gone everywhere", async () => {
             // Detail pages no longer render a YAML button or dialog.
             await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
@@ -3138,6 +3184,31 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='live-logs-matched-pod']")).toHaveCount(8);
             await expect(page.locator("[data-test-id='live-logs-matched-expand']")).toBeVisible();
         });
+
+        test("while streaming with no lines yet shows the progress indicator, not loading text", async () => {
+            // Delay the stream body so the pre-line streaming state is observable.
+            await page.unroute("**/api/logs/stream*");
+            await page.route("**/api/logs/stream*", async (route) => {
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+                await route.fulfill({
+                    headers: { "Content-Type": "text/event-stream" },
+                    body: buildSseBody(FAKE_PODS.pods.map((p) => p.name)),
+                });
+            });
+            await page.goto("/logs", { waitUntil: "networkidle" });
+            // Clear any leftover filter from earlier tests so both pods stream.
+            await page.locator("[data-test-id='live-logs-filter'] input").fill("");
+            await page.locator("[data-test-id='live-logs-start']").click();
+            // The spinner stands in for the loading state; no "Waiting for log lines..." text.
+            await expect(page.locator("[data-test-id='live-logs-viewer'] [data-test-id='loading-indicator']")).toBeVisible();
+            await expect(page.locator("[data-test-id='live-logs-viewer']")).not.toContainText("Waiting for log lines");
+            // Once lines arrive, the indicator is gone and the lines are shown.
+            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='live-logs-viewer'] [data-test-id='loading-indicator']")).toHaveCount(0);
+            // Restore the immediate stream (afterAll unroutes it).
+            await page.unroute("**/api/logs/stream*");
+            await interceptStream();
+        });
     });
 
     // ── Stern page (stern-powered live logs) ──────────────────────────────────
@@ -3216,6 +3287,32 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='stern-line']")).toHaveCount(1);
             await expect(page.locator("[data-test-id='stern-viewer']")).toContainText("default nginx-abc");
             await expect(page.locator("[data-test-id='stern-viewer']")).not.toContainText("redis-xyz");
+        });
+
+        test("while streaming with no lines yet shows the progress indicator, not loading text", async () => {
+            // Delay the stream body so the pre-line streaming state is observable.
+            await page.unroute("**/api/stern/stream*");
+            await page.route("**/api/stern/stream*", async (route) => {
+                const query = new URL(route.request().url()).searchParams.get("query") ?? "";
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+                await route.fulfill({
+                    headers: { "Content-Type": "text/event-stream" },
+                    body: buildSternSseBody(query),
+                });
+            });
+            await page.goto("/stern", { waitUntil: "networkidle" });
+            // Clear any leftover query from earlier tests so both pods stream.
+            await page.locator("[data-test-id='stern-query'] input").fill("");
+            await page.locator("[data-test-id='stern-start']").click();
+            // The spinner stands in for the loading state; no "Waiting for log lines..." text.
+            await expect(page.locator("[data-test-id='stern-viewer'] [data-test-id='loading-indicator']")).toBeVisible();
+            await expect(page.locator("[data-test-id='stern-viewer']")).not.toContainText("Waiting for log lines");
+            // Once lines arrive, the indicator is gone and the lines are shown.
+            await expect(page.locator("[data-test-id='stern-line']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='stern-viewer'] [data-test-id='loading-indicator']")).toHaveCount(0);
+            // Restore the immediate stream for the remaining test.
+            await page.unroute("**/api/stern/stream*");
+            await interceptSternStream(false);
         });
 
         test("shows install instructions when stern is not installed", async () => {

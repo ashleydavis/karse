@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { YamlResourceType } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
 import { fetchResourceYaml } from "../lib/api-client";
+import { LoadingIndicator } from "./loading-indicator";
 
 // Which resource to fetch YAML for. namespace is omitted for cluster-scoped
 // resources (nodes, namespaces) and supplied for namespaced ones.
@@ -68,7 +69,7 @@ export function YamlTabPanel({ target, active }: { target: YamlTarget; active: b
                     }}
                     data-test-id="yaml-content"
                 >
-                    {isLoading ? "Loading..." : (data?.yaml || "(no yaml)")}
+                    {isLoading ? <LoadingIndicator /> : (data?.yaml || "(no yaml)")}
                 </Paper>
             </Box>
         </Box>

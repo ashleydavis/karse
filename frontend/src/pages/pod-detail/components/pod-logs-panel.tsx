@@ -14,6 +14,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faRotate } from "@fortawesome/free-solid-svg-icons";
 import { useKubeContext } from "../../../lib/kube-context";
 import { streamPodLogs } from "../../../lib/api-client";
+import { LoadingIndicator } from "../../../components/loading-indicator";
 
 // Fetches and displays logs for a pod, with container and tail-line selectors plus
 // a refresh button. Logs load and follow live automatically when the panel mounts:
@@ -80,9 +81,12 @@ export function PodLogsPanel({ namespace, podName, containers }: {
     }, [lines]);
 
     // Streamed lines arrive newline-stripped, so they are rejoined with newlines.
-    const content = lines.length > 0
+    // While streaming with no lines yet, a progress indicator is shown instead of
+    // text; once lines arrive they are rendered, and an idle stream shows "(no logs)".
+    const hasLines = lines.length > 0;
+    const content = hasLines
         ? lines.join("\n")
-        : (streaming ? "(waiting for logs...)" : "(no logs)");
+        : (streaming ? <LoadingIndicator /> : "(no logs)");
 
     return (
         <Box data-test-id="pod-logs-panel">

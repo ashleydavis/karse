@@ -9,6 +9,12 @@ Applied consistently across every resource list page and detail page:
 - **List pages**: nodes, pods, deployments, stateful sets, daemon sets, namespaces, events, errors, and the cluster overview (home) stat tiles.
 - **Detail pages**: pod detail, node detail, and the shared workload detail.
 
+The same progress-indicator-only convention applies to every loading state in the app, not just primary-query page loads. No loading state is ever communicated with plain text such as "Loading" or "Waiting for logs":
+
+- **YAML sub-tab** (detail pages): the spinner is shown while the YAML query is loading, in place of the previous "Loading..." text. An empty result still shows "(no yaml)".
+- **Pod logs panel** (pod detail, Logs tab): while the live stream is connecting and before the first line arrives, the spinner is shown in place of the previous "(waiting for logs...)" text. Streamed lines replace it; an idle (non-streaming) panel shows "(no logs)".
+- **Logs page (`/logs`) and Stern page (`/stern`)**: while streaming and before the first line arrives, the spinner is shown in the viewer in place of the previous "Waiting for log lines..." text. The pre-stream idle viewer keeps its "Pick a scope and press Stream." prompt, which is guidance, not a loading state.
+
 ## Behaviour
 
 - While a page's primary data query is loading, the `LoadingIndicator` (a prominent centred spinner alone, with no text) is shown in place of the page content.
@@ -16,6 +22,7 @@ Applied consistently across every resource list page and detail page:
 - If the query fails, the indicator is removed and an error state (the shared `LoadError` component, an MUI `Alert`) is shown instead.
 - The same component is used everywhere so the loading experience is identical across pages.
 - The indicator carries `data-test-id="loading-indicator"` so e2e tests can assert it appears and is then removed.
+- No loading state anywhere in the app uses plain text ("Loading", "Waiting for logs", or similar); the `LoadingIndicator` spinner is used instead. Static guidance prompts and empty-result placeholders ("Pick a scope and press Stream.", "(no logs)", "(no yaml)") are not loading states and remain as text.
 
 ## Load timeout and connectivity error
 
@@ -36,6 +43,7 @@ So the spinner can never spin forever (for example when the cluster is unreachab
 - [x] On timeout (or an unreachable cluster) the view shows a connectivity error state, not a spinner.
 - [x] The connectivity error includes the text "Make sure your internet or VPN is connected".
 - [x] The error state offers a Retry path that re-attempts the load.
+- [x] No loading state anywhere in the app uses plain "Loading" / "Waiting for logs" text; the progress indicator is used everywhere, including the Logs page, Stern page, pod logs panel, and YAML sub-tab.
 
 ## Open Questions
 
