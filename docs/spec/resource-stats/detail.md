@@ -17,6 +17,7 @@ Backed by: `frontend/src/lib/resource-stats.ts` (count helpers), `frontend/src/c
   - **DaemonSets**: healthy = `ready === desired` with `desired > 0`; error = `ready === 0` with `desired > 0`.
 - The header is always rendered, including the empty state (`Total: 0`, `Healthy: 0`, `Error: 0`).
 - The same header is reused outside the list pages: the workload detail Pods sub-tab (deployments, stateful sets, daemon sets) renders a `ResourceStatsHeader` above its pod table, computed with the Pods helper from the workload's owner-scoped pod list (`data-test-id` prefix `workload-pods`). See `workload-detail`.
+- The same per-kind health definitions are exposed as single-resource classifiers (`podHealth`, `nodeHealth`, `deploymentHealth`, `statefulSetHealth`, `daemonSetHealth`, each returning `"Healthy" | "Error" | "Other"`) that the `computeXStats` helpers tally. The health filter (see `resource-search`) reuses these classifiers so the stats header and the filter always agree on what counts as healthy or error for each kind.
 
 ## Acceptance Criteria
 

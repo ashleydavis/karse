@@ -45,6 +45,11 @@ The dropdown also has "Select all" and "Deselect all" controls at the top (above
 
 See the dedicated scenarios: pods by phase in [pods-view](../pods-view/detail.md) (Scenario E) and nodes by status in [nodes-view](../nodes-view/detail.md) (Scenario G).
 
+### Health filtering
+Every table that shows a Healthy/Error stats header (pods, nodes, deployments, statefulsets, daemonsets) also has a second dropdown labelled **Health** beside the search box, reusing the same `status-filter.tsx` component and `status-filter-state.ts` wiring. It has two checkboxes, **Healthy** and **Error**, both ticked by default (`Health: All`). The Healthy/Error classification matches the stats header's per-kind definition (see [resource-stats](../resource-stats/detail.md)); a resource that is neither (e.g. a Pending pod or a partially-ready workload) shows only under the default view and is hidden as soon as any health box is selected.
+
+Checking only **Error** shows just the error rows; checking only **Healthy** shows just the healthy rows. The same "Select all" / "Deselect all" controls apply, and the health filter composes with the search box and the status filter. See the dedicated scenarios: pods in [pods-view](../pods-view/detail.md) (Scenario E.2) and nodes in [nodes-view](../nodes-view/detail.md) (Scenario G.2).
+
 Teardown:
 
 ```sh

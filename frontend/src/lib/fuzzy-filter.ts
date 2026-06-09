@@ -39,12 +39,17 @@ function cellToString(value: any): string {
     return String(value);
 }
 
-// Returns the searchable string for every column value of a row, one entry per
-// cell. Matching per cell (rather than against the whole concatenated row)
-// keeps the subsequence match scoped to a single value so a query cannot span
-// across unrelated columns.
+// Returns the searchable string for every searchable column value of a row, one
+// entry per cell. Matching per cell (rather than against the whole concatenated
+// row) keeps the subsequence match scoped to a single value so a query cannot
+// span across unrelated columns. Columns that opt out with `enableGlobalFilter:
+// false` (e.g. a hidden health column used only by the health filter) are
+// skipped so they never affect search results.
 function rowCellStrings<T>(row: Row<T>): string[] {
-    return row.getAllCells().map((cell) => cellToString(cell.getValue()));
+    return row
+        .getAllCells()
+        .filter((cell) => cell.column?.columnDef?.enableGlobalFilter !== false)
+        .map((cell) => cellToString(cell.getValue()));
 }
 
 // Tanstack global filter function that fuzzy-matches the query against each

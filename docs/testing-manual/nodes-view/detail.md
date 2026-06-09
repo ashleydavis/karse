@@ -115,6 +115,24 @@ A Ready node, a NotReady node, and a cordoned (Ready) node, so at least two dist
 - **Deselect all / Select all**: open the dropdown and click **Deselect all** (top of the dropdown): every status unticks, the table shows the "No nodes match the search." message, and the button reads `Status: 0 selected`. Click **Select all**: every status re-ticks, all three rows return, and the button reads `Status: All`. With everything ticked, **Select all** is greyed out; with nothing ticked, **Deselect all** is greyed out.
 - The status filter combines with the search box: searching while a subset of statuses is selected narrows results further.
 
+## Scenario G.2: Node health filter
+
+Reuses the mixed-statuses fixture: a Ready node, a NotReady node, and a cordoned (Ready) node. By health these are 2 healthy (the two Ready nodes) and 1 error (the NotReady node). Verifies the Healthy/Error health filter beside the status filter.
+
+**Fixture:** [_fixtures-kwok/04-mixed-node-statuses](../_fixtures-kwok/04-mixed-node-statuses/)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/04-mixed-node-statuses/setup.sh
+```
+
+### What to check
+- **Nodes table**: three rows. Beside the **Status** button is a **Health** button (filter icon) reading `Health: All`. The stats header reads `Healthy: 2` and `Error: 1`.
+- Click the **Health** button. Two checkboxes are shown: **Healthy** and **Error**, both ticked.
+- **Check only Error**: untick `Healthy`. Only the `fake-node-notready` row remains and the button reads `Health: 1 selected`.
+- **Check only Healthy**: re-tick `Healthy`, then untick `Error`. Only the two Ready nodes (`fake-node-ready`, `fake-node-cordoned`) remain and the button reads `Health: 1 selected`.
+- **Deselect all / Select all**: open the dropdown and click **Deselect all**: both boxes untick, the table shows "No nodes match the search.", and the button reads `Health: 0 selected`. Click **Select all**: both boxes re-tick, all three rows return, and the button reads `Health: All`.
+- The health filter combines with the search box and the status filter: a row must pass all active filters to show.
+
 Teardown each cluster you stood up while testing this doc:
 
 ```sh

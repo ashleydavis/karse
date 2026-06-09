@@ -2632,6 +2632,215 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Pods page: health filter ────────────────────────────────────────────────
+
+    test.describe("pods page health filter", () => {
+        // Five pods spanning every phase: 2 healthy (Running, Succeeded), 2 error
+        // (Failed, Unknown), 1 other (Pending). So the health filter sees 2 Healthy,
+        // 2 Error, and 1 row that belongs to neither bucket.
+        const HEALTH_PODS = {
+            pods: [
+                {
+                    name: "pod-running",
+                    namespace: "default",
+                    phase: "Running",
+                    ready: "1/1",
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                },
+                {
+                    name: "pod-succeeded",
+                    namespace: "default",
+                    phase: "Succeeded",
+                    ready: "0/1",
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                },
+                {
+                    name: "pod-failed",
+                    namespace: "default",
+                    phase: "Failed",
+                    ready: "0/1",
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                },
+                {
+                    name: "pod-unknown",
+                    namespace: "default",
+                    phase: "Unknown",
+                    ready: "0/1",
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                },
+                {
+                    name: "pod-pending",
+                    namespace: "default",
+                    phase: "Pending",
+                    ready: "0/1",
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                },
+            ],
+        };
+
+        // Install a route override that returns HEALTH_PODS for every /api/pods request.
+        async function interceptHealthPods(): Promise<void> {
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: HEALTH_PODS });
+            });
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await interceptHealthPods();
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+            setContext(CLUSTER_1);
+        });
+
+        test("shows every pod by default", async () => {
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(5);
+            await expect(page.locator("[data-test-id='pods-health-filter-button']")).toHaveText("Health: All");
+        });
+
+        test("checking only Error shows just the error pods", async () => {
+            await page.locator("[data-test-id='pods-health-filter-button']").click();
+            // Turn Healthy off, leaving only Error selected.
+            await page.locator("[data-test-id='pods-health-filter-item-Healthy']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-failed" })).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-unknown" })).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pods-health-filter-button']")).toHaveText("Health: 1 selected");
+        });
+
+        test("checking only Healthy shows just the healthy pods", async () => {
+            await page.locator("[data-test-id='pods-health-filter-button']").click();
+            // Error is currently the only one on; turn Error off and Healthy on.
+            await page.locator("[data-test-id='pods-health-filter-item-Error']").click();
+            await page.locator("[data-test-id='pods-health-filter-item-Healthy']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-running" })).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-succeeded" })).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pods-health-filter-button']")).toHaveText("Health: 1 selected");
+        });
+
+        test("deselect all hides every pod, then select all restores them", async () => {
+            await page.locator("[data-test-id='pods-health-filter-button']").click();
+            await page.locator("[data-test-id='pods-health-filter-deselect-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-pods-match']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pods-health-filter-button']")).toHaveText("Health: 0 selected");
+
+            await page.locator("[data-test-id='pods-health-filter-button']").click();
+            await page.locator("[data-test-id='pods-health-filter-select-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(5);
+            await expect(page.locator("[data-test-id='pods-health-filter-button']")).toHaveText("Health: All");
+        });
+    });
+
+    // ── Nodes page: health filter ────────────────────────────────────────────────
+
+    test.describe("nodes page health filter", () => {
+        // One node per status: 1 healthy (Ready) and 2 error (NotReady, Unknown).
+        const HEALTH_NODES = {
+            nodes: [
+                {
+                    name: "node-ready",
+                    status: "Ready",
+                    roles: ["worker"],
+                    version: "v1.30.0",
+                    createdAt: new Date().toISOString(),
+                },
+                {
+                    name: "node-notready",
+                    status: "NotReady",
+                    roles: ["worker"],
+                    version: "v1.30.0",
+                    createdAt: new Date().toISOString(),
+                },
+                {
+                    name: "node-unknown",
+                    status: "Unknown",
+                    roles: ["worker"],
+                    version: "v1.30.0",
+                    createdAt: new Date().toISOString(),
+                },
+            ],
+        };
+
+        // Install a route override that returns HEALTH_NODES for every nodes-list request.
+        async function interceptHealthNodes(): Promise<void> {
+            await page.route("**/api/cluster/nodes*", async (route) => {
+                await route.fulfill({ json: HEALTH_NODES });
+            });
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await interceptHealthNodes();
+            await page.goto("/nodes", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='nodes-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/cluster/nodes*");
+            setContext(CLUSTER_1);
+        });
+
+        test("shows every node by default", async () => {
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='nodes-health-filter-button']")).toHaveText("Health: All");
+        });
+
+        test("checking only Error shows just the error nodes", async () => {
+            await page.locator("[data-test-id='nodes-health-filter-button']").click();
+            await page.locator("[data-test-id='nodes-health-filter-item-Healthy']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='node-row']").filter({ hasText: "node-notready" })).toHaveCount(1);
+            await expect(page.locator("[data-test-id='node-row']").filter({ hasText: "node-unknown" })).toHaveCount(1);
+            await expect(page.locator("[data-test-id='nodes-health-filter-button']")).toHaveText("Health: 1 selected");
+        });
+
+        test("checking only Healthy shows just the healthy node", async () => {
+            await page.locator("[data-test-id='nodes-health-filter-button']").click();
+            await page.locator("[data-test-id='nodes-health-filter-item-Error']").click();
+            await page.locator("[data-test-id='nodes-health-filter-item-Healthy']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='node-row'] td:first-child")).toHaveText("node-ready");
+            await expect(page.locator("[data-test-id='nodes-health-filter-button']")).toHaveText("Health: 1 selected");
+        });
+
+        test("deselect all hides every node, then select all restores them", async () => {
+            await page.locator("[data-test-id='nodes-health-filter-button']").click();
+            await page.locator("[data-test-id='nodes-health-filter-deselect-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-nodes-match']")).toBeVisible();
+            await expect(page.locator("[data-test-id='nodes-health-filter-button']")).toHaveText("Health: 0 selected");
+
+            await page.locator("[data-test-id='nodes-health-filter-button']").click();
+            await page.locator("[data-test-id='nodes-health-filter-select-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='nodes-health-filter-button']")).toHaveText("Health: All");
+        });
+    });
+
     // ── Breadcrumbs ─────────────────────────────────────────────────────────────
 
     test.describe("breadcrumbs", () => {

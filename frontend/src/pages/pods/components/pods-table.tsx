@@ -38,7 +38,7 @@ import { statusColumnFilterFn, makeStatusFilterController } from "../../../lib/s
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
 import { ResourceStatsHeader } from "../../../components/resource-stats-header";
-import { computePodStats } from "../../../lib/resource-stats";
+import { computePodStats, podHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -181,6 +181,16 @@ function buildColumns(): ColumnDef<Pod>[] {
             cell: (info) => <LabelsCell labels={info.row.original.labels} />,
             enableSorting: false,
         },
+        {
+            // Hidden column carrying each pod's derived health ("Healthy"/"Error"/
+            // "Other") so the health filter can narrow rows. Never rendered (hidden via
+            // columnVisibility) and excluded from the fuzzy global filter.
+            id: "health",
+            accessorFn: (row) => podHealth(row),
+            filterFn: statusColumnFilterFn,
+            enableSorting: false,
+            enableGlobalFilter: false,
+        },
     );
 
     return cols;
@@ -208,6 +218,8 @@ export function PodsTable() {
 
     // The selected phases live in the table's "phase" column filter; an absent filter means "all".
     const phaseFilterController = makeStatusFilterController("phase", ALL_PHASES, columnFilters, setColumnFilters);
+    // The selected health states live in the hidden "health" column filter; an absent filter means "all".
+    const healthFilterController = makeStatusFilterController("health", HEALTH_FILTER_OPTIONS, columnFilters, setColumnFilters);
 
     const table = useReactTable({
         data: data?.pods ?? [],
@@ -216,6 +228,9 @@ export function PodsTable() {
             sorting,
             globalFilter,
             columnFilters,
+            columnVisibility: {
+                health: false,
+            },
         },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
@@ -275,6 +290,13 @@ export function PodsTable() {
                     label="Phase"
                     testIdPrefix="pods-phase-filter"
                 />
+                <StatusFilter
+                    all={HEALTH_FILTER_OPTIONS}
+                    selected={healthFilterController.selected}
+                    onChange={healthFilterController.setSelected}
+                    label="Health"
+                    testIdPrefix="pods-health-filter"
+                />
             </div>
             <TableContainer component={Paper} data-test-id="pods-table">
                 <Table size="small">
@@ -302,14 +324,14 @@ export function PodsTable() {
                     <TableBody>
                         {rows.length === 0 && allPods.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={columns.length}>
+                                <TableCell colSpan={table.getVisibleLeafColumns().length}>
                                     <Typography color="text.secondary" data-test-id="no-pods-empty">No pods.</Typography>
                                 </TableCell>
                             </TableRow>
                         )}
                         {rows.length === 0 && allPods.length > 0 && (
                             <TableRow>
-                                <TableCell colSpan={columns.length}>
+                                <TableCell colSpan={table.getVisibleLeafColumns().length}>
                                     <Typography color="text.secondary" data-test-id="no-pods-match">No pods match the search.</Typography>
                                 </TableCell>
                             </TableRow>

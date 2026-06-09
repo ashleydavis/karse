@@ -2,7 +2,7 @@
 
 ## Overview
 
-A per-table search and sort behaviour. Resource tables use a search box plus TanStack Table sorting. The fuzzy subsequence global filter (`fuzzyGlobalFilter`) is used by the nodes, pods, deployments, stateful sets and daemon sets tables. The events and errors tables instead use TanStack's built-in plain substring match (`globalFilterFn: "includesString"`). Tables whose kind has a status field (pods by phase, nodes by Ready/NotReady/Unknown) additionally share a status-filter dropdown.
+A per-table search and sort behaviour. Resource tables use a search box plus TanStack Table sorting. The fuzzy subsequence global filter (`fuzzyGlobalFilter`) is used by the nodes, pods, deployments, stateful sets and daemon sets tables. The events and errors tables instead use TanStack's built-in plain substring match (`globalFilterFn: "includesString"`). Tables whose kind has a status field (pods by phase, nodes by Ready/NotReady/Unknown) additionally share a status-filter dropdown. Every table that shows a Healthy/Error stats header (pods, nodes, deployments, stateful sets, daemon sets) also shares a health-filter dropdown that filters by the same derived Healthy/Error health used by the stats header (see `resource-stats`).
 
 Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-state.ts`, `frontend/src/components/status-filter.tsx`, and the per-page table components under `frontend/src/pages/*/components/`.
 
@@ -25,6 +25,16 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-s
 - The dropdown drives a TanStack Table column filter on the status column. A full selection clears the filter (every row passes); the status filter and the search box compose (both must match for a row to show).
 - The dropdown and its column-filter wiring are shared (`status-filter.tsx` and `status-filter-state.ts`) so behaviour is identical across tables. There is no per-table duplicate.
 
+### Health filtering
+
+- Every resource table that shows a Healthy/Error stats header (pods, nodes, deployments, stateful sets, daemon sets) has a second filter dropdown beside the search box labelled "Health", with two checkboxes: Healthy and Error.
+- The Healthy/Error classification is the same derived health the stats header uses, computed once per kind in `resource-stats.ts` (`podHealth`, `nodeHealth`, `deploymentHealth`, `statefulSetHealth`, `daemonSetHealth`). A resource that is neither healthy nor error (e.g. a Pending pod or a partially-ready workload) is classified "Other".
+- Both boxes are selected by default; the button reads "Health: All". By default every row shows, including "Other" rows.
+- Checking only "Error" shows just the error rows; checking only "Healthy" shows just the healthy rows. "Other" rows have no checkbox, so they show only under the default (all) view and are hidden as soon as any health box is selected.
+- The dropdown has the same "Select all" / "Deselect all" controls. "Deselect all" hides every row and shows the table's no-match message; "Select all" restores the default.
+- The health filter reuses the same shared dropdown (`status-filter.tsx`) and column-filter wiring (`status-filter-state.ts`) as the status filter, driving a hidden TanStack "health" column whose accessor returns the derived health. There is no per-table duplicate. The health column is excluded from the fuzzy search (`enableGlobalFilter: false`) so its values never affect the search box.
+- The health filter composes with the search box and (where present) the status filter: a row must pass all active filters to show.
+
 ## Acceptance Criteria
 
 - [x] Each resource table has a search box that filters its rows.
@@ -37,6 +47,9 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-s
 - [x] Unchecking a status hides rows with that status; unchecking all shows the no-match message.
 - [x] The status-filter dropdown and its column-filter wiring are shared across tables, with no per-table duplicate.
 - [x] The status-filter dropdown has "Select all" and "Deselect all" controls that tick or untick every status at once, shared across the pods phase filter and the nodes status filter.
+- [x] Every table with a Healthy/Error stats header (pods, nodes, deployments, stateful sets, daemon sets) has a Healthy/Error health-filter dropdown; both checked by default (shows all).
+- [x] Checking only "Error" shows just error rows; checking only "Healthy" shows just healthy rows; "Deselect all" hides all rows.
+- [x] The health filter reuses the shared dropdown and column-filter wiring (no per-table duplicate) and uses the same derived health as the stats header.
 
 ## Open Questions
 

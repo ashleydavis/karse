@@ -5,6 +5,11 @@ import {
     computeDeploymentStats,
     computeStatefulSetStats,
     computeDaemonSetStats,
+    podHealth,
+    nodeHealth,
+    deploymentHealth,
+    statefulSetHealth,
+    daemonSetHealth,
 } from "../../lib/resource-stats";
 
 // Builds a Pod fixture with the given name and phase; other fields are realistic
@@ -181,5 +186,58 @@ describe("computeDaemonSetStats", () => {
             healthy: 0,
             error: 0,
         });
+    });
+});
+
+describe("podHealth", () => {
+    test("Running and Succeeded are Healthy", () => {
+        expect(podHealth(makePod("a", "Running"))).toBe("Healthy");
+        expect(podHealth(makePod("b", "Succeeded"))).toBe("Healthy");
+    });
+
+    test("Failed and Unknown are Error", () => {
+        expect(podHealth(makePod("c", "Failed"))).toBe("Error");
+        expect(podHealth(makePod("d", "Unknown"))).toBe("Error");
+    });
+
+    test("Pending is Other", () => {
+        expect(podHealth(makePod("e", "Pending"))).toBe("Other");
+    });
+});
+
+describe("nodeHealth", () => {
+    test("Ready is Healthy", () => {
+        expect(nodeHealth(makeNode("a", "Ready"))).toBe("Healthy");
+    });
+
+    test("NotReady and Unknown are Error", () => {
+        expect(nodeHealth(makeNode("b", "NotReady"))).toBe("Error");
+        expect(nodeHealth(makeNode("c", "Unknown"))).toBe("Error");
+    });
+});
+
+describe("deploymentHealth", () => {
+    test("x/x is Healthy, 0/x is Error, partial and 0/0 are Other", () => {
+        expect(deploymentHealth(makeDeployment("a", "3/3"))).toBe("Healthy");
+        expect(deploymentHealth(makeDeployment("b", "0/2"))).toBe("Error");
+        expect(deploymentHealth(makeDeployment("c", "1/2"))).toBe("Other");
+        expect(deploymentHealth(makeDeployment("d", "0/0"))).toBe("Other");
+    });
+});
+
+describe("statefulSetHealth", () => {
+    test("x/x is Healthy, 0/x is Error, partial is Other", () => {
+        expect(statefulSetHealth(makeStatefulSet("a", "2/2"))).toBe("Healthy");
+        expect(statefulSetHealth(makeStatefulSet("b", "0/1"))).toBe("Error");
+        expect(statefulSetHealth(makeStatefulSet("c", "1/3"))).toBe("Other");
+    });
+});
+
+describe("daemonSetHealth", () => {
+    test("ready === desired is Healthy, ready 0 is Error, partial and 0 desired are Other", () => {
+        expect(daemonSetHealth(makeDaemonSet("a", 3, 3))).toBe("Healthy");
+        expect(daemonSetHealth(makeDaemonSet("b", 2, 0))).toBe("Error");
+        expect(daemonSetHealth(makeDaemonSet("c", 4, 2))).toBe("Other");
+        expect(daemonSetHealth(makeDaemonSet("d", 0, 0))).toBe("Other");
     });
 });

@@ -143,4 +143,24 @@ describe("fuzzyGlobalFilter", () => {
         const row = makeRow([null, undefined]);
         expect(runFilter(row,"x")).toBe(false);
     });
+
+    test("skips cells whose column opts out of global filtering", () => {
+        // The hidden health column carries values like "Healthy"/"Error" that
+        // must never affect search. A cell that opts out with enableGlobalFilter:
+        // false is excluded, so a query that only matches it finds nothing.
+        const row = {
+            getAllCells: () => [
+                {
+                    getValue: () => "nginx",
+                    column: { columnDef: {} },
+                },
+                {
+                    getValue: () => "Healthy",
+                    column: { columnDef: { enableGlobalFilter: false } },
+                },
+            ],
+        } as unknown as Row<unknown>;
+        expect(runFilter(row, "healthy")).toBe(false);
+        expect(runFilter(row, "nginx")).toBe(true);
+    });
 });

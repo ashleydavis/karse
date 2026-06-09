@@ -7,6 +7,7 @@ import {
     flexRender,
     type ColumnDef,
     type SortingState,
+    type ColumnFiltersState,
 } from "@tanstack/react-table";
 import {
     Table,
@@ -29,12 +30,14 @@ import { useKubeContext } from "../../../lib/kube-context";
 import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { fetchDeployments } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
+import { StatusFilter } from "../../../components/status-filter";
+import { statusColumnFilterFn, makeStatusFilterController } from "../../../lib/status-filter-state";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
 import { ResourceStatsHeader } from "../../../components/resource-stats-header";
-import { computeDeploymentStats } from "../../../lib/resource-stats";
+import { computeDeploymentStats, deploymentHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -75,6 +78,16 @@ const columns: ColumnDef<Deployment>[] = [
         cell: (info) => <LabelsCell labels={info.row.original.labels} />,
         enableSorting: false,
     },
+    {
+        // Hidden column carrying each deployment's derived health ("Healthy"/
+        // "Error"/"Other") so the health filter can narrow rows. Never rendered
+        // (hidden via columnVisibility) and excluded from the fuzzy global filter.
+        id: "health",
+        accessorFn: (row) => deploymentHealth(row),
+        filterFn: statusColumnFilterFn,
+        enableSorting: false,
+        enableGlobalFilter: false,
+    },
 ];
 
 // Sortable, filterable table of Kubernetes deployments for the active context.
@@ -91,6 +104,10 @@ export function DeploymentsTable() {
 
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+
+    // The selected health states live in the hidden "health" column filter; an absent filter means "all".
+    const healthFilterController = makeStatusFilterController("health", HEALTH_FILTER_OPTIONS, columnFilters, setColumnFilters);
 
     const table = useReactTable({
         data: data?.deployments ?? [],
@@ -98,9 +115,14 @@ export function DeploymentsTable() {
         state: {
             sorting,
             globalFilter,
+            columnFilters,
+            columnVisibility: {
+                health: false,
+            },
         },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
+        onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -135,20 +157,29 @@ export function DeploymentsTable() {
     return (
         <div className="flex flex-col gap-2">
             <ResourceStatsHeader stats={stats} testIdPrefix="deployments" />
-            <TextField
-                size="small"
-                placeholder="Search deployments..."
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                data-test-id="deployments-search"
-                slotProps={{
-                    input: {
-                        startAdornment: (
-                            <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                        ),
-                    },
-                }}
-            />
+            <div className="flex flex-row gap-2 items-center">
+                <TextField
+                    size="small"
+                    placeholder="Search deployments..."
+                    value={globalFilter}
+                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    data-test-id="deployments-search"
+                    slotProps={{
+                        input: {
+                            startAdornment: (
+                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
+                            ),
+                        },
+                    }}
+                />
+                <StatusFilter
+                    all={HEALTH_FILTER_OPTIONS}
+                    selected={healthFilterController.selected}
+                    onChange={healthFilterController.setSelected}
+                    label="Health"
+                    testIdPrefix="deployments-health-filter"
+                />
+            </div>
             <TableContainer component={Paper} data-test-id="deployments-table">
                 <Table size="small">
                     <TableHead>
@@ -175,14 +206,14 @@ export function DeploymentsTable() {
                     <TableBody>
                         {rows.length === 0 && all.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={columns.length}>
+                                <TableCell colSpan={table.getVisibleLeafColumns().length}>
                                     <Typography color="text.secondary" data-test-id="no-deployments-empty">No deployments.</Typography>
                                 </TableCell>
                             </TableRow>
                         )}
                         {rows.length === 0 && all.length > 0 && (
                             <TableRow>
-                                <TableCell colSpan={columns.length}>
+                                <TableCell colSpan={table.getVisibleLeafColumns().length}>
                                     <Typography color="text.secondary" data-test-id="no-deployments-match">No deployments match the search.</Typography>
                                 </TableCell>
                             </TableRow>

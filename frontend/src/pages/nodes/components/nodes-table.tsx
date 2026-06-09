@@ -37,7 +37,7 @@ import { statusColumnFilterFn, makeStatusFilterController } from "../../../lib/s
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
 import { ResourceStatsHeader } from "../../../components/resource-stats-header";
-import { computeNodeStats } from "../../../lib/resource-stats";
+import { computeNodeStats, nodeHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
 
 function formatAge(createdAt: string): string {
     const ms = Date.now() - new Date(createdAt).getTime();
@@ -134,6 +134,16 @@ const columns: ColumnDef<Node>[] = [
         cell: (info) => <LabelsCell labels={info.row.original.labels} />,
         enableSorting: false,
     },
+    {
+        // Hidden column carrying each node's derived health ("Healthy"/"Error"/
+        // "Other") so the health filter can narrow rows. Never rendered (hidden via
+        // columnVisibility) and excluded from the fuzzy global filter.
+        id: "health",
+        accessorFn: (row) => nodeHealth(row),
+        filterFn: statusColumnFilterFn,
+        enableSorting: false,
+        enableGlobalFilter: false,
+    },
 ];
 
 export function NodesTable() {
@@ -151,11 +161,13 @@ export function NodesTable() {
 
     // The selected statuses live in the table's "status" column filter; an absent filter means "all".
     const statusFilterController = makeStatusFilterController("status", ALL_STATUSES, columnFilters, setColumnFilters);
+    // The selected health states live in the hidden "health" column filter; an absent filter means "all".
+    const healthFilterController = makeStatusFilterController("health", HEALTH_FILTER_OPTIONS, columnFilters, setColumnFilters);
 
     const table = useReactTable({
         data: data?.nodes ?? [],
         columns,
-        state: { sorting, globalFilter, columnFilters },
+        state: { sorting, globalFilter, columnFilters, columnVisibility: { health: false } },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
         onColumnFiltersChange: setColumnFilters,
@@ -210,6 +222,13 @@ export function NodesTable() {
                     label="Status"
                     testIdPrefix="nodes-status-filter"
                 />
+                <StatusFilter
+                    all={HEALTH_FILTER_OPTIONS}
+                    selected={healthFilterController.selected}
+                    onChange={healthFilterController.setSelected}
+                    label="Health"
+                    testIdPrefix="nodes-health-filter"
+                />
             </div>
             <TableContainer component={Paper} data-test-id="nodes-table">
                 <Table size="small">
@@ -234,14 +253,14 @@ export function NodesTable() {
                     <TableBody>
                         {rows.length === 0 && allNodes.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={columns.length}>
+                                <TableCell colSpan={table.getVisibleLeafColumns().length}>
                                     <Typography color="text.secondary" data-test-id="no-nodes-empty">No nodes.</Typography>
                                 </TableCell>
                             </TableRow>
                         )}
                         {rows.length === 0 && allNodes.length > 0 && (
                             <TableRow>
-                                <TableCell colSpan={columns.length}>
+                                <TableCell colSpan={table.getVisibleLeafColumns().length}>
                                     <Typography color="text.secondary" data-test-id="no-nodes-match">No nodes match the search.</Typography>
                                 </TableCell>
                             </TableRow>

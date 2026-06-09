@@ -92,6 +92,24 @@ Five pods in `default`, one each in Running, Pending, Succeeded, Failed, Unknown
 - The phase filter combines with the search box: searching while a subset of phases is selected narrows results further.
 - If KWOK overrides a patched terminal phase back to `Running`, re-run the patch commands from the setup script and reload.
 
+## Scenario E.2: Pod health filter
+
+Reuses the phase-filter fixture: five pods in `default`, one per phase. By health these are 2 healthy (Running, Succeeded), 2 error (Failed, Unknown), and 1 "Other" (Pending). Verifies the Healthy/Error health filter beside the phase filter.
+
+**Fixture:** [_fixtures-kwok/21-pod-phase-filter](../_fixtures-kwok/21-pod-phase-filter/)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/21-pod-phase-filter/setup.sh
+```
+
+### What to check
+- **Pods page**: five rows. Beside the **Phase** button is a **Health** button (filter icon) reading `Health: All`. The stats header reads `Healthy: 2` and `Error: 2`.
+- Click the **Health** button. Two checkboxes are shown: **Healthy** and **Error**, both ticked.
+- **Check only Error**: untick `Healthy`. Only `pod-failed` and `pod-unknown` remain (two rows) and the button reads `Health: 1 selected`. (The Pending pod is hidden too: it is neither healthy nor error.)
+- **Check only Healthy**: re-tick `Healthy`, then untick `Error`. Only `pod-running` and `pod-succeeded` remain and the button reads `Health: 1 selected`.
+- **Deselect all / Select all**: open the dropdown and click **Deselect all**: both boxes untick, the table shows "No pods match the search.", and the button reads `Health: 0 selected`. Click **Select all**: both boxes re-tick, all five rows return, and the button reads `Health: All`.
+- The health filter combines with the search box and the phase filter: a row must pass all active filters to show.
+
 ## Scenario F: Labels column
 
 Two pods in `default`: `web-pod` (labels `app=web`, `tier=frontend`) and `db-pod` (label `app=db`), plus a labelled deployment. Verifies the Labels column renders and is searchable. The same fixture also covers the deployments view's Labels column.
