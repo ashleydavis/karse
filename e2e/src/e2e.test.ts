@@ -3030,32 +3030,46 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='live-logs-filter']")).toBeVisible();
         });
 
-        test("streaming all pods shows a prefixed line per pod", async () => {
+        test("streaming with no pod/wildcard selected shows guidance, not a stream", async () => {
+            // No pod selected and no filter: the page must refuse to stream all
+            // pods and show a message telling the user to pick pods first.
+            let streamRequested = false;
+            const onRequest = (req: import("@playwright/test").Request) => {
+                if (req.url().includes("/api/logs/stream")) {
+                    streamRequested = true;
+                }
+            };
+            page.on("request", onRequest);
             await page.locator("[data-test-id='live-logs-start']").click();
-            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(2);
-            await expect(page.locator("[data-test-id='live-logs-viewer']")).toContainText("default/nginx-abc");
-            await expect(page.locator("[data-test-id='live-logs-viewer']")).toContainText("default/redis-xyz");
-            await expect(page.locator("[data-test-id='live-logs-viewer']")).toContainText("log line from nginx-abc");
-        });
-
-        test("matched pod chips list every streamed pod", async () => {
-            await expect(page.locator("[data-test-id='live-logs-matched-pod']")).toHaveCount(2);
-        });
-
-        test("Stop button replaces Stream while streaming", async () => {
-            await expect(page.locator("[data-test-id='live-logs-stop']")).toBeVisible();
-            await page.locator("[data-test-id='live-logs-stop']").click();
+            await expect(page.locator("[data-test-id='live-logs-needs-selection']")).toBeVisible();
+            await expect(page.locator("[data-test-id='live-logs-needs-selection']")).toContainText("Pick which pods to stream first");
+            // No stream started: still on Stream (not Stop) and no lines rendered.
             await expect(page.locator("[data-test-id='live-logs-start']")).toBeVisible();
+            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(0);
+            expect(streamRequested).toBe(false);
+            page.off("request", onRequest);
         });
 
-        test("wildcard filter sends the filter param and restricts the streamed pods", async () => {
+        test("entering a wildcard then streaming works and clears the guidance", async () => {
             await page.locator("[data-test-id='live-logs-filter'] input").fill("nginx");
+            // Typing a filter clears the earlier guidance message.
+            await expect(page.locator("[data-test-id='live-logs-needs-selection']")).toHaveCount(0);
             const requestPromise = page.waitForRequest((req) => req.url().includes("/api/logs/stream") && req.url().includes("filter=nginx"));
             await page.locator("[data-test-id='live-logs-start']").click();
             await requestPromise;
             await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(1);
             await expect(page.locator("[data-test-id='live-logs-viewer']")).toContainText("default/nginx-abc");
             await expect(page.locator("[data-test-id='live-logs-viewer']")).not.toContainText("redis-xyz");
+        });
+
+        test("matched pod chips list every streamed pod", async () => {
+            await expect(page.locator("[data-test-id='live-logs-matched-pod']")).toHaveCount(1);
+        });
+
+        test("Stop button replaces Stream while streaming", async () => {
+            await expect(page.locator("[data-test-id='live-logs-stop']")).toBeVisible();
+            await page.locator("[data-test-id='live-logs-stop']").click();
+            await expect(page.locator("[data-test-id='live-logs-start']")).toBeVisible();
         });
     });
 

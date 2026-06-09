@@ -30,15 +30,15 @@ One node, three pods (`nginx-one`, `nginx-two`, `redis-main`).
 
 ### Controls
 - A "Namespace" dropdown defaults to "All namespaces" and lists `default`.
-- A "Pod" dropdown defaults to "All pods (use filter)" and lists `nginx-one`, `nginx-two`, and `redis-main`.
+- A "Pod" dropdown defaults to "Pick a pod (or use filter)" and lists `nginx-one`, `nginx-two`, and `redis-main`.
 - A "Pod filter" text field accepts a substring or wildcard (for example `nginx-*`).
 
-### Streaming all pods
-- Leave the filter empty and press "Stream".
-- The Stream button is replaced by a red "Stop" button.
-- A "Streaming N pod(s)" row shows a colored chip for each matched pod.
-- The log panel fills with lines, each prefixed with `default/<pod>` in a color unique to that pod, including `kube-probe` health-check entries and worker process notices (the simulated content from `KARSE_FAKE_LOGS`).
-- Press "Stop". The Stream button returns and streaming halts.
+### Streaming requires picking pods first
+- Streaming every pod at once is not supported, so the page makes you scope the stream first.
+- Leave the Pod dropdown on "Pick a pod (or use filter)" and the Pod filter empty, then press "Stream".
+- No stream starts. Instead an info message appears headed "Pick which pods to stream first", explaining you must choose a single pod from the dropdown or type a wildcard/substring (for example `nginx-*`) into the Pod filter, then press Stream.
+- The button stays on "Stream" (it does not switch to "Stop") and no log lines appear.
+- The message clears as soon as you pick a pod or type into the Pod filter.
 
 ### Filtering by substring
 - Type `nginx` into the Pod filter and press "Stream".

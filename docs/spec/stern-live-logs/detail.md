@@ -24,6 +24,14 @@ A whole-cluster `.*` all-namespaces stream is the worst case: stern fans out to 
 
 Both bounds preserve the read-only invariant: stern is still tail-only and no mutating verb is ever issued.
 
+### Logs page (`/logs`) requires scoping to pods before streaming
+
+The kubectl-based multi-pod Logs page (`/logs`, `frontend/src/pages/live-logs/`) streams `kubectl logs -f` from every pod matching the chosen scope. Streaming every pod in a context at once is not feasible, so the page requires the user to scope the stream before it will start:
+
+- The user scopes by selecting a single pod from the Pod dropdown, or by entering a wildcard/substring into the Pod filter field. An explicit pod selection takes precedence over the filter text.
+- Pressing Stream with no pod selected and an empty filter does **not** open a stream. Instead the page shows an info message ("Pick which pods to stream first") explaining that the user must choose a pod or type a wildcard/substring (e.g. `nginx-*`) and press Stream again.
+- The message clears as soon as the user selects a pod or types into the filter. Once a pod or wildcard is given, pressing Stream opens the stream as normal.
+
 ## Acceptance Criteria
 
 - [x] The page streams multi-pod logs via the external `stern` binary over SSE.
@@ -35,6 +43,7 @@ Both bounds preserve the read-only invariant: stern is still tail-only and no mu
 - [x] The stream is torn down on Stop and on unmount.
 - [x] The whole-cluster firehose is bounded: stern fan-out is capped via an explicit `--max-log-requests`, so an all-namespaces `.*` stream no longer pegs a CPU core.
 - [x] Backend backpressure is bounded: lines are buffered in a fixed-size drop-oldest ring and flushed on a timer, so a runaway producer cannot OOM the backend (a `dropped` event reports shed lines).
+- [x] The kubectl-based Logs page (`/logs`) does not stream all pods at once: with no pod selected and an empty filter, pressing Stream shows guidance ("Pick which pods to stream first") instead of streaming, and streaming proceeds once a pod or wildcard is given.
 
 ## Open Questions
 

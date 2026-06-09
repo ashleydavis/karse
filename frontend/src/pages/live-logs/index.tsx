@@ -10,6 +10,7 @@ import {
     InputLabel,
     Button,
     Alert,
+    AlertTitle,
     Chip,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -52,6 +53,9 @@ export function LiveLogsPage() {
     const [streamError, setStreamError] = useState<string | null>(null);
     // Whether the full streaming-pod list is expanded past the chip cap.
     const [showAllPods, setShowAllPods] = useState(false);
+    // True when the user pressed Stream without scoping to any pod/wildcard, so
+    // the page should show guidance on how to pick pods instead of streaming.
+    const [needsSelection, setNeedsSelection] = useState(false);
 
     // Holds the active stream's close function so it survives re-renders.
     const closeRef = useRef<(() => void) | null>(null);
@@ -105,11 +109,23 @@ export function LiveLogsPage() {
         if (current === null) {
             return;
         }
+        // Streaming every pod at once is not feasible, so the user must scope the
+        // stream first. If neither a pod nor a wildcard/substring filter is given,
+        // refuse to stream and show guidance instead of opening an "all pods" stream.
+        if (effectiveFilter.trim() === "") {
+            stopStream();
+            setLines([]);
+            setMatchedPods([]);
+            setStreamError(null);
+            setNeedsSelection(true);
+            return;
+        }
         stopStream();
         setLines([]);
         setMatchedPods([]);
         setShowAllPods(false);
         setStreamError(null);
+        setNeedsSelection(false);
         keyRef.current = 0;
         setStreaming(true);
         closeRef.current = openLogStream(current, namespace || undefined, effectiveFilter, 100, {
@@ -167,9 +183,14 @@ export function LiveLogsPage() {
                         <Select
                             value={selectedPod}
                             label="Pod"
-                            onChange={(e) => setSelectedPod(e.target.value)}
+                            onChange={(e) => {
+                                setSelectedPod(e.target.value);
+                                if (e.target.value !== "") {
+                                    setNeedsSelection(false);
+                                }
+                            }}
                         >
-                            <MenuItem value="" data-test-id="live-logs-pod-option">All pods (use filter)</MenuItem>
+                            <MenuItem value="" data-test-id="live-logs-pod-option">Pick a pod (or use filter)</MenuItem>
                             {pods.map((pod) => (
                                 <MenuItem key={`${pod.namespace}/${pod.name}`} value={pod.name} data-test-id="live-logs-pod-option">{pod.name}</MenuItem>
                             ))}
@@ -182,7 +203,12 @@ export function LiveLogsPage() {
                     label="Pod filter (wildcard, e.g. nginx-*)"
                     placeholder="substring or wildcard"
                     value={filter}
-                    onChange={(e) => setFilter(e.target.value)}
+                    onChange={(e) => {
+                        setFilter(e.target.value);
+                        if (e.target.value.trim() !== "") {
+                            setNeedsSelection(false);
+                        }
+                    }}
                     disabled={selectedPod !== ""}
                     data-test-id="live-logs-filter"
                     sx={{ minWidth: 260 }}
@@ -217,6 +243,15 @@ export function LiveLogsPage() {
                     </Button>
                 )}
             </Paper>
+
+            {needsSelection && (
+                <Alert severity="info" data-test-id="live-logs-needs-selection">
+                    <AlertTitle>Pick which pods to stream first</AlertTitle>
+                    Streaming every pod at once is not supported. Choose a single pod from the
+                    &quot;Pod&quot; dropdown, or type a wildcard/substring (for example{" "}
+                    <code>nginx-*</code>) into the &quot;Pod filter&quot; field, then press Stream.
+                </Alert>
+            )}
 
             {streamError && <Alert severity="error" data-test-id="live-logs-error">{streamError}</Alert>}
 
@@ -273,7 +308,7 @@ export function LiveLogsPage() {
             >
                 {lines.length === 0 ? (
                     <Typography component="span" sx={{ color: "grey.500", fontFamily: "monospace", fontSize: "0.75rem" }}>
-                        {streaming ? "Waiting for log lines..." : "Pick a scope and press Stream."}
+                        {streaming ? "Waiting for log lines..." : "Pick a pod or wildcard, then press Stream."}
                     </Typography>
                 ) : (
                     lines.map((entry) => (
