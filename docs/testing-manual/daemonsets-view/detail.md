@@ -24,6 +24,7 @@ Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stand
 
 ### What to check
 - **DaemonSets page**: navigate to `/daemonsets`. The `fluentd` daemon set appears in the `kube-system` namespace with columns Name, Namespace, Desired, Current, Ready, Up-to-date, Available, Age.
+- **Search**: type `fluentd` in the search box and confirm the `fluentd` row stays. Type a non-matching string and confirm the "No daemon sets match the search." message appears. Clear the search and confirm the row returns.
 - **Page title**: the header shows "DaemonSets".
 - **Sidebar**: the DaemonSets nav item is visible and highlighted when active.
 - **Namespace scoping**: select the `kube-system` namespace. The DaemonSets table shows `fluentd`. Clear the namespace; the table still shows `fluentd` (its namespace).

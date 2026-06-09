@@ -24,6 +24,7 @@ Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stand
 
 ### What to check
 - **StatefulSets page**: navigate to `/statefulsets`. The `postgres` stateful set appears with columns Name, Namespace, Ready, Age.
+- **Search**: type `postgres` in the search box and confirm the `postgres` row stays. Type a non-matching string and confirm the "No stateful sets match the search." message appears. Clear the search and confirm the row returns.
 - **Page title**: the header shows "StatefulSets".
 - **Sidebar**: the StatefulSets nav item is visible and highlighted when active.
 - **Namespace scoping**: select the `kube-system` namespace. The StatefulSets table shows the empty state. Clear the namespace; `postgres` returns.

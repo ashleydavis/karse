@@ -1039,10 +1039,18 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='deployments-stats-error']")).toHaveText("Error: 0");
         });
 
-        test("search filters deployment rows", async () => {
+        test("search filters deployment rows by the typed term", async () => {
+            // A matching term keeps the row.
+            await page.locator("[data-test-id='deployments-search'] input").fill("nginx");
+            await expect(page.locator("[data-test-id='deployment-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='deployment-row'] td:first-child")).toHaveText("nginx");
+            // A non-matching term hides every row and shows the no-match message.
             await page.locator("[data-test-id='deployments-search'] input").fill("zzznotfound");
+            await expect(page.locator("[data-test-id='deployment-row']")).toHaveCount(0);
             await expect(page.locator("[data-test-id='no-deployments-match']")).toBeVisible();
+            // Clearing the search restores the full list.
             await page.locator("[data-test-id='deployments-search'] input").fill("");
+            await expect(page.locator("[data-test-id='deployment-row']")).toHaveCount(1);
         });
 
         test("clicking a deployment row navigates to its detail URL", async () => {
@@ -1172,6 +1180,16 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='statefulsets-stats-error']")).toHaveText("Error: 0");
         });
 
+        test("search filters stateful set rows by the typed term", async () => {
+            await page.locator("[data-test-id='statefulsets-search'] input").fill("postgres");
+            await expect(page.locator("[data-test-id='statefulset-row']")).toHaveCount(1);
+            await page.locator("[data-test-id='statefulsets-search'] input").fill("zzznotfound");
+            await expect(page.locator("[data-test-id='statefulset-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-statefulsets-match']")).toBeVisible();
+            await page.locator("[data-test-id='statefulsets-search'] input").fill("");
+            await expect(page.locator("[data-test-id='statefulset-row']")).toHaveCount(1);
+        });
+
         test("clicking a stateful set row navigates to its detail URL", async () => {
             await page.locator("[data-test-id='statefulset-row']").click();
             await expect(page).toHaveURL(/\/statefulsets\/default\/postgres/);
@@ -1284,6 +1302,16 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='daemonsets-stats-total']")).toHaveText("Total: 1");
             await expect(page.locator("[data-test-id='daemonsets-stats-healthy']")).toHaveText("Healthy: 1");
             await expect(page.locator("[data-test-id='daemonsets-stats-error']")).toHaveText("Error: 0");
+        });
+
+        test("search filters daemon set rows by the typed term", async () => {
+            await page.locator("[data-test-id='daemonsets-search'] input").fill("fluentd");
+            await expect(page.locator("[data-test-id='daemonset-row']")).toHaveCount(1);
+            await page.locator("[data-test-id='daemonsets-search'] input").fill("zzznotfound");
+            await expect(page.locator("[data-test-id='daemonset-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-daemonsets-match']")).toBeVisible();
+            await page.locator("[data-test-id='daemonsets-search'] input").fill("");
+            await expect(page.locator("[data-test-id='daemonset-row']")).toHaveCount(1);
         });
 
         test("clicking a daemon set row navigates to its detail URL", async () => {
