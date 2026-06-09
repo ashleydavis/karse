@@ -24,7 +24,9 @@ function findChrome(): string | undefined {
     const dirs = (process.env.PATH ?? "").split(delimiter).filter(Boolean);
     for (const name of ["google-chrome", "google-chrome-stable"]) {
         for (const dir of dirs) {
-            if (existsSync(join(dir, name))) return name;
+            if (existsSync(join(dir, name))) {
+                return name;
+            }
         }
     }
     return undefined;
