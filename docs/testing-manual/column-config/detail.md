@@ -4,6 +4,14 @@ Manual tests for per-table configurable columns (visibility + order), persisted 
 
 Every resource table (nodes, pods, deployments, stateful sets, daemon sets, events, errors) has a **Columns** button beside its search box. The steps below use the nodes table; the same button and modal appear on every resource table.
 
+Start the app first. From the repo root run:
+
+```sh
+bun run dev
+```
+
+Then open the frontend at `http://127.0.0.1:5173`. The scenario's fixture stands up a `karse-test` KWOK cluster; `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse. Tear it down with the Teardown step at the end of this doc.
+
 ## Scenario: Configure and persist columns
 
 A cluster with several nodes so the table has stable columns to reorder and hide.
@@ -13,8 +21,6 @@ A cluster with several nodes so the table has stable columns to reorder and hide
 ```sh
 ./docs/testing-manual/_fixtures-kwok/03-many-nodes/setup.sh
 ```
-
-`kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse.
 
 ### What to check
 
