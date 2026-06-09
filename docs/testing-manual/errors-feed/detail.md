@@ -23,7 +23,7 @@ A cluster seeded with one error condition from each source the Errors page surfa
 `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse.
 
 ### What to check
-- **Sidebar bottom link**: the "Errors" nav item (circle-exclamation icon) is pinned to the **bottom** of the left sidebar, below a divider that separates it from the main nav items at the top. Clicking it opens the Errors page.
+- **Sidebar top link**: the "Errors" nav item (circle-exclamation icon) is the **first** item at the **top** of the left sidebar's nav list, above the other nav items. Clicking it opens the Errors page.
 - **Page title**: the header shows "Errors".
 - **Errors page**: the table shows columns Age, Source, Object, Reason, Message, Count, Namespace.
 - **Problem pod row**: a row for `Pod/broken` with reason `ImagePullBackOff`, a red "Pod" source chip, and count 1.

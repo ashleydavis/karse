@@ -8,6 +8,7 @@ import { useShareableTo } from "../lib/nav-state";
 import { TOP_BAR_HEIGHT } from "../lib/layout";
 
 const NAV_ITEMS = [
+    { to: "/errors",       icon: faCircleExclamation, label: "Errors"   },
     { to: "/contexts",     icon: faLink,          label: "Contexts"     },
     { to: "/cluster",      icon: faDharmachakra,  label: "Cluster"      },
     { to: "/nodes",        icon: faServer,        label: "Nodes"        },
@@ -19,12 +20,6 @@ const NAV_ITEMS = [
     { to: "/events",       icon: faBell,          label: "Events"       },
     { to: "/logs",         icon: faStream,        label: "Logs"         },
     { to: "/stern",        icon: faTowerBroadcast, label: "Stern"       },
-];
-
-// Nav items pinned to the bottom of the sidebar, visually separated from the
-// main navigation above. Currently just the cluster-wide Errors page.
-const BOTTOM_NAV_ITEMS = [
-    { to: "/errors", icon: faCircleExclamation, label: "Errors" },
 ];
 
 export function Sidebar() {
@@ -107,14 +102,8 @@ export function Sidebar() {
 
             <Divider />
 
-            <List sx={{ flex: 1, pt: 1, px: 0.75 }} disablePadding>
+            <List sx={{ flex: 1, pt: 1, px: 0.75 }} disablePadding data-test-id="sidebar-nav">
                 {NAV_ITEMS.map((item) => renderNavItem(item))}
-            </List>
-
-            <Divider />
-
-            <List sx={{ py: 0.5, px: 0.75 }} disablePadding data-test-id="sidebar-bottom-nav">
-                {BOTTOM_NAV_ITEMS.map((item) => renderNavItem(item))}
             </List>
 
             <Divider />

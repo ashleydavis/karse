@@ -3328,25 +3328,28 @@ test.describe("karse e2e", () => {
         });
     });
 
-    // ── Sidebar bottom nav ──────────────────────────────────────────────────────
+    // ── Sidebar nav ──────────────────────────────────────────────────────────────
 
-    test.describe("sidebar bottom nav", () => {
+    test.describe("sidebar nav", () => {
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
             await navigateTo();
         });
 
-        test("pins the Errors link to the bottom nav section", async () => {
-            const bottomNav = page.locator("[data-test-id='sidebar-bottom-nav']");
-            await expect(bottomNav).toBeVisible();
-            await expect(bottomNav.locator("[aria-label='errors']")).toBeVisible();
+        test("places the Errors link at the top of the sidebar nav", async () => {
+            const nav = page.locator("[data-test-id='sidebar-nav']");
+            await expect(nav).toBeVisible();
+            await expect(nav.locator("[aria-label='errors']")).toBeVisible();
+            // The Errors link is the first nav item, ahead of every other link.
+            const firstItem = nav.locator("a[aria-label]").first();
+            await expect(firstItem).toHaveAttribute("aria-label", "errors");
         });
 
-        test("navigates to the Errors page from the bottom nav link", async () => {
+        test("navigates to the Errors page from the sidebar nav link", async () => {
             await page.route("**/api/errors*", async (route) => {
                 await route.fulfill({ json: { errors: [] } });
             });
-            await page.locator("[data-test-id='sidebar-bottom-nav'] [aria-label='errors']").click();
+            await page.locator("[data-test-id='sidebar-nav'] [aria-label='errors']").click();
             await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Errors");
             await expect(page.locator("[data-test-id='no-errors-empty']")).toBeVisible();
             await page.unroute("**/api/errors*");
