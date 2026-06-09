@@ -15,9 +15,10 @@ Backed by:
 - The modal has two sections: **Visible** (ordered) and **Hidden**.
 - Within Visible, columns are reordered by drag and drop. Dropping a dragged column onto another column places it immediately before that column; dropping onto the section's empty area appends it to the end.
 - Dragging a column from Visible onto the Hidden section hides it; dragging a column from Hidden back onto Visible shows it again.
+- While a column is being dragged, a lifted preview of the row (a dnd-kit `DragOverlay`) follows the cursor. The same preview is shown for a reorder within a section and for a drag between sections (Visible ↔ Hidden), so cross-section drags look the same as vertical reorders.
 - Changes apply to the table immediately (live), via TanStack Table's `columnOrder` and `columnVisibility` state.
 - The configuration is persisted per table in `localStorage` under the key `karse-columns-<tableId>` (e.g. `karse-columns-nodes`). It is reloaded on mount, so it survives navigation and a full page reload.
-- Action columns (the YAML / actions cell) are not configurable: they set `enableHiding: false`, stay out of the modal, and remain pinned at the end of the row.
+- Non-configurable columns (any action/pinned cell) are excluded by setting `enableHiding: false`: they stay out of the modal and remain pinned at the end of the row.
 - A saved configuration is reconciled against the current columns on load: column ids that no longer exist are dropped, and newly-added configurable columns are appended to the end of the order.
 - Scope: this configures only the columns of the currently-rendered table. It does not add or remove data, and it does not affect search or sort behaviour (see `resource-search`).
 

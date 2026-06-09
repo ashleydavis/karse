@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type React from "react";
 import {
     Dialog,
     DialogTitle,
@@ -14,6 +15,7 @@ import {
 } from "@mui/material";
 import {
     DndContext,
+    DragOverlay,
     PointerSensor,
     KeyboardSensor,
     useSensor,
@@ -21,7 +23,7 @@ import {
     closestCenter,
     useDroppable,
 } from "@dnd-kit/core";
-import type { DragEndEvent } from "@dnd-kit/core";
+import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import {
     SortableContext,
     sortableKeyboardCoordinates,
@@ -35,6 +37,52 @@ import type { ColumnConfig, ConfigurableColumn } from "../lib/column-config";
 
 // Which section of the modal a draggable item currently lives in.
 type Section = "visible" | "hidden";
+
+// The visual presentation of a column row, shared by the in-list sortable item and the drag
+// overlay so the preview that follows the cursor looks identical to the row being dragged. The
+// optional `ref`, drag props, and style let the sortable wrapper hook it up to dnd-kit; the
+// overlay renders it plain (no ref/listeners) since the overlay itself follows the cursor.
+function ColumnRow({
+    column,
+    section,
+    setNodeRef,
+    style,
+    dragProps,
+    overlay = false,
+}: {
+    column: ConfigurableColumn;
+    section?: Section;
+    setNodeRef?: (node: HTMLElement | null) => void;
+    style?: React.CSSProperties;
+    dragProps?: React.HTMLAttributes<HTMLElement>;
+    overlay?: boolean;
+}) {
+    return (
+        <ListItem
+            ref={setNodeRef}
+            style={style}
+            {...dragProps}
+            data-test-id={`column-config-item-${column.id}`}
+            data-section={section}
+            sx={{
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 1,
+                mb: 0.5,
+                cursor: overlay ? "grabbing" : "grab",
+                bgcolor: "background.paper",
+                gap: 1,
+                touchAction: "none",
+                // The overlay copy floats above the modal; give it a shadow so the preview
+                // reads as "lifted" while it crosses between sections.
+                boxShadow: overlay ? 4 : "none",
+            }}
+        >
+            <FontAwesomeIcon icon={faGripVertical} style={{ opacity: 0.5 }} />
+            <Typography variant="body2">{column.label}</Typography>
+        </ListItem>
+    );
+}
 
 // A single sortable column row in the modal. Wired to dnd-kit's useSortable so it can be
 // dragged to reorder within its section or moved to the other section. Carries its id as the
@@ -50,34 +98,22 @@ function ColumnItem({
         id: column.id,
     });
 
-    const style = {
+    const style: React.CSSProperties = {
         transform: CSS.Transform.toString(transform),
         transition,
-        opacity: isDragging ? 0.5 : 1,
+        // While dragging, the original row is hidden because the DragOverlay renders the
+        // moving preview; this avoids showing two copies of the row at once.
+        opacity: isDragging ? 0 : 1,
     };
 
     return (
-        <ListItem
-            ref={setNodeRef}
+        <ColumnRow
+            column={column}
+            section={section}
+            setNodeRef={setNodeRef}
             style={style}
-            {...attributes}
-            {...listeners}
-            data-test-id={`column-config-item-${column.id}`}
-            data-section={section}
-            sx={{
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 1,
-                mb: 0.5,
-                cursor: "grab",
-                bgcolor: "background.paper",
-                gap: 1,
-                touchAction: "none",
-            }}
-        >
-            <FontAwesomeIcon icon={faGripVertical} style={{ opacity: 0.5 }} />
-            <Typography variant="body2">{column.label}</Typography>
-        </ListItem>
+            dragProps={{ ...attributes, ...listeners }}
+        />
     );
 }
 
@@ -159,6 +195,22 @@ export function ColumnConfigModal({
         }),
     );
 
+    // The id of the column currently being dragged, or null when nothing is dragging. It drives
+    // the DragOverlay, which renders a free-floating copy of the row that follows the cursor.
+    // Without the overlay, dnd-kit's sortable transform only animates the dragged row within its
+    // own SortableContext, so dragging a column to the OTHER section showed no preview; the
+    // overlay lifts the row out so the same preview follows the cursor across both sections.
+    const [activeId, setActiveId] = useState<string | null>(null);
+    const activeColumn = activeId === null ? undefined : columnById(activeId);
+
+    function handleDragStart(event: DragStartEvent): void {
+        setActiveId(String(event.active.id));
+    }
+
+    function handleDragCancel(): void {
+        setActiveId(null);
+    }
+
     // Look up a configurable column by id.
     function columnById(id: string): ConfigurableColumn | undefined {
         return configurable.find((c) => c.id === id);
@@ -196,6 +248,7 @@ export function ColumnConfigModal({
     // dropped on, ordered immediately before the column it was dropped onto (or at the end when
     // dropped on a section's empty area).
     function handleDragEnd(event: DragEndEvent): void {
+        setActiveId(null);
         const { active, over } = event;
         if (over === null) {
             return;
@@ -254,11 +307,25 @@ export function ColumnConfigModal({
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                     Drag columns to reorder them, or between sections to show or hide them.
                 </Typography>
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    onDragCancel={handleDragCancel}
+                >
                     <Box sx={{ display: "flex", gap: 2 }}>
                         <ColumnSection title="Visible" section="visible" columns={visibleColumns} />
                         <ColumnSection title="Hidden" section="hidden" columns={hiddenColumns} />
                     </Box>
+                    {/* The floating preview that follows the cursor during a drag. Rendering it
+                        here (outside both SortableContexts) is what makes the preview appear for
+                        cross-section drags, not just within-section reorders. */}
+                    <DragOverlay>
+                        {activeColumn === undefined
+                            ? null
+                            : <ColumnRow column={activeColumn} overlay />}
+                    </DragOverlay>
                 </DndContext>
             </DialogContent>
         </Dialog>
