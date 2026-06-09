@@ -8,7 +8,7 @@ Start the app first. From the repo root run:
 bun run dev
 ```
 
-Then open the frontend at `http://127.0.0.1:5173`. Then run each scenario's `setup.sh` and test it. Tear each cluster down with the Teardown step at the end of this doc.
+`bun run dev` opens the app for you in a brand-new Chrome window, using your normal Chrome profile (logins, extensions, and settings preserved). If Chrome is not installed it falls back to your OS default browser, and `KARSE_NO_OPEN=1` (set by the test harness) suppresses opening entirely. If a window did not open, browse to `http://127.0.0.1:5173` yourself. Then run each scenario's `setup.sh` and test it. Tear each cluster down with the Teardown step at the end of this doc.
 
 ## Long resource names
 

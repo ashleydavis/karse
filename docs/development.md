@@ -62,7 +62,9 @@ bun install
 bun run dev # Includes live reload.
 ```
 
-This starts both processes concurrently via bun workspaces: the backend on http://127.0.0.1:5172 and the frontend on http://localhost:5173. Open http://localhost:5173. Vite proxies `/api/*` to the backend.
+This starts both processes concurrently via bun workspaces: the backend on http://127.0.0.1:5172 and the frontend on http://localhost:5173. Vite proxies `/api/*` to the backend.
+
+Vite opens the app for you in a brand-new Chrome window each launch, using your normal Chrome profile so logins, extensions, and settings are preserved (it is a new window, not a fresh isolated profile, and not a reused tab). This is wired in `frontend/vite.config.ts`: when opening is enabled it detects a Chrome binary on `PATH` (`google-chrome`, then `google-chrome-stable`) and sets the `BROWSER` / `BROWSER_ARGS=--new-window` env vars that Vite's open feature honours. If no Chrome binary is found it falls back to your OS default browser; set `BROWSER` yourself to override. `KARSE_NO_OPEN=1` suppresses opening entirely (the e2e/smoke test harness sets it); if nothing opened, browse to http://localhost:5173 yourself.
 
 To override ports, prefix the env vars before the command:
 
