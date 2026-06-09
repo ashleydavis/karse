@@ -2,12 +2,8 @@ import { Breadcrumbs as MuiBreadcrumbs, Link as MuiLink, Typography } from "@mui
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
-
-// One entry in the breadcrumb trail; a missing "to" marks the current (non-linked) page.
-type Crumb = {
-    label: string;
-    to?: string;
-};
+import { collapseCrumbs, middleTruncate, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../lib/breadcrumb-trail";
+import type { Crumb } from "../lib/breadcrumb-trail";
 
 // Maps a top-level list-page segment to its display label.
 const LIST_LABELS: Record<string, string> = {
@@ -56,8 +52,8 @@ function buildCrumbs(
         const tabLabel = POD_TAB_LABELS[tab ?? "detail"] ?? POD_TAB_LABELS.detail;
         return [
             { label: "Pods", to: "/pods" },
-            { label: params.namespace },
-            { label: params.name, to: `/pods/${params.namespace}/${params.name}` },
+            { label: middleTruncate(params.namespace, MAX_NAME_LENGTH) },
+            { label: middleTruncate(params.name, MAX_NAME_LENGTH), to: `/pods/${params.namespace}/${params.name}` },
             { label: tabLabel },
         ];
     }
@@ -67,7 +63,7 @@ function buildCrumbs(
     {
         return [
             { label: "Nodes", to: "/nodes" },
-            { label: params.name },
+            { label: middleTruncate(params.name, MAX_NAME_LENGTH) },
         ];
     }
 
@@ -76,7 +72,7 @@ function buildCrumbs(
     {
         return [
             { label: "Namespaces", to: "/namespaces" },
-            { label: params.name },
+            { label: middleTruncate(params.name, MAX_NAME_LENGTH) },
         ];
     }
 
@@ -91,14 +87,24 @@ export function Breadcrumbs() {
     const { pathname } = useLocation();
     const params = useParams();
     const [searchParams] = useSearchParams();
-    const crumbs = buildCrumbs(pathname, params, searchParams.get("tab"));
+    const crumbs = collapseCrumbs(buildCrumbs(pathname, params, searchParams.get("tab")), MAX_TRAIL_ITEMS);
 
     return (
         <MuiBreadcrumbs
             data-test-id="breadcrumbs"
             aria-label="breadcrumb"
             separator={<FontAwesomeIcon icon={faChevronRight} style={{ fontSize: "0.7rem" }} />}
-            sx={{ "& .MuiBreadcrumbs-li": { display: "flex", alignItems: "center" } }}
+            sx={{
+                "& .MuiBreadcrumbs-li": {
+                    display: "flex",
+                    alignItems: "center",
+                },
+                // Keep the trail on a single line so it never wraps and grows the
+                // nav-bar height; individual crumbs are already length-capped.
+                "& .MuiBreadcrumbs-ol": {
+                    flexWrap: "nowrap",
+                },
+            }}
         >
             {crumbs.map((crumb, index) => {
                 const isLast = index === crumbs.length - 1;
@@ -116,7 +122,7 @@ export function Breadcrumbs() {
                             underline="hover"
                             color="inherit"
                             data-test-id="breadcrumb-item"
-                            sx={{ fontSize, fontWeight: 600 }}
+                            sx={{ fontSize, fontWeight: 600, whiteSpace: "nowrap" }}
                         >
                             {crumb.label}
                         </MuiLink>
@@ -127,7 +133,7 @@ export function Breadcrumbs() {
                         key={crumb.label + index}
                         color="text.primary"
                         data-test-id="breadcrumb-item"
-                        sx={{ fontSize, fontWeight: 600 }}
+                        sx={{ fontSize, fontWeight: 600, whiteSpace: "nowrap" }}
                     >
                         {crumb.label}
                     </Typography>

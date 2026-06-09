@@ -50,6 +50,18 @@ A node and a pod. Exercises the breadcrumb trail in the top navbar and confirms 
 - Navigate to `/nodes` and click the `fake-node-1` row. Confirm the breadcrumb trail shows "Nodes > fake-node-1".
 - Click the "Nodes" breadcrumb. Confirm the browser navigates back to `/nodes` and the trail collapses to a single "Nodes" crumb.
 
+### Truncation (long names and deep trails)
+The trail must never wrap onto a second line or grow the nav-bar height. Use the long-name fixture for this section instead of the breadcrumbs one:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/11-long-resource-names/setup.sh
+```
+
+- Navigate to `/nodes` and click the long node row (`fake-node-with-a-very-long-name-...`). Confirm the breadcrumb shows the node name **middle-truncated** with `...` (the start and end of the name stay visible) and the nav bar stays a single line at its normal height.
+- Navigate to the long-named pod's detail page the same way. Confirm the pod-name crumb is middle-truncated, the trail stays on one line, and the first crumb ("Pods") and the last crumb (the sub-tab) are both still visible.
+- Resize the browser to a narrow viewport. Confirm the trail still does not wrap or grow taller.
+- Tear this fixture down (see Teardown) before moving on.
+
 ## Shareable URL state
 
 Every meaningful piece of UI state lives in the URL so a link can be copied and reopened to reproduce the exact same view:

@@ -18,6 +18,9 @@ Backed by: `GET /api/namespaces/:name`, `backend/src/routes/namespace-detail-rou
 - The Commands tab shows guided, copy-only `kubectl` commands for the namespace (describe, get YAML, get all, get events, get resource quotas, delete); these are never executed (see `guided-commands`).
 - The YAML tab renders the namespace's raw YAML via the shared YAML tab panel (see `yaml-viewer`).
 - The breadcrumb trail for `/namespaces/:name` is `Namespaces > <name>`.
+- **Breadcrumb truncation (cross-cutting).** The nav-bar breadcrumb trail never wraps onto a second line or grows the nav-bar height. Two rules keep it on one line, applied to every detail page's trail (pod, node, namespace, and any deeper trail):
+  - **Trail cap.** The trail shows at most 4 crumbs. A longer trail keeps the first (root) crumb and the last 2 crumbs and replaces the inner crumbs with a single non-linked `...` crumb. The first (root) and last (current) crumbs are always visible.
+  - **Name middle-truncation.** A single resource-name crumb longer than 24 characters is middle-truncated: the middle is replaced with `...` so the start and end of the name stay visible (e.g. `really-long-pod-...0123456789`). Static labels (list-page names, sub-tab names) are never truncated.
 
 ## Acceptance Criteria
 

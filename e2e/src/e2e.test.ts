@@ -2526,10 +2526,21 @@ test.describe("karse e2e", () => {
             events: [],
         };
 
+        // A pod whose name is well past the 24-char crumb limit, used to verify
+        // the breadcrumb middle-truncates long resource names.
+        const LONG_POD_NAME = "really-long-pod-name-that-exceeds-the-breadcrumb-limit-0123456789";
+        const FAKE_LONG_POD_DETAIL = {
+            ...FAKE_POD_DETAIL,
+            name: LONG_POD_NAME,
+        };
+
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
             await page.route("**/api/pods/default/nginx-abc*", async (route) => {
                 await route.fulfill({ json: FAKE_POD_DETAIL });
+            });
+            await page.route(`**/api/pods/default/${LONG_POD_NAME}*`, async (route) => {
+                await route.fulfill({ json: FAKE_LONG_POD_DETAIL });
             });
             await page.route("**/api/nodes/node-cp*", async (route) => {
                 await route.fulfill({ json: FAKE_NODE_DETAIL });
@@ -2538,6 +2549,7 @@ test.describe("karse e2e", () => {
 
         test.afterAll(async () => {
             await page.unroute("**/api/pods/default/nginx-abc*");
+            await page.unroute(`**/api/pods/default/${LONG_POD_NAME}*`);
             await page.unroute("**/api/nodes/node-cp*");
         });
 
@@ -2583,6 +2595,31 @@ test.describe("karse e2e", () => {
             await page.locator("[data-test-id='breadcrumb-item']").filter({ hasText: "Nodes" }).click();
             await expect(page).toHaveURL(/\/nodes$/);
             await expect(page.locator("[data-test-id='breadcrumb-item']")).toHaveCount(1);
+        });
+
+        test("middle-truncates a long resource name keeping its start and end visible", async () => {
+            await page.goto(`/pods/default/${LONG_POD_NAME}`, { waitUntil: "networkidle" });
+            const nameCrumb = page.locator("[data-test-id='breadcrumb-item']").nth(2);
+            const text = (await nameCrumb.textContent()) ?? "";
+            // The shown name is shortened, with the middle replaced by "...".
+            expect(text.length).toBeLessThan(LONG_POD_NAME.length);
+            expect(text).toContain("...");
+            // The start and end of the original name both remain visible.
+            expect(text.startsWith("really-long")).toBe(true);
+            expect(text.endsWith("0123456789")).toBe(true);
+        });
+
+        test("keeps the breadcrumb trail on a single line for a long name", async () => {
+            await page.goto(`/pods/default/${LONG_POD_NAME}`, { waitUntil: "networkidle" });
+            const trail = page.locator("[data-test-id='breadcrumbs']");
+            await expect(trail).toBeVisible();
+            const box = await trail.boundingBox();
+            // A single line of crumb text stays under ~40px tall; a wrapped trail
+            // would be roughly double that.
+            expect(box).not.toBeNull();
+            expect(box!.height).toBeLessThan(48);
+            // The trail is still capped at four crumbs and the truncated name links to the pod.
+            await expect(page.locator("[data-test-id='breadcrumb-item']")).toHaveCount(4);
         });
     });
 
