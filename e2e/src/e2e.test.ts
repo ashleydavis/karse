@@ -1063,6 +1063,15 @@ test.describe("karse e2e", () => {
             await page.goto("/deployments", { waitUntil: "networkidle" });
         });
 
+        test("the deployment detail Pods sub-tab shows the stats header (1 Running pod)", async () => {
+            await page.goto("/deployments/default/nginx", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='workload-tab-pods']").click();
+            await expect(page.locator("[data-test-id='workload-pods-stats-total']")).toHaveText("Total: 1");
+            await expect(page.locator("[data-test-id='workload-pods-stats-healthy']")).toHaveText("Healthy: 1");
+            await expect(page.locator("[data-test-id='workload-pods-stats-error']")).toHaveText("Error: 0");
+            await page.goto("/deployments", { waitUntil: "networkidle" });
+        });
+
         test("clicking a pod row on the deployment Pods sub-tab navigates to the pod detail", async () => {
             await page.goto("/deployments/default/nginx", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='workload-tab-pods']").click();
@@ -1180,6 +1189,15 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='workload-pod-row'] td:first-child")).toHaveText("postgres-0");
             await page.goto("/statefulsets", { waitUntil: "networkidle" });
         });
+
+        test("the stateful set detail Pods sub-tab shows the stats header (1 Running pod)", async () => {
+            await page.goto("/statefulsets/default/postgres", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='workload-tab-pods']").click();
+            await expect(page.locator("[data-test-id='workload-pods-stats-total']")).toHaveText("Total: 1");
+            await expect(page.locator("[data-test-id='workload-pods-stats-healthy']")).toHaveText("Healthy: 1");
+            await expect(page.locator("[data-test-id='workload-pods-stats-error']")).toHaveText("Error: 0");
+            await page.goto("/statefulsets", { waitUntil: "networkidle" });
+        });
     });
 
     test.describe("daemon sets page", () => {
@@ -1287,6 +1305,15 @@ test.describe("karse e2e", () => {
             await expect(page).toHaveURL(/\/pods\/kube-system\/fluentd-xyz/);
             await page.goto("/daemonsets", { waitUntil: "networkidle" });
         });
+
+        test("the daemon set detail Pods sub-tab shows the stats header (1 Running pod)", async () => {
+            await page.goto("/daemonsets/kube-system/fluentd", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='workload-tab-pods']").click();
+            await expect(page.locator("[data-test-id='workload-pods-stats-total']")).toHaveText("Total: 1");
+            await expect(page.locator("[data-test-id='workload-pods-stats-healthy']")).toHaveText("Healthy: 1");
+            await expect(page.locator("[data-test-id='workload-pods-stats-error']")).toHaveText("Error: 0");
+            await page.goto("/daemonsets", { waitUntil: "networkidle" });
+        });
     });
 
     test.describe("workload Pods sub-tab empty state", () => {
@@ -1319,6 +1346,14 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='workload-panel-pods']")).toBeVisible();
             await expect(page.locator("[data-test-id='no-workload-pods']")).toBeVisible();
             await expect(page.locator("[data-test-id='workload-pod-row']")).toHaveCount(0);
+        });
+
+        test("the stats header renders zeroed in the empty state", async () => {
+            await page.goto("/deployments/default/empty", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='workload-tab-pods']").click();
+            await expect(page.locator("[data-test-id='workload-pods-stats-total']")).toHaveText("Total: 0");
+            await expect(page.locator("[data-test-id='workload-pods-stats-healthy']")).toHaveText("Healthy: 0");
+            await expect(page.locator("[data-test-id='workload-pods-stats-error']")).toHaveText("Error: 0");
         });
     });
 

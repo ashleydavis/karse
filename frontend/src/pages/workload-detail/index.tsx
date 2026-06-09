@@ -28,6 +28,8 @@ import { fetchWorkloadDetail } from "../../lib/api-client";
 import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
+import { ResourceStatsHeader } from "../../components/resource-stats-header";
+import { computePodStats } from "../../lib/resource-stats";
 import { tableRowSx } from "../../lib/table-row-style";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
@@ -217,6 +219,9 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
             {activeTab === "pods" && (
                 <Box data-test-id="workload-panel-pods">
                     <Paper variant="outlined" sx={{ p: 2 }}>
+                        <Box sx={{ mb: 2 }}>
+                            <ResourceStatsHeader stats={computePodStats(data.pods)} testIdPrefix="workload-pods" />
+                        </Box>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
                             Pods ({data.pods.length})
                         </Typography>

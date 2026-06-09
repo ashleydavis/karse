@@ -16,6 +16,7 @@ Backed by: `frontend/src/lib/resource-stats.ts` (count helpers), `frontend/src/c
   - **Deployments / StatefulSets**: healthy = the ready ratio is `x/x` with `x > 0` (all desired replicas ready); error = `0/x` with `x > 0` (none ready). A `0/0` (no desired replicas) counts toward the total only.
   - **DaemonSets**: healthy = `ready === desired` with `desired > 0`; error = `ready === 0` with `desired > 0`.
 - The header is always rendered, including the empty state (`Total: 0`, `Healthy: 0`, `Error: 0`).
+- The same header is reused outside the list pages: the workload detail Pods sub-tab (deployments, stateful sets, daemon sets) renders a `ResourceStatsHeader` above its pod table, computed with the Pods helper from the workload's owner-scoped pod list (`data-test-id` prefix `workload-pods`). See `workload-detail`.
 
 ## Acceptance Criteria
 

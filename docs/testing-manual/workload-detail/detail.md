@@ -28,6 +28,7 @@ One deployment, one stateful set, one daemon set.
 - **Selector**: the Selector panel lists the deployment's match labels (e.g. `app=nginx`).
 - **Tabs**: the detail page shows Status, Pods, Commands, and YAML tabs.
 - **Pods sub-tab**: click the **Pods** tab. The panel lists the pods the deployment owns (header shows the count). Clicking a pod row navigates to that pod's detail page.
+- **Pods stats header**: above the pod table the Pods sub-tab shows a stats header with Total / Healthy / Error chips for this workload's pods only. For a healthy deployment all pods are Running, so Healthy equals Total and Error is 0. The counts update when the data refetches (e.g. on context / namespace change).
 - **Labels**: the Labels panel (on the Status tab) lists the deployment's labels.
 - **Back button**: the back arrow returns to `/deployments`.
 - **YAML and Commands**: the YAML tab opens the raw YAML view; the Commands tab shows the guided kubectl command suggestions for the deployment.
@@ -56,10 +57,11 @@ A deployment that owns several pods, alongside a second deployment in the same n
 ### What to check
 - **Owned pods only**: navigate to `/deployments/default/web` and open the **Pods** tab. The panel lists three pods named `web-<hash>-<hash>` (`Pods (3)`). It does NOT list the `web-other-<hash>-<hash>` pods, even though `web-other` shares the `app=web` label, because they are owned by a different deployment.
 - **Count**: the Pods header shows `Pods (3)`.
+- **Stats header**: the stats header above the table shows `Total: 3`, `Healthy: 3`, `Error: 0` (all three `web` pods are Running), scoped to this workload's pods only.
 - **Click-through**: clicking a `web-...` pod row navigates to that pod's detail page.
 - **Other workload**: navigate to `/deployments/default/web-other` and open its Pods tab. It lists only its own two `web-other-...` pods (`Pods (2)`).
 - **DaemonSet pods**: navigate to `/daemonsets/kube-system/agent`, open the Pods tab, and confirm it lists the daemon set's pods (one `agent-...` pod per node, so two).
-- **Empty state**: navigate to `/deployments/default/idle` and open its Pods tab. It shows the empty state "No pods belong to this workload." because the deployment has zero replicas.
+- **Empty state**: navigate to `/deployments/default/idle` and open its Pods tab. It shows the empty state "No pods belong to this workload." because the deployment has zero replicas. The stats header still renders, showing `Total: 0`, `Healthy: 0`, `Error: 0`.
 
 Teardown:
 
