@@ -46,6 +46,7 @@ One node and a pod, deployment, stateful set, and daemon set in `default`.
 - Click it. The button icon briefly flips to a check mark and the tooltip reads "Copied" for about 1.5 seconds, then reverts.
 - Paste into a text editor and confirm the pasted text matches the displayed YAML exactly.
 - Before the YAML loads (or when there is none), the copy button is disabled.
+- Open a resource whose YAML is long enough to scroll (the panel shows a vertical scrollbar). Confirm the copy button sits clear of the scrollbar and does not overlap it; the button stays fully visible and clickable. On a short, non-scrolling YAML the button still hugs the top-right corner.
 
 ### Tables and namespaces
 - On `/pods`, `/nodes`, `/deployments`, `/statefulsets`, `/daemonsets`, and `/namespaces`, confirm NO row has a "YAML" button. YAML is reachable only from the detail-page sub tab.

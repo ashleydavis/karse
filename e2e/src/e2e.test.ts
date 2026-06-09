@@ -2417,6 +2417,40 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='yaml-content']")).toContainText("kind: Pod");
             await expect(page.locator("[data-test-id='yaml-content'] [data-test-id='loading-indicator']")).toHaveCount(0);
             // Restore the immediate response for later tests.
+            await page.unroute("**/api/yaml/pods/nginx-abc*");
+            await page.route("**/api/yaml/pods/nginx-abc*", async (route) => {
+                await route.fulfill({ json: { yaml: FAKE_POD_YAML } });
+            });
+        });
+
+        test("the copy button does not overlap the vertical scrollbar on long YAML", async () => {
+            // A long YAML doc so the panel scrolls and shows a vertical scrollbar.
+            const longYaml = "apiVersion: v1\nkind: Pod\nmetadata:\n  name: nginx-abc\n  namespace: default\n"
+                + Array.from({ length: 400 }, (_, i) => `  line-${i}: value-${i}\n`).join("");
+            await page.route("**/api/yaml/pods/nginx-abc*", async (route) => {
+                await route.fulfill({ json: { yaml: longYaml } });
+            });
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-yaml']").click();
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("kind: Pod");
+
+            const content = page.locator("[data-test-id='yaml-content']");
+            // Confirm the panel actually scrolls (otherwise the test proves nothing).
+            const scrollbarWidth = await content.evaluate((el: HTMLElement) => el.offsetWidth - el.clientWidth);
+            expect(scrollbarWidth).toBeGreaterThan(0);
+
+            const button = page.locator("[data-test-id='yaml-copy-button']");
+            const buttonBox = await button.boundingBox();
+            const contentBox = await content.boundingBox();
+            expect(buttonBox).not.toBeNull();
+            expect(contentBox).not.toBeNull();
+            // The scrollbar occupies the rightmost `scrollbarWidth` px of the panel.
+            // The button's right edge must stay clear of that strip.
+            const scrollbarLeftEdge = contentBox!.x + contentBox!.width - scrollbarWidth;
+            expect(buttonBox!.x + buttonBox!.width).toBeLessThanOrEqual(scrollbarLeftEdge);
+
+            // Restore the short-YAML route for any later test in this block.
+            await page.unroute("**/api/yaml/pods/nginx-abc*");
             await page.route("**/api/yaml/pods/nginx-abc*", async (route) => {
                 await route.fulfill({ json: { yaml: FAKE_POD_YAML } });
             });

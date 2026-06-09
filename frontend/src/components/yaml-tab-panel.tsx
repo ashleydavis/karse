@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Box, Alert, Paper, Tooltip, IconButton } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCopy, faCheck } from "@fortawesome/free-solid-svg-icons";
@@ -21,6 +21,10 @@ type YamlTarget = {
 export function YamlTabPanel({ target, active }: { target: YamlTarget; active: boolean }) {
     const { current } = useKubeContext();
     const [copied, setCopied] = useState(false);
+    // The YAML scrolls inside this Paper. When its vertical scrollbar is visible
+    // the copy button must be inset by the scrollbar's width so it never overlaps.
+    const contentRef = useRef<HTMLDivElement>(null);
+    const [scrollbarWidth, setScrollbarWidth] = useState(0);
 
     const { data, error, isLoading } = useQuery({
         queryKey: ["yaml", current, target.type, target.namespace ?? "", target.name],
@@ -29,6 +33,15 @@ export function YamlTabPanel({ target, active }: { target: YamlTarget; active: b
     });
 
     const yaml = data?.yaml ?? "";
+    // Measure the live scrollbar width (offsetWidth - clientWidth) after each
+    // render so the button offset tracks whether the content currently scrolls.
+    useLayoutEffect(() => {
+        const node = contentRef.current;
+        if (node === null) {
+            return;
+        }
+        setScrollbarWidth(node.offsetWidth - node.clientWidth);
+    }, [yaml, isLoading, active]);
     // Copy the displayed YAML to the clipboard, briefly flipping the button to a
     // "Copied" confirmation. Matches the shareable-link copy pattern in header.tsx.
     async function handleCopy(): Promise<void> {
@@ -42,7 +55,7 @@ export function YamlTabPanel({ target, active }: { target: YamlTarget; active: b
             {error && <Alert severity="error">{(error as Error).message}</Alert>}
             <Box sx={{ position: "relative" }}>
                 <Tooltip title={copied ? "Copied" : "Copy YAML"}>
-                    <span style={{ position: "absolute", top: 8, right: 8, zIndex: 1 }}>
+                    <span style={{ position: "absolute", top: 8, right: 8 + scrollbarWidth, zIndex: 1 }}>
                         <IconButton
                             size="small"
                             onClick={handleCopy}
@@ -56,6 +69,7 @@ export function YamlTabPanel({ target, active }: { target: YamlTarget; active: b
                     </span>
                 </Tooltip>
                 <Paper
+                    ref={contentRef}
                     variant="outlined"
                     sx={{
                         p: 1.5,
