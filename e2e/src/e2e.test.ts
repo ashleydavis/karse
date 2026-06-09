@@ -3713,6 +3713,17 @@ test.describe("karse e2e", () => {
             ],
         };
 
+        // A separate pod list with one pod carrying more labels than fit inline,
+        // so its row shows the "..." control that opens the searchable labels
+        // modal. Kept out of FAKE_PODS so the chip/search assertions above stay
+        // on a clean two-pod set (the fuzzy search matches subsequences across
+        // every cell, so an extra many-labelled pod would perturb those counts).
+        const FAKE_PODS_MANY = {
+            pods: [
+                { name: "many-pod", namespace: "default", phase: "Running", ready: "1/1", containerCount: 1, restarts: 0, node: "node-worker", createdAt: new Date().toISOString(), labels: { app: "many", tier: "backend", env: "prod", region: "eu-west", version: "1.2.3" } },
+            ],
+        };
+
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
             await page.route("**/api/pods*", async (route) => {
@@ -3751,6 +3762,53 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
             await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("db-pod");
             await page.locator("[data-test-id='pods-search'] input").fill("");
+        });
+
+        test.describe("many labels truncate to a searchable modal", () => {
+            test.beforeAll(async () => {
+                // Swap in the many-labelled pod list. This route is added after the
+                // outer beforeAll's, so it takes precedence (handlers match LIFO).
+                await page.route("**/api/pods*", async (route) => {
+                    await route.fulfill({ json: FAKE_PODS_MANY });
+                });
+                await page.goto("/pods", { waitUntil: "networkidle" });
+                await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "many-pod" })).toBeVisible();
+            });
+
+            test("a pod with many labels truncates to a '...' control instead of overflowing", async () => {
+                const manyRow = page.locator("[data-test-id='pod-row']").filter({ hasText: "many-pod" });
+                // Only the first few chips render inline; the rest are behind the control.
+                const inlineChips = manyRow.locator("[data-test-id='labels-cell'] > .MuiChip-root:not([data-test-id='labels-cell-more'])");
+                await expect(inlineChips).toHaveCount(3);
+                await expect(manyRow.locator("[data-test-id='labels-cell-more']")).toBeVisible();
+                await expect(manyRow.locator("[data-test-id='labels-cell-more'] .MuiChip-label")).toHaveText("+2 ...");
+            });
+
+            test("clicking '...' opens a modal listing every label", async () => {
+                const manyRow = page.locator("[data-test-id='pod-row']").filter({ hasText: "many-pod" });
+                await manyRow.locator("[data-test-id='labels-cell-more']").click();
+                await expect(page.locator("[data-test-id='labels-modal']")).toBeVisible();
+                // All five labels are listed in the modal.
+                await expect(page.locator("[data-test-id='labels-modal-chip']")).toHaveCount(5);
+            });
+
+            test("the labels modal is searchable", async () => {
+                await page.locator("[data-test-id='labels-modal-search'] input").fill("region");
+                await expect(page.locator("[data-test-id='labels-modal-chip']")).toHaveCount(1);
+                await expect(page.locator("[data-test-id='labels-modal-chip'] .MuiChip-label")).toHaveText("region=eu-west");
+                // Clearing the search restores the full list.
+                await page.locator("[data-test-id='labels-modal-search'] input").fill("");
+                await expect(page.locator("[data-test-id='labels-modal-chip']")).toHaveCount(5);
+            });
+
+            test("clicking '...' opens the modal without navigating to the pod", async () => {
+                // Close the modal left open by the previous test.
+                await page.locator("[data-test-id='labels-modal-close']").click();
+                await expect(page.locator("[data-test-id='labels-modal']")).toBeHidden();
+                // Still on the pods list, not a pod detail page.
+                await expect(page).toHaveURL(/\/pods(\?|$)/);
+                await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+            });
         });
     });
 

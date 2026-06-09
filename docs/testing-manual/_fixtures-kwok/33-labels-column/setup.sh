@@ -61,6 +61,23 @@ spec:
   - name: pause
     image: registry.k8s.io/pause:3.9
 ---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: many-pod
+  namespace: default
+  labels:
+    app: many
+    tier: backend
+    env: prod
+    region: eu-west
+    version: 1.2.3
+spec:
+  nodeName: fake-node-1
+  containers:
+  - name: pause
+    image: registry.k8s.io/pause:3.9
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:

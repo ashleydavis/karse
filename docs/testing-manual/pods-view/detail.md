@@ -112,7 +112,7 @@ Reuses the phase-filter fixture: five pods in `default`, one per phase. By healt
 
 ## Scenario F: Labels column
 
-Two pods in `default`: `web-pod` (labels `app=web`, `tier=frontend`) and `db-pod` (label `app=db`), plus a labelled deployment. Verifies the Labels column renders and is searchable. The same fixture also covers the deployments view's Labels column.
+Three pods in `default`: `web-pod` (labels `app=web`, `tier=frontend`), `db-pod` (label `app=db`), and `many-pod` (five labels: `app=many`, `tier=backend`, `env=prod`, `region=eu-west`, `version=1.2.3`), plus a labelled deployment. Verifies the Labels column renders, is searchable, and truncates many labels behind a `+N ...` control that opens a searchable modal. The same fixture also covers the deployments view's Labels column.
 
 **Fixture:** [_fixtures-kwok/33-labels-column](../_fixtures-kwok/33-labels-column/)
 
@@ -122,8 +122,11 @@ Two pods in `default`: `web-pod` (labels `app=web`, `tier=frontend`) and `db-pod
 
 ### What to check
 - **Pods page**: a **Labels** column appears after the Age column. `web-pod` shows `app=web` and `tier=frontend` chips; `db-pod` shows an `app=db` chip.
-- **Search by label value**: type `tier=frontend` in the search box. Only `web-pod` remains.
-- **Search by label key/value shared form**: type `app=db`. Only `db-pod` remains. Clear the search to restore both rows.
+- **Row height stays fixed**: `many-pod` has five labels but its row is the same height as the others. It shows the first three chips inline plus a `+2 ...` chip; the labels do not wrap or run off-screen.
+- **Open the labels modal**: click `many-pod`'s `+2 ...` chip. A modal opens listing all five labels as chips. The pods list stays put (it does not navigate to the pod detail page).
+- **Search inside the modal**: type `region` in the modal's search box. Only `region=eu-west` remains. Clear it to restore all five. Close the modal with the X.
+- **Search by label value**: type `tier=frontend` in the table search box. Only `web-pod` remains (the search still matches labels hidden behind the `...` control).
+- **Search by label key/value shared form**: type `app=db`. Only `db-pod` remains. Clear the search to restore all rows.
 - **Deployments page** (`/deployments`): the `web-deploy` row shows `app=web` and `tier=frontend` chips in its Labels column.
 
 Teardown:

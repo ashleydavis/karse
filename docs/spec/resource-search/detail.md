@@ -46,6 +46,15 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-s
 - The label filter drives a TanStack Table column filter on the `labels` column. An empty selection clears the filter (every row passes), so the filter, the status filter, the health filter, and the search box all compose (a row must satisfy all active ones).
 - The dropdown and its column-filter wiring are shared (`label-filter.tsx` and `label-filter-state.ts`) so behaviour is identical across tables. There is no per-table duplicate.
 
+### Labels column
+
+- Every resource table that shows labels (pods, nodes, deployments, stateful sets, daemon sets, namespaces) renders them through a single shared cell (`frontend/src/components/labels-cell.tsx`), so the behaviour is identical everywhere.
+- Each label is a compact `key=value` chip; a muted dash is shown when the resource has no labels.
+- The row height stays fixed regardless of label count. Only the first few chips (currently three) are shown inline; the cell does not wrap or overflow off-screen.
+- When a resource has more labels than fit inline, a `+N ...` control is shown. Clicking it opens a modal listing every label for that resource as chips. Clicking it does not navigate to the resource's detail page (it stops the click from reaching the clickable row).
+- The labels modal has a search box that filters the listed labels by case-insensitive substring on the `key=value` text. Clearing the search restores the full list.
+- The table's own fuzzy search still indexes the full set of labels (all `key=value` pairs), not just the chips shown inline, so a row matches on any of its labels even when some are hidden behind the `...` control.
+
 ## Acceptance Criteria
 
 - [x] Each resource table has a search box that filters its rows.
@@ -65,6 +74,7 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/status-filter-s
 - [x] Selecting a label key's value(s) narrows the table to matching resources (OR within a key, AND across keys); the default empty selection shows everything.
 - [x] A "Deselect all" control clears every label selection and returns to showing everything.
 - [x] The label-filter dropdown and its column-filter wiring are shared across tables, with no per-table duplicate, and compose with the search box and the status filter.
+- [x] The shared Labels column keeps the row height fixed (only the first few chips inline) and exposes the rest behind a `+N ...` control that opens a searchable modal listing every label, while the table's fuzzy search still matches on all labels.
 
 ## Open Questions
 

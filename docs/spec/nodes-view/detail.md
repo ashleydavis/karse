@@ -11,7 +11,7 @@ Backed by: `GET /api/cluster/nodes`, `backend/src/routes/cluster-route.ts`, `bac
 - `GET /api/cluster/nodes` returns `{ nodes: Node[] }`. Each `Node` has `name`, `status` (`Ready` | `NotReady` | `Unknown`), `roles` (string array; empty means `<none>`), `version` (kubeletVersion), `createdAt` (ISO timestamp; the UI computes age), and `labels` (the node's `metadata.labels`, an empty object when none). Returns 500 with kubectl's stderr on failure.
 - Status is derived from the node's `Ready` condition; roles are parsed from `node-role.kubernetes.io/<role>` labels and sorted.
 - The table columns are Name, Status (Ready/NotReady/Unknown chip), Roles, Version, Age, Labels.
-- The Labels column renders each node's labels as compact `key=value` chips (a muted dash when none) and participates in the table's fuzzy search.
+- The Labels column renders each node's labels as compact `key=value` chips (a muted dash when none) and participates in the table's fuzzy search. It truncates to the first few chips with a `+N ...` control that opens a searchable labels modal (the shared Labels column behaviour, see `resource-search`).
 - A stats header above the table shows Total / Healthy / Error chips for the current scope; Healthy counts `Ready` nodes, Error counts the rest (see `resource-stats`).
 - Column headers sort; a search box filters rows (see `resource-search`).
 - Each row links to the node detail page (see `clickable-resource-rows`).
