@@ -1054,15 +1054,18 @@ test.describe("karse e2e", () => {
             await page.goto("/deployments", { waitUntil: "networkidle" });
         });
 
-        test("the deployment detail page lists its selected pods", async () => {
+        test("the deployment detail Pods sub-tab lists the workload's pods", async () => {
             await page.goto("/deployments/default/nginx", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='workload-tab-pods']").click();
+            await expect(page.locator("[data-test-id='workload-panel-pods']")).toBeVisible();
             await expect(page.locator("[data-test-id='workload-pod-row']")).toHaveCount(1);
             await expect(page.locator("[data-test-id='workload-pod-row'] td:first-child")).toHaveText("nginx-abc");
             await page.goto("/deployments", { waitUntil: "networkidle" });
         });
 
-        test("clicking a pod row on the deployment detail navigates to the pod detail", async () => {
+        test("clicking a pod row on the deployment Pods sub-tab navigates to the pod detail", async () => {
             await page.goto("/deployments/default/nginx", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='workload-tab-pods']").click();
             await page.locator("[data-test-id='workload-pod-row']").click();
             await expect(page).toHaveURL(/\/pods\/default\/nginx-abc/);
             await page.goto("/deployments", { waitUntil: "networkidle" });
@@ -1104,7 +1107,18 @@ test.describe("karse e2e", () => {
                 { label: "Current", value: "1" },
                 { label: "Updated", value: "1" },
             ],
-            pods: [],
+            pods: [
+                {
+                    name: "postgres-0",
+                    namespace: "default",
+                    phase: "Running",
+                    ready: "1/1",
+                    containerCount: 1,
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                },
+            ],
             events: [],
         };
 
@@ -1157,6 +1171,15 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='workload-stat']").filter({ hasText: "Ready" })).toContainText("1/1");
             await page.goto("/statefulsets", { waitUntil: "networkidle" });
         });
+
+        test("the stateful set detail Pods sub-tab lists the workload's pods", async () => {
+            await page.goto("/statefulsets/default/postgres", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='workload-tab-pods']").click();
+            await expect(page.locator("[data-test-id='workload-panel-pods']")).toBeVisible();
+            await expect(page.locator("[data-test-id='workload-pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='workload-pod-row'] td:first-child")).toHaveText("postgres-0");
+            await page.goto("/statefulsets", { waitUntil: "networkidle" });
+        });
     });
 
     test.describe("daemon sets page", () => {
@@ -1189,7 +1212,18 @@ test.describe("karse e2e", () => {
                 { label: "Up-to-date", value: "2" },
                 { label: "Available", value: "2" },
             ],
-            pods: [],
+            pods: [
+                {
+                    name: "fluentd-xyz",
+                    namespace: "kube-system",
+                    phase: "Running",
+                    ready: "1/1",
+                    containerCount: 1,
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                },
+            ],
             events: [],
         };
 
@@ -1241,6 +1275,50 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='workload-detail']")).toBeVisible();
             await expect(page.locator("[data-test-id='workload-stat']").filter({ hasText: "Desired" })).toContainText("2");
             await page.goto("/daemonsets", { waitUntil: "networkidle" });
+        });
+
+        test("the daemon set detail Pods sub-tab lists the workload's pods and links to pod detail", async () => {
+            await page.goto("/daemonsets/kube-system/fluentd", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='workload-tab-pods']").click();
+            await expect(page.locator("[data-test-id='workload-panel-pods']")).toBeVisible();
+            await expect(page.locator("[data-test-id='workload-pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='workload-pod-row'] td:first-child")).toHaveText("fluentd-xyz");
+            await page.locator("[data-test-id='workload-pod-row']").click();
+            await expect(page).toHaveURL(/\/pods\/kube-system\/fluentd-xyz/);
+            await page.goto("/daemonsets", { waitUntil: "networkidle" });
+        });
+    });
+
+    test.describe("workload Pods sub-tab empty state", () => {
+        const FAKE_DEPLOYMENT_NO_PODS = {
+            kind: "deployments",
+            name: "empty",
+            namespace: "default",
+            createdAt: new Date().toISOString(),
+            labels: { app: "empty" },
+            selector: { app: "empty" },
+            stats: [{ label: "Ready", value: "0/0" }],
+            pods: [],
+            events: [],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/deployments/default/empty*", async (route) => {
+                await route.fulfill({ json: FAKE_DEPLOYMENT_NO_PODS });
+            });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/deployments/default/empty*");
+        });
+
+        test("shows a clear empty state when the workload owns no pods", async () => {
+            await page.goto("/deployments/default/empty", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='workload-tab-pods']").click();
+            await expect(page.locator("[data-test-id='workload-panel-pods']")).toBeVisible();
+            await expect(page.locator("[data-test-id='no-workload-pods']")).toBeVisible();
+            await expect(page.locator("[data-test-id='workload-pod-row']")).toHaveCount(0);
         });
     });
 

@@ -12,6 +12,7 @@ import {
     getNodeDetail,
     getNamespaceDetail,
     getWorkloadDetail,
+    podBelongsToWorkload,
     isWorkloadKind,
     getClusterOverview,
     listPods,
@@ -834,6 +835,24 @@ describe("getWorkloadDetail", () => {
     const DEPLOY_KEY = "--context test-ctx -n default get deployment nginx -o json";
     const EVENTS_KEY = "--context test-ctx -n default get events --field-selector=involvedObject.name=nginx,involvedObject.namespace=default -o json";
     const PODS_KEY = "--context test-ctx -n default get pods -l app=nginx -o json";
+    const REPLICASET_KEY = "--context test-ctx -n default get replicasets -l app=nginx -o json";
+
+    // A ReplicaSet owned by the nginx deployment, returned by the replicaset lookup so
+    // pods owned by it trace back to the deployment.
+    function makeReplicaSetItem(name: string): object {
+        return {
+            metadata: {
+                name,
+                namespace: "default",
+                ownerReferences: [{ kind: "Deployment", name: "nginx" }],
+            },
+        };
+    }
+
+    // A replicaset list response with a single nginx-owned replicaset.
+    function makeReplicaSets(): object {
+        return { items: [makeReplicaSetItem("nginx-rs")] };
+    }
 
     // A minimal deployment item shape with the fields getWorkloadDetail reads.
     function makeDeploymentItem(): object {
@@ -863,6 +882,7 @@ describe("getWorkloadDetail", () => {
                 name,
                 namespace: "default",
                 creationTimestamp: "2024-06-01T00:00:00Z",
+                ownerReferences: [{ kind: "ReplicaSet", name: "nginx-rs" }],
             },
             spec: {
                 nodeName: "node-1",
@@ -880,6 +900,7 @@ describe("getWorkloadDetail", () => {
         setRunnerHandlers({
             [DEPLOY_KEY]: () => ok(JSON.stringify(makeDeploymentItem())),
             [EVENTS_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [REPLICASET_KEY]: () => ok(JSON.stringify(makeReplicaSets())),
             [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
         });
         await getWorkloadDetail("test-ctx", "deployments", "default", "nginx");
@@ -905,6 +926,7 @@ describe("getWorkloadDetail", () => {
                     },
                 ],
             })),
+            [REPLICASET_KEY]: () => ok(JSON.stringify(makeReplicaSets())),
             [PODS_KEY]: () => ok(JSON.stringify({ items: [makePodItem("nginx-abc")] })),
         });
         const result = await getWorkloadDetail("test-ctx", "deployments", "default", "nginx");
@@ -1005,6 +1027,7 @@ describe("getWorkloadDetail", () => {
         setRunnerHandlers({
             [DEPLOY_KEY]: () => ok(JSON.stringify(makeDeploymentItem())),
             [EVENTS_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [REPLICASET_KEY]: () => ok(JSON.stringify(makeReplicaSets())),
             [PODS_KEY]: () => fail("forbidden"),
         });
         const result = await getWorkloadDetail("test-ctx", "deployments", "default", "nginx");
@@ -1019,6 +1042,126 @@ describe("getWorkloadDetail", () => {
             [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
         });
         await expect(getWorkloadDetail("test-ctx", "deployments", "default", "nginx")).rejects.toThrow("not found");
+    });
+
+    test("scopes a deployment's pods to those owned via its replicaset, dropping label-only matches", async () => {
+        // Two pods share the app=nginx selector. One is owned by the deployment's
+        // replicaset; the other is owned by a different deployment's replicaset and must
+        // be dropped even though its labels match.
+        const ownedPod = {
+            metadata: {
+                name: "nginx-mine",
+                namespace: "default",
+                creationTimestamp: "2024-06-01T00:00:00Z",
+                ownerReferences: [{ kind: "ReplicaSet", name: "nginx-rs" }],
+            },
+            spec: { containers: [{ name: "nginx" }] },
+            status: { phase: "Running", containerStatuses: [{ ready: true, restartCount: 0 }] },
+        };
+        const foreignPod = {
+            metadata: {
+                name: "nginx-other",
+                namespace: "default",
+                creationTimestamp: "2024-06-01T00:00:00Z",
+                ownerReferences: [{ kind: "ReplicaSet", name: "other-rs" }],
+            },
+            spec: { containers: [{ name: "nginx" }] },
+            status: { phase: "Running", containerStatuses: [{ ready: true, restartCount: 0 }] },
+        };
+        setRunnerHandlers({
+            [DEPLOY_KEY]: () => ok(JSON.stringify(makeDeploymentItem())),
+            [EVENTS_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [REPLICASET_KEY]: () => ok(JSON.stringify(makeReplicaSets())),
+            [PODS_KEY]: () => ok(JSON.stringify({ items: [ownedPod, foreignPod] })),
+        });
+        const result = await getWorkloadDetail("test-ctx", "deployments", "default", "nginx");
+        expect(result.pods.map((p) => p.name)).toEqual(["nginx-mine"]);
+    });
+
+    test("scopes a stateful set's pods to those it owns directly", async () => {
+        const ssKey = "--context test-ctx -n default get statefulset postgres -o json";
+        const ssEventsKey = "--context test-ctx -n default get events --field-selector=involvedObject.name=postgres,involvedObject.namespace=default -o json";
+        const ssPodsKey = "--context test-ctx -n default get pods -l app=postgres -o json";
+        const ownedPod = {
+            metadata: {
+                name: "postgres-0",
+                namespace: "default",
+                creationTimestamp: "2024-06-01T00:00:00Z",
+                ownerReferences: [{ kind: "StatefulSet", name: "postgres" }],
+            },
+            spec: { containers: [{ name: "postgres" }] },
+            status: { phase: "Running", containerStatuses: [{ ready: true, restartCount: 0 }] },
+        };
+        const foreignPod = {
+            metadata: {
+                name: "postgres-other-0",
+                namespace: "default",
+                creationTimestamp: "2024-06-01T00:00:00Z",
+                ownerReferences: [{ kind: "StatefulSet", name: "postgres-other" }],
+            },
+            spec: { containers: [{ name: "postgres" }] },
+            status: { phase: "Running", containerStatuses: [{ ready: true, restartCount: 0 }] },
+        };
+        setRunnerHandlers({
+            [ssKey]: () => ok(JSON.stringify({
+                metadata: { name: "postgres", namespace: "default", creationTimestamp: "2024-06-01T00:00:00Z", labels: {} },
+                spec: { replicas: 1, selector: { matchLabels: { app: "postgres" } } },
+                status: { readyReplicas: 1 },
+            })),
+            [ssEventsKey]: () => ok(JSON.stringify({ items: [] })),
+            [ssPodsKey]: () => ok(JSON.stringify({ items: [ownedPod, foreignPod] })),
+        });
+        const result = await getWorkloadDetail("test-ctx", "statefulsets", "default", "postgres");
+        // No replicaset lookup is made for a stateful set: setRunnerHandlers would throw
+        // on the unmocked argv if one were attempted.
+        expect(result.pods.map((p) => p.name)).toEqual(["postgres-0"]);
+    });
+});
+
+describe("podBelongsToWorkload", () => {
+    const noReplicaSets = new Set<string>();
+
+    test("matches a stateful set's directly-owned pod", () => {
+        const pod = { metadata: { ownerReferences: [{ kind: "StatefulSet", name: "postgres" }] } };
+        expect(podBelongsToWorkload(pod, { kind: "statefulsets", name: "postgres", ownedReplicaSetNames: noReplicaSets }, {})).toBe(true);
+    });
+
+    test("matches a daemon set's directly-owned pod", () => {
+        const pod = { metadata: { ownerReferences: [{ kind: "DaemonSet", name: "fluentd" }] } };
+        expect(podBelongsToWorkload(pod, { kind: "daemonsets", name: "fluentd", ownedReplicaSetNames: noReplicaSets }, {})).toBe(true);
+    });
+
+    test("matches a deployment pod owned by one of its replicasets", () => {
+        const pod = { metadata: { ownerReferences: [{ kind: "ReplicaSet", name: "nginx-rs" }] } };
+        const owned = new Set(["nginx-rs"]);
+        expect(podBelongsToWorkload(pod, { kind: "deployments", name: "nginx", ownedReplicaSetNames: owned }, {})).toBe(true);
+    });
+
+    test("rejects a deployment pod owned by a replicaset the deployment does not own", () => {
+        const pod = { metadata: { ownerReferences: [{ kind: "ReplicaSet", name: "other-rs" }], labels: { app: "nginx" } } };
+        const owned = new Set(["nginx-rs"]);
+        // Has owner references but none match: the label selector is NOT consulted.
+        expect(podBelongsToWorkload(pod, { kind: "deployments", name: "nginx", ownedReplicaSetNames: owned }, { app: "nginx" })).toBe(false);
+    });
+
+    test("rejects a pod owned by a different stateful set even when labels match", () => {
+        const pod = { metadata: { ownerReferences: [{ kind: "StatefulSet", name: "other" }], labels: { app: "postgres" } } };
+        expect(podBelongsToWorkload(pod, { kind: "statefulsets", name: "postgres", ownedReplicaSetNames: noReplicaSets }, { app: "postgres" })).toBe(false);
+    });
+
+    test("falls back to the selector for a pod with no owner references", () => {
+        const pod = { metadata: { labels: { app: "nginx", tier: "web" } } };
+        expect(podBelongsToWorkload(pod, { kind: "deployments", name: "nginx", ownedReplicaSetNames: noReplicaSets }, { app: "nginx" })).toBe(true);
+    });
+
+    test("selector fallback requires every selector label to match", () => {
+        const pod = { metadata: { labels: { app: "nginx" } } };
+        expect(podBelongsToWorkload(pod, { kind: "deployments", name: "nginx", ownedReplicaSetNames: noReplicaSets }, { app: "nginx", tier: "web" })).toBe(false);
+    });
+
+    test("an ownerless pod with an empty selector matches nothing", () => {
+        const pod = { metadata: { labels: { app: "nginx" } } };
+        expect(podBelongsToWorkload(pod, { kind: "deployments", name: "nginx", ownedReplicaSetNames: noReplicaSets }, {})).toBe(false);
     });
 });
 

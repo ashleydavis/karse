@@ -57,3 +57,4 @@ To tear down every test cluster at once (after running several fixtures, or to c
 | [32-errors-view](32-errors-view/) | Problem pod + Warning event + healthy pod | errors-feed |
 | [33-labels-column](33-labels-column/) | Labelled pods + a labelled deployment in `default` | pods-view, deployments-view |
 | [34-namespace-detail](34-namespace-detail/) | One namespace with a deployment, stateful set, resource quota, and limit range | namespace-detail |
+| [35-workload-pods-subtab](35-workload-pods-subtab/) | Two deployments sharing the `app=web` selector (each owning its own pods via a ReplicaSet), an idle 0-replica deployment, and a daemon set with one pod per node | workload-detail |

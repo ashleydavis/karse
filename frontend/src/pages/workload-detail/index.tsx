@@ -68,7 +68,7 @@ const KIND_LABEL: Record<WorkloadKind, string> = {
 };
 
 // The set of tabs available on the workload detail page.
-type WorkloadDetailTab = "detail" | "commands" | "yaml";
+type WorkloadDetailTab = "detail" | "pods" | "commands" | "yaml";
 
 // Maps the plural URL/UI workload token to the singular kind the Commands tab expects.
 const COMMAND_KIND: Record<WorkloadKind, GuidedResourceKind> = {
@@ -78,10 +78,10 @@ const COMMAND_KIND: Record<WorkloadKind, GuidedResourceKind> = {
 };
 
 // Detail page for a single deployment, stateful set, or daemon set. Shows the
-// workload's status counters, labels, selector, selected pods, and events on the
-// Detail tab, the guided commands on the Commands tab, and the raw YAML on the YAML
-// tab. The kind is fixed per route so the three workload types share one page
-// implementation.
+// workload's status counters, labels, selector, and events on the Status tab, the
+// owned pods on the Pods tab, the guided commands on the Commands tab, and the raw
+// YAML on the YAML tab. The kind is fixed per route so the three workload types
+// share one page implementation.
 export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
     const { namespace, name } = useParams<{ namespace: string; name: string }>();
     const { current } = useKubeContext();
@@ -124,6 +124,7 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                     data-test-id="workload-detail-tabs"
                 >
                     <Tab label="Status" value="detail" data-test-id="workload-tab-detail" />
+                    <Tab label="Pods" value="pods" data-test-id="workload-tab-pods" />
                     <Tab label="Commands" value="commands" data-test-id="workload-tab-commands" />
                     <Tab label="YAML" value="yaml" data-test-id="workload-tab-yaml" />
                 </Tabs>
@@ -163,48 +164,6 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                             </Box>
                         </Paper>
                     )}
-
-                    <Paper variant="outlined" sx={{ p: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                            Pods ({data.pods.length})
-                        </Typography>
-                        {data.pods.length === 0
-                            ? (
-                                <Typography color="text.secondary">No pods selected by this workload.</Typography>
-                            )
-                            : (
-                                <TableContainer>
-                                    <Table size="small">
-                                        <TableHead>
-                                            <TableRow>
-                                                <TableCell>Name</TableCell>
-                                                <TableCell>Status</TableCell>
-                                                <TableCell>Ready</TableCell>
-                                                <TableCell>Restarts</TableCell>
-                                                <TableCell>Node</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {data.pods.map((pod) => (
-                                                <TableRow
-                                                    key={pod.namespace + "/" + pod.name}
-                                                    data-test-id="workload-pod-row"
-                                                    onClick={() => navigate(`/pods/${pod.namespace}/${pod.name}`)}
-                                                    sx={tableRowSx(true)}
-                                                >
-                                                    <TableCell sx={{ fontFamily: "monospace" }}>{pod.name}</TableCell>
-                                                    <TableCell>{pod.phase}</TableCell>
-                                                    <TableCell>{pod.ready}</TableCell>
-                                                    <TableCell>{pod.restarts}</TableCell>
-                                                    <TableCell>{pod.node || "-"}</TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </TableContainer>
-                            )
-                        }
-                    </Paper>
 
                     {Object.keys(data.labels).length > 0 && (
                         <Paper variant="outlined" sx={{ p: 2 }}>
@@ -252,6 +211,54 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                             </TableContainer>
                         </Paper>
                     )}
+                </Box>
+            )}
+
+            {activeTab === "pods" && (
+                <Box data-test-id="workload-panel-pods">
+                    <Paper variant="outlined" sx={{ p: 2 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                            Pods ({data.pods.length})
+                        </Typography>
+                        {data.pods.length === 0
+                            ? (
+                                <Typography color="text.secondary" data-test-id="no-workload-pods">
+                                    No pods belong to this workload.
+                                </Typography>
+                            )
+                            : (
+                                <TableContainer>
+                                    <Table size="small">
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell>Name</TableCell>
+                                                <TableCell>Status</TableCell>
+                                                <TableCell>Ready</TableCell>
+                                                <TableCell>Restarts</TableCell>
+                                                <TableCell>Node</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {data.pods.map((pod) => (
+                                                <TableRow
+                                                    key={pod.namespace + "/" + pod.name}
+                                                    data-test-id="workload-pod-row"
+                                                    onClick={() => navigate(`/pods/${pod.namespace}/${pod.name}`)}
+                                                    sx={tableRowSx(true)}
+                                                >
+                                                    <TableCell sx={{ fontFamily: "monospace" }}>{pod.name}</TableCell>
+                                                    <TableCell>{pod.phase}</TableCell>
+                                                    <TableCell>{pod.ready}</TableCell>
+                                                    <TableCell>{pod.restarts}</TableCell>
+                                                    <TableCell>{pod.node || "-"}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            )
+                        }
+                    </Paper>
                 </Box>
             )}
 

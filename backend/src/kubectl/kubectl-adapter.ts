@@ -652,6 +652,55 @@ function workloadStats(kind: WorkloadKind, item: any): WorkloadStat[] {
     ];
 }
 
+// The Kubernetes owner kind (kind field of an ownerReference) for each workload kind.
+// Deployments are absent here on purpose: a deployment never directly owns its pods,
+// it owns ReplicaSets which in turn own the pods, so pod ownership is matched via the
+// owning ReplicaSet names instead (see ownedReplicaSetNames / podBelongsToWorkload).
+const WORKLOAD_OWNER_KIND: Partial<Record<WorkloadKind, string>> = {
+    statefulsets: "StatefulSet",
+    daemonsets: "DaemonSet",
+};
+
+// Decides whether a single raw pod item belongs to the named workload, used to scope
+// a workload's Pods list to just that workload's pods rather than everything its label
+// selector happens to match.
+//
+// Ownership is preferred: a pod belongs to the workload when one of its ownerReferences
+// names the workload directly (stateful sets and daemon sets own their pods), or, for a
+// deployment, names a ReplicaSet that the deployment owns (a deployment owns ReplicaSets
+// which own the pods). When a pod carries no ownerReferences at all (e.g. a hand-rolled
+// pod, or a cluster that does not populate them), the workload's label selector is used
+// as a fallback so the list is not silently empty. A pod that has owner references but
+// none matching this workload is excluded even if its labels match, which is what keeps
+// two workloads that share a selector from showing each other's pods.
+export function podBelongsToWorkload(
+    podItem: any,
+    workload: { kind: WorkloadKind; name: string; ownedReplicaSetNames: Set<string> },
+    selector: Record<string, string>,
+): boolean {
+    const owners: any[] = podItem?.metadata?.ownerReferences ?? [];
+    if (owners.length > 0) {
+        const directKind = WORKLOAD_OWNER_KIND[workload.kind];
+        return owners.some((owner) => {
+            if (directKind !== undefined && owner?.kind === directKind && owner?.name === workload.name) {
+                return true;
+            }
+            if (workload.kind === "deployments" && owner?.kind === "ReplicaSet") {
+                return workload.ownedReplicaSetNames.has(owner?.name);
+            }
+            return false;
+        });
+    }
+    // No owner references: fall back to the label selector. An empty selector matches
+    // nothing rather than every pod.
+    const selectorEntries = Object.entries(selector);
+    if (selectorEntries.length === 0) {
+        return false;
+    }
+    const labels: Record<string, string> = podItem?.metadata?.labels ?? {};
+    return selectorEntries.every(([key, value]) => labels[key] === value);
+}
+
 // Returns detailed information for a single deployment, stateful set, or daemon set:
 // its metadata, kind-specific status counters, the pods it selects, and its events.
 // kind must be one of WORKLOAD_KINDS; passing anything else throws. READ-ONLY.
@@ -679,18 +728,45 @@ export async function getWorkloadDetail(
     const item = JSON.parse(workloadResult.stdout);
     const selector: Record<string, string> = item.spec?.selector?.matchLabels ?? {};
 
-    // Fetch the pods the workload selects so the detail page can list them. When the
-    // workload has no match labels we skip the query rather than fetch every pod.
+    // Fetch the pods that belong to the workload so the detail page can list them. The
+    // label selector pre-filters the query (and is the fallback when owner references are
+    // absent), but the result is then scoped down to the pods this workload actually owns
+    // so a shared selector does not pull in another workload's pods. When the workload has
+    // no match labels we skip the query rather than fetch every pod.
     let pods: Pod[] = [];
     const selectorParts = Object.entries(selector).map(([key, value]) => `${key}=${value}`);
     if (selectorParts.length > 0) {
+        // For deployments, pods are owned by ReplicaSets, which are owned by the
+        // deployment. Look up the ReplicaSets this deployment owns so pod ownership can be
+        // traced through them. Stateful sets and daemon sets own their pods directly, so
+        // they need no such lookup.
+        const ownedReplicaSetNames = new Set<string>();
+        if (kind === "deployments") {
+            const rsResult = await kubectl([
+                "--context", context, "-n", namespace, "get", "replicasets",
+                "-l", selectorParts.join(","), "-o", "json",
+            ]);
+            if (rsResult.exitCode === 0) {
+                for (const rs of (JSON.parse(rsResult.stdout).items as any[])) {
+                    const ownedByThis = (rs.metadata?.ownerReferences ?? []).some(
+                        (o: any) => o?.kind === "Deployment" && o?.name === name,
+                    );
+                    if (ownedByThis) {
+                        ownedReplicaSetNames.add(rs.metadata?.name);
+                    }
+                }
+            }
+        }
+
         const podsResult = await kubectl([
             "--context", context, "-n", namespace, "get", "pods",
             "-l", selectorParts.join(","), "-o", "json",
         ]);
         if (podsResult.exitCode === 0) {
             const podsData = JSON.parse(podsResult.stdout);
-            pods = (podsData.items as any[]).map((p) => mapPodListItem(p));
+            pods = (podsData.items as any[])
+                .filter((p) => podBelongsToWorkload(p, { kind, name, ownedReplicaSetNames }, selector))
+                .map((p) => mapPodListItem(p));
         }
     }
 
