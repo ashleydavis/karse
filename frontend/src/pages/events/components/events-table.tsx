@@ -29,6 +29,8 @@ import { useKubeContext } from "../../../lib/kube-context";
 import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { fetchEvents } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
+import { EventTypeFilter } from "../../../components/event-type-filter";
+import { ALL_EVENT_TYPES, filterEventsByType } from "../../../lib/event-type-filter";
 
 // Formats a Kubernetes timestamp into a human-readable age string.
 function formatAge(lastSeen: string): string {
@@ -120,9 +122,15 @@ export function EventsTable() {
 
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
+    // Checked event types. Empty means "show all" (the default); see filterEventsByType.
+    const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+
+    // Narrow by type before the table applies search and sorting. An empty selection
+    // leaves every event in place.
+    const typeFiltered = filterEventsByType(data?.events ?? [], selectedTypes);
 
     const table = useReactTable({
-        data: data?.events ?? [],
+        data: typeFiltered,
         columns,
         state: {
             sorting,
@@ -162,20 +170,27 @@ export function EventsTable() {
 
     return (
         <div className="flex flex-col gap-2">
-            <TextField
-                size="small"
-                placeholder="Search events..."
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                data-test-id="events-search"
-                slotProps={{
-                    input: {
-                        startAdornment: (
-                            <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                        ),
-                    },
-                }}
-            />
+            <div className="flex flex-row gap-2 items-center">
+                <TextField
+                    size="small"
+                    placeholder="Search events..."
+                    value={globalFilter}
+                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    data-test-id="events-search"
+                    slotProps={{
+                        input: {
+                            startAdornment: (
+                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
+                            ),
+                        },
+                    }}
+                />
+                <EventTypeFilter
+                    all={ALL_EVENT_TYPES}
+                    selected={selectedTypes}
+                    onChange={setSelectedTypes}
+                />
+            </div>
             <TableContainer component={Paper} data-test-id="events-table">
                 <Table size="small">
                     <TableHead>

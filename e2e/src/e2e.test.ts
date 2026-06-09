@@ -3125,6 +3125,105 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Events page: type filter ────────────────────────────────────────────────
+
+    test.describe("events page type filter", () => {
+        // Two Warning and one Normal event so each type checkbox is observable.
+        const TYPE_EVENTS = {
+            events: [
+                {
+                    type: "Warning",
+                    reason: "BackOff",
+                    message: "Back-off restarting failed container",
+                    count: 5,
+                    lastSeen: new Date().toISOString(),
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "nginx-warn",
+                },
+                {
+                    type: "Warning",
+                    reason: "Unhealthy",
+                    message: "Readiness probe failed",
+                    count: 3,
+                    lastSeen: new Date().toISOString(),
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "redis-warn",
+                },
+                {
+                    type: "Normal",
+                    reason: "Scheduled",
+                    message: "Successfully assigned default/web to node-cp",
+                    count: 1,
+                    lastSeen: new Date().toISOString(),
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "web-normal",
+                },
+            ],
+        };
+
+        // Install a route override that returns TYPE_EVENTS for every /api/events request.
+        async function interceptTypeEvents(): Promise<void> {
+            await page.route("**/api/events*", async (route) => {
+                await route.fulfill({ json: TYPE_EVENTS });
+            });
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await interceptTypeEvents();
+            await page.goto("/events", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='events-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/events*");
+            setContext(CLUSTER_1);
+        });
+
+        test("shows all events by default with nothing checked", async () => {
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='events-type-filter-button']")).toHaveText("Type: All");
+        });
+
+        test("checking Warning narrows to only Warning events", async () => {
+            await page.locator("[data-test-id='events-type-filter-button']").click();
+            await page.locator("[data-test-id='events-type-filter-item-Warning']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "web-normal" })).toHaveCount(0);
+            await expect(page.locator("[data-test-id='events-type-filter-button']")).toHaveText("Type: 1 selected");
+        });
+
+        test("also checking Normal widens to both types", async () => {
+            await page.locator("[data-test-id='events-type-filter-button']").click();
+            await page.locator("[data-test-id='events-type-filter-item-Normal']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='events-type-filter-button']")).toHaveText("Type: 2 selected");
+        });
+
+        test("checking only Normal shows just the Normal event", async () => {
+            await page.locator("[data-test-id='events-type-filter-button']").click();
+            // Uncheck Warning, leaving only Normal checked.
+            await page.locator("[data-test-id='events-type-filter-item-Warning']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "web-normal" })).toBeVisible();
+            await expect(page.locator("[data-test-id='events-type-filter-button']")).toHaveText("Type: 1 selected");
+        });
+
+        test("deselect all clears the selection and restores every event", async () => {
+            await page.locator("[data-test-id='events-type-filter-button']").click();
+            await page.locator("[data-test-id='events-type-filter-deselect-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='events-type-filter-button']")).toHaveText("Type: All");
+        });
+    });
+
     // ── Errors page ───────────────────────────────────────────────────────────
 
     test.describe("errors page", () => {
