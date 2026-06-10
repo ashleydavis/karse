@@ -35,10 +35,13 @@ beforeEach(() => {
 
 // A minimal valid cluster event returned by the mock adapter.
 const FAKE_EVENT = {
+    uid: "evt-uid-1",
     type: "Warning",
     reason: "BackOff",
     message: "Back-off restarting failed container",
     count: 5,
+    source: "kubelet",
+    firstSeen: "2024-05-31T23:00:00Z",
     lastSeen: "2024-06-01T00:00:00Z",
     namespace: "default",
     objectKind: "Pod",

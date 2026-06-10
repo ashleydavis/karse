@@ -144,10 +144,13 @@ export type KubeEvent = {
 // Richer than KubeEvent: includes the involved object and namespace so events
 // from many resources can be displayed together in a single table.
 export type ClusterEvent = {
+    uid: string;            // metadata.uid; stable identifier for the detail route
     type: "Normal" | "Warning";
     reason: string;
     message: string;
     count: number;
+    source: string;         // reporting component, e.g. "kubelet" ("" when unknown)
+    firstSeen: string;      // ISO timestamp of the first occurrence ("" when unknown)
     lastSeen: string;       // ISO timestamp; UI computes age
     namespace: string;
     objectKind: string;     // involvedObject.kind, e.g. "Pod"

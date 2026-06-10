@@ -36,6 +36,7 @@ A cluster seeded with a few events (one Warning, two Normal) across two namespac
 - **Type filter (narrow)**: open the filter and check `Warning`. The button reads "Type: 1 selected" and only the `Warning` event (`BackOff`) remains; the `Normal` events are hidden. Also check `Normal`: the button reads "Type: 2 selected" and all events return.
 - **Type filter (only Normal)**: uncheck `Warning` so only `Normal` is checked. Only the `Normal` events appear.
 - **Deselect all**: open the filter and click "Deselect all". The button returns to "Type: All" and every event is shown again.
+- **Row click drills down**: hover an event row; the cursor becomes a pointer and the row highlights (the standard clickable-row affordance). Click the `BackOff` row. The app navigates to that event's detail page (`/events/:uid`); see the `event-detail` manual tests.
 
 Teardown:
 

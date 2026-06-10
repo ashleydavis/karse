@@ -15,6 +15,7 @@ Backed by: the per-page table components under `frontend/src/pages/*/components/
 - Errors table rows link to that error's detail page (`/errors/:index`; see `errors-feed`).
 - Pods listed on a node, pod, or workload detail page link to the relevant pod detail page; resources listed on a namespace detail page link to their own detail page.
 - Container and init-container rows on the pod detail page link to that container's detail page (`/pods/:namespace/:name/containers/:container`; see `container-detail`).
+- Events table rows link to the event detail page (`/events/:uid`; see `event-detail`).
 - Clickable rows share a common hover/cursor style (`table-row-style.ts`) so they look and behave consistently.
 
 ## Acceptance Criteria

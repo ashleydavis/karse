@@ -240,8 +240,10 @@ curl -fsS "$BASE/api/daemonsets?context=$CURRENT_CTX" \
 echo "OK"
 
 echo "--- GET /api/events (all namespaces) ---"
+# When events exist, each must carry the detail-page fields (uid, firstSeen, lastSeen,
+# objectKind/objectName). An empty list is still valid (kwok may emit no events).
 curl -fsS "$BASE/api/events?context=$CURRENT_CTX" \
-    | jq -e 'has("events")' \
+    | jq -e 'has("events") and (.events | all(has("uid") and has("source") and has("firstSeen") and has("lastSeen") and has("objectKind") and has("objectName")))' \
     > /dev/null
 echo "OK"
 

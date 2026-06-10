@@ -33,6 +33,8 @@ import { ALL_EVENT_TYPES, filterEventsByType } from "../../../lib/event-type-fil
 import { LoadError } from "../../../components/load-error";
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
+import { useShareableNavigate } from "../../../lib/nav-state";
+import { tableRowSx } from "../../../lib/table-row-style";
 
 // Formats a Kubernetes timestamp into a human-readable age string.
 function formatAge(lastSeen: string): string {
@@ -115,6 +117,7 @@ const columns: ColumnDef<ClusterEvent>[] = [
 export function EventsTable() {
     const { current } = useKubeContext();
     const { namespace } = useKubeNamespace();
+    const navigate = useShareableNavigate();
 
     const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["events", current, namespace],
@@ -237,7 +240,12 @@ export function EventsTable() {
                             </TableRow>
                         )}
                         {rows.map((row) => (
-                            <TableRow key={row.id} data-test-id="event-row">
+                            <TableRow
+                                key={row.id}
+                                data-test-id="event-row"
+                                onClick={() => navigate(`/events/${encodeURIComponent(row.original.uid)}`)}
+                                sx={tableRowSx(true)}
+                            >
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell key={cell.id}>
                                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

@@ -5,10 +5,13 @@ import { ALL_EVENT_TYPES, filterEventsByType } from "../../lib/event-type-filter
 // realistic but irrelevant to the type filter.
 function makeEvent(reason: string, type: ClusterEvent["type"]): ClusterEvent {
     return {
+        uid: `uid-${reason}`,
         type,
         reason,
         message: `${reason} happened`,
         count: 1,
+        source: "kubelet",
+        firstSeen: "2024-01-01T00:00:00Z",
         lastSeen: "2024-01-01T00:00:00Z",
         namespace: "default",
         objectKind: "Pod",

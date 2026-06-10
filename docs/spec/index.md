@@ -26,6 +26,7 @@ The spec is reverse-engineered from the shipped code and the prose docs (`docs/a
 | [log-viewer](./log-viewer/index.md) | Settled | Complete | Read-only pod/container log viewer with container + tail selectors and a live follow. |
 | [stern-live-logs](./stern-live-logs/index.md) | Settled | Complete | Multi-pod live log streaming via the `stern` binary. |
 | [events-feed](./events-feed/index.md) | Settled | Complete | Recent cluster events view, sorted newest-first. |
+| [event-detail](./event-detail/index.md) | Settled | Complete | `/events/:uid` page: every event field, the full message, first/last seen, and a link to the involved object. |
 | [errors-feed](./errors-feed/index.md) | Settled | Complete | Unified view of Warning events and problem pods. |
 | [resource-search](./resource-search/index.md) | Settled | Complete | In-table search and column sorting; fuzzy on most tables, plain substring on events and errors. |
 | [resource-stats](./resource-stats/index.md) | Settled | Complete | Per-page Total / Healthy / Error stats header on each resource list page. |

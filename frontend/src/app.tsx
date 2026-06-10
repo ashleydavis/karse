@@ -10,6 +10,7 @@ import { DeploymentsPage } from "./pages/deployments";
 import { StatefulSetsPage } from "./pages/statefulsets";
 import { DaemonSetsPage } from "./pages/daemonsets";
 import { EventsPage } from "./pages/events";
+import { EventDetailPage } from "./pages/event-detail";
 import { ErrorsPage } from "./pages/errors";
 import { ErrorDetailPage } from "./pages/error-detail";
 import { PodDetailPage } from "./pages/pod-detail";
@@ -46,6 +47,7 @@ export function App() {
                 <Route path="daemonsets" element={<DaemonSetsPage />} />
                 <Route path="daemonsets/:namespace/:name" element={<WorkloadDetailPage kind="daemonsets" />} />
                 <Route path="events" element={<EventsPage />} />
+                <Route path="events/:uid" element={<EventDetailPage />} />
                 <Route path="logs" element={<LiveLogsPage />} />
                 <Route path="errors" element={<ErrorsPage />} />
                 <Route path="errors/:index" element={<ErrorDetailPage />} />

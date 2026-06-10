@@ -1710,10 +1710,13 @@ describe("listEvents", () => {
     // Minimal event item shape with the fields listEvents reads, mirroring
     // the structurally significant fields kubectl returns for core/v1 Events.
     function makeEventItem(overrides: {
+        uid?: string;
         type?: string;
         reason?: string;
         message?: string;
         count?: number;
+        source?: string;
+        firstTimestamp?: string;
         lastTimestamp?: string;
         eventTime?: string;
         namespace?: string;
@@ -1725,16 +1728,21 @@ describe("listEvents", () => {
             metadata: {
                 name: "evt-1.abc",
                 namespace: overrides.namespace ?? "default",
+                uid: overrides.uid ?? "evt-uid-1",
             },
             involvedObject: {
                 kind: overrides.objectKind ?? "Pod",
                 name: overrides.objectName ?? "nginx-abc",
                 namespace: overrides.objectNamespace ?? "default",
             },
+            source: {
+                component: overrides.source ?? "kubelet",
+            },
             reason: overrides.reason ?? "Scheduled",
             message: overrides.message ?? "Successfully assigned default/nginx-abc to node-1",
             type: overrides.type ?? "Normal",
             count: overrides.count ?? 1,
+            firstTimestamp: overrides.firstTimestamp,
             lastTimestamp: overrides.lastTimestamp,
             eventTime: overrides.eventTime,
         };
@@ -1765,10 +1773,13 @@ describe("listEvents", () => {
             "--context test-ctx get events -A -o json": () => ok(JSON.stringify({
                 items: [
                     makeEventItem({
+                        uid: "abc-123",
                         type: "Warning",
                         reason: "BackOff",
                         message: "Back-off restarting failed container",
                         count: 7,
+                        source: "kubelet",
+                        firstTimestamp: "2024-01-15T11:00:00Z",
                         lastTimestamp: "2024-01-15T12:00:00Z",
                         namespace: "prod",
                         objectKind: "Pod",
@@ -1779,15 +1790,74 @@ describe("listEvents", () => {
         });
         const result = await listEvents("test-ctx");
         expect(result[0]).toEqual({
+            uid: "abc-123",
             type: "Warning",
             reason: "BackOff",
             message: "Back-off restarting failed container",
             count: 7,
+            source: "kubelet",
+            firstSeen: "2024-01-15T11:00:00Z",
             lastSeen: "2024-01-15T12:00:00Z",
             namespace: "prod",
             objectKind: "Pod",
             objectName: "api-xyz",
         });
+    });
+
+    test("uid is empty and firstSeen falls back to eventTime when both absent", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get events -A -o json": () => ok(JSON.stringify({
+                items: [
+                    {
+                        metadata: {
+                            name: "evt-no-uid",
+                            namespace: "default",
+                        },
+                        involvedObject: {
+                            kind: "Pod",
+                            name: "nginx-abc",
+                        },
+                        reason: "Scheduled",
+                        message: "msg",
+                        type: "Normal",
+                        count: 1,
+                        eventTime: "2024-03-03T03:03:03Z",
+                    },
+                ],
+            })),
+        });
+        const result = await listEvents("test-ctx");
+        expect(result[0]!.uid).toBe("");
+        expect(result[0]!.firstSeen).toBe("2024-03-03T03:03:03Z");
+        expect(result[0]!.source).toBe("");
+    });
+
+    test("source falls back to reportingComponent when source.component is absent", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get events -A -o json": () => ok(JSON.stringify({
+                items: [
+                    {
+                        metadata: {
+                            name: "evt-reporting",
+                            namespace: "default",
+                            uid: "u1",
+                        },
+                        involvedObject: {
+                            kind: "Pod",
+                            name: "nginx-abc",
+                        },
+                        reportingComponent: "kubelet",
+                        reason: "Scheduled",
+                        message: "msg",
+                        type: "Normal",
+                        count: 1,
+                        lastTimestamp: "2024-03-03T03:03:03Z",
+                    },
+                ],
+            })),
+        });
+        const result = await listEvents("test-ctx");
+        expect(result[0]!.source).toBe("kubelet");
     });
 
     test("falls back to eventTime when lastTimestamp is absent", async () => {

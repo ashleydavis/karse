@@ -2,8 +2,11 @@ import { Breadcrumbs as MuiBreadcrumbs, Link as MuiLink, Typography } from "@mui
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { collapseCrumbs, middleTruncate, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../lib/breadcrumb-trail";
 import type { Crumb } from "../lib/breadcrumb-trail";
+import { useKubeContext } from "../lib/kube-context";
+import { fetchEvents } from "../lib/api-client";
 
 // Maps a top-level list-page segment to its display label.
 const LIST_LABELS: Record<string, string> = {
@@ -45,6 +48,7 @@ function buildCrumbs(
     pathname: string,
     params: Record<string, string | undefined>,
     tab: string | null,
+    eventName: string | null,
 ): Crumb[] {
     const segments = pathname.split("/").filter((s) => s.length > 0);
     if (segments.length === 0)
@@ -99,6 +103,17 @@ function buildCrumbs(
         ];
     }
 
+    // Event detail: /events/:uid -> Events > <reason>. The uid is an opaque GUID,
+    // so the leaf crumb shows the event's own name (its reason), resolved from the
+    // events data; it falls back to the generic "Event" until the data is loaded.
+    if (root === "events" && params.uid)
+    {
+        return [
+            { label: "Events", to: "/events" },
+            { label: eventName !== null ? middleTruncate(eventName, MAX_NAME_LENGTH) : "Event" },
+        ];
+    }
+
     // Namespace detail: /namespaces/:name -> Namespaces > <name>
     if (root === "namespaces" && params.name)
     {
@@ -119,7 +134,24 @@ export function Breadcrumbs() {
     const { pathname } = useLocation();
     const params = useParams();
     const [searchParams] = useSearchParams();
-    const crumbs = collapseCrumbs(buildCrumbs(pathname, params, searchParams.get("tab")), MAX_TRAIL_ITEMS);
+    const { current } = useKubeContext();
+
+    // On the event detail route the URL only carries the event's opaque uid, so the
+    // trailing crumb's name (the event's reason) has to come from the events data.
+    // This reuses the same cluster-wide query key the detail page populates, so it
+    // reads from the cache rather than triggering an extra fetch.
+    const onEventDetail = pathname.split("/").filter((s) => s.length > 0)[0] === "events"
+        && params.uid !== undefined;
+    const { data: eventsData } = useQuery({
+        queryKey: ["events", current, null],
+        queryFn: () => fetchEvents(current!),
+        enabled: onEventDetail && current !== null,
+    });
+    const eventName = onEventDetail
+        ? (eventsData?.events.find((e) => e.uid === params.uid)?.reason ?? null)
+        : null;
+
+    const crumbs = collapseCrumbs(buildCrumbs(pathname, params, searchParams.get("tab"), eventName), MAX_TRAIL_ITEMS);
 
     return (
         <MuiBreadcrumbs

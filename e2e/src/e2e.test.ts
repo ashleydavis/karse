@@ -3905,6 +3905,135 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Event detail page ───────────────────────────────────────────────────────
+
+    test.describe("event detail page", () => {
+        // Two events with stable uids so the detail route can address each one. The
+        // Warning event's involved Pod has a detail page; the message is long so the
+        // "full untruncated message" assertion is meaningful.
+        const LONG_MESSAGE =
+            "Back-off restarting failed container nginx in pod nginx-abc_default; the container keeps crashing on startup and kubelet is throttling restarts";
+        const DETAIL_EVENTS = {
+            events: [
+                {
+                    uid: "evt-warning-1",
+                    type: "Warning",
+                    reason: "BackOff",
+                    message: LONG_MESSAGE,
+                    count: 9,
+                    source: "kubelet",
+                    firstSeen: new Date(Date.now() - 3_600_000).toISOString(),
+                    lastSeen: new Date().toISOString(),
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "nginx-abc",
+                },
+                {
+                    uid: "evt-normal-1",
+                    type: "Normal",
+                    reason: "Scheduled",
+                    message: "Successfully assigned default/redis-xyz to node-cp",
+                    count: 1,
+                    source: "default-scheduler",
+                    firstSeen: new Date(Date.now() - 60_000).toISOString(),
+                    lastSeen: new Date().toISOString(),
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "redis-xyz",
+                },
+            ],
+        };
+
+        async function interceptDetailEvents(): Promise<void> {
+            await page.route("**/api/events*", async (route) => {
+                await route.fulfill({ json: DETAIL_EVENTS });
+            });
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await interceptDetailEvents();
+            await page.goto("/events", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='events-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/events*");
+            setContext(CLUSTER_1);
+        });
+
+        test("clicking an event row navigates to its detail page", async () => {
+            await page.goto("/events", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='event-row']").filter({ hasText: "BackOff" }).click();
+            await expect(page).toHaveURL(/\/events\/evt-warning-1/);
+            await expect(page.locator("[data-test-id='event-detail']")).toBeVisible();
+        });
+
+        test("shows the event fields including count and object", async () => {
+            await page.goto("/events/evt-warning-1", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='event-field-reason']")).toContainText("BackOff");
+            await expect(page.locator("[data-test-id='event-field-type']")).toContainText("Warning");
+            await expect(page.locator("[data-test-id='event-field-count']")).toContainText("9");
+            await expect(page.locator("[data-test-id='event-field-source']")).toContainText("kubelet");
+            await expect(page.locator("[data-test-id='event-field-object']")).toContainText("Pod/nginx-abc");
+            await expect(page.locator("[data-test-id='event-field-namespace']")).toContainText("default");
+        });
+
+        test("shows the full untruncated message", async () => {
+            await page.goto("/events/evt-warning-1", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='event-field-message']")).toHaveText(LONG_MESSAGE);
+        });
+
+        test("shows first-seen and last-seen timestamps", async () => {
+            await page.goto("/events/evt-warning-1", { waitUntil: "networkidle" });
+            const firstSeen = await page.locator("[data-test-id='event-field-first-seen']").textContent();
+            const lastSeen = await page.locator("[data-test-id='event-field-last-seen']").textContent();
+            // Each shows an absolute timestamp plus a relative age in parentheses.
+            expect(firstSeen).toContain("First seen");
+            expect(firstSeen).toMatch(/\(.+\)/);
+            expect(lastSeen).toContain("Last seen");
+            expect(lastSeen).toMatch(/\(.+\)/);
+        });
+
+        test("the involved-object link navigates to the pod detail page", async () => {
+            await page.goto("/events/evt-warning-1", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='event-object-link']").click();
+            await expect(page).toHaveURL(/\/pods\/default\/nginx-abc/);
+        });
+
+        test("the back button returns to the events list", async () => {
+            await page.goto("/events/evt-warning-1", { waitUntil: "networkidle" });
+            await page.locator("[aria-label='back to events']").click();
+            await expect(page).toHaveURL(/\/events($|\?)/);
+            await expect(page.locator("[data-test-id='events-table']")).toBeVisible();
+        });
+
+        test("the trailing breadcrumb shows the event name, not the literal \"Event\"", async () => {
+            await page.goto("/events/evt-warning-1", { waitUntil: "networkidle" });
+            // The trailing crumb must be the event's own name (its reason), mirroring
+            // how the other detail pages put the resource's name in the last crumb.
+            await expect(page.locator("[data-test-id='breadcrumb-item']").last()).toHaveText("BackOff");
+            const items = await page.locator("[data-test-id='breadcrumb-item']").allTextContents();
+            expect(items).toEqual(["Events", "BackOff"]);
+        });
+
+        test("the trailing breadcrumb reflects a different event's name", async () => {
+            await page.goto("/events/evt-normal-1", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='breadcrumb-item']").last()).toHaveText("Scheduled");
+        });
+
+        test("the Events breadcrumb returns to the events list", async () => {
+            await page.goto("/events/evt-warning-1", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='breadcrumb-item']").filter({ hasText: "Events" }).click();
+            await expect(page).toHaveURL(/\/events($|\?)/);
+        });
+
+        test("shows a not-found message for an unknown event uid", async () => {
+            await page.goto("/events/does-not-exist", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='event-not-found']")).toBeVisible();
+        });
+    });
+
     // ── Events page: type filter ────────────────────────────────────────────────
 
     test.describe("events page type filter", () => {

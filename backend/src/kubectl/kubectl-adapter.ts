@@ -269,11 +269,16 @@ export async function listEvents(context: string, namespace?: string): Promise<C
     const events: ClusterEvent[] = (data.items as any[]).map((ev) => {
         const involved = ev.involvedObject ?? {};
         const lastSeen = ev.lastTimestamp ?? ev.eventTime ?? ev.firstTimestamp ?? "";
+        const firstSeen = ev.firstTimestamp ?? ev.eventTime ?? "";
+        const source = ev.source?.component ?? ev.reportingComponent ?? "";
         return {
+            uid: ev.metadata?.uid ?? "",
             type: (ev.type as "Normal" | "Warning") ?? "Normal",
             reason: ev.reason ?? "",
             message: ev.message ?? "",
             count: ev.count ?? 1,
+            source,
+            firstSeen,
             lastSeen,
             namespace: ev.metadata?.namespace ?? involved.namespace ?? "",
             objectKind: involved.kind ?? "",
