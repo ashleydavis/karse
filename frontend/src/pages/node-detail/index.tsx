@@ -17,7 +17,7 @@ import {
     Tab,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleCheck, faCircleXmark, faCircleQuestion, faTriangleExclamation, faArrowLeft, faTag } from "@fortawesome/free-solid-svg-icons";
+import { faCircleCheck, faCircleXmark, faCircleQuestion, faTriangleExclamation, faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { NodeStatus, NodeCondition, KubeEvent } from "karse-types";
 import { useKubeContext } from "../../lib/kube-context";
@@ -25,6 +25,7 @@ import { useShareableNavigate } from "../../lib/nav-state";
 import { fetchNodeDetail } from "../../lib/api-client";
 import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
+import { LabelsTab } from "../../components/labels-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { tableRowSx } from "../../lib/table-row-style";
@@ -80,7 +81,7 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
 }
 
 // The set of tabs available on the node detail page.
-type NodeDetailTab = "detail" | "pods" | "events" | "commands" | "yaml";
+type NodeDetailTab = "detail" | "pods" | "events" | "labels" | "commands" | "yaml";
 
 // Detail page for a single node, organizing its content into Status, Pods, and Events tabs.
 export function NodeDetailPage() {
@@ -127,6 +128,7 @@ export function NodeDetailPage() {
                     <Tab label="Status" value="detail" data-test-id="node-tab-detail" />
                     <Tab label="Pods" value="pods" data-test-id="node-tab-pods" />
                     <Tab label="Events" value="events" data-test-id="node-tab-events" />
+                    <Tab label="Labels" value="labels" data-test-id="node-tab-labels" />
                     <Tab label="Commands" value="commands" data-test-id="node-tab-commands" />
                     <Tab label="YAML" value="yaml" data-test-id="node-tab-yaml" />
                 </Tabs>
@@ -214,22 +216,12 @@ export function NodeDetailPage() {
                         </TableContainer>
                     </Paper>
 
-                    {Object.keys(data.labels).length > 0 && (
-                        <Paper variant="outlined" sx={{ p: 2 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Labels</Typography>
-                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                                {Object.entries(data.labels).map(([k, v]) => (
-                                    <Chip
-                                        key={k}
-                                        label={`${k}=${v}`}
-                                        size="small"
-                                        variant="outlined"
-                                        icon={<FontAwesomeIcon icon={faTag} />}
-                                    />
-                                ))}
-                            </Box>
-                        </Paper>
-                    )}
+                </Box>
+            )}
+
+            {activeTab === "labels" && (
+                <Box data-test-id="node-panel-labels">
+                    <LabelsTab labels={data.labels} />
                 </Box>
             )}
 

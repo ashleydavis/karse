@@ -16,7 +16,7 @@ import {
     Tab,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft, faCircleCheck, faCirclePause, faCircleQuestion, faCircleXmark, faTag, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
+import { faArrowLeft, faCircleCheck, faCirclePause, faCircleQuestion, faCircleXmark, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { PodPhase, KubeEvent } from "karse-types";
 import { useKubeContext } from "../../lib/kube-context";
@@ -24,6 +24,7 @@ import { useShareableNavigate } from "../../lib/nav-state";
 import { fetchPodDetail } from "../../lib/api-client";
 import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
+import { LabelsTab } from "../../components/labels-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { PodContainersPanel, PodInitContainersPanel } from "./components/pod-containers-panel";
@@ -77,12 +78,12 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
 }
 
 // The set of tabs available on the pod detail page.
-type PodDetailTab = "detail" | "containers" | "init-containers" | "logs" | "commands" | "yaml";
+type PodDetailTab = "detail" | "containers" | "init-containers" | "labels" | "logs" | "commands" | "yaml";
 
 // Reads the active tab from the URL, falling back to the Detail tab for any
 // missing or unrecognized value so the page always has a valid selection.
 function parseTab(value: string | null): PodDetailTab {
-    if (value === "containers" || value === "init-containers" || value === "logs" || value === "commands" || value === "yaml") {
+    if (value === "containers" || value === "init-containers" || value === "labels" || value === "logs" || value === "commands" || value === "yaml") {
         return value;
     }
     return "detail";
@@ -161,6 +162,7 @@ export function PodDetailPage() {
                             data-test-id="pod-tab-init-containers"
                         />
                     )}
+                    <Tab label="Labels" value="labels" data-test-id="pod-tab-labels" />
                     <Tab label="Logs" value="logs" data-test-id="pod-tab-logs" />
                     <Tab label="Commands" value="commands" data-test-id="pod-tab-commands" />
                     <Tab label="YAML" value="yaml" data-test-id="pod-tab-yaml" />
@@ -185,23 +187,6 @@ export function PodDetailPage() {
                             ))}
                         </Box>
                     </Paper>
-
-                    {Object.keys(data.labels).length > 0 && (
-                        <Paper variant="outlined" sx={{ p: 2 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Labels</Typography>
-                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                                {Object.entries(data.labels).map(([k, v]) => (
-                                    <Chip
-                                        key={k}
-                                        label={`${k}=${v}`}
-                                        size="small"
-                                        variant="outlined"
-                                        icon={<FontAwesomeIcon icon={faTag} />}
-                                    />
-                                ))}
-                            </Box>
-                        </Paper>
-                    )}
 
                     {data.events.length > 0 && (
                         <Paper variant="outlined" sx={{ p: 2 }}>
@@ -244,6 +229,12 @@ export function PodDetailPage() {
             {effectiveTab === "init-containers" && (
                 <Box data-test-id="pod-panel-init-containers">
                     <PodInitContainersPanel initContainers={data.initContainers} namespace={data.namespace} podName={data.name} />
+                </Box>
+            )}
+
+            {effectiveTab === "labels" && (
+                <Box data-test-id="pod-panel-labels">
+                    <LabelsTab labels={data.labels} />
                 </Box>
             )}
 

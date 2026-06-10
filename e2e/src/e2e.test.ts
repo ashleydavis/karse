@@ -1093,6 +1093,16 @@ test.describe("karse e2e", () => {
             await page.goto("/deployments", { waitUntil: "networkidle" });
         });
 
+        test("the deployment detail Labels tab shows the workload's own labels", async () => {
+            await page.goto("/deployments/default/nginx", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='workload-tab-labels']").click();
+            await expect(page.locator("[data-test-id='labels-table']")).toBeVisible();
+            await expect(
+                page.locator("[data-test-id='label-row']").filter({ hasText: "app" })
+            ).toContainText("nginx");
+            await page.goto("/deployments", { waitUntil: "networkidle" });
+        });
+
         test("the deployment detail Commands tab lists read-only kubectl suggestions", async () => {
             await page.goto("/deployments/default/nginx", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='workload-tab-commands']").click();
@@ -1652,6 +1662,77 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Labels tab (per-detail-page, single resource's own labels) ──────────────
+
+    test.describe("pod detail Labels tab", () => {
+        // A pod with several labels so sort and search are observable. The Labels
+        // tab shows only this one pod's own labels, as a Key / Value table.
+        const FAKE_POD_LABELLED = {
+            name: "web-1",
+            namespace: "default",
+            phase: "Running",
+            node: "node-worker",
+            podIP: "10.0.0.9",
+            createdAt: new Date().toISOString(),
+            labels: { app: "web", tier: "frontend", env: "prod" },
+            containers: [
+                { name: "web", image: "web:1", ready: true, restarts: 0, state: "Running", stateReason: "" },
+            ],
+            initContainers: [],
+            events: [],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods/default/web-1*", async (route) => {
+                await route.fulfill({ json: FAKE_POD_LABELLED });
+            });
+            await page.goto("/pods/default/web-1", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-labels']").click();
+            await expect(page.locator("[data-test-id='labels-tab']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods/default/web-1*");
+        });
+
+        test("renders the Labels tab as a Key / Value table with one row per label", async () => {
+            await expect(page.locator("[data-test-id='labels-table']")).toBeVisible();
+            await expect(page.locator("[data-test-id='label-row']")).toHaveCount(3);
+            // Default order is by key: app, env, tier.
+            const keys = await page.locator("[data-test-id='label-row'] td:first-child").allTextContents();
+            expect(keys).toEqual(["app", "env", "tier"]);
+        });
+
+        test("sorting on the Key column reverses the row order", async () => {
+            // Click once for ascending (already the default), then again for descending.
+            await page.locator("[data-test-id='labels-header-key']").click();
+            await page.locator("[data-test-id='labels-header-key']").click();
+            const keys = await page.locator("[data-test-id='label-row'] td:first-child").allTextContents();
+            expect(keys).toEqual(["tier", "env", "app"]);
+            // Restore ascending so later tests start from a known order.
+            await page.locator("[data-test-id='labels-header-key']").click();
+        });
+
+        test("searching filters the rows to matching labels", async () => {
+            await page.locator("[data-test-id='labels-filter'] input").fill("tier");
+            await expect(page.locator("[data-test-id='label-row']")).toHaveCount(1);
+            const keys = await page.locator("[data-test-id='label-row'] td:first-child").allTextContents();
+            expect(keys).toEqual(["tier"]);
+        });
+
+        test("a non-matching search shows the no-match message", async () => {
+            await page.locator("[data-test-id='labels-filter'] input").fill("zzzznope");
+            await expect(page.locator("[data-test-id='no-labels-match']")).toBeVisible();
+            await expect(page.locator("[data-test-id='label-row']")).toHaveCount(0);
+        });
+
+        test("clearing the search restores all label rows", async () => {
+            await page.locator("[data-test-id='labels-filter'] input").fill("");
+            await expect(page.locator("[data-test-id='label-row']")).toHaveCount(3);
+        });
+    });
+
     // ── Pod detail page without init containers ─────────────────────────────────
 
     test.describe("pod detail page without init containers", () => {
@@ -1922,13 +2003,22 @@ test.describe("karse e2e", () => {
             await expect(page.getByRole("cell", { name: "pods" })).toBeVisible();
         });
 
-        test("shows the three tabs and defaults to Status", async () => {
+        test("shows the tabs and defaults to Status", async () => {
             await expect(page.locator("[data-test-id='node-tab-detail']")).toBeVisible();
             await expect(page.locator("[data-test-id='node-tab-pods']")).toBeVisible();
             await expect(page.locator("[data-test-id='node-tab-events']")).toBeVisible();
+            await expect(page.locator("[data-test-id='node-tab-labels']")).toBeVisible();
             await expect(page.locator("[data-test-id='node-panel-detail']")).toBeVisible();
             await expect(page.locator("[data-test-id='node-panel-pods']")).toHaveCount(0);
             await expect(page.locator("[data-test-id='node-panel-events']")).toHaveCount(0);
+        });
+
+        test("Labels tab shows the node's own labels as a Key / Value table", async () => {
+            await page.locator("[data-test-id='node-tab-labels']").click();
+            await expect(page.locator("[data-test-id='labels-table']")).toBeVisible();
+            await expect(
+                page.locator("[data-test-id='label-row']").filter({ hasText: "kubernetes.io/hostname" })
+            ).toContainText("node-cp");
         });
 
         test("shows the scheduled pod in the pods table on the Pods tab", async () => {
@@ -2029,21 +2119,36 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Namespaces");
         });
 
-        test("shows the four tabs and defaults to Details", async () => {
+        test("shows the five tabs and defaults to Details", async () => {
             await expect(page.locator("[data-test-id='namespace-tab-detail']")).toBeVisible();
             await expect(page.locator("[data-test-id='namespace-tab-resources']")).toBeVisible();
+            await expect(page.locator("[data-test-id='namespace-tab-labels']")).toBeVisible();
             await expect(page.locator("[data-test-id='namespace-tab-commands']")).toBeVisible();
             await expect(page.locator("[data-test-id='namespace-tab-yaml']")).toBeVisible();
             await expect(page.locator("[data-test-id='namespace-panel-detail']")).toBeVisible();
             await expect(page.locator("[data-test-id='namespace-panel-resources']")).toHaveCount(0);
         });
 
-        test("Details tab shows labels, annotations, quotas, and limit ranges", async () => {
-            await expect(page.locator("[data-test-id='namespace-labels']")).toBeVisible();
-            await expect(page.locator("[data-test-id='namespace-labels']")).toContainText("team=alpha");
+        test("Details tab shows annotations, quotas, and limit ranges (labels are on the Labels tab)", async () => {
+            // Labels moved to their own Labels tab (see labels-tab); the Status tab
+            // no longer renders an inline label-chip card.
+            await expect(page.locator("[data-test-id='namespace-labels']")).toHaveCount(0);
             await expect(page.locator("[data-test-id='namespace-annotations']")).toContainText("owner");
             await expect(page.locator("[data-test-id='namespace-quota-row']").first()).toContainText("requests.cpu");
             await expect(page.locator("[data-test-id='namespace-limit-row']").first()).toContainText("memory");
+        });
+
+        test("Labels tab shows the namespace's own labels as a Key / Value table", async () => {
+            await page.locator("[data-test-id='namespace-tab-labels']").click();
+            await expect(page.locator("[data-test-id='labels-table']")).toBeVisible();
+            const keys = await page.locator("[data-test-id='label-row'] td:first-child").allTextContents();
+            expect(keys).toContain("team");
+            // Target the row whose Key cell is exactly "team" so the value assertion
+            // is not confused by the metadata.name row whose value also contains "team".
+            const teamRow = page.locator("[data-test-id='label-row']").filter({
+                has: page.locator("td:first-child", { hasText: /^team$/ }),
+            });
+            await expect(teamRow).toContainText("alpha");
         });
 
         test("Details tab Resources stat counts pods only, matching the list column", async () => {

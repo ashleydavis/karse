@@ -13,6 +13,7 @@ Backed by: `GET /api/nodes/:name`, `backend/src/routes/node-detail-route.ts`, `b
 - Conditions carry `type`, `status` (True/False/Unknown), `message`, and `lastTransition`. Capacity and allocatable each carry `cpu`, `memory`, `pods`. Addresses carry `type` and `address`.
 - The pods and events sub-reads are tolerant: if they fail, the page renders with empty pods/events rather than failing the whole request.
 - The page links each scheduled pod to its pod detail page, and offers guided commands for the node (see `guided-commands`).
+- The node's own labels are shown on a Labels tab as a searchable, sortable Key / Value table (see `labels-tab`), not inline on the Status tab.
 
 ## Acceptance Criteria
 

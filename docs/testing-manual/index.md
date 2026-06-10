@@ -48,6 +48,7 @@ Single-test-cluster discipline (per `readme.md`): there is only ever ONE test cl
 | [quick-find](./quick-find/index.md) | Header context and namespace dropdown pickers. |
 | [guided-commands](./guided-commands/index.md) | Copy-only kubectl command suggestions. |
 | [yaml-viewer](./yaml-viewer/index.md) | Raw YAML sub tab on resource detail pages. |
+| [labels-tab](./labels-tab/index.md) | Per-detail-page Labels tab: a resource's own labels, searchable and sortable. |
 | [audit-log](./audit-log/index.md) | On-disk kubectl audit log. |
 
 ## Cross-cutting guides

@@ -26,6 +26,7 @@ import { useShareableNavigate } from "../../lib/nav-state";
 import { fetchWorkloadDetail } from "../../lib/api-client";
 import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
+import { LabelsTab } from "../../components/labels-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { ResourceStatsHeader } from "../../components/resource-stats-header";
@@ -70,7 +71,7 @@ const KIND_LABEL: Record<WorkloadKind, string> = {
 };
 
 // The set of tabs available on the workload detail page.
-type WorkloadDetailTab = "detail" | "pods" | "commands" | "yaml";
+type WorkloadDetailTab = "detail" | "pods" | "labels" | "commands" | "yaml";
 
 // Maps the plural URL/UI workload token to the singular kind the Commands tab expects.
 const COMMAND_KIND: Record<WorkloadKind, GuidedResourceKind> = {
@@ -127,6 +128,7 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                 >
                     <Tab label="Status" value="detail" data-test-id="workload-tab-detail" />
                     <Tab label="Pods" value="pods" data-test-id="workload-tab-pods" />
+                    <Tab label="Labels" value="labels" data-test-id="workload-tab-labels" />
                     <Tab label="Commands" value="commands" data-test-id="workload-tab-commands" />
                     <Tab label="YAML" value="yaml" data-test-id="workload-tab-yaml" />
                 </Tabs>
@@ -155,23 +157,6 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Selector</Typography>
                             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                                 {Object.entries(data.selector).map(([k, v]) => (
-                                    <Chip
-                                        key={k}
-                                        label={`${k}=${v}`}
-                                        size="small"
-                                        variant="outlined"
-                                        icon={<FontAwesomeIcon icon={faTag} />}
-                                    />
-                                ))}
-                            </Box>
-                        </Paper>
-                    )}
-
-                    {Object.keys(data.labels).length > 0 && (
-                        <Paper variant="outlined" sx={{ p: 2 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Labels</Typography>
-                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                                {Object.entries(data.labels).map(([k, v]) => (
                                     <Chip
                                         key={k}
                                         label={`${k}=${v}`}
@@ -213,6 +198,12 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                             </TableContainer>
                         </Paper>
                     )}
+                </Box>
+            )}
+
+            {activeTab === "labels" && (
+                <Box data-test-id="workload-panel-labels">
+                    <LabelsTab labels={data.labels} />
                 </Box>
             )}
 

@@ -12,6 +12,7 @@ Backed by: `GET /api/pods/:namespace/:name`, `backend/src/routes/pod-detail-rout
 - The adapter runs the pod read and an events read (`get events --field-selector=involvedObject.name=<name>,involvedObject.namespace=<ns>`) in parallel; the events read is tolerant (degrades to empty on failure).
 - Each `ContainerInfo` carries `name`, `image`, `ready`, `restarts`, `state` (Running/Waiting/Terminated/Unknown), and `stateReason`.
 - The page shows pod metadata, the containers and init containers panel, the events list, and an embedded log viewer (see `log-viewer`). It offers guided commands for the pod (see `guided-commands`) and a raw-YAML view (see `yaml-viewer`).
+- The pod's own labels are shown on a Labels tab as a searchable, sortable Key / Value table (see `labels-tab`), not inline on the Status tab.
 - Each row in the Containers and Init Containers tables is clickable and drills down to that container's detail page (see `container-detail`).
 
 ## Acceptance Criteria

@@ -34,6 +34,7 @@ The spec is reverse-engineered from the shipped code and the prose docs (`docs/a
 | [quick-find](./quick-find/index.md) | Settled | Partial | Header quick-pickers for context and namespace. Global cross-kind quick-find is not yet shipped. |
 | [guided-commands](./guided-commands/index.md) | Settled | Complete | Copy-only kubectl command suggestions per resource; never executed. |
 | [yaml-viewer](./yaml-viewer/index.md) | Settled | Complete | View the raw YAML of a viewable resource on a detail-page sub tab. |
+| [labels-tab](./labels-tab/index.md) | Settled | Complete | A Labels sub tab on each resource detail page: that resource's own labels as a searchable, sortable table. |
 | [audit-log](./audit-log/index.md) | Settled | Complete | Every kubectl call is appended to a rolling on-disk audit log. |
 
 ## Not yet shipped

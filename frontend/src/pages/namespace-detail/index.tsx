@@ -17,13 +17,14 @@ import {
     Tab,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft, faTag } from "@fortawesome/free-solid-svg-icons";
+import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useKubeContext } from "../../lib/kube-context";
 import { useShareableNavigate } from "../../lib/nav-state";
 import { fetchNamespaceDetail } from "../../lib/api-client";
 import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
+import { LabelsTab } from "../../components/labels-tab";
 import { LoadError } from "../../components/load-error";
 import { tableRowSx } from "../../lib/table-row-style";
 import { ResourcesTable } from "./components/resources-table";
@@ -51,7 +52,7 @@ function PhaseChip({ phase }: { phase: string }) {
 }
 
 // The set of tabs available on the namespace detail page.
-type NamespaceDetailTab = "detail" | "resources" | "commands" | "yaml";
+type NamespaceDetailTab = "detail" | "resources" | "labels" | "commands" | "yaml";
 
 // Detail page for a single namespace. The Details tab shows the namespace's phase,
 // age, labels, annotations, and any resource quotas / limit ranges. The Resources
@@ -106,6 +107,7 @@ export function NamespaceDetailPage() {
                 >
                     <Tab label="Status" value="detail" data-test-id="namespace-tab-detail" />
                     <Tab label="Resources" value="resources" data-test-id="namespace-tab-resources" />
+                    <Tab label="Labels" value="labels" data-test-id="namespace-tab-labels" />
                     <Tab label="Commands" value="commands" data-test-id="namespace-tab-commands" />
                     <Tab label="YAML" value="yaml" data-test-id="namespace-tab-yaml" />
                 </Tabs>
@@ -133,23 +135,6 @@ export function NamespaceDetailPage() {
                             ))}
                         </Box>
                     </Paper>
-
-                    {Object.keys(data.labels).length > 0 && (
-                        <Paper variant="outlined" sx={{ p: 2 }} data-test-id="namespace-labels">
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Labels</Typography>
-                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                                {Object.entries(data.labels).map(([k, v]) => (
-                                    <Chip
-                                        key={k}
-                                        label={v === "" ? k : `${k}=${v}`}
-                                        size="small"
-                                        variant="outlined"
-                                        icon={<FontAwesomeIcon icon={faTag} />}
-                                    />
-                                ))}
-                            </Box>
-                        </Paper>
-                    )}
 
                     {Object.keys(data.annotations).length > 0 && (
                         <Paper variant="outlined" sx={{ p: 2 }} data-test-id="namespace-annotations">
@@ -240,6 +225,12 @@ export function NamespaceDetailPage() {
             {activeTab === "resources" && (
                 <Box data-test-id="namespace-panel-resources">
                     <ResourcesTable resources={data.resources} onOpen={(path) => navigate(path)} />
+                </Box>
+            )}
+
+            {activeTab === "labels" && (
+                <Box data-test-id="namespace-panel-labels">
+                    <LabelsTab labels={data.labels} />
                 </Box>
             )}
 

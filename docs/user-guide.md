@@ -107,10 +107,11 @@ A table of namespaces for the active context.
 
 ## Namespace detail page (`/namespaces/:name`)
 
-Reached by clicking a namespace row. Organised into four tabs:
+Reached by clicking a namespace row. Organised into five tabs:
 
-- **Details**: the namespace's status (its lifecycle phase, e.g. Active/Terminating), age, labels, annotations, and any resource quotas and limit ranges.
+- **Status**: the namespace's status (its lifecycle phase, e.g. Active/Terminating), age, annotations, and any resource quotas and limit ranges.
 - **Resources**: a searchable, sortable table of the resources in the namespace (pods, deployments, stateful sets, daemon sets). Click a row to open that resource's own detail page.
+- **Labels**: the namespace's own labels as a searchable, sortable Key / Value table (see [Labels tab](#labels-tab-on-detail-pages) below).
 - **Commands**: copy-only `kubectl` command suggestions for the namespace. Karse never runs them.
 - **YAML**: the namespace's raw YAML.
 
@@ -132,7 +133,17 @@ Every resource table that carries labels (Nodes, Pods, Deployments, StatefulSets
 - "Deselect all" at the top of the dropdown clears every label selection and returns to showing everything.
 - The label filter works together with the search box and the status/phase/health filter: a row must satisfy all of them.
 
-Click a pod row to open its detail page (`/pods/:namespace/:name`), with tabs for Status, Containers, Init Containers (when present), Logs, Commands, and YAML.
+### Labels tab on detail pages
+
+Every resource detail page that carries labels (pod, node, namespace, and the workload pages: deployment, stateful set, daemon set) has a **Labels** tab. It shows only that one resource's own labels, as a Key / Value table:
+
+- Click a column header to sort the rows by Key or Value (ascending, then descending).
+- Type in the search box to filter the rows to matching labels.
+- A resource with no labels shows "This resource has no labels."
+
+This is per detail page and per resource: it shows the labels of the one resource you are viewing, never an aggregate across resources. (Container detail pages have no Labels tab, since containers carry no labels of their own.)
+
+Click a pod row to open its detail page (`/pods/:namespace/:name`), with tabs for Status, Containers, Init Containers (when present), Labels, Logs, Commands, and YAML.
 
 ## Container detail page (`/pods/:namespace/:name/containers/:container`)
 
