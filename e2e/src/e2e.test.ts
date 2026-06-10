@@ -3118,6 +3118,9 @@ test.describe("karse e2e", () => {
         });
 
         test("caps visible pod chips and shows a '...' expander when there are more pods", async () => {
+            // Streaming requires a pod/wildcard scope first, so type a substring
+            // matching every fake pod (named pod-0..pod-11) before streaming.
+            await page.locator("[data-test-id='live-logs-filter'] input").fill("pod");
             await page.locator("[data-test-id='live-logs-start']").click();
             // 12 pods stream but only the first 8 chips render.
             await expect(page.locator("[data-test-id='live-logs-matched-pod']")).toHaveCount(8);
