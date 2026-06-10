@@ -1723,13 +1723,20 @@ test.describe("karse e2e", () => {
         test("breadcrumbs reflect the pod -> container trail", async () => {
             await page.goto("/pods/default/nginx-abc/containers/nginx", { waitUntil: "networkidle" });
             const items = await page.locator("[data-test-id='breadcrumb-item']").allTextContents();
-            expect(items).toEqual(["Pods", "default", "nginx-abc", "nginx", "Status"]);
+            // The full pod -> container trail is five crumbs (Pods, namespace, pod,
+            // container, sub-tab), which exceeds MAX_TRAIL_ITEMS (4), so the trail
+            // collapses its inner crumbs into a single "..." crumb, keeping the
+            // first crumb and the last two.
+            expect(items).toEqual(["Pods", "...", "nginx", "Status"]);
         });
 
-        test("clicking the pod breadcrumb returns to the pod detail page", async () => {
+        test("clicking the Pods breadcrumb returns to the pods list", async () => {
             await page.goto("/pods/default/nginx-abc/containers/nginx", { waitUntil: "networkidle" });
-            await page.locator("[data-test-id='breadcrumb-item']").filter({ hasText: "nginx-abc" }).click();
-            await expect(page).toHaveURL(/\/pods\/default\/nginx-abc$/);
+            // The pod crumb (nginx-abc) is collapsed into the "..." crumb on the
+            // five-crumb container trail, so back-navigation is via the visible
+            // root "Pods" crumb, which is always kept.
+            await page.locator("[data-test-id='breadcrumb-item']").filter({ hasText: "Pods" }).click();
+            await expect(page).toHaveURL(/\/pods$/);
         });
 
         test("defaults to the Status tab showing the container details", async () => {
