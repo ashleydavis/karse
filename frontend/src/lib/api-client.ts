@@ -245,13 +245,15 @@ export type LogStreamCallbacks = {
 };
 
 // Opens a Server-Sent Events connection to GET /api/logs/stream and dispatches
-// each event to the callbacks. Streams pod-prefixed live logs from every pod in
-// the given context that matches the namespace scope and wildcard/substring
-// filter. Returns a function that closes the stream (terminating the backend
+// each event to the callbacks. When `pods` lists one or more pod names, exactly
+// those pods are streamed (the picker's explicit checkbox selection); otherwise
+// the wildcard/substring `filter` chooses which of the namespace's pods to stream
+// from. Returns a function that closes the stream (terminating the backend
 // kubectl processes via the request-close handler).
 export function openLogStream(
     context: string,
     namespace: string | undefined,
+    pods: string[],
     filter: string,
     tail: number,
     callbacks: LogStreamCallbacks,
@@ -259,6 +261,9 @@ export function openLogStream(
     const params = new URLSearchParams({ context, filter, tail: String(tail) });
     if (namespace) {
         params.set("namespace", namespace);
+    }
+    for (const pod of pods) {
+        params.append("pods", pod);
     }
     const source = new EventSource(`/api/logs/stream?${params.toString()}`);
 

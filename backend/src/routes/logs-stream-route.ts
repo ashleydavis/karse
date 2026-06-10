@@ -32,11 +32,29 @@ function sendEvent(res: Response, event: string, data: any): void {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
-// GET /logs/stream?context=&namespace=&filter=&tail=
+// Parses the `pods` query parameter into the explicit set of pod names to stream.
+// The picker sends one `pods` entry per selected pod, so Express may hand back a
+// string (one selection) or a string array (several); both are normalised here,
+// with blank entries dropped. An empty result means no explicit selection was made.
+function parseSelectedPods(raw: unknown): string[] {
+    const values = Array.isArray(raw) ? raw : raw === undefined ? [] : [raw];
+    const names: string[] = [];
+    for (const value of values) {
+        if (typeof value === "string" && value.trim() !== "") {
+            names.push(value.trim());
+        }
+    }
+    return names;
+}
+
+// GET /logs/stream?context=&namespace=&pods=&filter=&tail=
 // Streams aggregated, pod-prefixed log lines as SSE. Each "line" event carries
 // { namespace, pod, container, line }; a "started" event lists the matched pods;
 // an "error" event carries a message. The connection stays open (follow mode)
 // until the client disconnects, at which point all kubectl processes are killed.
+// When one or more `pods` are given they are streamed verbatim (the picker's
+// explicit checkbox selection wins); otherwise the wildcard/substring `filter`
+// chooses which of the namespace's pods to stream.
 logsStreamRouter.get("/logs/stream", async (req, res) => {
     const context = req.query.context;
     if (typeof context !== "string" || context.trim() === "") {
@@ -46,6 +64,7 @@ logsStreamRouter.get("/logs/stream", async (req, res) => {
     const namespace = typeof req.query.namespace === "string" && req.query.namespace.trim() !== ""
         ? req.query.namespace
         : undefined;
+    const selectedPods = parseSelectedPods(req.query.pods);
     const filter = typeof req.query.filter === "string" ? req.query.filter : "";
     const tailRaw = req.query.tail;
     const tail = typeof tailRaw === "string" && /^\d+$/.test(tailRaw) ? parseInt(tailRaw, 10) : 100;
@@ -59,8 +78,17 @@ logsStreamRouter.get("/logs/stream", async (req, res) => {
         return;
     }
 
-    const matcher = buildPodMatcher(filter);
-    const matched = pods.filter((pod) => matcher(pod.name));
+    let matched: Pod[];
+    if (selectedPods.length > 0) {
+        // Explicit checkbox selection: stream exactly those pods, in the order the
+        // cluster listed them, ignoring the substring filter entirely.
+        const wanted = new Set(selectedPods);
+        matched = pods.filter((pod) => wanted.has(pod.name));
+    }
+    else {
+        const matcher = buildPodMatcher(filter);
+        matched = pods.filter((pod) => matcher(pod.name));
+    }
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");

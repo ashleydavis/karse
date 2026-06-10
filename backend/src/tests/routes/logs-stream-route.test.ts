@@ -148,6 +148,52 @@ describe("GET /api/logs/stream", () => {
         expect(streamedNames).toEqual(["nginx-abc", "nginx-def"]);
     });
 
+    test("an explicit pods selection streams exactly those pods", async () => {
+        kubectlMocks.listPods.mockResolvedValue([
+            pod("nginx-abc", "default"),
+            pod("nginx-def", "default"),
+            pod("redis-xyz", "default"),
+        ]);
+        kubectlMocks.streamPodLogs.mockImplementation(
+            (_ctx: string, _ns: string, _name: string, _c: unknown, _t: number, handlers: any) => {
+                handlers.onClose();
+                return { stop: jest.fn() };
+            }
+        );
+
+        await readStream(
+            `http://127.0.0.1:${port}/api/logs/stream?context=my-ctx&pods=nginx-abc&pods=redis-xyz`,
+            80
+        );
+
+        const streamedNames = kubectlMocks.streamPodLogs.mock.calls.map((c: any[]) => c[2]);
+        expect(streamedNames).toEqual(["nginx-abc", "redis-xyz"]);
+    });
+
+    test("an explicit pods selection overrides the substring filter", async () => {
+        kubectlMocks.listPods.mockResolvedValue([
+            pod("nginx-abc", "default"),
+            pod("redis-xyz", "default"),
+        ]);
+        kubectlMocks.streamPodLogs.mockImplementation(
+            (_ctx: string, _ns: string, _name: string, _c: unknown, _t: number, handlers: any) => {
+                handlers.onClose();
+                return { stop: jest.fn() };
+            }
+        );
+
+        // The filter would match nginx-abc, but the explicit pods selection wins.
+        // Only one pod matches and it emits no lines, so read just enough of the
+        // "started" event to confirm the stream opened before aborting.
+        await readStream(
+            `http://127.0.0.1:${port}/api/logs/stream?context=my-ctx&filter=nginx&pods=redis-xyz`,
+            40
+        );
+
+        const streamedNames = kubectlMocks.streamPodLogs.mock.calls.map((c: any[]) => c[2]);
+        expect(streamedNames).toEqual(["redis-xyz"]);
+    });
+
     test("emits a done event and no streams when no pods match", async () => {
         kubectlMocks.listPods.mockResolvedValue([pod("worker", "default")]);
 

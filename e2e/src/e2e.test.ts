@@ -3283,6 +3283,21 @@ test.describe("karse e2e", () => {
             ],
         };
 
+        // Opens the pod-picker dropdown by clicking its trigger, then waits for the
+        // dropped-down search box to be visible. The picker is a real dropdown now,
+        // so the search box and checkbox list are not on the page until it is open.
+        async function openPicker(): Promise<void> {
+            await page.locator("[data-test-id='live-logs-picker-trigger']").click();
+            await expect(page.locator("[data-test-id='live-logs-search']")).toBeVisible();
+        }
+
+        // Closes the open dropdown by clicking its invisible backdrop, so it does not
+        // overlay the rest of the page (e.g. the Stream button) during later assertions.
+        async function closePicker(): Promise<void> {
+            await page.locator(".MuiModal-root .MuiBackdrop-root").last().click();
+            await expect(page.locator("[data-test-id='live-logs-search']")).toHaveCount(0);
+        }
+
         // Builds a Server-Sent Events body that announces the matched pods then
         // emits one prefixed log line per pod, mirroring the real endpoint shape.
         function buildSseBody(podNames: string[]): string {
@@ -3297,10 +3312,13 @@ test.describe("karse e2e", () => {
         // names match the request's filter (substring), like the backend does.
         async function interceptStream(): Promise<void> {
             await page.route("**/api/logs/stream*", async (route) => {
-                const filter = new URL(route.request().url()).searchParams.get("filter") ?? "";
-                const matched = FAKE_PODS.pods
-                    .map((p) => p.name)
-                    .filter((name) => filter === "" || name.toLowerCase().includes(filter.toLowerCase()));
+                const params = new URL(route.request().url()).searchParams;
+                const selected = params.getAll("pods");
+                const filter = params.get("filter") ?? "";
+                // An explicit pods selection wins; otherwise filter by substring.
+                const matched = selected.length > 0
+                    ? FAKE_PODS.pods.map((p) => p.name).filter((name) => selected.includes(name))
+                    : FAKE_PODS.pods.map((p) => p.name).filter((name) => filter === "" || name.toLowerCase().includes(filter.toLowerCase()));
                 await route.fulfill({
                     headers: { "Content-Type": "text/event-stream" },
                     body: buildSseBody(matched),
@@ -3327,10 +3345,52 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Logs");
         });
 
-        test("renders namespace, pod, and filter controls", async () => {
+        test("renders namespace selector and a searchable pod picker dropdown", async () => {
             await expect(page.locator("[data-test-id='live-logs-namespace-select']")).toBeVisible();
-            await expect(page.locator("[data-test-id='live-logs-pod-select']")).toBeVisible();
-            await expect(page.locator("[data-test-id='live-logs-filter']")).toBeVisible();
+            await expect(page.locator("[data-test-id='live-logs-pod-picker']")).toBeVisible();
+            // Collapsed by default: the trigger shows, but the search box and pod
+            // list are not on the page until the dropdown is opened.
+            await expect(page.locator("[data-test-id='live-logs-picker-trigger']")).toBeVisible();
+            await expect(page.locator("[data-test-id='live-logs-search']")).toHaveCount(0);
+            // Clicking the trigger drops the search box and checkbox list down as an
+            // overlay; the count and Clear control sit inside that dropdown.
+            await openPicker();
+            const dropdown = page.locator("[data-test-id='live-logs-pod-dropdown']");
+            await expect(dropdown.locator("[data-test-id='live-logs-search']")).toBeVisible();
+            await expect(page.locator("[data-test-id='live-logs-pod-checkbox']")).toHaveCount(2);
+            await expect(dropdown.locator("[data-test-id='live-logs-selected-count']")).toBeVisible();
+            await expect(dropdown.locator("[data-test-id='live-logs-clear']")).toBeVisible();
+            await closePicker();
+        });
+
+        test("typing in the search box filters the pod checkbox list", async () => {
+            await openPicker();
+            await page.locator("[data-test-id='live-logs-search'] input").fill("nginx");
+            await expect(page.locator("[data-test-id='live-logs-pod-option']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='live-logs-pod-list']")).toContainText("nginx-abc");
+            await expect(page.locator("[data-test-id='live-logs-pod-list']")).not.toContainText("redis-xyz");
+            await page.locator("[data-test-id='live-logs-search'] input").fill("");
+            await expect(page.locator("[data-test-id='live-logs-pod-option']")).toHaveCount(2);
+            await closePicker();
+        });
+
+        test("checking a pod sends it as an explicit pods selection", async () => {
+            await openPicker();
+            await page.locator("[data-test-id='live-logs-pod-list'] [data-test-id='live-logs-pod-option']", { hasText: "redis-xyz" })
+                .locator("input").check();
+            await expect(page.locator("[data-test-id='live-logs-selected-count']")).toHaveText("1 selected");
+            // The trigger summarises the selection even once the dropdown closes.
+            await closePicker();
+            await expect(page.locator("[data-test-id='live-logs-picker-trigger']")).toContainText("1 pod(s) selected");
+            const requestPromise = page.waitForRequest((req) => req.url().includes("/api/logs/stream") && req.url().includes("pods=redis-xyz"));
+            await page.locator("[data-test-id='live-logs-start']").click();
+            await requestPromise;
+            await expect(page.locator("[data-test-id='live-logs-viewer']")).toContainText("default/redis-xyz");
+            await page.locator("[data-test-id='live-logs-stop']").click();
+            await openPicker();
+            await page.locator("[data-test-id='live-logs-clear']").click();
+            await expect(page.locator("[data-test-id='live-logs-selected-count']")).toHaveText("0 selected");
+            await closePicker();
         });
 
         test("streaming with no pod/wildcard selected shows guidance, not a stream", async () => {
@@ -3354,7 +3414,9 @@ test.describe("karse e2e", () => {
         });
 
         test("entering a wildcard then streaming works and clears the guidance", async () => {
-            await page.locator("[data-test-id='live-logs-filter'] input").fill("nginx");
+            await openPicker();
+            await page.locator("[data-test-id='live-logs-search'] input").fill("nginx");
+            await closePicker();
             // Typing a filter clears the earlier guidance message.
             await expect(page.locator("[data-test-id='live-logs-needs-selection']")).toHaveCount(0);
             const requestPromise = page.waitForRequest((req) => req.url().includes("/api/logs/stream") && req.url().includes("filter=nginx"));
@@ -3375,7 +3437,11 @@ test.describe("karse e2e", () => {
             const indicator = page.locator("[data-test-id='live-logs-last-updated']");
             await expect(indicator).toHaveText("No logs yet");
             // Scope and stream; once a line lands the caption flips to "Updated just now".
-            await page.locator("[data-test-id='live-logs-filter'] input").fill("nginx");
+            // The pod scope lives inside the picker dropdown, so open it, type the
+            // wildcard filter, then close it before pressing Stream.
+            await openPicker();
+            await page.locator("[data-test-id='live-logs-search'] input").fill("nginx");
+            await closePicker();
             await page.locator("[data-test-id='live-logs-start']").click();
             await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(1);
             await expect(indicator).toHaveText("Updated just now");
@@ -3403,7 +3469,9 @@ test.describe("karse e2e", () => {
                 });
             });
             await page.goto("/logs", { waitUntil: "networkidle" });
-            await page.locator("[data-test-id='live-logs-filter'] input").fill("nginx");
+            await openPicker();
+            await page.locator("[data-test-id='live-logs-search'] input").fill("nginx");
+            await closePicker();
             await page.locator("[data-test-id='live-logs-start']").click();
             // The spinner stands in for the loading state; no "Waiting for log lines..." text.
             await expect(page.locator("[data-test-id='live-logs-viewer'] [data-test-id='loading-indicator']")).toBeVisible();
@@ -3464,7 +3532,12 @@ test.describe("karse e2e", () => {
             // Reload so each test starts from a fresh, non-streaming page (the
             // serial page is shared, and a prior test leaves the Stop button up).
             await page.goto("/logs", { waitUntil: "networkidle" });
-            await page.locator("[data-test-id='live-logs-filter'] input").fill("nginx");
+            // Scope by searching: open the pod-picker dropdown, type a substring, close it.
+            await page.locator("[data-test-id='live-logs-picker-trigger']").click();
+            await expect(page.locator("[data-test-id='live-logs-search']")).toBeVisible();
+            await page.locator("[data-test-id='live-logs-search'] input").fill("nginx");
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='live-logs-search']")).toHaveCount(0);
             await page.locator("[data-test-id='live-logs-start']").click();
             await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(200);
             const viewer = page.locator("[data-test-id='live-logs-viewer']");
@@ -3583,8 +3656,13 @@ test.describe("karse e2e", () => {
 
         test("caps visible pod chips and shows a '...' expander when there are more pods", async () => {
             // Streaming requires a pod/wildcard scope first, so type a substring
-            // matching every fake pod (named pod-0..pod-11) before streaming.
-            await page.locator("[data-test-id='live-logs-filter'] input").fill("pod");
+            // matching every fake pod (named pod-0..pod-11) before streaming. The
+            // picker is a dropdown, so open it, type, then close it.
+            await page.locator("[data-test-id='live-logs-picker-trigger']").click();
+            await expect(page.locator("[data-test-id='live-logs-search']")).toBeVisible();
+            await page.locator("[data-test-id='live-logs-search'] input").fill("pod");
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='live-logs-search']")).toHaveCount(0);
             await page.locator("[data-test-id='live-logs-start']").click();
             // 12 pods stream but only the first 8 chips render.
             await expect(page.locator("[data-test-id='live-logs-matched-pod']")).toHaveCount(8);

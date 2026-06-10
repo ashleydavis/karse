@@ -30,27 +30,31 @@ One node, three pods (`nginx-one`, `nginx-two`, `redis-main`).
 
 ### Controls
 - A "Namespace" dropdown defaults to "All namespaces" and lists `default`.
-- A "Pod" dropdown defaults to "Pick a pod (or use filter)" and lists `nginx-one`, `nginx-two`, and `redis-main`.
-- A "Pod filter" text field accepts a substring or wildcard (for example `nginx-*`).
+- A pod picker: a "Search pods..." button (the dropdown trigger). The pod list is not shown until you open it.
+
+### The pod picker is a searchable, multi-select dropdown
+- Initially the picker is collapsed: only the "Search pods..." trigger button is shown, with no pod list expanded on the page.
+- Click the trigger. A dropdown drops DOWN below it as an overlay, holding (top to bottom): a "Search pods..." input, a checkbox list of `nginx-one`, `nginx-two`, and `redis-main`, and a "N selected" count next to a "Clear" button.
+- Type `nginx` into the "Search pods..." input. The checkbox list narrows to `nginx-one` and `nginx-two`; `redis-main` disappears. Clear the input and all three return.
+- The "N selected" count and the "Clear" button sit inside the same dropdown as the search input and checkbox list, not floating on the page.
+- Click outside the dropdown (or press Escape). It collapses again, leaving only the trigger. When pods are checked the trigger reads "N pod(s) selected"; with a search typed it reads "Search: <text>".
 
 ### Streaming requires picking pods first
 - Streaming every pod at once is not supported, so the page makes you scope the stream first.
-- Leave the Pod dropdown on "Pick a pod (or use filter)" and the Pod filter empty, then press "Stream".
-- No stream starts. Instead an info message appears headed "Pick which pods to stream first", explaining you must choose a single pod from the dropdown or type a wildcard/substring (for example `nginx-*`) into the Pod filter, then press Stream.
+- Check no pods and leave the "Search pods..." input empty, then press "Stream".
+- No stream starts. Instead an info message appears headed "Pick which pods to stream first", explaining you must check one or more pods or type a substring (for example `nginx`) into the search box, then press Stream.
 - The button stays on "Stream" (it does not switch to "Stop") and no log lines appear.
-- The message clears as soon as you pick a pod or type into the Pod filter.
+- The message clears as soon as you check a pod or type into the search box.
 
-### Filtering by substring
-- Type `nginx` into the Pod filter and press "Stream".
-- Only `nginx-one` and `nginx-two` appear as matched chips and in the log prefixes.
-- `redis-main` does not appear.
+### Streaming checked pods
+- Open the picker dropdown and check `nginx-one` and `redis-main`. The count reads "2 selected" and the search input is disabled. Close the dropdown; the trigger now reads "2 pod(s) selected".
+- Press "Stream". Exactly `nginx-one` and `redis-main` are streamed (matched chips and log prefixes); `nginx-two` does not appear.
+- Open the dropdown and press "Clear" to reset the selection; the count returns to "0 selected" and the search input re-enables.
 
-### Filtering by wildcard
-- Type `nginx-*` into the Pod filter and press "Stream".
-- Both `nginx-one` and `nginx-two` are streamed; `redis-main` is excluded.
-
-### Scoping by pod
-- Select `redis-main` from the Pod dropdown (this disables the text filter) and press "Stream". Only `redis-main` is streamed.
+### Streaming by search substring (no pods checked)
+- With no pod checked, open the dropdown, type `nginx` into the "Search pods..." input, close the dropdown, then press "Stream".
+- Only `nginx-one` and `nginx-two` appear as matched chips and in the log prefixes; `redis-main` does not appear.
+- A wildcard such as `nginx-*` works the same way: both `nginx-one` and `nginx-two` are streamed, `redis-main` excluded.
 
 ### Scoping by namespace
 - Select `default` from the Namespace dropdown and press "Stream". Only pods in `default` are streamed (all three pods here).
@@ -73,7 +77,7 @@ One node, three pods (`nginx-one`, `nginx-two`, `redis-main`).
 
 ### Capped streaming-pod labels
 - This needs more than 8 streaming pods to exercise the cap. Use a namespace/fixture with at least 9 pods (for example scale the fixture up, or stream across all namespaces on a busier cluster).
-- Leave the filter empty and press "Stream".
+- Open the picker dropdown, type a substring that matches every pod (or check more than 8 pods), close the dropdown, and press "Stream".
 - The "Streaming N pod(s)" row shows at most 8 pod chips, followed by a "... +M more" chip (where M is the number of hidden pods). The row does not grow to list every pod.
 - Click the "... +M more" chip. The row expands to show a chip for every streaming pod, and the "..." chip is replaced by a "Show fewer" chip.
 - Click "Show fewer". The row collapses back to 8 chips with the "... +M more" chip again.

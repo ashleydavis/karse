@@ -24,13 +24,23 @@ A whole-cluster `.*` all-namespaces stream is the worst case: stern fans out to 
 
 Both bounds preserve the read-only invariant: stern is still tail-only and no mutating verb is ever issued.
 
-### Logs page (`/logs`) requires scoping to pods before streaming
+### Logs page (`/logs`) pod picker and scoping before streaming
 
-The kubectl-based multi-pod Logs page (`/logs`, `frontend/src/pages/live-logs/`) streams `kubectl logs -f` from every pod matching the chosen scope. Streaming every pod in a context at once is not feasible, so the page requires the user to scope the stream before it will start:
+The kubectl-based multi-pod Logs page (`/logs`, `frontend/src/pages/live-logs/`) streams `kubectl logs -f` from every chosen pod. Once a stream is open the logs are live and update automatically (no manual refresh): each `kubectl logs -f` follow pushes new lines to the backend, which forwards them over SSE to the viewer as they arrive.
 
-- The user scopes by selecting a single pod from the Pod dropdown, or by entering a wildcard/substring into the Pod filter field. An explicit pod selection takes precedence over the filter text.
-- Pressing Stream with no pod selected and an empty filter does **not** open a stream. Instead the page shows an info message ("Pick which pods to stream first") explaining that the user must choose a pod or type a wildcard/substring (e.g. `nginx-*`) and press Stream again.
-- The message clears as soon as the user selects a pod or types into the filter. Once a pod or wildcard is given, pressing Stream opens the stream as normal.
+The page replaces the old single-select pod dropdown with a **searchable, multi-select pod picker dropdown** so it stays usable when there are many pods. The picker is a trigger button (labelled "Search pods...", or summarising the current selection/search) that, when clicked, drops an overlay panel DOWN below it. The pod list is collapsed until the trigger is used, rather than always expanded inline on the page. The dropdown panel holds, top to bottom:
+
+- A visible **"Search pods..."** input that filters the pod list by case-insensitive substring (the pure `filterPods` helper in `frontend/src/lib/filter-pods.ts`).
+- A scrollable **checkbox list**, one checkbox per pod, so the user can pick several pods to stream at once.
+- An **"N selected" count** and a **Clear** button, both inside the dropdown panel, that report and reset the current selection.
+
+The dropdown collapses again when dismissed (click away or Escape). The trigger then summarises the scope: "N pod(s) selected" when pods are checked, "Search: <text>" when a search is typed, or "Search pods..." when neither.
+
+Streaming every pod in a context at once is not feasible, so the page requires the user to scope the stream before it will start:
+
+- The user scopes either by checking one or more pods, or by typing a substring into the search box (with nothing checked) so every matching pod is streamed. An explicit checkbox selection takes precedence: while pods are checked the search box is disabled, and the checked pod names are sent verbatim to the backend in `pods` query parameters. With nothing checked, the search text is sent as the wildcard/substring `filter` instead.
+- Pressing Stream with no pod checked and an empty search does **not** open a stream. Instead the page shows an info message ("Pick which pods to stream first") explaining that the user must check pods or type a substring, then press Stream again.
+- The message clears as soon as the user checks a pod or types into the search box. Once a pod or search is given, pressing Stream opens the stream as normal.
 
 #### Auto-follow and the visible scrollbar
 
@@ -63,6 +73,7 @@ Next to the Stream/Stop button the Logs page shows a small caption telling the u
 - [x] The kubectl-based Logs page (`/logs`) does not stream all pods at once: with no pod selected and an empty filter, pressing Stream shows guidance ("Pick which pods to stream first") instead of streaming, and streaming proceeds once a pod or wildcard is given.
 - [x] The Logs page (`/logs`) auto-follows the newest line only while the view is at the bottom; once the user scrolls up, new lines do not force-scroll them back down, and the viewer keeps a clearly visible, usable scrollbar so the streamed history stays reachable.
 - [x] The Logs page shows an "Updated ..." indicator next to the Stream/Stop button: "No logs yet" until the first line, then "Updated just now" / "Updated Ns/Nm/Nh ago" tracking the most recent appended log line, ticking once a second and resetting when a new stream starts.
+- [x] The Logs page (`/logs`) pod selector is a searchable, multi-select **dropdown** picker: a trigger drops an overlay panel holding a "Search pods..." box, a checkbox list (one per pod), and the "N selected" count + Clear control, all inside the dropdown, so the list is not expanded inline and it stays usable with many pods. Checked pods stream verbatim; with nothing checked the search text is the substring filter.
 
 ## Open Questions
 

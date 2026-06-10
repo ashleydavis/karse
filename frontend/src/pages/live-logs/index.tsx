@@ -13,13 +13,17 @@ import {
     Alert,
     AlertTitle,
     Chip,
+    Checkbox,
+    FormControlLabel,
+    Popover,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMagnifyingGlass, faPlay, faStop, faStream } from "@fortawesome/free-solid-svg-icons";
+import { faMagnifyingGlass, faPlay, faStop, faStream, faChevronDown } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { LogStreamLine } from "karse-types";
 import { useKubeContext } from "../../lib/kube-context";
 import { fetchNamespaces, fetchPods, openLogStream } from "../../lib/api-client";
+import { filterPods } from "../../lib/filter-pods";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { shouldFollow, bottomScrollTop, thumbMetrics, scrollTopForThumbTop, type ThumbMetrics } from "../../lib/log-autoscroll";
 
@@ -64,14 +68,21 @@ function colorForPod(pod: string): string {
     return PREFIX_COLORS[hash % PREFIX_COLORS.length]!;
 }
 
-// Stern-style multi-pod live log streaming page. The user scopes the stream by
-// namespace and an optional wildcard/substring pod filter, then streams live
-// logs from every matching pod at once, each line prefixed with its pod name.
+// Stern-style multi-pod live log streaming page. The user scopes the stream with
+// a searchable pod picker: a "Search pods..." box filters a checkbox list, and the
+// user checks one or more pods to stream (or, with nothing checked, the search box
+// acts as a substring filter over pod names). Logs then stream live from every
+// chosen pod at once, each line prefixed with its pod name.
 export function LiveLogsPage() {
     const { current } = useKubeContext();
     const [namespace, setNamespace] = useState<string>("");
-    const [filter, setFilter] = useState<string>("");
-    const [selectedPod, setSelectedPod] = useState<string>("");
+    // The pod-picker search box. It filters the checkbox list, and when no pod is
+    // explicitly checked it doubles as the wildcard/substring filter sent to the
+    // backend (reconciling with logs-require-pods-1's "scope before streaming" gate).
+    const [search, setSearch] = useState<string>("");
+    // Names of the pods the user has checked in the picker. An explicit selection
+    // takes precedence over the search filter when streaming.
+    const [selectedPods, setSelectedPods] = useState<string[]>([]);
     const [streaming, setStreaming] = useState(false);
     const [lines, setLines] = useState<RenderedLine[]>([]);
     const [matchedPods, setMatchedPods] = useState<string[]>([]);
@@ -87,6 +98,11 @@ export function LiveLogsPage() {
     // A clock that ticks once a second so the relative "Updated ..." caption
     // ages without a new log line having to arrive.
     const [now, setNow] = useState<number>(() => Date.now());
+    // The picker dropdown's anchor element. Non-null while the dropdown is open,
+    // so the search box and checkbox list drop down below the trigger as an
+    // overlay rather than sitting inline on the page.
+    const [pickerAnchor, setPickerAnchor] = useState<HTMLElement | null>(null);
+    const pickerOpen = pickerAnchor !== null;
 
     // Holds the active stream's close function so it survives re-renders.
     const closeRef = useRef<(() => void) | null>(null);
@@ -135,8 +151,33 @@ export function LiveLogsPage() {
     const namespaces = namespacesData?.namespaces ?? [];
     const pods = podsData?.pods ?? [];
 
-    // The effective pod filter: an explicit pod selection wins over the text filter.
-    const effectiveFilter = useMemo(() => selectedPod || filter, [selectedPod, filter]);
+    // The picker's checkbox list, narrowed to pods matching the search box. When
+    // pods are explicitly checked the search box is disabled, so the full list shows.
+    const visiblePods = useMemo(
+        () => (selectedPods.length > 0 ? pods : filterPods(pods, search)),
+        [pods, search, selectedPods],
+    );
+
+    // True when the stream is scoped: either a pod is checked, or the search box
+    // holds a wildcard/substring to match pods against. With neither, streaming
+    // every pod at once is refused (see logs-require-pods-1).
+    const hasScope = useMemo(
+        () => selectedPods.length > 0 || search.trim() !== "",
+        [selectedPods, search],
+    );
+
+    // Toggles a pod's membership in the explicit selection set.
+    function togglePod(name: string): void {
+        setNeedsSelection(false);
+        setSelectedPods((prev) =>
+            prev.includes(name) ? prev.filter((p) => p !== name) : [...prev, name],
+        );
+    }
+
+    // Clears the explicit pod selection, returning the picker to search-filter mode.
+    function clearSelection(): void {
+        setSelectedPods([]);
+    }
 
     // Stops any active stream and clears the close handle.
     function stopStream(): void {
@@ -247,9 +288,9 @@ export function LiveLogsPage() {
             return;
         }
         // Streaming every pod at once is not feasible, so the user must scope the
-        // stream first. If neither a pod nor a wildcard/substring filter is given,
-        // refuse to stream and show guidance instead of opening an "all pods" stream.
-        if (effectiveFilter.trim() === "") {
+        // stream first. If no pod is checked and the search box is empty, refuse to
+        // stream and show guidance instead of opening an "all pods" stream.
+        if (!hasScope) {
             stopStream();
             setLines([]);
             setMatchedPods([]);
@@ -268,7 +309,10 @@ export function LiveLogsPage() {
         // A fresh stream starts pinned to the bottom (following the newest line).
         followRef.current = true;
         setStreaming(true);
-        closeRef.current = openLogStream(current, namespace || undefined, effectiveFilter, 100, {
+        // An explicit checkbox selection wins; otherwise the search box is the
+        // wildcard/substring filter the backend matches pod names against.
+        const filterText = selectedPods.length > 0 ? "" : search;
+        closeRef.current = openLogStream(current, namespace || undefined, selectedPods, filterText, 100, {
             onStarted: (started) => {
                 setMatchedPods(started.pods.map((p) => p.name));
             },
@@ -309,7 +353,8 @@ export function LiveLogsPage() {
                             label="Namespace"
                             onChange={(e) => {
                                 setNamespace(e.target.value);
-                                setSelectedPod("");
+                                setSelectedPods([]);
+                                setSearch("");
                             }}
                         >
                             <MenuItem value="" data-test-id="live-logs-namespace-option">All namespaces</MenuItem>
@@ -320,49 +365,101 @@ export function LiveLogsPage() {
                     </FormControl>
                 </div>
 
-                <div data-test-id="live-logs-pod-select">
-                    <FormControl size="small" sx={{ minWidth: 220 }}>
-                        <InputLabel>Pod</InputLabel>
-                        <Select
-                            value={selectedPod}
-                            label="Pod"
+                <Box data-test-id="live-logs-pod-picker">
+                    {/* The picker trigger. Clicking it drops the search box and
+                        filterable checkbox list DOWN below it as an overlay, so the
+                        pod list is not always expanded inline on the page. The label
+                        summarises the current scope (count of checked pods, or the
+                        active search text). */}
+                    <Button
+                        variant="outlined"
+                        onClick={(e) => setPickerAnchor(e.currentTarget)}
+                        data-test-id="live-logs-picker-trigger"
+                        startIcon={<FontAwesomeIcon icon={faMagnifyingGlass} />}
+                        endIcon={<FontAwesomeIcon icon={faChevronDown} />}
+                        sx={{ minWidth: 220, justifyContent: "space-between", textTransform: "none" }}
+                    >
+                        {selectedPods.length > 0
+                            ? `${selectedPods.length} pod(s) selected`
+                            : search.trim() !== ""
+                              ? `Search: ${search}`
+                              : "Search pods..."}
+                    </Button>
+
+                    <Popover
+                        open={pickerOpen}
+                        anchorEl={pickerAnchor}
+                        onClose={() => setPickerAnchor(null)}
+                        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                        transformOrigin={{ vertical: "top", horizontal: "left" }}
+                        data-test-id="live-logs-pod-dropdown"
+                        slotProps={{ paper: { sx: { width: 320, p: 1, display: "flex", flexDirection: "column", gap: 1 } } }}
+                    >
+                        <TextField
+                            size="small"
+                            placeholder="Search pods..."
+                            value={search}
+                            autoFocus
                             onChange={(e) => {
-                                setSelectedPod(e.target.value);
-                                if (e.target.value !== "") {
+                                setSearch(e.target.value);
+                                if (e.target.value.trim() !== "") {
                                     setNeedsSelection(false);
                                 }
                             }}
-                        >
-                            <MenuItem value="" data-test-id="live-logs-pod-option">Pick a pod (or use filter)</MenuItem>
-                            {pods.map((pod) => (
-                                <MenuItem key={`${pod.namespace}/${pod.name}`} value={pod.name} data-test-id="live-logs-pod-option">{pod.name}</MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                </div>
+                            disabled={selectedPods.length > 0}
+                            data-test-id="live-logs-search"
+                            fullWidth
+                            slotProps={{
+                                input: {
+                                    startAdornment: (
+                                        <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
+                                    ),
+                                },
+                            }}
+                        />
 
-                <TextField
-                    size="small"
-                    label="Pod filter (wildcard, e.g. nginx-*)"
-                    placeholder="substring or wildcard"
-                    value={filter}
-                    onChange={(e) => {
-                        setFilter(e.target.value);
-                        if (e.target.value.trim() !== "") {
-                            setNeedsSelection(false);
-                        }
-                    }}
-                    disabled={selectedPod !== ""}
-                    data-test-id="live-logs-filter"
-                    sx={{ minWidth: 260 }}
-                    slotProps={{
-                        input: {
-                            startAdornment: (
-                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                            ),
-                        },
-                    }}
-                />
+                        <Box
+                            data-test-id="live-logs-pod-list"
+                            sx={{ maxHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column" }}
+                        >
+                            {visiblePods.length === 0 ? (
+                                <Typography variant="caption" color="text.secondary" sx={{ p: 0.5 }}>
+                                    No pods match.
+                                </Typography>
+                            ) : (
+                                visiblePods.map((pod) => (
+                                    <FormControlLabel
+                                        key={`${pod.namespace}/${pod.name}`}
+                                        data-test-id="live-logs-pod-option"
+                                        control={
+                                            <Checkbox
+                                                size="small"
+                                                checked={selectedPods.includes(pod.name)}
+                                                onChange={() => togglePod(pod.name)}
+                                                data-test-id="live-logs-pod-checkbox"
+                                            />
+                                        }
+                                        label={<Typography variant="body2">{pod.name}</Typography>}
+                                    />
+                                ))
+                            )}
+                        </Box>
+
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <Typography variant="caption" color="text.secondary" data-test-id="live-logs-selected-count">
+                                {selectedPods.length} selected
+                            </Typography>
+                            <Button
+                                size="small"
+                                onClick={clearSelection}
+                                disabled={selectedPods.length === 0}
+                                data-test-id="live-logs-clear"
+                            >
+                                Clear
+                            </Button>
+                        </Box>
+                    </Popover>
+                </Box>
 
                 {!streaming ? (
                     <Button
@@ -398,9 +495,9 @@ export function LiveLogsPage() {
             {needsSelection && (
                 <Alert severity="info" data-test-id="live-logs-needs-selection">
                     <AlertTitle>Pick which pods to stream first</AlertTitle>
-                    Streaming every pod at once is not supported. Choose a single pod from the
-                    &quot;Pod&quot; dropdown, or type a wildcard/substring (for example{" "}
-                    <code>nginx-*</code>) into the &quot;Pod filter&quot; field, then press Stream.
+                    Streaming every pod at once is not supported. Check one or more pods in the
+                    picker, or type a substring (for example <code>nginx</code>) into the
+                    &quot;Search pods...&quot; box to stream every matching pod, then press Stream.
                 </Alert>
             )}
 
@@ -477,7 +574,7 @@ export function LiveLogsPage() {
                             <LoadingIndicator />
                         ) : (
                             <Typography component="span" sx={{ color: "grey.500", fontFamily: "monospace", fontSize: "0.75rem" }}>
-                                Pick a pod or wildcard, then press Stream.
+                                Check pods or type a search, then press Stream.
                             </Typography>
                         )
                     ) : (
