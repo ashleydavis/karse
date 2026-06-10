@@ -368,10 +368,12 @@ export function ColumnConfigModal({
     // it. We treat the gesture as cross-section for the whole drag based on the column's ORIGINAL
     // section in the committed `config` (not its in-flight position, which we keep moving), so:
     //   - Over a ROW in the destination: re-insert the column before that row (the cursor's insertion
-    //     point). We do this every time the over row changes so the gap follows the cursor; the
-    //     `sameConfig` guard drops no-op updates so it settles. Over a row only — never the bare
-    //     section area — so it cannot loop over an empty section (which has no rows to be over).
-    //   - Over the destination's BARE area (e.g. an empty section, or below all rows): append.
+    //     point). We do this every time the over row changes so the gap follows the cursor.
+    //   - Over the destination's BARE area (an empty section, or below all rows): append to the END.
+    //     This is the only way to preview/land at the end of the destination list, so we must honour
+    //     it rather than ignore it. The `sameConfig` guard below drops no-op updates, so re-placing
+    //     at the end when the column is already at the end is a no-op and an empty section cannot
+    //     loop (placing the sole column at index 0 reproduces the same config every time).
     // A genuine WITHIN-section reorder is left entirely to dnd-kit's verticalListSortingStrategy
     // (mutating the array on every move would fight the strategy and oscillate); `handleDragEnd`
     // resolves that final slot.
@@ -391,13 +393,6 @@ export function ColumnConfigModal({
             if (targetSection === null || targetSection === originSection) {
                 return base;
             }
-            const overBareSection = overId === `section-${targetSection}`;
-            // Once parked in the destination, only re-place when over a ROW (so the gap follows the
-            // cursor); ignore bare-area events so the parked position is not yanked to the end and an
-            // empty section cannot loop.
-            if (overBareSection && sectionOfColumn(dragId, base) === targetSection) {
-                return base;
-            }
             const next = placeInSection(base, dragId, targetSection, overId, false);
             return sameConfig(next, base) ? base : next;
         });
@@ -412,8 +407,10 @@ export function ColumnConfigModal({
     //     in-flight position, which drag-over may have parked in the target section): a true reorder
     //     uses arrayMove semantics; a cross-section move inserts BEFORE the over row, landing exactly
     //     where the gap pointed instead of arrayMove-ing it past the row to the end.
-    //   - When `over` IS the section droppable (the cursor sits in the open gap, not on a row), we
-    //     keep the column where drag-over already previewed it in `base` rather than appending.
+    //   - When `over` IS the section droppable (the cursor sits below all rows / in the bare area), we
+    //     keep the column where drag-over already previewed it in `base` — for a cross-section move
+    //     drag-over has parked it at the END of the destination, so the drop lands at the end, matching
+    //     the gap the user saw there.
     function handleDragEnd(event: DragEndEvent): void {
         const { active, over } = event;
         const base = dragConfig ?? config;

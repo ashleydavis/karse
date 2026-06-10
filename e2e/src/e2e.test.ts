@@ -3800,6 +3800,43 @@ test.describe("karse e2e", () => {
         await page.locator("[data-test-id='column-config-modal']").getByText("Drag columns to reorder").click();
     }
 
+    // Drags a source column to the END of a destination section: releases the pointer in the bare
+    // area just below the section's last row, so the column lands as the last item rather than at a
+    // mid-list insertion point. Mirrors dragColumnOnto's pointer sequence but aims at a point inside
+    // the section droppable, below its last row.
+    async function dragColumnToSectionEnd(sourceTestId: string, sectionTestId: string): Promise<void> {
+        const source = page.locator(
+            `[data-test-id^='column-config-section-'] [data-test-id='${sourceTestId}']`,
+        );
+        const section = page.locator(`[data-test-id='${sectionTestId}']`);
+        const lastRow = section.locator("[data-test-id^='column-config-item-']").last();
+        const sourceBox = await source.boundingBox();
+        const sectionBox = await section.boundingBox();
+        const lastRowBox = await lastRow.boundingBox();
+        if (sourceBox === null || sectionBox === null) {
+            throw new Error("drag source or section not found");
+        }
+        const startX = sourceBox.x + sourceBox.width / 2;
+        const startY = sourceBox.y + sourceBox.height / 2;
+        const endX = sectionBox.x + sectionBox.width / 2;
+        // Aim a little below the last row (still inside the section's padded box) so the cursor sits
+        // in the bare area beneath every row; if the section is empty, aim at its centre.
+        const endY = lastRowBox === null
+            ? sectionBox.y + sectionBox.height / 2
+            : Math.min(lastRowBox.y + lastRowBox.height + 10, sectionBox.y + sectionBox.height - 4);
+        await page.mouse.move(startX, startY);
+        await page.mouse.down();
+        const steps = 10;
+        for (let step = 1; step <= steps; step++) {
+            const x = startX + ((endX - startX) * step) / steps;
+            const y = startY + ((endY - startY) * step) / steps;
+            await page.mouse.move(x, y);
+        }
+        await page.mouse.move(endX, endY);
+        await page.mouse.up();
+        await page.locator("[data-test-id='column-config-modal']").getByText("Drag columns to reorder").click();
+    }
+
     // Returns the visible nodes-table column header texts (excluding the empty actions header).
     async function getNodeHeaders(): Promise<string[]> {
         const texts = await page.locator("[data-test-id='nodes-table'] thead th").allTextContents();
@@ -3925,6 +3962,31 @@ test.describe("karse e2e", () => {
             await expect(hiddenItems.nth(0)).toHaveAttribute("data-test-id", "column-config-item-roles");
             await expect(hiddenItems.nth(1)).toHaveAttribute("data-test-id", "column-config-item-version");
             await expect(hiddenItems.nth(2)).toHaveAttribute("data-test-id", "column-config-item-age");
+            await page.locator("[data-test-id='column-config-close']").click();
+        });
+
+        test("a cross-section drop at the END of the destination lands last", async () => {
+            // Deterministic start: Roles and Age hidden (in that order); Visible has Version.
+            await page.evaluate(() => {
+                localStorage.setItem(
+                    "karse-columns-nodes",
+                    JSON.stringify({ order: ["name", "status", "version", "roles", "age"], hidden: ["roles", "age"] }),
+                );
+            });
+            await page.reload({ waitUntil: "networkidle" });
+            await waitForNodeRows();
+            await page.locator("[data-test-id='column-config-button']").click();
+            // Drag Version (Visible) to the END of the Hidden section (below its last row). It must
+            // land as the LAST hidden item → Hidden = Roles, Age, Version. Before the fix there was
+            // no end landing spot, so this drop could not place Version after Age.
+            await dragColumnToSectionEnd("column-config-item-version", "column-config-section-hidden");
+            const hiddenItems = page.locator(
+                "[data-test-id='column-config-section-hidden'] [data-test-id^='column-config-item-']",
+            );
+            await expect(hiddenItems).toHaveCount(3);
+            await expect(hiddenItems.nth(0)).toHaveAttribute("data-test-id", "column-config-item-roles");
+            await expect(hiddenItems.nth(1)).toHaveAttribute("data-test-id", "column-config-item-age");
+            await expect(hiddenItems.nth(2)).toHaveAttribute("data-test-id", "column-config-item-version");
             await page.locator("[data-test-id='column-config-close']").click();
         });
 
