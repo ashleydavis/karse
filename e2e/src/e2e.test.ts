@@ -4078,6 +4078,41 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='error-row']")).toHaveCount(1);
         });
 
+        test("search matches a term only in the Message column", async () => {
+            // "nodes are available" appears only in the FailedScheduling row's message.
+            await page.locator("[data-test-id='errors-search'] input").fill("nodes are available");
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='error-row']").filter({ hasText: "FailedScheduling" })).toHaveCount(1);
+        });
+
+        test("search matches a term only in the Source column", async () => {
+            // "Event" is the source-chip label of only the FailedScheduling row.
+            await page.locator("[data-test-id='errors-search'] input").fill("Event");
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='error-row']").filter({ hasText: "FailedScheduling" })).toHaveCount(1);
+        });
+
+        test("search matches a term only in the Object column", async () => {
+            // "crasher-abc" is the object name of only the CrashLoopBackOff row.
+            await page.locator("[data-test-id='errors-search'] input").fill("crasher-abc");
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='error-row']").filter({ hasText: "CrashLoopBackOff" })).toHaveCount(1);
+        });
+
+        test("search matches a term only in the Namespace column", async () => {
+            // "kube-system" is the namespace of only the FailedScheduling row.
+            await page.locator("[data-test-id='errors-search'] input").fill("kube-system");
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='error-row']").filter({ hasText: "FailedScheduling" })).toHaveCount(1);
+        });
+
+        test("search matches a term only in the Count column", async () => {
+            // count 4 belongs only to the FailedScheduling row.
+            await page.locator("[data-test-id='errors-search'] input").fill("4");
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='error-row']").filter({ hasText: "FailedScheduling" })).toHaveCount(1);
+        });
+
         test("shows no-errors-match message when search has no results", async () => {
             await page.locator("[data-test-id='errors-search'] input").fill("zzznotfound");
             await expect(page.locator("[data-test-id='no-errors-match']")).toBeVisible();

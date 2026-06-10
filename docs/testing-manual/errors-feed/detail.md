@@ -31,6 +31,11 @@ A cluster seeded with one error condition from each source the Errors page surfa
 - **Healthy pod excluded**: there is no row for the `healthy` pod.
 - **Namespace scoping**: select the `default` namespace; both error rows still appear.
 - **Search**: type `ImagePullBackOff` in the search box and confirm only the problem-pod row is shown. Type a non-matching string and confirm the "No errors match the search." message appears.
+- **Cross-column search**: the search box matches the text shown in *any* column, not just the reason. Confirm each of the following narrows the table to the one matching row, then clear the box and confirm both rows return:
+  - **Source column**: type `Event` and confirm only the `FailedScheduling` (yellow "Event" chip) row is shown.
+  - **Count column**: type `4` and confirm only the `FailedScheduling` row (count 4) is shown.
+  - **Message column**: type a fragment of one row's message that does not appear in the other (e.g. part of the `FailedScheduling` event's message) and confirm only that row is shown.
+  - Clearing the box restores both rows.
 - **Sort**: click the Source header and confirm the table re-sorts.
 - **Type filter**: a "Type: All" dropdown sits beside the search box. Open it and confirm it lists the error types present (`FailedScheduling` and `ImagePullBackOff`), each with a checkbox, all unchecked by default and both rows visible. Check `ImagePullBackOff` and confirm only the problem-pod row remains and the button reads "Type: 1 selected". Check `FailedScheduling` too and confirm both rows return ("Type: 2 selected"). Click "Deselect all" and confirm the selection clears, the button reads "Type: All" again, and both rows are shown.
 

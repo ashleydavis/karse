@@ -36,6 +36,7 @@ import { LoadError } from "../../../components/load-error";
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
 import { tableRowSx } from "../../../lib/table-row-style";
+import { formatAge, errorsGlobalFilter } from "../../../lib/errors-search";
 
 // The distinct error types (reasons) present in the data, in display order
 // (alphabetical). These are the checkboxes offered by the type filter.
@@ -45,24 +46,6 @@ function distinctReasons(errors: ClusterError[]): string[] {
         seen.add(e.reason);
     }
     return [...seen].sort((a, b) => a.localeCompare(b));
-}
-
-// Formats a Kubernetes timestamp into a human-readable age string.
-function formatAge(lastSeen: string): string {
-    if (lastSeen === "") {
-        return "-";
-    }
-    const ms = Date.now() - new Date(lastSeen).getTime();
-    const minutes = Math.floor(ms / 60_000);
-    const hours = Math.floor(ms / 3_600_000);
-    const days = Math.floor(ms / 86_400_000);
-    if (days > 0) {
-        return `${days}d`;
-    }
-    if (hours > 0) {
-        return `${hours}h`;
-    }
-    return `${minutes}m`;
 }
 
 // Renders a colored MUI Chip indicating where an error originated.
@@ -155,7 +138,7 @@ export function ErrorsTable() {
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
-        globalFilterFn: "includesString",
+        globalFilterFn: errorsGlobalFilter,
     });
 
     if (error) {
