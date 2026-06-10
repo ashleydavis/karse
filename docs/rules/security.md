@@ -4,9 +4,24 @@ Karse is a local-only, read-only Kubernetes dashboard wrapping the locally-insta
 
 ## kubectl is read-only (invariant)
 
-- The kubectl adapter only ever runs read commands (`get`, `version`, `config view`, `config current-context`) and the one local-kubeconfig command needed to switch contexts (`config use-context`).
-- **Create / write / edit kubectl commands (`apply`, `create`, `delete`, `edit`, `patch`, `replace`, `scale`, `rollout`, `expose`, `label`, `annotate`, etc.) must never be added to `kubectl-adapter.ts`.** Karse is for information only; it must not mutate cluster state.
-- The adapter exposes only specific named functions, never a "run any kubectl" interface.
+Karse is for viewing a cluster, never changing it. Every kubectl command it runs must be read-only against the cluster. This is a hard invariant, not a default: it must hold for every change, with no exceptions.
+
+**Why.** Karse is a dashboard. A bug, a stray click, or a malformed request must never be able to alter, restart, or delete anything in the cluster. Keeping the command set read-only means the worst case is a failed read, never an unwanted mutation.
+
+**What "read-only" means here.** A command is read-only if it only queries the cluster. The single exception is local kubeconfig changes (see below), which touch a file on the user's machine, not the cluster.
+
+**Allowed commands** (the only ones the adapter may run):
+
+- `get` (list and describe resources).
+- `version`.
+- `config view`, `config current-context` (read local kubeconfig).
+- `config use-context`, and setting a context's default namespace: the only writes Karse performs. These edit the user's local kubeconfig file, not the cluster.
+
+**Forbidden commands** (never add these to `kubectl-adapter.ts`): any command that changes cluster state, including `apply`, `create`, `delete`, `edit`, `patch`, `replace`, `scale`, `rollout`, `expose`, `label`, `annotate`, `cordon`, `drain`, `taint`, `exec`, `cp`, `port-forward`, and `run`. The list is illustrative, not exhaustive: if a command can mutate the cluster, it is forbidden.
+
+**How it is enforced.** The adapter exposes only specific named functions, each building a fixed argv. There is no "run arbitrary kubectl" interface, and arguments are never assembled from raw user input. To stay read-only, add a new named function with a hard-coded read command; never widen an existing one to accept caller-supplied subcommands or flags.
+
+**Displaying commands is fine; executing them is not.** The invariant constrains what Karse *runs*, not what it *shows*. The per-resource "Commands" tab displays write, create, and destroy commands (`apply`, `delete`, `scale`, etc.) for the user to copy and run themselves in their own terminal. That is allowed, because Karse never executes them: they are text for display only. The rule is solely about commands Karse itself spawns through the adapter, all of which must be read-only.
 
 ## kubectl assumption
 
