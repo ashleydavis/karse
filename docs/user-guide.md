@@ -90,7 +90,7 @@ Four cards summarise the active context:
 
 A read-only table of the cluster's nodes:
 
-- **Name**, **Status** (Ready/NotReady/Unknown chip), **Roles**, **Version**, **Age**.
+- **Name**, **Status** (Ready/NotReady/Unknown chip), **Version**, **Age**, and a **Roles** column that is **hidden by default** (it usually reads `<none>` on real clusters; reveal it from the **Columns** button if you want it).
 
 Click a column header to sort; type in the search box to filter rows. Use the **Status** dropdown (filter icon, beside the search box) to show only nodes with the statuses you check; all statuses are shown by default. Use the **Health** dropdown to show only **Healthy** or only **Error** nodes (matching the Healthy/Error counts in the stats header); both are shown by default. Use the **Labels** dropdown (tags icon) to filter by label: pick a key, then tick one or more of its values; "Deselect all" clears the label filter. See [Label filtering](#label-filtering) below. Click the **Columns** button to open a modal where you can drag columns to reorder them and drag them between Visible and Hidden to show or hide them; the layout is saved per table and persists across reloads. The Columns button is available on every resource table.
 

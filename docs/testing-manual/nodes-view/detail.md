@@ -10,6 +10,8 @@ bun run dev
 
 Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stands up a `karse-test` KWOK cluster; `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse. Tear each one down with the Teardown step at the end of this doc.
 
+> The **Roles column is hidden by default** (it usually reads `<none>`; see `column-config`). Any scenario below that checks the Roles column requires you to reveal it first: click the **Columns** button beside the search box, drag **Roles** from the Hidden section into Visible, and close the modal. Once revealed, the choice persists per table.
+
 ## Scenario A: Two nodes (baseline)
 
 **Fixture:** [_fixtures-kwok/01-empty-cluster-two-nodes](../_fixtures-kwok/01-empty-cluster-two-nodes/)
@@ -19,7 +21,7 @@ Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stand
 ```
 
 ### What to check
-- **Nodes table**: two rows, `fake-node-1` and `fake-node-2`, both with role `worker` and a green Ready chip. Click either row to navigate to the node detail page; confirm the node name, Ready chip, capacity vs allocatable table, and conditions are shown.
+- **Nodes table**: two rows, `fake-node-1` and `fake-node-2`, both with a green Ready chip. Reveal the Roles column (see the note above) and confirm both show role `worker`. Click either row to navigate to the node detail page; confirm the node name, Ready chip, capacity vs allocatable table, and conditions are shown.
 
 ## Scenario B: No nodes (empty state)
 
@@ -80,7 +82,7 @@ The cordoned node is a normal kwok-managed Ready node with `spec.unschedulable: 
 ```
 
 ### What to check
-- **Nodes table**: both rows show `<none>` in the Roles column.
+- **Nodes table**: reveal the Roles column (see the note above); both rows then show `<none>` in it. This is why the column is hidden by default.
 
 ## Scenario F: Nodes with multiple roles
 
@@ -93,7 +95,7 @@ One node with both `control-plane` and `worker` roles, and one plain worker node
 ```
 
 ### What to check
-- **Nodes table**: `fake-node-multi-role` shows `control-plane, worker` in the Roles column. `fake-node-worker` shows `worker`.
+- **Nodes table**: reveal the Roles column (see the note above). `fake-node-multi-role` shows `control-plane, worker` in the Roles column. `fake-node-worker` shows `worker`.
 
 ## Scenario G: Node status filter
 

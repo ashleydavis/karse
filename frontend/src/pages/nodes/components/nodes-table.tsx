@@ -177,7 +177,10 @@ export function NodesTable() {
     // The label-filter selection lives in the table's "labels" column filter; an absent filter means "no selection" (all rows show).
     const labelFilterController = makeLabelFilterController("labels", data?.nodes ?? [], columnFilters, setColumnFilters);
 
-    const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("nodes", columns);
+    // The Roles column is hidden by default: on real single-distribution clusters
+    // (e.g. docker-desktop) nodes carry no role labels, so it reads "<none>" and adds
+    // little. The user can reveal it from the column config (drag it back to Visible).
+    const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("nodes", columns, ["roles"]);
 
     const table = useReactTable({
         data: data?.nodes ?? [],

@@ -7,4 +7,4 @@ Manual tests for the shared, per-table column configuration: the "Columns" butto
 ## Fixtures
 - [03-many-nodes](../_fixtures-kwok/03-many-nodes/)
 
-Any resource table works; the nodes table is used here because its columns (Name, Status, Roles, Version, Age) are stable and easy to verify.
+Any resource table works; the nodes table is used here because its columns (Name, Status, Roles, Version, Age) are stable and easy to verify. The Roles column is hidden by default (it usually reads `<none>`), so it starts in the modal's Hidden section.

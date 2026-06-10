@@ -398,6 +398,69 @@ describe("listNodes", () => {
         expect(result[0]!.roles).toEqual(["control-plane", "etcd"]);
     });
 
+    test("returns no roles when the node carries no role labels", async () => {
+        const fixture = {
+            items: [
+                {
+                    metadata: {
+                        name: "plain-0",
+                        creationTimestamp: "2024-01-01T00:00:00Z",
+                        labels: {
+                            "kubernetes.io/hostname": "plain-0",
+                            "kubernetes.io/os": "linux",
+                        },
+                    },
+                    status: {
+                        conditions: [
+                            {
+                                type: "Ready",
+                                status: "True",
+                            },
+                        ],
+                        nodeInfo: {
+                            kubeletVersion: "v1.30.0",
+                        },
+                    },
+                },
+            ],
+        };
+        setRunnerHandlers({
+            "--context test-ctx get nodes -o json": () => ok(JSON.stringify(fixture)),
+        });
+        const result = await listNodes("test-ctx");
+        expect(result[0]!.roles).toEqual([]);
+    });
+
+    test("returns no roles when the node has no labels field at all", async () => {
+        const fixture = {
+            items: [
+                {
+                    metadata: {
+                        name: "bare-0",
+                        creationTimestamp: "2024-01-01T00:00:00Z",
+                    },
+                    status: {
+                        conditions: [
+                            {
+                                type: "Ready",
+                                status: "True",
+                            },
+                        ],
+                        nodeInfo: {
+                            kubeletVersion: "v1.30.0",
+                        },
+                    },
+                },
+            ],
+        };
+        setRunnerHandlers({
+            "--context test-ctx get nodes -o json": () => ok(JSON.stringify(fixture)),
+        });
+        const result = await listNodes("test-ctx");
+        expect(result[0]!.roles).toEqual([]);
+        expect(result[0]!.labels).toEqual({});
+    });
+
     test("derives Unknown when Ready condition missing", async () => {
         const fixture = {
             items: [

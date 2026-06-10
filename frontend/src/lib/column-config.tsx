@@ -90,12 +90,14 @@ function saveConfig(tableId: string, config: ColumnConfig): void {
 
 // Reconciles a saved configuration against the current column set: drops ids that no
 // longer exist and appends any newly-added configurable columns to the end of the order.
-function reconcile(saved: ColumnConfig | null, configurable: ConfigurableColumn[]): ColumnConfig {
+// When there is no saved configuration, columns in `defaultHidden` start in the Hidden
+// section so a table can ship a column hidden by default (the user can still reveal it).
+function reconcile(saved: ColumnConfig | null, configurable: ConfigurableColumn[], defaultHidden: string[]): ColumnConfig {
     const validIds = new Set(configurable.map((c) => c.id));
     if (saved === null) {
         return {
             order: configurable.map((c) => c.id),
-            hidden: [],
+            hidden: defaultHidden.filter((id) => validIds.has(id)),
         };
     }
     const order: string[] = [];
@@ -133,10 +135,12 @@ export type UseColumnConfigResult = {
 
 // Hook that manages a table's persisted column configuration (visibility + order).
 // Pass a stable `tableId` (used as the storage key) and the table's full column definitions.
+// `defaultHidden` lists column ids that start in the Hidden section when the user has no
+// saved configuration yet; a saved configuration always takes precedence over it.
 // Feed `columnOrder` and `columnVisibility` into useReactTable's state.
-export function useColumnConfig<T>(tableId: string, columns: ColumnDef<T>[]): UseColumnConfigResult {
+export function useColumnConfig<T>(tableId: string, columns: ColumnDef<T>[], defaultHidden: string[] = []): UseColumnConfigResult {
     const configurable = configurableColumns(columns);
-    const [config, setConfigState] = useState<ColumnConfig>(() => reconcile(loadConfig(tableId), configurable));
+    const [config, setConfigState] = useState<ColumnConfig>(() => reconcile(loadConfig(tableId), configurable, defaultHidden));
 
     const setConfig = useCallback((next: ColumnConfig) => {
         setConfigState(next);

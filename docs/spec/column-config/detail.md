@@ -5,7 +5,7 @@
 A shared, per-table column configuration: which columns are visible and the order they appear in. Every resource table (nodes, pods, deployments, stateful sets, daemon sets, events, errors) gets a "Columns" button that opens a configuration modal. The chosen configuration is persisted per table so it survives navigation and reload.
 
 Backed by:
-- `frontend/src/lib/column-config.tsx`: the `useColumnConfig(tableId, columns)` hook that derives TanStack Table's `columnOrder` and `columnVisibility` state from a persisted config and exposes the configurable columns and a setter.
+- `frontend/src/lib/column-config.tsx`: the `useColumnConfig(tableId, columns, defaultHidden?)` hook that derives TanStack Table's `columnOrder` and `columnVisibility` state from a persisted config and exposes the configurable columns and a setter. The optional `defaultHidden` lists column ids that start in the Hidden section when there is no saved configuration.
 - `frontend/src/components/column-config-modal.tsx`: the `ColumnConfigButton` (toolbar entry point) and the `ColumnConfigModal` (Visible / Hidden drag-and-drop modal). Drag-and-drop is provided by **dnd-kit** (`@dnd-kit/core` + `@dnd-kit/sortable`), which also gives keyboard and touch support.
 - The per-page table components under `frontend/src/pages/*/components/` wire the hook and button in.
 
@@ -22,6 +22,7 @@ Backed by:
 - The configuration is persisted per table in `localStorage` under the key `karse-columns-<tableId>` (e.g. `karse-columns-nodes`). It is reloaded on mount, so it survives navigation and a full page reload.
 - Non-configurable columns (any action/pinned cell) are excluded by setting `enableHiding: false`: they stay out of the modal and remain pinned at the end of the row.
 - A saved configuration is reconciled against the current columns on load: column ids that no longer exist are dropped, and newly-added configurable columns are appended to the end of the order.
+- A table may declare columns that **default to hidden** (`useColumnConfig`'s `defaultHidden`). When the user has no saved configuration for that table, those columns start in the Hidden section while everything else starts Visible. A saved configuration always takes precedence, so once the user has changed the config their choice is preserved. The nodes Role column is the first such column: it is usually `<none>`, so it is hidden by default (see `nodes-view`).
 - Scope: this configures only the columns of the currently-rendered table. It does not add or remove data, and it does not affect search or sort behaviour (see `resource-search`).
 
 ## Acceptance Criteria

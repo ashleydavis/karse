@@ -144,14 +144,31 @@ test.describe("karse e2e", () => {
     test.describe("nodes table", () => {
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
+            // Start from a clean configuration so the default-hidden Roles column applies.
+            await page.goto("/nodes");
+            await page.evaluate(() => localStorage.removeItem("karse-columns-nodes"));
             await navigateToNodes();
         });
 
-        test("has all five column headers", async () => {
+        test("shows the default column headers with Roles hidden by default", async () => {
             const table = page.locator("[data-test-id='nodes-table']");
-            for (const name of ["Name", "Status", "Roles", "Version", "Age"]) {
+            // Roles is hidden by default (usually "<none>" on real clusters), so it is not shown.
+            for (const name of ["Name", "Status", "Version", "Age"]) {
                 await expect(table.getByRole("columnheader", { name, exact: true })).toBeVisible();
             }
+            await expect(table.getByRole("columnheader", { name: "Roles", exact: true })).toHaveCount(0);
+
+            // Reveal Roles for the remaining content tests below, which assert the Roles cell
+            // (3rd column once shown). Persist a config with Roles visible, then reload.
+            await page.evaluate(() => {
+                localStorage.setItem(
+                    "karse-columns-nodes",
+                    JSON.stringify({ order: ["name", "status", "roles", "version", "age", "labels"], hidden: [] }),
+                );
+            });
+            await page.reload({ waitUntil: "networkidle" });
+            await waitForNodeRows();
+            await expect(table.getByRole("columnheader", { name: "Roles", exact: true })).toBeVisible();
         });
 
         test("shows all three nodes", async () => {
@@ -4282,17 +4299,36 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='column-config-modal']")).toBeVisible();
         });
 
-        test("modal lists configurable columns in the Visible section", async () => {
+        test("the Roles column is hidden by default and starts in the Hidden section", async () => {
+            // With no saved configuration, Roles is default-hidden: it is not a table header,
+            // and in the modal it sits in the Hidden section while the others are Visible.
+            const headers = await getNodeHeaders();
+            expect(headers).not.toContain("Roles");
+            expect(headers).toContain("Name");
             const visible = page.locator("[data-test-id='column-config-section-visible']");
-            for (const id of ["name", "status", "roles", "version", "age"]) {
+            for (const id of ["name", "status", "version", "age"]) {
                 await expect(visible.locator(`[data-test-id='column-config-item-${id}']`)).toBeVisible();
             }
-            // The Hidden section starts empty.
-            await expect(page.locator("[data-test-id='column-config-empty-hidden']")).toBeVisible();
+            await expect(
+                page.locator("[data-test-id='column-config-section-hidden'] [data-test-id='column-config-item-roles']"),
+            ).toBeVisible();
+        });
+
+        test("dragging the hidden Roles column to Visible shows it in the table", async () => {
+            // Drag Roles from Hidden back into Visible.
+            await dragColumnOnto("column-config-item-roles", "column-config-section-visible");
+            await expect(
+                page.locator("[data-test-id='column-config-section-visible'] [data-test-id='column-config-item-roles']"),
+            ).toBeVisible();
+            await page.locator("[data-test-id='column-config-close']").click();
+            await expect(page.locator("[data-test-id='column-config-modal']")).toBeHidden();
+            const headers = await getNodeHeaders();
+            expect(headers).toContain("Roles");
         });
 
         test("dragging a column to the Hidden section hides it from the table", async () => {
-            // Drag the Roles column onto the Hidden section.
+            await page.locator("[data-test-id='column-config-button']").click();
+            // Drag the Roles column (now visible) back onto the Hidden section.
             await dragColumnOnto("column-config-item-roles", "column-config-section-hidden");
             // The item now lives in the Hidden section.
             await expect(
