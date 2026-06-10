@@ -3117,6 +3117,35 @@ test.describe("karse e2e", () => {
             await page.locator("[data-test-id='live-logs-stop']").click();
             await expect(page.locator("[data-test-id='live-logs-start']")).toBeVisible();
         });
+
+        test("while streaming with no lines yet shows the progress indicator, not loading text", async () => {
+            // Delay the stream body so the pre-line streaming state is observable.
+            // Streaming requires a pod/wildcard scope, so filter to "nginx" first.
+            await page.unroute("**/api/logs/stream*");
+            await page.route("**/api/logs/stream*", async (route) => {
+                const filter = new URL(route.request().url()).searchParams.get("filter") ?? "";
+                const matched = FAKE_PODS.pods
+                    .map((p) => p.name)
+                    .filter((name) => filter === "" || name.toLowerCase().includes(filter.toLowerCase()));
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+                await route.fulfill({
+                    headers: { "Content-Type": "text/event-stream" },
+                    body: buildSseBody(matched),
+                });
+            });
+            await page.goto("/logs", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='live-logs-filter'] input").fill("nginx");
+            await page.locator("[data-test-id='live-logs-start']").click();
+            // The spinner stands in for the loading state; no "Waiting for log lines..." text.
+            await expect(page.locator("[data-test-id='live-logs-viewer'] [data-test-id='loading-indicator']")).toBeVisible();
+            await expect(page.locator("[data-test-id='live-logs-viewer']")).not.toContainText("Waiting for log lines");
+            // Once lines arrive, the indicator is gone and the lines are shown.
+            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='live-logs-viewer'] [data-test-id='loading-indicator']")).toHaveCount(0);
+            // Restore the immediate stream (afterAll unroutes it).
+            await page.unroute("**/api/logs/stream*");
+            await interceptStream();
+        });
     });
 
     test.describe("live logs page pod-label cap", () => {
@@ -3183,31 +3212,6 @@ test.describe("karse e2e", () => {
             await page.locator("[data-test-id='live-logs-matched-collapse']").click();
             await expect(page.locator("[data-test-id='live-logs-matched-pod']")).toHaveCount(8);
             await expect(page.locator("[data-test-id='live-logs-matched-expand']")).toBeVisible();
-        });
-
-        test("while streaming with no lines yet shows the progress indicator, not loading text", async () => {
-            // Delay the stream body so the pre-line streaming state is observable.
-            await page.unroute("**/api/logs/stream*");
-            await page.route("**/api/logs/stream*", async (route) => {
-                await new Promise((resolve) => setTimeout(resolve, 1500));
-                await route.fulfill({
-                    headers: { "Content-Type": "text/event-stream" },
-                    body: buildSseBody(FAKE_PODS.pods.map((p) => p.name)),
-                });
-            });
-            await page.goto("/logs", { waitUntil: "networkidle" });
-            // Clear any leftover filter from earlier tests so both pods stream.
-            await page.locator("[data-test-id='live-logs-filter'] input").fill("");
-            await page.locator("[data-test-id='live-logs-start']").click();
-            // The spinner stands in for the loading state; no "Waiting for log lines..." text.
-            await expect(page.locator("[data-test-id='live-logs-viewer'] [data-test-id='loading-indicator']")).toBeVisible();
-            await expect(page.locator("[data-test-id='live-logs-viewer']")).not.toContainText("Waiting for log lines");
-            // Once lines arrive, the indicator is gone and the lines are shown.
-            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(2);
-            await expect(page.locator("[data-test-id='live-logs-viewer'] [data-test-id='loading-indicator']")).toHaveCount(0);
-            // Restore the immediate stream (afterAll unroutes it).
-            await page.unroute("**/api/logs/stream*");
-            await interceptStream();
         });
     });
 
