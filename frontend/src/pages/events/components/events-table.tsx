@@ -28,13 +28,18 @@ import { useKubeContext } from "../../../lib/kube-context";
 import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { fetchEvents } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
-import { EventTypeFilter } from "../../../components/event-type-filter";
-import { ALL_EVENT_TYPES, filterEventsByType } from "../../../lib/event-type-filter";
+import { TableFilter } from "../../../components/table-filter";
+import { valueColumnFilterFn, type FilterableColumn } from "../../../lib/table-filter-state";
+import { useTableFilter } from "../../../lib/use-table-filter";
 import { LoadError } from "../../../components/load-error";
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
 import { useShareableNavigate } from "../../../lib/nav-state";
 import { tableRowSx } from "../../../lib/table-row-style";
+
+// Every selectable event type, in display order. Drives the type column in the
+// shared filter editor.
+const ALL_EVENT_TYPES: ClusterEvent["type"][] = ["Warning", "Normal"];
 
 // Formats a Kubernetes timestamp into a human-readable age string.
 function formatAge(lastSeen: string): string {
@@ -98,6 +103,9 @@ const columns: ColumnDef<ClusterEvent>[] = [
         cell: (info) => <TypeChip type={info.getValue<ClusterEvent["type"]>()} />,
         sortingFn: (a, b) =>
             TYPE_ORDER[a.original.type] - TYPE_ORDER[b.original.type],
+        // Keeps a row only when its type is among the values ticked in the shared
+        // filter editor. An empty selection clears this filter, so every row shows.
+        filterFn: valueColumnFilterFn,
     },
     { accessorKey: "reason", header: "Reason" },
     {
@@ -127,21 +135,24 @@ export function EventsTable() {
 
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
-    // Checked event types. Empty means "show all" (the default); see filterEventsByType.
-    const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
 
-    // Narrow by type before the table applies search and sorting. An empty selection
-    // leaves every event in place.
-    const typeFiltered = filterEventsByType(data?.events ?? [], selectedTypes);
+    // The filterable columns the shared editor offers: the Type value column. An
+    // empty selection means "show all" (the default); the filter activates on the
+    // first tick.
+    const filterableColumns: FilterableColumn[] = [
+        { columnId: "type", label: "Type", options: ALL_EVENT_TYPES, kind: "value" },
+    ];
+    const filter = useTableFilter(filterableColumns);
 
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("events", columns);
 
     const table = useReactTable({
-        data: typeFiltered,
+        data: data?.events ?? [],
         columns,
         state: {
             sorting,
             globalFilter,
+            columnFilters: filter.columnFilters,
             columnOrder,
             columnVisibility,
         },
@@ -194,10 +205,13 @@ export function EventsTable() {
                         },
                     }}
                 />
-                <EventTypeFilter
-                    all={ALL_EVENT_TYPES}
-                    selected={selectedTypes}
-                    onChange={setSelectedTypes}
+                <TableFilter
+                    columns={filter.columns}
+                    selection={filter.selection}
+                    onToggle={filter.onToggle}
+                    onDeselectAll={filter.onDeselectAll}
+                    totalSelected={filter.totalSelected}
+                    testIdPrefix="events-filter"
                 />
                 <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
             </div>

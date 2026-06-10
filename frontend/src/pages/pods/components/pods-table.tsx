@@ -7,7 +7,6 @@ import {
     flexRender,
     type ColumnDef,
     type SortingState,
-    type ColumnFiltersState,
 } from "@tanstack/react-table";
 import {
     Table,
@@ -31,12 +30,11 @@ import { useShareableNavigate } from "../../../lib/nav-state";
 import { fetchPods } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
-import { StatusFilter } from "../../../components/status-filter";
-import { LabelFilter } from "../../../components/label-filter";
+import { TableFilter } from "../../../components/table-filter";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
-import { statusColumnFilterFn, makeStatusFilterController } from "../../../lib/status-filter-state";
-import { labelColumnFilterFn, makeLabelFilterController } from "../../../lib/label-filter-state";
+import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn } from "../../../lib/table-filter-state";
+import { useTableFilter } from "../../../lib/use-table-filter";
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
 import { ResourceStatsHeader } from "../../../components/resource-stats-header";
@@ -144,10 +142,9 @@ function buildColumns(): ColumnDef<Pod>[] {
             cell: (info) => <PhaseChip phase={info.getValue<PodPhase>()} />,
             sortingFn: (a, b) =>
                 PHASE_ORDER[a.original.phase] - PHASE_ORDER[b.original.phase],
-            // Keeps a row only when its phase is in the selected set. "All phases" is
-            // represented by the absence of this filter (cleared by the shared status
-            // filter controller), so an empty selection here correctly matches no rows.
-            filterFn: statusColumnFilterFn,
+            // Keeps a row only when its phase is among the values ticked in the shared
+            // filter editor. An empty selection clears this filter, so every row shows.
+            filterFn: valueColumnFilterFn,
         },
         {
             accessorKey: "ready",
@@ -184,10 +181,9 @@ function buildColumns(): ColumnDef<Pod>[] {
             header: "Labels",
             cell: (info) => <LabelsCell labels={info.row.original.labels} />,
             enableSorting: false,
-            // Keeps a row only when its labels satisfy the label-filter selection.
-            // An empty selection clears this filter (set by the label-filter controller),
-            // so every row passes by default.
-            filterFn: labelColumnFilterFn,
+            // Keeps a row only when its labels satisfy the shared editor's label
+            // selection. An empty selection clears this filter, so every row passes.
+            filterFn: labelsColumnFilterFn,
         },
         {
             // Hidden column carrying each pod's derived health ("Healthy"/"Error"/
@@ -195,7 +191,7 @@ function buildColumns(): ColumnDef<Pod>[] {
             // columnVisibility) and excluded from the fuzzy global filter.
             id: "health",
             accessorFn: (row) => podHealth(row),
-            filterFn: statusColumnFilterFn,
+            filterFn: valueColumnFilterFn,
             enableSorting: false,
             enableGlobalFilter: false,
             // Excluded from the column-config modal: it is an always-hidden filter helper, never shown.
@@ -222,18 +218,18 @@ export function PodsTable() {
 
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
-    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
     const columns = buildColumns();
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("pods", columns);
 
-    // The selected phases live in the table's "phase" column filter; an absent filter means "all".
-    const phaseFilterController = makeStatusFilterController("phase", ALL_PHASES, columnFilters, setColumnFilters);
-    // The selected health states live in the hidden "health" column filter; an absent filter means "all".
-    const healthFilterController = makeStatusFilterController("health", HEALTH_FILTER_OPTIONS, columnFilters, setColumnFilters);
-
-    // The label-filter selection lives in the table's "labels" column filter; an absent filter means "no selection" (all rows show).
-    const labelFilterController = makeLabelFilterController("labels", data?.pods ?? [], columnFilters, setColumnFilters);
+    // The filterable columns the shared editor offers: the Status (phase) and
+    // Health value columns plus one column per label key present on the loaded pods.
+    const filterableColumns: FilterableColumn[] = [
+        { columnId: "phase", label: "Status", options: ALL_PHASES, kind: "value" },
+        { columnId: "health", label: "Health", options: HEALTH_FILTER_OPTIONS, kind: "value" },
+        ...collectLabelColumns(data?.pods ?? []),
+    ];
+    const filter = useTableFilter(filterableColumns);
 
     const table = useReactTable({
         data: data?.pods ?? [],
@@ -241,13 +237,12 @@ export function PodsTable() {
         state: {
             sorting,
             globalFilter,
-            columnFilters,
+            columnFilters: filter.columnFilters,
             columnOrder,
             columnVisibility: { ...columnVisibility, health: false },
         },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
-        onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -296,27 +291,13 @@ export function PodsTable() {
                         },
                     }}
                 />
-                <StatusFilter
-                    all={ALL_PHASES}
-                    selected={phaseFilterController.selected}
-                    onChange={phaseFilterController.setSelected}
-                    label="Status"
-                    testIdPrefix="pods-status-filter"
-                />
-                <StatusFilter
-                    all={HEALTH_FILTER_OPTIONS}
-                    selected={healthFilterController.selected}
-                    onChange={healthFilterController.setSelected}
-                    label="Health"
-                    testIdPrefix="pods-health-filter"
-                />
-                <LabelFilter
-                    available={labelFilterController.available}
-                    selection={labelFilterController.selection}
-                    onToggle={labelFilterController.toggleValue}
-                    onDeselectAll={labelFilterController.deselectAll}
-                    selectedCount={labelFilterController.selectedCount}
-                    testIdPrefix="pods-label-filter"
+                <TableFilter
+                    columns={filter.columns}
+                    selection={filter.selection}
+                    onToggle={filter.onToggle}
+                    onDeselectAll={filter.onDeselectAll}
+                    totalSelected={filter.totalSelected}
+                    testIdPrefix="pods-filter"
                 />
                 <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
             </div>

@@ -7,7 +7,6 @@ import {
     flexRender,
     type ColumnDef,
     type SortingState,
-    type ColumnFiltersState,
 } from "@tanstack/react-table";
 import {
     Table,
@@ -30,8 +29,9 @@ import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { useShareableNavigate } from "../../../lib/nav-state";
 import { fetchErrors } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
-import { TypeFilter } from "../../../components/type-filter";
-import { typeColumnFilterFn, makeTypeFilterController } from "../../../lib/type-filter-state";
+import { TableFilter } from "../../../components/table-filter";
+import { valueColumnFilterFn, type FilterableColumn } from "../../../lib/table-filter-state";
+import { useTableFilter } from "../../../lib/use-table-filter";
 import { LoadError } from "../../../components/load-error";
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
@@ -91,7 +91,7 @@ const columns: ColumnDef<ClusterError>[] = [
         accessorFn: (row) => `${row.objectKind}/${row.objectName}`,
         cell: (info) => info.getValue<string>(),
     },
-    { accessorKey: "reason", header: "Reason", filterFn: typeColumnFilterFn },
+    { accessorKey: "reason", header: "Reason", filterFn: valueColumnFilterFn },
     { accessorKey: "message", header: "Message" },
     { accessorKey: "count", header: "Count" },
     { accessorKey: "namespace", header: "Namespace" },
@@ -114,11 +114,14 @@ export function ErrorsTable() {
 
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
-    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
-    // The checked error types live in the table's "reason" column filter; an
-    // empty selection means "show all" (the default).
-    const typeFilterController = makeTypeFilterController("reason", columnFilters, setColumnFilters);
+    // The filterable columns the shared editor offers: the Reason value column, whose
+    // options are the distinct reasons present in the loaded errors. An empty selection
+    // means "show all" (the default); the filter activates on the first tick.
+    const filterableColumns: FilterableColumn[] = [
+        { columnId: "reason", label: "Reason", options: distinctReasons(data?.errors ?? []), kind: "value" },
+    ];
+    const filter = useTableFilter(filterableColumns);
 
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("errors", columns);
 
@@ -128,13 +131,12 @@ export function ErrorsTable() {
         state: {
             sorting,
             globalFilter,
-            columnFilters,
+            columnFilters: filter.columnFilters,
             columnOrder,
             columnVisibility,
         },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
-        onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -151,7 +153,6 @@ export function ErrorsTable() {
 
     const rows = table.getRowModel().rows;
     const all = data?.errors ?? [];
-    const allReasons = distinctReasons(all);
 
     // Renders the appropriate sort direction icon for a column header.
     function SortIcon({ columnId }: { columnId: string }) {
@@ -183,12 +184,13 @@ export function ErrorsTable() {
                         },
                     }}
                 />
-                <TypeFilter
-                    all={allReasons}
-                    selected={typeFilterController.selected}
-                    onChange={typeFilterController.setSelected}
-                    label="Type"
-                    testIdPrefix="errors-type-filter"
+                <TableFilter
+                    columns={filter.columns}
+                    selection={filter.selection}
+                    onToggle={filter.onToggle}
+                    onDeselectAll={filter.onDeselectAll}
+                    totalSelected={filter.totalSelected}
+                    testIdPrefix="errors-filter"
                 />
                 <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
             </div>

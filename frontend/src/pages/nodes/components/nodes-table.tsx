@@ -8,7 +8,6 @@ import {
     flexRender,
     type ColumnDef,
     type SortingState,
-    type ColumnFiltersState,
 } from "@tanstack/react-table";
 import {
     Table,
@@ -30,12 +29,11 @@ import { useKubeContext } from "../../../lib/kube-context";
 import { fetchNodes } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
-import { StatusFilter } from "../../../components/status-filter";
-import { LabelFilter } from "../../../components/label-filter";
+import { TableFilter } from "../../../components/table-filter";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
-import { statusColumnFilterFn, makeStatusFilterController } from "../../../lib/status-filter-state";
-import { labelColumnFilterFn, makeLabelFilterController } from "../../../lib/label-filter-state";
+import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn } from "../../../lib/table-filter-state";
+import { useTableFilter } from "../../../lib/use-table-filter";
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
 import { ResourceStatsHeader } from "../../../components/resource-stats-header";
@@ -99,10 +97,9 @@ const columns: ColumnDef<Node>[] = [
         cell: (info) => <StatusChip status={info.getValue<NodeStatus>()} />,
         sortingFn: (a, b) =>
             STATUS_ORDER[a.original.status] - STATUS_ORDER[b.original.status],
-        // Keeps a row only when its status is in the selected set. "All statuses" is
-        // represented by the absence of this filter (cleared by the shared status
-        // filter controller), so an empty selection here correctly matches no rows.
-        filterFn: statusColumnFilterFn,
+        // Keeps a row only when its status is among the values ticked in the shared
+        // filter editor. An empty selection clears this filter, so every row shows.
+        filterFn: valueColumnFilterFn,
     },
     {
         accessorKey: "roles",
@@ -137,10 +134,9 @@ const columns: ColumnDef<Node>[] = [
         header: "Labels",
         cell: (info) => <LabelsCell labels={info.row.original.labels} />,
         enableSorting: false,
-        // Keeps a row only when its labels satisfy the label-filter selection.
-        // An empty selection clears this filter (set by the label-filter controller),
-        // so every row passes by default.
-        filterFn: labelColumnFilterFn,
+        // Keeps a row only when its labels satisfy the shared editor's label
+        // selection. An empty selection clears this filter, so every row passes.
+        filterFn: labelsColumnFilterFn,
     },
     {
         // Hidden column carrying each node's derived health ("Healthy"/"Error"/
@@ -148,7 +144,7 @@ const columns: ColumnDef<Node>[] = [
         // columnVisibility) and excluded from the fuzzy global filter.
         id: "health",
         accessorFn: (row) => nodeHealth(row),
-        filterFn: statusColumnFilterFn,
+        filterFn: valueColumnFilterFn,
         enableSorting: false,
         enableGlobalFilter: false,
         // Excluded from the column-config modal: it is an always-hidden filter helper, never shown.
@@ -167,15 +163,15 @@ export function NodesTable() {
 
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
-    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
-    // The selected statuses live in the table's "status" column filter; an absent filter means "all".
-    const statusFilterController = makeStatusFilterController("status", ALL_STATUSES, columnFilters, setColumnFilters);
-    // The selected health states live in the hidden "health" column filter; an absent filter means "all".
-    const healthFilterController = makeStatusFilterController("health", HEALTH_FILTER_OPTIONS, columnFilters, setColumnFilters);
-
-    // The label-filter selection lives in the table's "labels" column filter; an absent filter means "no selection" (all rows show).
-    const labelFilterController = makeLabelFilterController("labels", data?.nodes ?? [], columnFilters, setColumnFilters);
+    // The filterable columns the shared editor offers: the Status and Health value
+    // columns plus one column per label key present on the loaded nodes.
+    const filterableColumns: FilterableColumn[] = [
+        { columnId: "status", label: "Status", options: ALL_STATUSES, kind: "value" },
+        { columnId: "health", label: "Health", options: HEALTH_FILTER_OPTIONS, kind: "value" },
+        ...collectLabelColumns(data?.nodes ?? []),
+    ];
+    const filter = useTableFilter(filterableColumns);
 
     // The Roles column is hidden by default: on real single-distribution clusters
     // (e.g. docker-desktop) nodes carry no role labels, so it reads "<none>" and adds
@@ -185,10 +181,9 @@ export function NodesTable() {
     const table = useReactTable({
         data: data?.nodes ?? [],
         columns,
-        state: { sorting, globalFilter, columnFilters, columnOrder, columnVisibility: { ...columnVisibility, health: false } },
+        state: { sorting, globalFilter, columnFilters: filter.columnFilters, columnOrder, columnVisibility: { ...columnVisibility, health: false } },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
-        onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -233,27 +228,13 @@ export function NodesTable() {
                         },
                     }}
                 />
-                <StatusFilter
-                    all={ALL_STATUSES}
-                    selected={statusFilterController.selected}
-                    onChange={statusFilterController.setSelected}
-                    label="Status"
-                    testIdPrefix="nodes-status-filter"
-                />
-                <StatusFilter
-                    all={HEALTH_FILTER_OPTIONS}
-                    selected={healthFilterController.selected}
-                    onChange={healthFilterController.setSelected}
-                    label="Health"
-                    testIdPrefix="nodes-health-filter"
-                />
-                <LabelFilter
-                    available={labelFilterController.available}
-                    selection={labelFilterController.selection}
-                    onToggle={labelFilterController.toggleValue}
-                    onDeselectAll={labelFilterController.deselectAll}
-                    selectedCount={labelFilterController.selectedCount}
-                    testIdPrefix="nodes-label-filter"
+                <TableFilter
+                    columns={filter.columns}
+                    selection={filter.selection}
+                    onToggle={filter.onToggle}
+                    onDeselectAll={filter.onDeselectAll}
+                    totalSelected={filter.totalSelected}
+                    testIdPrefix="nodes-filter"
                 />
                 <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
             </div>

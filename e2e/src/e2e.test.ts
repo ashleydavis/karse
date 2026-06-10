@@ -2794,68 +2794,79 @@ test.describe("karse e2e", () => {
             setContext(CLUSTER_1);
         });
 
-        test("shows all phases by default", async () => {
+        test("shows all phases by default with the filter off", async () => {
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(5);
-            await expect(page.locator("[data-test-id='pods-status-filter-button']")).toHaveText("Status: All");
-            // The filter is labelled "Status", not "Phase": no stray "Phase" label remains.
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: All");
+            // The Status group is labelled "Status", not "Phase": no stray "Phase" label remains.
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            await expect(page.locator("[data-test-id='pods-filter-group-phase']")).toHaveText("Status");
+            await page.keyboard.press("Escape");
             await expect(page.getByText("Phase", { exact: false })).toHaveCount(0);
         });
 
-        test("deselecting a phase hides matching pods", async () => {
-            await page.locator("[data-test-id='pods-status-filter-button']").click();
-            await page.locator("[data-test-id='pods-status-filter-item-Pending']").click();
+        test("checking a single phase shows just those pods", async () => {
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            await page.locator("[data-test-id='pods-filter-item-phase-Running']").click();
             // Close the menu to read the table.
-            await page.keyboard.press("Escape");
-            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(4);
-            await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-pending" })).toHaveCount(0);
-            await expect(page.locator("[data-test-id='pods-status-filter-button']")).toHaveText("Status: 4 selected");
-        });
-
-        test("selecting only one phase shows just those pods", async () => {
-            await page.locator("[data-test-id='pods-status-filter-button']").click();
-            // Turn everything off, then turn Running back on.
-            for (const phase of ["Running", "Succeeded", "Failed", "Unknown"]) {
-                await page.locator(`[data-test-id='pods-status-filter-item-${phase}']`).click();
-            }
-            // After the previous test Pending is already off; only Running remains off too, so re-enable Running.
-            await page.locator("[data-test-id='pods-status-filter-item-Running']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
             await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("pod-running");
-            await expect(page.locator("[data-test-id='pods-status-filter-button']")).toHaveText("Status: 1 selected");
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: 1 selected");
         });
 
-        test("deselecting every phase shows the no-match message", async () => {
-            await page.locator("[data-test-id='pods-status-filter-button']").click();
-            await page.locator("[data-test-id='pods-status-filter-item-Running']").click();
+        test("checking a second phase ORs the two within the column", async () => {
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            await page.locator("[data-test-id='pods-filter-item-phase-Pending']").click();
             await page.keyboard.press("Escape");
-            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(0);
-            await expect(page.locator("[data-test-id='no-pods-match']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: 2 selected");
         });
 
-        test("re-selecting phases restores matching pods", async () => {
-            await page.locator("[data-test-id='pods-status-filter-button']").click();
-            for (const phase of ["Running", "Pending", "Succeeded", "Failed", "Unknown"]) {
-                await page.locator(`[data-test-id='pods-status-filter-item-${phase}']`).click();
-            }
+        test("a value picked in a second column ANDs across columns", async () => {
+            // Running OR Pending (from the previous test) AND Health=Error keeps just
+            // pod-failed/pod-unknown? No: Running/Pending are not Error. Pick Error +
+            // re-pick a matching phase to show AND narrows within the OR'd phases.
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            // Clear, then pick Pending (Pending pods are health "Other") and Health=Error.
+            await page.locator("[data-test-id='pods-filter-deselect-all']").click();
+            await page.locator("[data-test-id='pods-filter-item-phase-Failed']").click();
+            await page.locator("[data-test-id='pods-filter-item-health-Error']").click();
+            await page.keyboard.press("Escape");
+            // Failed pods are classified Error, so the AND keeps exactly pod-failed.
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("pod-failed");
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: 2 selected");
+        });
+
+        test("the search input filters the options by column name and by value text", async () => {
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            // Reset selection so the table is not affected while we inspect options.
+            await page.locator("[data-test-id='pods-filter-deselect-all']").click();
+            // Search by column name: only the Status group survives.
+            await page.locator("[data-test-id='pods-filter-search'] input").fill("status");
+            await expect(page.locator("[data-test-id='pods-filter-group-phase']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pods-filter-group-health']")).toHaveCount(0);
+            // Search by value text: only the matching Running option survives.
+            await page.locator("[data-test-id='pods-filter-search'] input").fill("Running");
+            await expect(page.locator("[data-test-id='pods-filter-item-phase-Running']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pods-filter-item-phase-Pending']")).toHaveCount(0);
+            // A non-matching query shows the no-match message.
+            await page.locator("[data-test-id='pods-filter-search'] input").fill("zzznotfound");
+            await expect(page.locator("[data-test-id='pods-filter-no-match']")).toBeVisible();
+            await page.locator("[data-test-id='pods-filter-search'] input").fill("");
+            await page.keyboard.press("Escape");
+            // Make sure the menu has closed before the next test interacts with the page.
+            await expect(page.locator("[data-test-id='pods-filter-menu']")).toBeHidden();
+        });
+
+        test("deselect all clears the selection and restores every pod", async () => {
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            // Make a selection first so Deselect all is enabled, then clear it.
+            await page.locator("[data-test-id='pods-filter-item-phase-Running']").click();
+            await page.locator("[data-test-id='pods-filter-deselect-all']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(5);
-            await expect(page.locator("[data-test-id='pods-status-filter-button']")).toHaveText("Status: All");
-        });
-
-        test("deselect all hides every pod, then select all restores them", async () => {
-            await page.locator("[data-test-id='pods-status-filter-button']").click();
-            await page.locator("[data-test-id='pods-status-filter-deselect-all']").click();
-            await page.keyboard.press("Escape");
-            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(0);
-            await expect(page.locator("[data-test-id='no-pods-match']")).toBeVisible();
-            await expect(page.locator("[data-test-id='pods-status-filter-button']")).toHaveText("Status: 0 selected");
-
-            await page.locator("[data-test-id='pods-status-filter-button']").click();
-            await page.locator("[data-test-id='pods-status-filter-select-all']").click();
-            await page.keyboard.press("Escape");
-            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(5);
-            await expect(page.locator("[data-test-id='pods-status-filter-button']")).toHaveText("Status: All");
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: All");
         });
     });
 
@@ -2908,61 +2919,35 @@ test.describe("karse e2e", () => {
             setContext(CLUSTER_1);
         });
 
-        test("shows all statuses by default", async () => {
+        test("shows all statuses by default with the filter off", async () => {
             await expect(page.locator("[data-test-id='node-row']")).toHaveCount(3);
-            await expect(page.locator("[data-test-id='nodes-status-filter-button']")).toHaveText("Status: All");
+            await expect(page.locator("[data-test-id='nodes-filter-button']")).toHaveText("Filter: All");
         });
 
-        test("deselecting a status hides matching nodes", async () => {
-            await page.locator("[data-test-id='nodes-status-filter-button']").click();
-            await page.locator("[data-test-id='nodes-status-filter-item-NotReady']").click();
-            await page.keyboard.press("Escape");
-            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(2);
-            await expect(page.locator("[data-test-id='node-row']").filter({ hasText: "node-notready" })).toHaveCount(0);
-            await expect(page.locator("[data-test-id='nodes-status-filter-button']")).toHaveText("Status: 2 selected");
-        });
-
-        test("selecting only one status shows just those nodes", async () => {
-            await page.locator("[data-test-id='nodes-status-filter-button']").click();
-            // NotReady is already off from the previous test; turn Unknown off so only Ready remains.
-            await page.locator("[data-test-id='nodes-status-filter-item-Unknown']").click();
+        test("checking a single status shows just those nodes", async () => {
+            await page.locator("[data-test-id='nodes-filter-button']").click();
+            await page.locator("[data-test-id='nodes-filter-item-status-Ready']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='node-row']")).toHaveCount(1);
             await expect(page.locator("[data-test-id='node-row'] td:first-child")).toHaveText("node-ready");
-            await expect(page.locator("[data-test-id='nodes-status-filter-button']")).toHaveText("Status: 1 selected");
+            await expect(page.locator("[data-test-id='nodes-filter-button']")).toHaveText("Filter: 1 selected");
         });
 
-        test("deselecting every status shows the no-match message", async () => {
-            await page.locator("[data-test-id='nodes-status-filter-button']").click();
-            await page.locator("[data-test-id='nodes-status-filter-item-Ready']").click();
+        test("checking a second status ORs the two within the column", async () => {
+            await page.locator("[data-test-id='nodes-filter-button']").click();
+            await page.locator("[data-test-id='nodes-filter-item-status-NotReady']").click();
             await page.keyboard.press("Escape");
-            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(0);
-            await expect(page.locator("[data-test-id='no-nodes-match']")).toBeVisible();
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='node-row']").filter({ hasText: "node-unknown" })).toHaveCount(0);
+            await expect(page.locator("[data-test-id='nodes-filter-button']")).toHaveText("Filter: 2 selected");
         });
 
-        test("re-selecting statuses restores matching nodes", async () => {
-            await page.locator("[data-test-id='nodes-status-filter-button']").click();
-            for (const status of ["Ready", "NotReady", "Unknown"]) {
-                await page.locator(`[data-test-id='nodes-status-filter-item-${status}']`).click();
-            }
+        test("deselect all clears the selection and restores every node", async () => {
+            await page.locator("[data-test-id='nodes-filter-button']").click();
+            await page.locator("[data-test-id='nodes-filter-deselect-all']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='node-row']")).toHaveCount(3);
-            await expect(page.locator("[data-test-id='nodes-status-filter-button']")).toHaveText("Status: All");
-        });
-
-        test("deselect all hides every node, then select all restores them", async () => {
-            await page.locator("[data-test-id='nodes-status-filter-button']").click();
-            await page.locator("[data-test-id='nodes-status-filter-deselect-all']").click();
-            await page.keyboard.press("Escape");
-            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(0);
-            await expect(page.locator("[data-test-id='no-nodes-match']")).toBeVisible();
-            await expect(page.locator("[data-test-id='nodes-status-filter-button']")).toHaveText("Status: 0 selected");
-
-            await page.locator("[data-test-id='nodes-status-filter-button']").click();
-            await page.locator("[data-test-id='nodes-status-filter-select-all']").click();
-            await page.keyboard.press("Escape");
-            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(3);
-            await expect(page.locator("[data-test-id='nodes-status-filter-button']")).toHaveText("Status: All");
+            await expect(page.locator("[data-test-id='nodes-filter-button']")).toHaveText("Filter: All");
         });
     });
 
@@ -3041,47 +3026,39 @@ test.describe("karse e2e", () => {
             setContext(CLUSTER_1);
         });
 
-        test("shows every pod by default", async () => {
+        test("shows every pod by default with the filter off", async () => {
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(5);
-            await expect(page.locator("[data-test-id='pods-health-filter-button']")).toHaveText("Health: All");
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: All");
         });
 
         test("checking only Error shows just the error pods", async () => {
-            await page.locator("[data-test-id='pods-health-filter-button']").click();
-            // Turn Healthy off, leaving only Error selected.
-            await page.locator("[data-test-id='pods-health-filter-item-Healthy']").click();
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            await page.locator("[data-test-id='pods-filter-item-health-Error']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
             await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-failed" })).toHaveCount(1);
             await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-unknown" })).toHaveCount(1);
-            await expect(page.locator("[data-test-id='pods-health-filter-button']")).toHaveText("Health: 1 selected");
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: 1 selected");
         });
 
         test("checking only Healthy shows just the healthy pods", async () => {
-            await page.locator("[data-test-id='pods-health-filter-button']").click();
+            await page.locator("[data-test-id='pods-filter-button']").click();
             // Error is currently the only one on; turn Error off and Healthy on.
-            await page.locator("[data-test-id='pods-health-filter-item-Error']").click();
-            await page.locator("[data-test-id='pods-health-filter-item-Healthy']").click();
+            await page.locator("[data-test-id='pods-filter-item-health-Error']").click();
+            await page.locator("[data-test-id='pods-filter-item-health-Healthy']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
             await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-running" })).toHaveCount(1);
             await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-succeeded" })).toHaveCount(1);
-            await expect(page.locator("[data-test-id='pods-health-filter-button']")).toHaveText("Health: 1 selected");
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: 1 selected");
         });
 
-        test("deselect all hides every pod, then select all restores them", async () => {
-            await page.locator("[data-test-id='pods-health-filter-button']").click();
-            await page.locator("[data-test-id='pods-health-filter-deselect-all']").click();
-            await page.keyboard.press("Escape");
-            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(0);
-            await expect(page.locator("[data-test-id='no-pods-match']")).toBeVisible();
-            await expect(page.locator("[data-test-id='pods-health-filter-button']")).toHaveText("Health: 0 selected");
-
-            await page.locator("[data-test-id='pods-health-filter-button']").click();
-            await page.locator("[data-test-id='pods-health-filter-select-all']").click();
+        test("deselect all clears the selection and restores every pod", async () => {
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            await page.locator("[data-test-id='pods-filter-deselect-all']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(5);
-            await expect(page.locator("[data-test-id='pods-health-filter-button']")).toHaveText("Health: All");
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: All");
         });
     });
 
@@ -3134,44 +3111,37 @@ test.describe("karse e2e", () => {
             setContext(CLUSTER_1);
         });
 
-        test("shows every node by default", async () => {
+        test("shows every node by default with the filter off", async () => {
             await expect(page.locator("[data-test-id='node-row']")).toHaveCount(3);
-            await expect(page.locator("[data-test-id='nodes-health-filter-button']")).toHaveText("Health: All");
+            await expect(page.locator("[data-test-id='nodes-filter-button']")).toHaveText("Filter: All");
         });
 
         test("checking only Error shows just the error nodes", async () => {
-            await page.locator("[data-test-id='nodes-health-filter-button']").click();
-            await page.locator("[data-test-id='nodes-health-filter-item-Healthy']").click();
+            await page.locator("[data-test-id='nodes-filter-button']").click();
+            await page.locator("[data-test-id='nodes-filter-item-health-Error']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='node-row']")).toHaveCount(2);
             await expect(page.locator("[data-test-id='node-row']").filter({ hasText: "node-notready" })).toHaveCount(1);
             await expect(page.locator("[data-test-id='node-row']").filter({ hasText: "node-unknown" })).toHaveCount(1);
-            await expect(page.locator("[data-test-id='nodes-health-filter-button']")).toHaveText("Health: 1 selected");
+            await expect(page.locator("[data-test-id='nodes-filter-button']")).toHaveText("Filter: 1 selected");
         });
 
         test("checking only Healthy shows just the healthy node", async () => {
-            await page.locator("[data-test-id='nodes-health-filter-button']").click();
-            await page.locator("[data-test-id='nodes-health-filter-item-Error']").click();
-            await page.locator("[data-test-id='nodes-health-filter-item-Healthy']").click();
+            await page.locator("[data-test-id='nodes-filter-button']").click();
+            await page.locator("[data-test-id='nodes-filter-item-health-Error']").click();
+            await page.locator("[data-test-id='nodes-filter-item-health-Healthy']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='node-row']")).toHaveCount(1);
             await expect(page.locator("[data-test-id='node-row'] td:first-child")).toHaveText("node-ready");
-            await expect(page.locator("[data-test-id='nodes-health-filter-button']")).toHaveText("Health: 1 selected");
+            await expect(page.locator("[data-test-id='nodes-filter-button']")).toHaveText("Filter: 1 selected");
         });
 
-        test("deselect all hides every node, then select all restores them", async () => {
-            await page.locator("[data-test-id='nodes-health-filter-button']").click();
-            await page.locator("[data-test-id='nodes-health-filter-deselect-all']").click();
-            await page.keyboard.press("Escape");
-            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(0);
-            await expect(page.locator("[data-test-id='no-nodes-match']")).toBeVisible();
-            await expect(page.locator("[data-test-id='nodes-health-filter-button']")).toHaveText("Health: 0 selected");
-
-            await page.locator("[data-test-id='nodes-health-filter-button']").click();
-            await page.locator("[data-test-id='nodes-health-filter-select-all']").click();
+        test("deselect all clears the selection and restores every node", async () => {
+            await page.locator("[data-test-id='nodes-filter-button']").click();
+            await page.locator("[data-test-id='nodes-filter-deselect-all']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='node-row']")).toHaveCount(3);
-            await expect(page.locator("[data-test-id='nodes-health-filter-button']")).toHaveText("Health: All");
+            await expect(page.locator("[data-test-id='nodes-filter-button']")).toHaveText("Filter: All");
         });
     });
 
@@ -4203,42 +4173,42 @@ test.describe("karse e2e", () => {
 
         test("shows all events by default with nothing checked", async () => {
             await expect(page.locator("[data-test-id='event-row']")).toHaveCount(3);
-            await expect(page.locator("[data-test-id='events-type-filter-button']")).toHaveText("Type: All");
+            await expect(page.locator("[data-test-id='events-filter-button']")).toHaveText("Filter: All");
         });
 
         test("checking Warning narrows to only Warning events", async () => {
-            await page.locator("[data-test-id='events-type-filter-button']").click();
-            await page.locator("[data-test-id='events-type-filter-item-Warning']").click();
+            await page.locator("[data-test-id='events-filter-button']").click();
+            await page.locator("[data-test-id='events-filter-item-type-Warning']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='event-row']")).toHaveCount(2);
             await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "web-normal" })).toHaveCount(0);
-            await expect(page.locator("[data-test-id='events-type-filter-button']")).toHaveText("Type: 1 selected");
+            await expect(page.locator("[data-test-id='events-filter-button']")).toHaveText("Filter: 1 selected");
         });
 
         test("also checking Normal widens to both types", async () => {
-            await page.locator("[data-test-id='events-type-filter-button']").click();
-            await page.locator("[data-test-id='events-type-filter-item-Normal']").click();
+            await page.locator("[data-test-id='events-filter-button']").click();
+            await page.locator("[data-test-id='events-filter-item-type-Normal']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='event-row']")).toHaveCount(3);
-            await expect(page.locator("[data-test-id='events-type-filter-button']")).toHaveText("Type: 2 selected");
+            await expect(page.locator("[data-test-id='events-filter-button']")).toHaveText("Filter: 2 selected");
         });
 
         test("checking only Normal shows just the Normal event", async () => {
-            await page.locator("[data-test-id='events-type-filter-button']").click();
+            await page.locator("[data-test-id='events-filter-button']").click();
             // Uncheck Warning, leaving only Normal checked.
-            await page.locator("[data-test-id='events-type-filter-item-Warning']").click();
+            await page.locator("[data-test-id='events-filter-item-type-Warning']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='event-row']")).toHaveCount(1);
             await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "web-normal" })).toBeVisible();
-            await expect(page.locator("[data-test-id='events-type-filter-button']")).toHaveText("Type: 1 selected");
+            await expect(page.locator("[data-test-id='events-filter-button']")).toHaveText("Filter: 1 selected");
         });
 
         test("deselect all clears the selection and restores every event", async () => {
-            await page.locator("[data-test-id='events-type-filter-button']").click();
-            await page.locator("[data-test-id='events-type-filter-deselect-all']").click();
+            await page.locator("[data-test-id='events-filter-button']").click();
+            await page.locator("[data-test-id='events-filter-deselect-all']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='event-row']")).toHaveCount(3);
-            await expect(page.locator("[data-test-id='events-type-filter-button']")).toHaveText("Type: All");
+            await expect(page.locator("[data-test-id='events-filter-button']")).toHaveText("Filter: All");
         });
     });
 
@@ -4820,55 +4790,55 @@ test.describe("karse e2e", () => {
 
         test("shows all errors by default with nothing checked", async () => {
             await expect(page.locator("[data-test-id='error-row']")).toHaveCount(3);
-            await expect(page.locator("[data-test-id='errors-type-filter-button']")).toHaveText("Type: All");
+            await expect(page.locator("[data-test-id='errors-filter-button']")).toHaveText("Filter: All");
         });
 
         test("lists every error type present in the dropdown", async () => {
-            await page.locator("[data-test-id='errors-type-filter-button']").click();
+            await page.locator("[data-test-id='errors-filter-button']").click();
             for (const reason of ["CrashLoopBackOff", "FailedScheduling", "ImagePullBackOff"]) {
-                await expect(page.locator(`[data-test-id='errors-type-filter-item-${reason}']`)).toBeVisible();
+                await expect(page.locator(`[data-test-id='errors-filter-item-reason-${reason}']`)).toBeVisible();
             }
             await page.keyboard.press("Escape");
         });
 
         test("checking one type narrows the table to that type", async () => {
-            await page.locator("[data-test-id='errors-type-filter-button']").click();
-            await page.locator("[data-test-id='errors-type-filter-item-CrashLoopBackOff']").click();
+            await page.locator("[data-test-id='errors-filter-button']").click();
+            await page.locator("[data-test-id='errors-filter-item-reason-CrashLoopBackOff']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='error-row']")).toHaveCount(1);
             await expect(page.locator("[data-test-id='error-row']").filter({ hasText: "CrashLoopBackOff" })).toHaveCount(1);
-            await expect(page.locator("[data-test-id='errors-type-filter-button']")).toHaveText("Type: 1 selected");
+            await expect(page.locator("[data-test-id='errors-filter-button']")).toHaveText("Filter: 1 selected");
         });
 
         test("checking a second type widens the table to both types", async () => {
-            await page.locator("[data-test-id='errors-type-filter-button']").click();
-            await page.locator("[data-test-id='errors-type-filter-item-ImagePullBackOff']").click();
+            await page.locator("[data-test-id='errors-filter-button']").click();
+            await page.locator("[data-test-id='errors-filter-item-reason-ImagePullBackOff']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='error-row']")).toHaveCount(2);
             await expect(page.locator("[data-test-id='error-row']").filter({ hasText: "FailedScheduling" })).toHaveCount(0);
-            await expect(page.locator("[data-test-id='errors-type-filter-button']")).toHaveText("Type: 2 selected");
+            await expect(page.locator("[data-test-id='errors-filter-button']")).toHaveText("Filter: 2 selected");
         });
 
         test("deselect all clears the selection and restores all errors", async () => {
-            await page.locator("[data-test-id='errors-type-filter-button']").click();
-            await page.locator("[data-test-id='errors-type-filter-deselect-all']").click();
+            await page.locator("[data-test-id='errors-filter-button']").click();
+            await page.locator("[data-test-id='errors-filter-deselect-all']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='error-row']")).toHaveCount(3);
-            await expect(page.locator("[data-test-id='errors-type-filter-button']")).toHaveText("Type: All");
+            await expect(page.locator("[data-test-id='errors-filter-button']")).toHaveText("Filter: All");
         });
 
         test("unchecking the last checked type also restores all errors", async () => {
-            await page.locator("[data-test-id='errors-type-filter-button']").click();
-            await page.locator("[data-test-id='errors-type-filter-item-FailedScheduling']").click();
+            await page.locator("[data-test-id='errors-filter-button']").click();
+            await page.locator("[data-test-id='errors-filter-item-reason-FailedScheduling']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='error-row']")).toHaveCount(1);
-            await expect(page.locator("[data-test-id='errors-type-filter-button']")).toHaveText("Type: 1 selected");
+            await expect(page.locator("[data-test-id='errors-filter-button']")).toHaveText("Filter: 1 selected");
 
-            await page.locator("[data-test-id='errors-type-filter-button']").click();
-            await page.locator("[data-test-id='errors-type-filter-item-FailedScheduling']").click();
+            await page.locator("[data-test-id='errors-filter-button']").click();
+            await page.locator("[data-test-id='errors-filter-item-reason-FailedScheduling']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='error-row']")).toHaveCount(3);
-            await expect(page.locator("[data-test-id='errors-type-filter-button']")).toHaveText("Type: All");
+            await expect(page.locator("[data-test-id='errors-filter-button']")).toHaveText("Filter: All");
         });
     });
 
@@ -5108,37 +5078,37 @@ test.describe("karse e2e", () => {
 
         test("shows all pods by default with the filter reading All", async () => {
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(3);
-            await expect(page.locator("[data-test-id='pods-label-filter-button']")).toHaveText("Labels: All");
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: All");
         });
 
         test("the dropdown lists the label keys present on the pods", async () => {
-            await page.locator("[data-test-id='pods-label-filter-button']").click();
-            await expect(page.locator("[data-test-id='pods-label-filter-key-app']")).toBeVisible();
-            await expect(page.locator("[data-test-id='pods-label-filter-key-tier']")).toBeVisible();
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            await expect(page.locator("[data-test-id='pods-filter-group-label:app']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pods-filter-group-label:tier']")).toBeVisible();
             await page.keyboard.press("Escape");
         });
 
         test("selecting a label value narrows the table to matching pods", async () => {
-            await page.locator("[data-test-id='pods-label-filter-button']").click();
-            await page.locator("[data-test-id='pods-label-filter-item-app-web']").click();
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            await page.locator("[data-test-id='pods-filter-item-label:app-web']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
             await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("web-pod");
-            await expect(page.locator("[data-test-id='pods-label-filter-button']")).toHaveText("Labels: 1 selected");
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: 1 selected");
         });
 
         test("selecting a second value for the same key widens to the union (OR within a key)", async () => {
-            await page.locator("[data-test-id='pods-label-filter-button']").click();
-            await page.locator("[data-test-id='pods-label-filter-item-app-api']").click();
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            await page.locator("[data-test-id='pods-filter-item-label:app-api']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
             await expect(page.locator("[data-test-id='pod-row']").filter({ hasText: "db-pod" })).toHaveCount(0);
-            await expect(page.locator("[data-test-id='pods-label-filter-button']")).toHaveText("Labels: 2 selected");
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: 2 selected");
         });
 
         test("adding a value on a second key narrows by AND across keys", async () => {
-            await page.locator("[data-test-id='pods-label-filter-button']").click();
-            await page.locator("[data-test-id='pods-label-filter-item-tier-backend']").click();
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            await page.locator("[data-test-id='pods-filter-item-label:tier-backend']").click();
             await page.keyboard.press("Escape");
             // app in {web,api} AND tier=backend matches no pod (web/api are frontend).
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(0);
@@ -5146,11 +5116,11 @@ test.describe("karse e2e", () => {
         });
 
         test("deselect all clears every filter and restores the full list", async () => {
-            await page.locator("[data-test-id='pods-label-filter-button']").click();
-            await page.locator("[data-test-id='pods-label-filter-deselect-all']").click();
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            await page.locator("[data-test-id='pods-filter-deselect-all']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(3);
-            await expect(page.locator("[data-test-id='pods-label-filter-button']")).toHaveText("Labels: All");
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: All");
         });
     });
 
@@ -5182,21 +5152,21 @@ test.describe("karse e2e", () => {
 
         test("has a label-filter dropdown and shows all by default", async () => {
             await expect(page.locator("[data-test-id='deployment-row']")).toHaveCount(2);
-            await expect(page.locator("[data-test-id='deployments-label-filter-button']")).toHaveText("Labels: All");
+            await expect(page.locator("[data-test-id='deployments-filter-button']")).toHaveText("Filter: All");
         });
 
         test("selecting a label value narrows the table; deselect all restores it", async () => {
-            await page.locator("[data-test-id='deployments-label-filter-button']").click();
-            await page.locator("[data-test-id='deployments-label-filter-item-app-web']").click();
+            await page.locator("[data-test-id='deployments-filter-button']").click();
+            await page.locator("[data-test-id='deployments-filter-item-label:app-web']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='deployment-row']")).toHaveCount(1);
             await expect(page.locator("[data-test-id='deployment-row'] td:first-child")).toHaveText("web-deploy");
 
-            await page.locator("[data-test-id='deployments-label-filter-button']").click();
-            await page.locator("[data-test-id='deployments-label-filter-deselect-all']").click();
+            await page.locator("[data-test-id='deployments-filter-button']").click();
+            await page.locator("[data-test-id='deployments-filter-deselect-all']").click();
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='deployment-row']")).toHaveCount(2);
-            await expect(page.locator("[data-test-id='deployments-label-filter-button']")).toHaveText("Labels: All");
+            await expect(page.locator("[data-test-id='deployments-filter-button']")).toHaveText("Filter: All");
         });
     });
 });

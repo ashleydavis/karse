@@ -7,7 +7,6 @@ import {
     flexRender,
     type ColumnDef,
     type SortingState,
-    type ColumnFiltersState,
 } from "@tanstack/react-table";
 import {
     Table,
@@ -29,15 +28,14 @@ import { useKubeContext } from "../../../lib/kube-context";
 import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { fetchStatefulSets } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
-import { StatusFilter } from "../../../components/status-filter";
-import { statusColumnFilterFn, makeStatusFilterController } from "../../../lib/status-filter-state";
+import { TableFilter } from "../../../components/table-filter";
+import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn } from "../../../lib/table-filter-state";
+import { useTableFilter } from "../../../lib/use-table-filter";
 import { LoadError } from "../../../components/load-error";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
-import { LabelFilter } from "../../../components/label-filter";
-import { labelColumnFilterFn, makeLabelFilterController } from "../../../lib/label-filter-state";
 import { ResourceStatsHeader } from "../../../components/resource-stats-header";
 import { computeStatefulSetStats, statefulSetHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
 import { useColumnConfig } from "../../../lib/column-config";
@@ -79,10 +77,9 @@ const columns: ColumnDef<StatefulSet>[] = [
         header: "Labels",
         cell: (info) => <LabelsCell labels={info.row.original.labels} />,
         enableSorting: false,
-        // Keeps a row only when its labels satisfy the label-filter selection.
-        // An empty selection clears this filter (set by the label-filter controller),
-        // so every row passes by default.
-        filterFn: labelColumnFilterFn,
+        // Keeps a row only when its labels satisfy the shared editor's label
+        // selection. An empty selection clears this filter, so every row passes.
+        filterFn: labelsColumnFilterFn,
     },
     {
         // Hidden column carrying each stateful set's derived health ("Healthy"/
@@ -90,7 +87,7 @@ const columns: ColumnDef<StatefulSet>[] = [
         // (hidden via columnVisibility) and excluded from the fuzzy global filter.
         id: "health",
         accessorFn: (row) => statefulSetHealth(row),
-        filterFn: statusColumnFilterFn,
+        filterFn: valueColumnFilterFn,
         enableSorting: false,
         enableGlobalFilter: false,
         // Excluded from the column-config modal: it is an always-hidden filter helper, never shown.
@@ -112,13 +109,14 @@ export function StatefulSetsTable() {
 
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
-    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
-    // The selected health states live in the hidden "health" column filter; an absent filter means "all".
-    const healthFilterController = makeStatusFilterController("health", HEALTH_FILTER_OPTIONS, columnFilters, setColumnFilters);
-
-    // The label-filter selection lives in the table's "labels" column filter; an absent filter means "no selection" (all rows show).
-    const labelFilterController = makeLabelFilterController("labels", data?.statefulSets ?? [], columnFilters, setColumnFilters);
+    // The filterable columns the shared editor offers: the Health value column plus
+    // one column per label key present on the loaded stateful sets.
+    const filterableColumns: FilterableColumn[] = [
+        { columnId: "health", label: "Health", options: HEALTH_FILTER_OPTIONS, kind: "value" },
+        ...collectLabelColumns(data?.statefulSets ?? []),
+    ];
+    const filter = useTableFilter(filterableColumns);
 
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("statefulsets", columns);
 
@@ -128,13 +126,12 @@ export function StatefulSetsTable() {
         state: {
             sorting,
             globalFilter,
-            columnFilters,
+            columnFilters: filter.columnFilters,
             columnOrder,
             columnVisibility: { ...columnVisibility, health: false },
         },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
-        onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -184,20 +181,13 @@ export function StatefulSetsTable() {
                         },
                     }}
                 />
-                <StatusFilter
-                    all={HEALTH_FILTER_OPTIONS}
-                    selected={healthFilterController.selected}
-                    onChange={healthFilterController.setSelected}
-                    label="Health"
-                    testIdPrefix="statefulsets-health-filter"
-                />
-                <LabelFilter
-                    available={labelFilterController.available}
-                    selection={labelFilterController.selection}
-                    onToggle={labelFilterController.toggleValue}
-                    onDeselectAll={labelFilterController.deselectAll}
-                    selectedCount={labelFilterController.selectedCount}
-                    testIdPrefix="statefulsets-label-filter"
+                <TableFilter
+                    columns={filter.columns}
+                    selection={filter.selection}
+                    onToggle={filter.onToggle}
+                    onDeselectAll={filter.onDeselectAll}
+                    totalSelected={filter.totalSelected}
+                    testIdPrefix="statefulsets-filter"
                 />
                 <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
             </div>

@@ -7,7 +7,6 @@ import {
     flexRender,
     type ColumnDef,
     type SortingState,
-    type ColumnFiltersState,
 } from "@tanstack/react-table";
 import {
     Table,
@@ -31,8 +30,9 @@ import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
-import { LabelFilter } from "../../../components/label-filter";
-import { labelColumnFilterFn, makeLabelFilterController } from "../../../lib/label-filter-state";
+import { TableFilter } from "../../../components/table-filter";
+import { labelsColumnFilterFn, collectLabelColumns } from "../../../lib/table-filter-state";
+import { useTableFilter } from "../../../lib/use-table-filter";
 
 type Props = {
     namespaces: Namespace[];
@@ -49,10 +49,10 @@ type Props = {
 export function NamespaceList({ namespaces, active, terminalDefault, isLoading, error, onRetry, onUse, onSetDefault, onOpen }: Props) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
-    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
-    // The label-filter selection lives in the table's "labels" column filter; an absent filter means "no selection" (all rows show).
-    const labelFilterController = makeLabelFilterController("labels", namespaces, columnFilters, setColumnFilters);
+    // The filterable columns the shared editor offers: one column per label key
+    // present on the loaded namespaces.
+    const filter = useTableFilter(collectLabelColumns(namespaces));
 
     const columns: ColumnDef<Namespace>[] = [
         {
@@ -78,10 +78,9 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
             header: "Labels",
             cell: (info) => <LabelsCell labels={info.row.original.labels} />,
             enableSorting: false,
-            // Keeps a row only when its labels satisfy the label-filter selection.
-            // An empty selection clears this filter (set by the label-filter controller),
-            // so every row passes by default.
-            filterFn: labelColumnFilterFn,
+            // Keeps a row only when its labels satisfy the shared editor's label
+            // selection. An empty selection clears this filter, so every row passes.
+            filterFn: labelsColumnFilterFn,
         },
         {
             accessorKey: "resourceCount",
@@ -130,10 +129,9 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
     const table = useReactTable({
         data: namespaces,
         columns,
-        state: { sorting, globalFilter, columnFilters },
+        state: { sorting, globalFilter, columnFilters: filter.columnFilters },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
-        onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -175,13 +173,13 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
                         },
                     }}
                 />
-                <LabelFilter
-                    available={labelFilterController.available}
-                    selection={labelFilterController.selection}
-                    onToggle={labelFilterController.toggleValue}
-                    onDeselectAll={labelFilterController.deselectAll}
-                    selectedCount={labelFilterController.selectedCount}
-                    testIdPrefix="namespaces-label-filter"
+                <TableFilter
+                    columns={filter.columns}
+                    selection={filter.selection}
+                    onToggle={filter.onToggle}
+                    onDeselectAll={filter.onDeselectAll}
+                    totalSelected={filter.totalSelected}
+                    testIdPrefix="namespaces-filter"
                 />
             </div>
             <TableContainer component={Paper} data-test-id="namespaces-list">

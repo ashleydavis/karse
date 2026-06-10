@@ -108,14 +108,12 @@ A Ready node, a NotReady node, and a cordoned (Ready) node, so at least two dist
 ```
 
 ### What to check
-- **Nodes table**: three rows. The status filter button (filter icon, beside the search box) reads `Status: All`.
-- Click the **Status** button to open the dropdown. `Ready`, `NotReady`, and `Unknown` are listed; all are checked.
-- **Uncheck `NotReady`**: the `fake-node-notready` row disappears and the button updates to `Status: 2 selected`.
-- **Check only `Ready`**: uncheck the others until just `Ready` remains. Only the Ready nodes (`fake-node-ready`, `fake-node-cordoned`) are listed and the button reads `Status: 1 selected`.
-- **Uncheck every status**: the table shows the "No nodes match the search." message.
-- **Re-check all statuses**: all three rows return and the button reads `Status: All`.
-- **Deselect all / Select all**: open the dropdown and click **Deselect all** (top of the dropdown): every status unticks, the table shows the "No nodes match the search." message, and the button reads `Status: 0 selected`. Click **Select all**: every status re-ticks, all three rows return, and the button reads `Status: All`. With everything ticked, **Select all** is greyed out; with nothing ticked, **Deselect all** is greyed out.
-- The status filter combines with the search box: searching while a subset of statuses is selected narrows results further.
+- **Nodes table**: three rows. The shared **Filter** button (filter icon, beside the search box) reads `Filter: All`.
+- Click the **Filter** button to open the editor. Under the **Status** heading `Ready`, `NotReady`, and `Unknown` are listed, none checked (the filter is off).
+- **Check `Ready`**: only the Ready nodes (`fake-node-ready`, `fake-node-cordoned`) are listed and the button reads `Filter: 1 selected`.
+- **Check a second status** (for example `NotReady`): the `fake-node-notready` row joins them (OR within Status) and the button reads `Filter: 2 selected`.
+- **Deselect all**: open the editor and click **Deselect all** (top of the editor): the selection clears, all three rows return, and the button reads `Filter: All`. With nothing selected, **Deselect all** is greyed out.
+- The filter combines with the search box: searching while a subset of statuses is checked narrows results further.
 
 ## Scenario G.2: Node health filter
 
@@ -128,12 +126,12 @@ Reuses the mixed-statuses fixture: a Ready node, a NotReady node, and a cordoned
 ```
 
 ### What to check
-- **Nodes table**: three rows. Beside the **Status** button is a **Health** button (filter icon) reading `Health: All`. The stats header reads `Healthy: 2` and `Error: 1`.
-- Click the **Health** button. Two checkboxes are shown: **Healthy** and **Error**, both ticked.
-- **Check only Error**: untick `Healthy`. Only the `fake-node-notready` row remains and the button reads `Health: 1 selected`.
-- **Check only Healthy**: re-tick `Healthy`, then untick `Error`. Only the two Ready nodes (`fake-node-ready`, `fake-node-cordoned`) remain and the button reads `Health: 1 selected`.
-- **Deselect all / Select all**: open the dropdown and click **Deselect all**: both boxes untick, the table shows "No nodes match the search.", and the button reads `Health: 0 selected`. Click **Select all**: both boxes re-tick, all three rows return, and the button reads `Health: All`.
-- The health filter combines with the search box and the status filter: a row must pass all active filters to show.
+- **Nodes table**: three rows. The shared **Filter** button reads `Filter: All`; the stats header reads `Healthy: 2` and `Error: 1`.
+- Click the **Filter** button. Under the **Health** heading two values are listed, **Healthy** and **Error**, none checked.
+- **Check only Error**: tick `Error`. Only the `fake-node-notready` row remains and the button reads `Filter: 1 selected`.
+- **Check only Healthy**: untick `Error`, then tick `Healthy`. Only the two Ready nodes (`fake-node-ready`, `fake-node-cordoned`) remain and the button reads `Filter: 1 selected`.
+- **Deselect all**: open the editor and click **Deselect all**: the selection clears, all three rows return, and the button reads `Filter: All`.
+- The Health values combine with the search box and the Status values: a row must pass all active filters to show.
 
 Teardown each cluster you stood up while testing this doc:
 

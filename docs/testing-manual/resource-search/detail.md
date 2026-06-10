@@ -57,21 +57,23 @@ Repeat a couple of the queries on the **Nodes page** search box (for example `nw
 ### Column sorting
 Column sorting is shared across all tables. See the sort checks in [nodes-view](../nodes-view/detail.md) (many-nodes scenario) and [pods-view](../pods-view/detail.md) (many-pods scenario): clicking a column header reorders rows, and clicking again reverses.
 
-### Status filtering
-Tables whose kind has a status field share one status-filter dropdown (the same `status-filter.tsx` component and `status-filter-state.ts` column-filter wiring). The dropdown sits beside the search box, has one checkbox per status value, defaults to all selected, hides rows whose status is unchecked, and shows the table's no-match message when every status is unchecked. It composes with the search box.
+### The shared column-filter editor
 
-The dropdown also has "Select all" and "Deselect all" controls at the top (above the checkboxes). "Deselect all" unticks every status at once (hiding all rows and showing the no-match message); "Select all" ticks every status at once (showing all rows again). "Select all" is greyed out when everything is already ticked, and "Deselect all" is greyed out when nothing is ticked.
+Every resource table has one shared filter editor (the same `table-filter.tsx` component plus `table-filter-state.ts` / `use-table-filter.ts` wiring), opened by a single **Filter** button beside the search box. There is no separate status/health/type/label button. A table declares which of its columns are filterable, and each becomes a group in the editor headed by the column name, with one checkbox per distinct value:
 
-See the dedicated scenarios: pods by phase in [pods-view](../pods-view/detail.md) (Scenario E) and nodes by status in [nodes-view](../nodes-view/detail.md) (Scenario G).
+- **Status** (pods by phase, nodes by Ready/NotReady/Unknown), labelled "Status" everywhere.
+- **Health** (Healthy/Error) on every table with a Healthy/Error stats header (pods, nodes, deployments, statefulsets, daemonsets), using the same per-kind classification as the stats header (see [resource-stats](../resource-stats/detail.md)). A resource that is neither (e.g. a Pending pod or a partially-ready workload) shows only while Health has nothing ticked.
+- **Type/Reason** on the errors and events tables.
+- **One group per label key** present on the loaded rows (nodes, pods, deployments, statefulsets, daemonsets, namespaces), with that key's distinct values.
 
-### Health filtering
-Every table that shows a Healthy/Error stats header (pods, nodes, deployments, statefulsets, daemonsets) also has a second dropdown labelled **Health** beside the search box, reusing the same `status-filter.tsx` component and `status-filter-state.ts` wiring. It has two checkboxes, **Healthy** and **Error**, both ticked by default (`Health: All`). The Healthy/Error classification matches the stats header's per-kind definition (see [resource-stats](../resource-stats/detail.md)); a resource that is neither (e.g. a Pending pod or a partially-ready workload) shows only under the default view and is hidden as soon as any health box is selected.
+Behaviour:
+- Nothing ticked = filter off, every row shows; the button reads **Filter: All**. The filter activates on the first tick, and the button then reads **Filter: N selected** (N = total ticked across all columns).
+- Within one column the ticked values are OR'd; across columns they are AND'd. A selection that matches no rows shows the table's no-match message.
+- A **Deselect all** control at the top clears every selection at once (back to showing everything); it is greyed out when nothing is selected.
+- A **search input** filters the shown options: a query matching a column name keeps that whole column, otherwise only the matching values survive (columns with no match drop out); a query matching nothing shows "No matching filters".
+- It composes with the search box: a row must satisfy all active filters and the search.
 
-Checking only **Error** shows just the error rows; checking only **Healthy** shows just the healthy rows. The same "Select all" / "Deselect all" controls apply, and the health filter composes with the search box and the status filter. See the dedicated scenarios: pods in [pods-view](../pods-view/detail.md) (Scenario E.2) and nodes in [nodes-view](../nodes-view/detail.md) (Scenario G.2).
-
-### Label filtering
-
-Every resource table whose kind carries labels (nodes, pods, deployments, statefulsets, daemonsets, namespaces) shares one structured label-filter dropdown (the same `label-filter.tsx` component and `label-filter-state.ts` column-filter wiring). The dropdown sits beside the search box (and beside the status and health filters where present). It lists every label key present on the loaded resources, with one checkbox per distinct value under each key. Nothing is selected by default and all resources show; the button reads `Labels: All`. Picking values for a key narrows the table to resources matching one of those values (OR within a key); picking values across different keys requires a row to match every key (AND across keys). A "Deselect all" control clears every selection. It composes with the search box and the status filter.
+See the dedicated scenarios: pods status/health in [pods-view](../pods-view/detail.md) (Scenario E), nodes status/health in [nodes-view](../nodes-view/detail.md) (Scenario G).
 
 Teardown the fuzzy-search fixture, then stand up the labels fixture below:
 
@@ -90,14 +92,15 @@ Teardown the fuzzy-search fixture, then stand up the labels fixture below:
 #### What to check
 Open the **Pods page** (default namespace). Two pods are present: `web-pod` (labels `app=web`, `tier=frontend`) and `db-pod` (label `app=db`).
 
-- **Default**: both pods show; the label-filter button reads `Labels: All`.
-- **Lists keys**: click the label-filter button. The dropdown lists the keys `app` and `tier`, each with its values as checkboxes.
-- **Filter by value**: tick `app` → `web`. Only `web-pod` remains; the button reads `Labels: 1 selected`.
-- **OR within a key**: also tick `app` → `db`. Both pods reappear (the table shows any pod whose `app` is `web` or `db`); the button reads `Labels: 2 selected`.
+- **Default**: both pods show; the **Filter** button reads `Filter: All`.
+- **Lists keys**: click the **Filter** button. Below the search input and Deselect all, the editor lists the `app` and `tier` label groups, each with its values as checkboxes (alongside the Status and Health groups).
+- **Filter by value**: tick `app` → `web`. Only `web-pod` remains; the button reads `Filter: 1 selected`.
+- **OR within a key**: also tick `app` → `db`. Both pods reappear (the table shows any pod whose `app` is `web` or `db`); the button reads `Filter: 2 selected`.
 - **AND across keys**: with `app` still on `web` and `db`, tick `tier` → `frontend`. Only `web-pod` remains (it is the only pod that is both in the app set and `tier=frontend`).
-- **Deselect all**: click "Deselect all" at the top of the dropdown. Every selection clears, both pods show again, and the button reads `Labels: All`.
+- **Search the options**: type `tier` in the editor's search input; only the `tier` group remains. Type a value like `web`; only matching options remain. Clear the search to restore the full list.
+- **Deselect all**: click "Deselect all" at the top of the editor. Every selection clears, both pods show again, and the button reads `Filter: All`.
 
-Repeat a value filter on the **Deployments page** (or another workload table) to confirm the same dropdown works on the other resource kinds.
+Repeat a value filter on the **Deployments page** (or another workload table) to confirm the same editor works on the other resource kinds.
 
 Teardown:
 
