@@ -40,6 +40,7 @@ Karse currently ships a single cluster home page (overview tiles plus a read-onl
 29. **ReplicaSet view**: read-only, searchable, sortable table for ReplicaSets, with detail pages showing desired/ready/available replica counts and owner reference.
 30. **RBAC views**: read-only, searchable, sortable tables for ServiceAccounts, Roles, ClusterRoles, RoleBindings, and ClusterRoleBindings, with detail pages showing rules and subjects.
 31. **CRD browser**: a view listing installed CustomResourceDefinitions and allowing users to browse instances of each CRD kind in a searchable, sortable table.
+32. **Explore-by-labels page** (needs fleshing out): a whole page dedicated to exploring the cluster through labels rather than resource kind. The user picks a label key, then one or more of its values, and sees every resource (across all kinds) carrying that label, searchable and sortable. Distinct from the all-resources browser (item 24, organised by kind/name) and from the per-resource and per-detail-page labels tables: this is a label-first lens over the whole cluster. Came out of the labels-tab work; flesh out the exact interactions, layout, and how it relates to the label-filter dropdown and the labels tabs before ticketing.
 
 ## Already shipped
 
