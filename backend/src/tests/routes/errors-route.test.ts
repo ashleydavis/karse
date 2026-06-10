@@ -42,6 +42,7 @@ const FAKE_ERROR = {
     reason: "CrashLoopBackOff",
     message: "Back-off restarting failed container",
     count: 1,
+    firstSeen: "2024-05-30T00:00:00Z",
     lastSeen: "2024-06-01T00:00:00Z",
 };
 

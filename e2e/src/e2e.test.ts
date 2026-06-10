@@ -3870,6 +3870,7 @@ test.describe("karse e2e", () => {
                     reason: "CrashLoopBackOff",
                     message: "back-off 5m0s restarting failed container",
                     count: 1,
+                    firstSeen: "2024-01-01T00:00:00Z",
                     lastSeen: new Date().toISOString(),
                 },
                 {
@@ -3880,6 +3881,7 @@ test.describe("karse e2e", () => {
                     reason: "FailedScheduling",
                     message: "0/3 nodes are available",
                     count: 4,
+                    firstSeen: "2024-01-02T00:00:00Z",
                     lastSeen: new Date().toISOString(),
                 },
             ],
@@ -3947,6 +3949,104 @@ test.describe("karse e2e", () => {
         test("clearing search restores all errors", async () => {
             await page.locator("[data-test-id='errors-search'] input").fill("");
             await expect(page.locator("[data-test-id='error-row']")).toHaveCount(2);
+        });
+    });
+
+    // ── Error detail page ───────────────────────────────────────────────────────
+
+    test.describe("error detail page", () => {
+        // One problem pod and one Warning event, with distinct first/last seen times
+        // and a long message so the detail page's untruncated rendering is testable.
+        const LONG_MESSAGE =
+            "back-off 5m0s restarting failed container app pod default/crasher-abc: this message is intentionally long so the table clips it but the detail page shows it in full without truncation";
+        const FAKE_ERRORS = {
+            errors: [
+                {
+                    source: "Pod",
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "crasher-abc",
+                    reason: "CrashLoopBackOff",
+                    message: LONG_MESSAGE,
+                    count: 7,
+                    firstSeen: "2024-01-01T00:00:00Z",
+                    lastSeen: new Date().toISOString(),
+                },
+                {
+                    source: "Event",
+                    namespace: "kube-system",
+                    objectKind: "Pod",
+                    objectName: "scheduler-xyz",
+                    reason: "FailedScheduling",
+                    message: "0/3 nodes are available",
+                    count: 4,
+                    firstSeen: "2024-01-02T00:00:00Z",
+                    lastSeen: new Date().toISOString(),
+                },
+            ],
+        };
+
+        async function interceptErrors(): Promise<void> {
+            await page.route("**/api/errors*", async (route) => {
+                await route.fulfill({ json: FAKE_ERRORS });
+            });
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await interceptErrors();
+        });
+
+        test.beforeEach(async () => {
+            await page.goto("/errors", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='errors-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/errors*");
+            setContext(CLUSTER_1);
+        });
+
+        test("clicking an error row navigates to its detail page", async () => {
+            await page.locator("[data-test-id='error-row']").filter({ hasText: "CrashLoopBackOff" }).click();
+            await expect(page.locator("[data-test-id='error-detail']")).toBeVisible();
+            await expect(page).toHaveURL(/\/errors\/\d+/);
+        });
+
+        test("detail page shows every table field", async () => {
+            await page.locator("[data-test-id='error-row']").filter({ hasText: "CrashLoopBackOff" }).click();
+            await expect(page.locator("[data-test-id='error-detail-source']")).toContainText("Pod");
+            await expect(page.locator("[data-test-id='error-detail-object']")).toContainText("Pod/crasher-abc");
+            await expect(page.locator("[data-test-id='error-detail-reason-field']")).toContainText("CrashLoopBackOff");
+            await expect(page.locator("[data-test-id='error-detail-namespace']")).toContainText("default");
+            await expect(page.locator("[data-test-id='error-detail-count']")).toContainText("7");
+            await expect(page.locator("[data-test-id='error-detail-age']")).toBeVisible();
+        });
+
+        test("detail page shows the full untruncated message", async () => {
+            await page.locator("[data-test-id='error-row']").filter({ hasText: "CrashLoopBackOff" }).click();
+            await expect(page.locator("[data-test-id='error-detail-message']")).toHaveText(LONG_MESSAGE);
+        });
+
+        test("detail page shows the first-seen and last-seen times", async () => {
+            await page.locator("[data-test-id='error-row']").filter({ hasText: "CrashLoopBackOff" }).click();
+            // 2024-01-01 is rendered in the browser's locale; assert the year is present.
+            await expect(page.locator("[data-test-id='error-detail-first-seen']")).toContainText("2024");
+            await expect(page.locator("[data-test-id='error-detail-last-seen']")).toContainText("ago");
+        });
+
+        test("related-object link navigates to the pod detail page", async () => {
+            await page.locator("[data-test-id='error-row']").filter({ hasText: "CrashLoopBackOff" }).click();
+            await page.locator("[data-test-id='error-detail-object-link']").click();
+            await expect(page).toHaveURL(/\/pods\/default\/crasher-abc/);
+        });
+
+        test("back navigation returns to the errors list", async () => {
+            await page.locator("[data-test-id='error-row']").filter({ hasText: "CrashLoopBackOff" }).click();
+            await expect(page.locator("[data-test-id='error-detail']")).toBeVisible();
+            await page.locator("[data-test-id='error-detail-back']").click();
+            await expect(page.locator("[data-test-id='errors-table']")).toBeVisible();
+            await expect(page).toHaveURL(/\/errors(\?|$)/);
         });
     });
 

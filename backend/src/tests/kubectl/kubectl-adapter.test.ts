@@ -1776,6 +1776,7 @@ describe("listClusterErrors", () => {
         reason?: string;
         message?: string;
         count?: number;
+        firstTimestamp?: string;
         lastTimestamp?: string;
         namespace?: string;
         objectName?: string;
@@ -1794,6 +1795,7 @@ describe("listClusterErrors", () => {
             message: overrides.message ?? "Back-off restarting failed container",
             type: "Warning",
             count: overrides.count ?? 3,
+            firstTimestamp: overrides.firstTimestamp ?? "2024-05-30T00:00:00Z",
             lastTimestamp: overrides.lastTimestamp ?? "2024-06-01T00:00:00Z",
         };
     }
@@ -1910,6 +1912,7 @@ describe("listClusterErrors", () => {
                         count: 4,
                         namespace: "prod",
                         objectName: "api-xyz",
+                        firstTimestamp: "2024-05-29T00:00:00Z",
                         lastTimestamp: "2024-06-02T00:00:00Z",
                     })],
                 })));
@@ -1926,6 +1929,7 @@ describe("listClusterErrors", () => {
                 reason: "FailedScheduling",
                 message: "0/3 nodes are available",
                 count: 4,
+                firstSeen: "2024-05-29T00:00:00Z",
                 lastSeen: "2024-06-02T00:00:00Z",
             },
         ]);
@@ -1956,6 +1960,7 @@ describe("listClusterErrors", () => {
                 reason: "CrashLoopBackOff",
                 message: "back-off 5m0s restarting failed container",
                 count: 1,
+                firstSeen: "2024-05-01T00:00:00Z",
                 lastSeen: "2024-06-03T00:00:00Z",
             },
         ]);
@@ -2070,6 +2075,31 @@ describe("listClusterErrors", () => {
             return Promise.resolve(ok(JSON.stringify({ items: [] })));
         });
         await expect(listClusterErrors("test-ctx")).rejects.toThrow("pods unreachable");
+    });
+
+    test("carries firstSeen from the event firstTimestamp and the pod creationTimestamp", async () => {
+        run.mockImplementation((_binary: string, args: readonly string[]) => {
+            const key = args.join(" ");
+            if (key.includes("get events")) {
+                return Promise.resolve(ok(JSON.stringify({
+                    items: [warningEventItem({
+                        objectName: "evt-pod",
+                        firstTimestamp: "2024-06-10T00:00:00Z",
+                        lastTimestamp: "2024-06-12T00:00:00Z",
+                    })],
+                })));
+            }
+            return Promise.resolve(ok(JSON.stringify({
+                items: [waitingPodItem("ImagePullBackOff", { name: "pod-1", startTime: "2024-06-15T00:00:00Z" })],
+            })));
+        });
+        const result = await listClusterErrors("test-ctx");
+        const event = result.find((e) => e.objectName === "evt-pod")!;
+        const pod = result.find((e) => e.objectName === "pod-1")!;
+        expect(event.firstSeen).toBe("2024-06-10T00:00:00Z");
+        expect(event.lastSeen).toBe("2024-06-12T00:00:00Z");
+        expect(pod.firstSeen).toBe("2024-05-01T00:00:00Z");
+        expect(pod.lastSeen).toBe("2024-06-15T00:00:00Z");
     });
 });
 

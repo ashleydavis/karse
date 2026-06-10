@@ -11,6 +11,7 @@ import { StatefulSetsPage } from "./pages/statefulsets";
 import { DaemonSetsPage } from "./pages/daemonsets";
 import { EventsPage } from "./pages/events";
 import { ErrorsPage } from "./pages/errors";
+import { ErrorDetailPage } from "./pages/error-detail";
 import { PodDetailPage } from "./pages/pod-detail";
 import { ContainerDetailPage } from "./pages/container-detail";
 import { NodeDetailPage } from "./pages/node-detail";
@@ -47,6 +48,7 @@ export function App() {
                 <Route path="events" element={<EventsPage />} />
                 <Route path="logs" element={<LiveLogsPage />} />
                 <Route path="errors" element={<ErrorsPage />} />
+                <Route path="errors/:index" element={<ErrorDetailPage />} />
                 <Route path="stern" element={<SternPage />} />
             </Route>
         </Routes>

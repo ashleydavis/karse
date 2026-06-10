@@ -174,6 +174,7 @@ export type ClusterError = {
     reason: string;         // event reason or pod waiting/terminated reason
     message: string;
     count: number;          // event count, or 1 for a problem pod
+    firstSeen: string;      // ISO timestamp the condition was first observed ("" if unknown)
     lastSeen: string;       // ISO timestamp; UI computes age
 };
 

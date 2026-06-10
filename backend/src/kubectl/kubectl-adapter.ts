@@ -363,6 +363,7 @@ export async function listClusterErrors(context: string, namespace?: string): Pr
     for (const ev of eventItems) {
         const involved = ev.involvedObject ?? {};
         const lastSeen = ev.lastTimestamp ?? ev.eventTime ?? ev.firstTimestamp ?? "";
+        const firstSeen = ev.firstTimestamp ?? ev.eventTime ?? lastSeen ?? "";
         errors.push({
             source: "Event",
             namespace: ev.metadata?.namespace ?? involved.namespace ?? "",
@@ -371,6 +372,7 @@ export async function listClusterErrors(context: string, namespace?: string): Pr
             reason: ev.reason ?? "",
             message: ev.message ?? "",
             count: ev.count ?? 1,
+            firstSeen,
             lastSeen,
         });
     }
@@ -382,6 +384,7 @@ export async function listClusterErrors(context: string, namespace?: string): Pr
             continue;
         }
         const lastSeen = item.status?.startTime ?? item.metadata?.creationTimestamp ?? "";
+        const firstSeen = item.metadata?.creationTimestamp ?? lastSeen ?? "";
         errors.push({
             source: "Pod",
             namespace: item.metadata?.namespace ?? "",
@@ -390,6 +393,7 @@ export async function listClusterErrors(context: string, namespace?: string): Pr
             reason: problem.reason,
             message: problem.message,
             count: 1,
+            firstSeen,
             lastSeen,
         });
     }

@@ -12,13 +12,14 @@ Backed by: the per-page table components under `frontend/src/pages/*/components/
 - Namespaces table rows link to `/namespaces/:name` (clicking an action button on a row does not navigate).
 - Pods table rows link to `/pods/:namespace/:name`.
 - Deployments / stateful sets / daemon sets table rows link to `/<kind>/:namespace/:name`.
+- Errors table rows link to that error's detail page (`/errors/:index`; see `errors-feed`).
 - Pods listed on a node, pod, or workload detail page link to the relevant pod detail page; resources listed on a namespace detail page link to their own detail page.
 - Container and init-container rows on the pod detail page link to that container's detail page (`/pods/:namespace/:name/containers/:container`; see `container-detail`).
 - Clickable rows share a common hover/cursor style (`table-row-style.ts`) so they look and behave consistently.
 
 ## Acceptance Criteria
 
-- [x] Nodes, pods, deployments, stateful sets, and daemon sets table rows each link to their detail page.
+- [x] Nodes, pods, deployments, stateful sets, daemon sets, and errors table rows each link to their detail page.
 - [x] Pods listed on detail pages link to their pod detail page.
 - [x] Clickable rows share a consistent hover/cursor affordance.
 

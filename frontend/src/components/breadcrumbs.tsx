@@ -90,6 +90,15 @@ function buildCrumbs(
         ];
     }
 
+    // Error detail: /errors/:index -> Errors > Error
+    if (root === "errors" && params.index !== undefined)
+    {
+        return [
+            { label: "Errors", to: "/errors" },
+            { label: "Error" },
+        ];
+    }
+
     // Namespace detail: /namespaces/:name -> Namespaces > <name>
     if (root === "namespaces" && params.name)
     {

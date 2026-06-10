@@ -27,6 +27,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ClusterError } from "karse-types";
 import { useKubeContext } from "../../../lib/kube-context";
 import { useKubeNamespace } from "../../../lib/kube-namespace";
+import { useShareableNavigate } from "../../../lib/nav-state";
 import { fetchErrors } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { TypeFilter } from "../../../components/type-filter";
@@ -34,6 +35,7 @@ import { typeColumnFilterFn, makeTypeFilterController } from "../../../lib/type-
 import { LoadError } from "../../../components/load-error";
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
+import { tableRowSx } from "../../../lib/table-row-style";
 
 // The distinct error types (reasons) present in the data, in display order
 // (alphabetical). These are the checkboxes offered by the type filter.
@@ -119,6 +121,7 @@ const columns: ColumnDef<ClusterError>[] = [
 export function ErrorsTable() {
     const { current } = useKubeContext();
     const { namespace } = useKubeNamespace();
+    const navigate = useShareableNavigate();
 
     const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["errors", current, namespace],
@@ -244,15 +247,27 @@ export function ErrorsTable() {
                                 </TableCell>
                             </TableRow>
                         )}
-                        {rows.map((row) => (
-                            <TableRow key={row.id} data-test-id="error-row">
-                                {row.getVisibleCells().map((cell) => (
-                                    <TableCell key={cell.id}>
-                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        ))}
+                        {rows.map((row) => {
+                            // The detail page selects an error by its index into the
+                            // unfiltered, newest-first list it re-fetches, so the row
+                            // links by its position in that same list (`all`), not by
+                            // its position in the current filtered/sorted view.
+                            const detailIndex = all.indexOf(row.original);
+                            return (
+                                <TableRow
+                                    key={row.id}
+                                    data-test-id="error-row"
+                                    onClick={() => navigate(`/errors/${detailIndex}`)}
+                                    sx={tableRowSx(true)}
+                                >
+                                    {row.getVisibleCells().map((cell) => (
+                                        <TableCell key={cell.id}>
+                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            );
+                        })}
                     </TableBody>
                 </Table>
             </TableContainer>
