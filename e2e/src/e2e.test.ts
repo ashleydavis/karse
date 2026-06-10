@@ -3388,6 +3388,126 @@ test.describe("karse e2e", () => {
         });
     });
 
+    test.describe("live logs auto-follow", () => {
+        // One pod whose stream emits enough lines to overflow the viewer, so the
+        // scroll position is meaningful (there is both history above and a bottom
+        // to follow).
+        const FOLLOW_PODS = {
+            pods: [
+                { name: "nginx-abc", namespace: "default", phase: "Running", ready: "1/1", restarts: 0, createdAt: new Date().toISOString(), node: "node-1" },
+            ],
+        };
+
+        // Builds an SSE body announcing the pod then emitting `count` numbered log
+        // lines, so the viewer overflows and the first/last lines are identifiable.
+        function buildLongSseBody(count: number): string {
+            const started = `event: started\ndata: ${JSON.stringify({ pods: [{ namespace: "default", name: "nginx-abc" }] })}\n\n`;
+            let body = started;
+            for (let i = 1; i <= count; i++) {
+                body += `event: line\ndata: ${JSON.stringify({ namespace: "default", pod: "nginx-abc", line: `line ${i}` })}\n\n`;
+            }
+            return body;
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: FOLLOW_PODS });
+            });
+            await page.route("**/api/logs/stream*", async (route) => {
+                await route.fulfill({
+                    headers: { "Content-Type": "text/event-stream" },
+                    body: buildLongSseBody(200),
+                });
+            });
+            await page.goto("/logs", { waitUntil: "networkidle" });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+            await page.unroute("**/api/logs/stream*");
+            setContext(CLUSTER_1);
+        });
+
+        // Streams 200 lines into the viewer and returns the viewer locator once the
+        // lines have rendered and overflowed.
+        async function streamLongLog() {
+            // Reload so each test starts from a fresh, non-streaming page (the
+            // serial page is shared, and a prior test leaves the Stop button up).
+            await page.goto("/logs", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='live-logs-filter'] input").fill("nginx");
+            await page.locator("[data-test-id='live-logs-start']").click();
+            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(200);
+            const viewer = page.locator("[data-test-id='live-logs-viewer']");
+            // The content must actually overflow for scrolling to be meaningful.
+            const overflows = await viewer.evaluate((el) => el.scrollHeight > el.clientHeight + 1);
+            expect(overflows).toBe(true);
+            return viewer;
+        }
+
+        test("when at the bottom, appended lines keep the view pinned to the bottom", async () => {
+            const viewer = await streamLongLog();
+            // After streaming, the view should be pinned to the very bottom.
+            const distanceFromBottom = await viewer.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop);
+            expect(distanceFromBottom).toBeLessThanOrEqual(4);
+            // The last line is the one in view at the bottom.
+            await expect(page.locator("[data-test-id='live-logs-line']").last()).toContainText("line 200");
+        });
+
+        test("after scrolling up, the position is left alone (not yanked back down)", async () => {
+            const viewer = await streamLongLog();
+            // Scroll the user up to the very top and let the scroll handler run.
+            await viewer.evaluate((el) => { el.scrollTop = 0; });
+            await viewer.dispatchEvent("scroll");
+            const topBefore = await viewer.evaluate((el) => el.scrollTop);
+            expect(topBefore).toBe(0);
+            // The earliest line must be reachable: line 1 is visible at the top.
+            await expect(page.locator("[data-test-id='live-logs-line']").first()).toContainText("line 1");
+            // The viewer is the scroll container.
+            const overflowY = await viewer.evaluate((el) => getComputedStyle(el).overflowY);
+            expect(overflowY).toBe("scroll");
+        });
+
+        test("shows a visible, usable custom scrollbar so the offscreen history is reachable", async () => {
+            await streamLongLog();
+            // The browser renders the native scrollbar as an invisible auto-hiding
+            // overlay, so the page draws its own always-visible bar. The track and
+            // thumb must be present and have real, visible dimensions.
+            const track = page.locator("[data-test-id='live-logs-scrollbar-track']");
+            const thumb = page.locator("[data-test-id='live-logs-scrollbar-thumb']");
+            await expect(track).toBeVisible();
+            await expect(thumb).toBeVisible();
+            const thumbBox = await thumb.boundingBox();
+            expect(thumbBox).not.toBeNull();
+            // A real, grabbable thumb: non-trivial width and height.
+            expect(thumbBox!.width).toBeGreaterThanOrEqual(6);
+            expect(thumbBox!.height).toBeGreaterThanOrEqual(24);
+            // The thumb has real contrast against the dark panel (light grey thumb
+            // on a dark track), so it is plainly visible, not an invisible gutter.
+            const thumbColor = await thumb.evaluate((el) => getComputedStyle(el).backgroundColor);
+            expect(thumbColor).toBe("rgb(203, 213, 225)");
+        });
+
+        test("dragging the custom scrollbar thumb scrolls up through the history", async () => {
+            const viewer = await streamLongLog();
+            // The view starts pinned to the bottom (line 200 in view).
+            const bottomBefore = await viewer.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop);
+            expect(bottomBefore).toBeLessThanOrEqual(4);
+            const thumb = page.locator("[data-test-id='live-logs-scrollbar-thumb']");
+            const box = (await thumb.boundingBox())!;
+            // Drag the thumb up to the top of the track to scroll back to the start.
+            await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+            await page.mouse.down();
+            await page.mouse.move(box.x + box.width / 2, box.y - 1000, { steps: 10 });
+            await page.mouse.up();
+            // The drag scrolled the viewer up off the bottom, reaching the earliest
+            // lines, and turned off auto-follow (the position holds at the top).
+            const scrollTopAfter = await viewer.evaluate((el) => el.scrollTop);
+            expect(scrollTopAfter).toBeLessThan(50);
+            await expect(page.locator("[data-test-id='live-logs-line']").first()).toContainText("line 1");
+        });
+    });
+
     test.describe("live logs page pod-label cap", () => {
         // Twelve fake pods, more than the page's 8-chip cap, to drive the
         // "..." expander that reveals the full streaming-pod list.

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import type { UIEvent, PointerEvent as ReactPointerEvent } from "react";
 import {
     Box,
     Typography,
@@ -20,6 +21,7 @@ import type { LogStreamLine } from "karse-types";
 import { useKubeContext } from "../../lib/kube-context";
 import { fetchNamespaces, fetchPods, openLogStream } from "../../lib/api-client";
 import { LoadingIndicator } from "../../components/loading-indicator";
+import { shouldFollow, bottomScrollTop, thumbMetrics, scrollTopForThumbTop, type ThumbMetrics } from "../../lib/log-autoscroll";
 
 // A rendered log line tagged with a stable key for React reconciliation.
 type RenderedLine = LogStreamLine & { key: number };
@@ -61,7 +63,34 @@ export function LiveLogsPage() {
     // Holds the active stream's close function so it survives re-renders.
     const closeRef = useRef<(() => void) | null>(null);
     const keyRef = useRef(0);
-    const logEndRef = useRef<HTMLDivElement | null>(null);
+    // The scrollable log viewer element, so the append effect can read its scroll
+    // metrics and pin it to the bottom when auto-following.
+    const viewerRef = useRef<HTMLDivElement | null>(null);
+    // Whether the view is currently auto-following the newest line. Starts true
+    // (a fresh stream follows) and flips to false once the user scrolls up, back
+    // to true once they scroll to the bottom again. A ref (not state) because the
+    // append effect reads it synchronously and it must not trigger re-renders.
+    const followRef = useRef(true);
+    // Geometry of the custom scrollbar thumb. The browser renders native
+    // scrollbars as invisible auto-hiding overlays, so the viewer draws its own
+    // always-visible bar; this state positions its thumb from the scroll metrics.
+    const [thumb, setThumb] = useState<ThumbMetrics>({ visible: false, heightPx: 0, topPx: 0 });
+    // Active thumb-drag gesture, captured on pointer-down so pointer-move maps the
+    // pointer's travel into a scrollTop. Null when not dragging.
+    const dragRef = useRef<{ startY: number; startTop: number; trackPx: number; thumbHeightPx: number } | null>(null);
+
+    // Re-reads the viewer's scroll metrics and repositions the custom scrollbar
+    // thumb. Called after lines append and on every user scroll.
+    function refreshThumb(): void {
+        const viewer = viewerRef.current;
+        if (viewer === null) {
+            return;
+        }
+        setThumb(thumbMetrics(
+            { scrollTop: viewer.scrollTop, scrollHeight: viewer.scrollHeight, clientHeight: viewer.clientHeight },
+            viewer.clientHeight,
+        ));
+    }
 
     const { data: namespacesData } = useQuery({
         queryKey: ["namespaces", current],
@@ -100,10 +129,78 @@ export function LiveLogsPage() {
         };
     }, []);
 
-    // Auto-scrolls to the newest line as logs arrive.
+    // Keeps the view pinned to the newest line as logs arrive, but only while
+    // auto-following. The follow flag is decided from the scroll position *before*
+    // these new lines grew the content: see the viewer's onScroll handler. If the
+    // user has scrolled up, the scroll position is left untouched.
     useEffect(() => {
-        logEndRef.current?.scrollIntoView({ block: "end" });
+        const viewer = viewerRef.current;
+        if (viewer === null) {
+            return;
+        }
+        if (followRef.current) {
+            viewer.scrollTop = bottomScrollTop(viewer);
+        }
+        refreshThumb();
     }, [lines]);
+
+    // Repositions the thumb after a layout-affecting resize (the track height is
+    // the viewer's client height) and on the first paint with content.
+    useEffect(() => {
+        refreshThumb();
+        const viewer = viewerRef.current;
+        if (viewer === null || typeof ResizeObserver === "undefined") {
+            return;
+        }
+        const observer = new ResizeObserver(() => refreshThumb());
+        observer.observe(viewer);
+        return () => observer.disconnect();
+    }, []);
+
+    // Recomputes the follow flag whenever the user scrolls the viewer: following
+    // resumes when they return to the bottom and stops when they scroll up. Driven
+    // by the user's own scrolling, so it reflects intent rather than the auto-pin.
+    function handleViewerScroll(event: UIEvent<HTMLDivElement>): void {
+        const viewer = event.currentTarget;
+        followRef.current = shouldFollow(viewer);
+        refreshThumb();
+    }
+
+    // Starts dragging the custom scrollbar thumb. Subsequent pointer-moves map the
+    // pointer's vertical travel onto the viewer's scrollTop until pointer-up.
+    function handleThumbPointerDown(event: ReactPointerEvent<HTMLDivElement>): void {
+        const viewer = viewerRef.current;
+        if (viewer === null) {
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        (event.target as HTMLElement).setPointerCapture(event.pointerId);
+        dragRef.current = {
+            startY: event.clientY,
+            startTop: thumb.topPx,
+            trackPx: viewer.clientHeight,
+            thumbHeightPx: thumb.heightPx,
+        };
+    }
+
+    function handleThumbPointerMove(event: ReactPointerEvent<HTMLDivElement>): void {
+        const drag = dragRef.current;
+        const viewer = viewerRef.current;
+        if (drag === null || viewer === null) {
+            return;
+        }
+        const nextThumbTop = drag.startTop + (event.clientY - drag.startY);
+        // A drag means the user is taking manual control, so stop auto-following.
+        followRef.current = false;
+        viewer.scrollTop = scrollTopForThumbTop(nextThumbTop, viewer, drag.trackPx, drag.thumbHeightPx);
+        refreshThumb();
+    }
+
+    function handleThumbPointerUp(event: ReactPointerEvent<HTMLDivElement>): void {
+        dragRef.current = null;
+        (event.target as HTMLElement).releasePointerCapture?.(event.pointerId);
+    }
 
     // Opens a fresh stream with the current scope, replacing any existing one.
     function startStream(): void {
@@ -128,6 +225,8 @@ export function LiveLogsPage() {
         setStreamError(null);
         setNeedsSelection(false);
         keyRef.current = 0;
+        // A fresh stream starts pinned to the bottom (following the newest line).
+        followRef.current = true;
         setStreaming(true);
         closeRef.current = openLogStream(current, namespace || undefined, effectiveFilter, 100, {
             onStarted: (started) => {
@@ -291,42 +390,94 @@ export function LiveLogsPage() {
                 </Box>
             )}
 
-            <Paper
-                variant="outlined"
-                sx={{
-                    p: 1.5,
-                    flex: 1,
-                    minHeight: 300,
-                    bgcolor: "grey.900",
-                    color: "grey.100",
-                    fontFamily: "monospace",
-                    fontSize: "0.75rem",
-                    overflowY: "auto",
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-all",
-                }}
-                data-test-id="live-logs-viewer"
-            >
-                {lines.length === 0 ? (
-                    streaming ? (
-                        <LoadingIndicator />
+            {/* The viewer and its custom scrollbar share a relative-positioned
+                wrapper so the bar can be drawn over the viewer's right edge. The
+                native scrollbar is hidden (this browser renders it as an invisible
+                auto-hiding overlay), and an always-visible bar is drawn instead so
+                the streamed history is plainly reachable. */}
+            <Box sx={{ position: "relative", flex: 1, minHeight: 300, display: "flex" }}>
+                <Paper
+                    ref={viewerRef}
+                    onScroll={handleViewerScroll}
+                    variant="outlined"
+                    sx={{
+                        p: 1.5,
+                        // Leave room on the right so log text does not run under the
+                        // custom scrollbar that is overlaid there.
+                        pr: 3,
+                        flex: 1,
+                        bgcolor: "grey.900",
+                        color: "grey.100",
+                        fontFamily: "monospace",
+                        fontSize: "0.75rem",
+                        overflowY: "scroll",
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-all",
+                        // Hide the native scrollbar: it renders as an invisible
+                        // auto-hiding overlay against the dark panel here, so the
+                        // custom bar below is the visible, usable one.
+                        scrollbarWidth: "none",
+                        "&::-webkit-scrollbar": { display: "none" },
+                    }}
+                    data-test-id="live-logs-viewer"
+                >
+                    {lines.length === 0 ? (
+                        streaming ? (
+                            <LoadingIndicator />
+                        ) : (
+                            <Typography component="span" sx={{ color: "grey.500", fontFamily: "monospace", fontSize: "0.75rem" }}>
+                                Pick a pod or wildcard, then press Stream.
+                            </Typography>
+                        )
                     ) : (
-                        <Typography component="span" sx={{ color: "grey.500", fontFamily: "monospace", fontSize: "0.75rem" }}>
-                            Pick a pod or wildcard, then press Stream.
-                        </Typography>
-                    )
-                ) : (
-                    lines.map((entry) => (
-                        <Box key={entry.key} component="div" data-test-id="live-logs-line">
-                            <Box component="span" sx={{ color: colorForPod(entry.pod), fontWeight: 600 }}>
-                                {entry.namespace}/{entry.pod}
+                        lines.map((entry) => (
+                            <Box key={entry.key} component="div" data-test-id="live-logs-line">
+                                <Box component="span" sx={{ color: colorForPod(entry.pod), fontWeight: 600 }}>
+                                    {entry.namespace}/{entry.pod}
+                                </Box>
+                                <Box component="span"> {entry.line}</Box>
                             </Box>
-                            <Box component="span"> {entry.line}</Box>
-                        </Box>
-                    ))
+                        ))
+                    )}
+                </Paper>
+
+                {/* Always-visible custom scrollbar track. Drawn only when the
+                    content overflows; the thumb is draggable to scroll. */}
+                {thumb.visible && (
+                    <Box
+                        data-test-id="live-logs-scrollbar-track"
+                        sx={{
+                            position: "absolute",
+                            top: 4,
+                            bottom: 4,
+                            right: 4,
+                            width: "12px",
+                            borderRadius: "6px",
+                            backgroundColor: "#3a3f4b",
+                            border: "1px solid #4b5563",
+                        }}
+                    >
+                        <Box
+                            data-test-id="live-logs-scrollbar-thumb"
+                            onPointerDown={handleThumbPointerDown}
+                            onPointerMove={handleThumbPointerMove}
+                            onPointerUp={handleThumbPointerUp}
+                            sx={{
+                                position: "absolute",
+                                left: 0,
+                                right: 0,
+                                top: `${thumb.topPx}px`,
+                                height: `${thumb.heightPx}px`,
+                                borderRadius: "6px",
+                                backgroundColor: "#cbd5e1",
+                                cursor: "grab",
+                                "&:hover": { backgroundColor: "#e2e8f0" },
+                                "&:active": { cursor: "grabbing" },
+                            }}
+                        />
+                    </Box>
                 )}
-                <div ref={logEndRef} />
-            </Paper>
+            </Box>
         </Box>
     );
 }

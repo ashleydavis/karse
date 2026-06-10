@@ -55,6 +55,13 @@ One node, three pods (`nginx-one`, `nginx-two`, `redis-main`).
 ### Scoping by namespace
 - Select `default` from the Namespace dropdown and press "Stream". Only pods in `default` are streamed (all three pods here).
 
+### Auto-follow and the scrollbar
+- Stream a pod that produces a steady flow of lines (the fake-logs mode emits lines continuously). Let it fill past one screen.
+- While the viewer is scrolled to the bottom, watch new lines arrive: the view stays pinned to the bottom, always showing the newest line.
+- Confirm the log panel shows a clearly visible scrollbar down its right edge: a track with a light-grey draggable thumb that plainly stands out against the dark panel. (This is the app's own custom bar; the browser's native overlay scrollbar is invisible against the dark panel, so do not rely on it.)
+- Drag the thumb up with the mouse (or use the mouse wheel) to scroll into the earlier output. Dragging the thumb scrolls the view and the earliest streamed lines remain reachable. New lines keep arriving but the view stays where you left it: it is not yanked back to the bottom.
+- Scroll back to the bottom. Auto-follow resumes: new lines again keep the view pinned to the end.
+
 ### Read-only invariant
 - Tail `logs/audit-*.log` while streaming and confirm only `logs -f` and `get` kubectl commands are recorded. No mutating verbs ever appear.
 

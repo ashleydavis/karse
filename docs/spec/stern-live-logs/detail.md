@@ -32,6 +32,15 @@ The kubectl-based multi-pod Logs page (`/logs`, `frontend/src/pages/live-logs/`)
 - Pressing Stream with no pod selected and an empty filter does **not** open a stream. Instead the page shows an info message ("Pick which pods to stream first") explaining that the user must choose a pod or type a wildcard/substring (e.g. `nginx-*`) and press Stream again.
 - The message clears as soon as the user selects a pod or types into the filter. Once a pod or wildcard is given, pressing Stream opens the stream as normal.
 
+#### Auto-follow and the visible scrollbar
+
+The Logs viewer keeps up with a live stream without trapping the user:
+
+- New streamed lines are appended to the viewer as they arrive.
+- The view auto-follows the newest line (stays pinned to the bottom) **only while it is already at the bottom**. The follow decision is the pure helper `frontend/src/lib/log-autoscroll.ts` (`isAtBottom`/`shouldFollow`/`bottomScrollTop`), read from the viewer's scroll metrics before the new lines grow the content.
+- Once the user scrolls up to read earlier output, auto-follow stops: new lines are still appended, but the scroll position is left alone (the user is not yanked back to the bottom). Returning to the bottom re-enables following.
+- The viewer always shows a clearly visible, usable scrollbar so the streamed history is reachable. The app's browser renders the native scrollbar as an invisible auto-hiding overlay (the `::-webkit-scrollbar` pseudo-elements are ignored), so the native bar is hidden and the viewer draws **its own always-visible scrollbar**: a fixed track down the panel's right edge with a light-grey thumb (`rgb(203, 213, 225)`) that stands out against the dark `grey.900` panel. The thumb's size and position come from the pure helper `thumbMetrics`, and dragging it scrolls the viewer (`scrollTopForThumbTop`), which also turns off auto-follow. This makes the streamed history reachable: the user can always see and grab the bar to scroll back through it, which is also what makes "scrolled up → don't yank back" reachable in the first place.
+
 ## Acceptance Criteria
 
 - [x] The page streams multi-pod logs via the external `stern` binary over SSE.
@@ -44,6 +53,7 @@ The kubectl-based multi-pod Logs page (`/logs`, `frontend/src/pages/live-logs/`)
 - [x] The whole-cluster firehose is bounded: stern fan-out is capped via an explicit `--max-log-requests`, so an all-namespaces `.*` stream no longer pegs a CPU core.
 - [x] Backend backpressure is bounded: lines are buffered in a fixed-size drop-oldest ring and flushed on a timer, so a runaway producer cannot OOM the backend (a `dropped` event reports shed lines).
 - [x] The kubectl-based Logs page (`/logs`) does not stream all pods at once: with no pod selected and an empty filter, pressing Stream shows guidance ("Pick which pods to stream first") instead of streaming, and streaming proceeds once a pod or wildcard is given.
+- [x] The Logs page (`/logs`) auto-follows the newest line only while the view is at the bottom; once the user scrolls up, new lines do not force-scroll them back down, and the viewer keeps a clearly visible, usable scrollbar so the streamed history stays reachable.
 
 ## Open Questions
 
