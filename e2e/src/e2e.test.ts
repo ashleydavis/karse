@@ -3369,6 +3369,18 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='live-logs-matched-pod']")).toHaveCount(1);
         });
 
+        test("last-updated indicator starts empty then reflects streamed log lines", async () => {
+            // Fresh page so no stream has run yet: the indicator reads "No logs yet".
+            await page.goto("/logs", { waitUntil: "networkidle" });
+            const indicator = page.locator("[data-test-id='live-logs-last-updated']");
+            await expect(indicator).toHaveText("No logs yet");
+            // Scope and stream; once a line lands the caption flips to "Updated just now".
+            await page.locator("[data-test-id='live-logs-filter'] input").fill("nginx");
+            await page.locator("[data-test-id='live-logs-start']").click();
+            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(1);
+            await expect(indicator).toHaveText("Updated just now");
+        });
+
         test("Stop button replaces Stream while streaming", async () => {
             await expect(page.locator("[data-test-id='live-logs-stop']")).toBeVisible();
             await page.locator("[data-test-id='live-logs-stop']").click();

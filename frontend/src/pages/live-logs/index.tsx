@@ -33,6 +33,28 @@ const PREFIX_COLORS = ["#4fc3f7", "#81c784", "#ffb74d", "#ba68c8", "#e57373", "#
 // behind a "..." expander, so a large stream does not eat vertical space.
 const MAX_VISIBLE_POD_CHIPS = 8;
 
+// Builds the "last updated" caption from the timestamp of the most recent log
+// line. Reads "Updated just now" within the first few seconds, then ages into
+// "Updated Ns/Nm/Nh ago" so the user can tell how fresh the streamed output is.
+function formatLastUpdated(lastLineAt: number | null, now: number): string {
+    if (lastLineAt === null) {
+        return "No logs yet";
+    }
+    const seconds = Math.max(0, Math.floor((now - lastLineAt) / 1000));
+    if (seconds < 5) {
+        return "Updated just now";
+    }
+    if (seconds < 60) {
+        return `Updated ${seconds}s ago`;
+    }
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) {
+        return `Updated ${minutes}m ago`;
+    }
+    const hours = Math.floor(minutes / 60);
+    return `Updated ${hours}h ago`;
+}
+
 // Deterministically maps a pod name to one of the prefix colors.
 function colorForPod(pod: string): string {
     let hash = 0;
@@ -59,6 +81,12 @@ export function LiveLogsPage() {
     // True when the user pressed Stream without scoping to any pod/wildcard, so
     // the page should show guidance on how to pick pods instead of streaming.
     const [needsSelection, setNeedsSelection] = useState(false);
+    // Epoch ms of the most recent appended log line, or null before any arrive.
+    // Drives the "Updated ..." caption next to the Stream/Stop button.
+    const [lastLineAt, setLastLineAt] = useState<number | null>(null);
+    // A clock that ticks once a second so the relative "Updated ..." caption
+    // ages without a new log line having to arrive.
+    const [now, setNow] = useState<number>(() => Date.now());
 
     // Holds the active stream's close function so it survives re-renders.
     const closeRef = useRef<(() => void) | null>(null);
@@ -202,6 +230,17 @@ export function LiveLogsPage() {
         (event.target as HTMLElement).releasePointerCapture?.(event.pointerId);
     }
 
+    // Ticks the clock once a second so the relative "Updated ..." caption ages
+    // on its own. Only runs once a line has arrived; idle until then.
+    useEffect(() => {
+        if (lastLineAt === null) {
+            return;
+        }
+        setNow(Date.now());
+        const id = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(id);
+    }, [lastLineAt]);
+
     // Opens a fresh stream with the current scope, replacing any existing one.
     function startStream(): void {
         if (current === null) {
@@ -224,6 +263,7 @@ export function LiveLogsPage() {
         setShowAllPods(false);
         setStreamError(null);
         setNeedsSelection(false);
+        setLastLineAt(null);
         keyRef.current = 0;
         // A fresh stream starts pinned to the bottom (following the newest line).
         followRef.current = true;
@@ -233,6 +273,9 @@ export function LiveLogsPage() {
                 setMatchedPods(started.pods.map((p) => p.name));
             },
             onLine: (line) => {
+                // Record when the latest line landed so the "Updated ..."
+                // caption reflects the freshest output.
+                setLastLineAt(Date.now());
                 setLines((prev) => {
                     const next = [...prev, { ...line, key: keyRef.current++ }];
                     // Cap the buffer so a long-running stream cannot exhaust memory.
@@ -342,6 +385,14 @@ export function LiveLogsPage() {
                         Stop
                     </Button>
                 )}
+
+                <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    data-test-id="live-logs-last-updated"
+                >
+                    {formatLastUpdated(lastLineAt, now)}
+                </Typography>
             </Paper>
 
             {needsSelection && (

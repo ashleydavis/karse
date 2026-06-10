@@ -62,6 +62,12 @@ One node, three pods (`nginx-one`, `nginx-two`, `redis-main`).
 - Drag the thumb up with the mouse (or use the mouse wheel) to scroll into the earlier output. Dragging the thumb scrolls the view and the earliest streamed lines remain reachable. New lines keep arriving but the view stays where you left it: it is not yanked back to the bottom.
 - Scroll back to the bottom. Auto-follow resumes: new lines again keep the view pinned to the end.
 
+### "Updated" indicator
+- Before streaming, the caption next to the Stream button reads "No logs yet".
+- Type `nginx` into the Pod filter and press "Stream". As soon as the first line arrives the caption reads "Updated just now".
+- Leave the stream idle (or watch a stream whose lines have stopped). After a few seconds the caption ages: "Updated Ns ago", then "Updated Nm ago" after a minute, then "Updated Nh ago" after an hour. It tracks the most recent line and ticks on its own.
+- Press "Stream" again (or start a fresh stream). The caption resets to "No logs yet" until the first new line lands.
+
 ### Read-only invariant
 - Tail `logs/audit-*.log` while streaming and confirm only `logs -f` and `get` kubectl commands are recorded. No mutating verbs ever appear.
 

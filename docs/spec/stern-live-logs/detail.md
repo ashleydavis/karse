@@ -41,6 +41,14 @@ The Logs viewer keeps up with a live stream without trapping the user:
 - Once the user scrolls up to read earlier output, auto-follow stops: new lines are still appended, but the scroll position is left alone (the user is not yanked back to the bottom). Returning to the bottom re-enables following.
 - The viewer always shows a clearly visible, usable scrollbar so the streamed history is reachable. The app's browser renders the native scrollbar as an invisible auto-hiding overlay (the `::-webkit-scrollbar` pseudo-elements are ignored), so the native bar is hidden and the viewer draws **its own always-visible scrollbar**: a fixed track down the panel's right edge with a light-grey thumb (`rgb(203, 213, 225)`) that stands out against the dark `grey.900` panel. The thumb's size and position come from the pure helper `thumbMetrics`, and dragging it scrolls the viewer (`scrollTopForThumbTop`), which also turns off auto-follow. This makes the streamed history reachable: the user can always see and grab the bar to scroll back through it, which is also what makes "scrolled up → don't yank back" reachable in the first place.
 
+#### Logs page "last updated" indicator
+
+Next to the Stream/Stop button the Logs page shows a small caption telling the user how fresh the streamed output is, so they can tell whether the stream is still active:
+
+- Before any line has arrived (and after a new stream is started) it reads "No logs yet".
+- Once a line lands it reads "Updated just now", then ages into "Updated Ns ago", "Updated Nm ago", and "Updated Nh ago" relative to the most recent appended log line.
+- It ticks once a second so the relative time advances on its own, and it resets to "No logs yet" whenever a fresh stream is started.
+
 ## Acceptance Criteria
 
 - [x] The page streams multi-pod logs via the external `stern` binary over SSE.
@@ -54,6 +62,7 @@ The Logs viewer keeps up with a live stream without trapping the user:
 - [x] Backend backpressure is bounded: lines are buffered in a fixed-size drop-oldest ring and flushed on a timer, so a runaway producer cannot OOM the backend (a `dropped` event reports shed lines).
 - [x] The kubectl-based Logs page (`/logs`) does not stream all pods at once: with no pod selected and an empty filter, pressing Stream shows guidance ("Pick which pods to stream first") instead of streaming, and streaming proceeds once a pod or wildcard is given.
 - [x] The Logs page (`/logs`) auto-follows the newest line only while the view is at the bottom; once the user scrolls up, new lines do not force-scroll them back down, and the viewer keeps a clearly visible, usable scrollbar so the streamed history stays reachable.
+- [x] The Logs page shows an "Updated ..." indicator next to the Stream/Stop button: "No logs yet" until the first line, then "Updated just now" / "Updated Ns/Nm/Nh ago" tracking the most recent appended log line, ticking once a second and resetting when a new stream starts.
 
 ## Open Questions
 
