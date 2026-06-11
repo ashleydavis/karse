@@ -2,15 +2,17 @@ import { useState } from "react";
 import { Box, Typography, List, ListItemButton, ListItemIcon, ListItemText, Divider, Tooltip, IconButton } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
-import { faLink, faDharmachakra, faServer, faLayerGroup, faCube, faCubes, faDatabase, faSitemap, faBell, faStream, faTowerBroadcast, faCircleExclamation, faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
-import { Link, useLocation } from "react-router-dom";
+import { faLink, faDharmachakra, faServer, faLayerGroup, faCube, faCubes, faDatabase, faSitemap, faBell, faStream, faTowerBroadcast, faCircleExclamation, faList, faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useShareableTo } from "../lib/nav-state";
+import { FROM_ALL_RESOURCES } from "../lib/breadcrumb-trail";
 import { TOP_BAR_HEIGHT } from "../lib/layout";
 
 const NAV_ITEMS = [
     { to: "/errors",       icon: faCircleExclamation, label: "Errors"   },
     { to: "/contexts",     icon: faLink,          label: "Contexts"     },
     { to: "/cluster",      icon: faDharmachakra,  label: "Cluster"      },
+    { to: "/all-resources", icon: faList,         label: "All resources" },
     { to: "/nodes",        icon: faServer,        label: "Nodes"        },
     { to: "/namespaces",   icon: faLayerGroup,    label: "Namespaces"   },
     { to: "/pods",         icon: faCube,          label: "Pods"         },
@@ -24,13 +26,21 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
     const { pathname } = useLocation();
+    const [searchParams] = useSearchParams();
     const buildTo = useShareableTo();
     const [collapsed, setCollapsed] = useState(false);
+
+    // A detail page reached from the All resources list is tagged with
+    // "from=all-resources". On such a page the nav origin is All resources, so it
+    // stays highlighted instead of the resource's own list page (e.g. Deployments).
+    const fromAllResources = searchParams.get("from") === FROM_ALL_RESOURCES;
 
     // Renders a single sidebar nav item (link with icon and label). Shared between
     // the main nav list and the bottom-pinned nav list.
     function renderNavItem({ to, icon, label }: { to: string; icon: IconDefinition; label: string }) {
-        const active = pathname === to || pathname.startsWith(to + "/");
+        const active = fromAllResources
+            ? to === "/all-resources"
+            : pathname === to || pathname.startsWith(to + "/");
         return (
             <Tooltip key={to} title={collapsed ? label : ""} placement="right">
                 <ListItemButton

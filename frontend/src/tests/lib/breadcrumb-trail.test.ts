@@ -1,4 +1,4 @@
-import { middleTruncate, collapseCrumbs, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../../lib/breadcrumb-trail";
+import { middleTruncate, collapseCrumbs, originCrumbs, FROM_ALL_RESOURCES, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../../lib/breadcrumb-trail";
 import type { Crumb } from "../../lib/breadcrumb-trail";
 
 describe("middleTruncate", () => {
@@ -84,5 +84,53 @@ describe("breadcrumb constants", () => {
 
     test("the name length limit is twenty-four", () => {
         expect(MAX_NAME_LENGTH).toBe(24);
+    });
+});
+
+describe("originCrumbs", () => {
+    test("builds an All resources origin trail showing only the resource name", () => {
+        expect(originCrumbs(FROM_ALL_RESOURCES, "Pod", "nginx-abc")).toEqual([
+            { label: "All resources", to: "/all-resources" },
+            { label: "nginx-abc" },
+        ]);
+    });
+
+    test("the origin crumb links back to the All resources page and the leaf is current", () => {
+        const result = originCrumbs(FROM_ALL_RESOURCES, "Deployment", "web-deploy");
+        expect(result).not.toBeNull();
+        expect(result![0].to).toBe("/all-resources");
+        expect(result![result!.length - 1].to).toBeUndefined();
+        expect(result![result!.length - 1].label).toBe("web-deploy");
+    });
+
+    test("omits the kind prefix from the leaf crumb", () => {
+        const result = originCrumbs(FROM_ALL_RESOURCES, "Deployment", "web-deploy");
+        expect(result![result!.length - 1].label).not.toContain("Deployment");
+    });
+
+    test("middle-truncates a long resource name in the leaf crumb", () => {
+        const name = "really-long-pod-name-that-exceeds-the-breadcrumb-limit-0123456789";
+        const result = originCrumbs(FROM_ALL_RESOURCES, "Pod", name);
+        const leaf = result![result!.length - 1].label;
+        expect(leaf.startsWith("really-long")).toBe(true);
+        expect(leaf).toContain("...");
+        expect(leaf.endsWith("0123456789")).toBe(true);
+    });
+
+    test("returns null when there is no origin (so the normal trail is used)", () => {
+        expect(originCrumbs(null, "Pod", "nginx-abc")).toBeNull();
+    });
+
+    test("returns null for an unrecognised origin", () => {
+        expect(originCrumbs("somewhere-else", "Pod", "nginx-abc")).toBeNull();
+    });
+
+    test("returns null when the kind is unknown", () => {
+        expect(originCrumbs(FROM_ALL_RESOURCES, null, "nginx-abc")).toBeNull();
+    });
+
+    test("returns null when the name is missing or empty", () => {
+        expect(originCrumbs(FROM_ALL_RESOURCES, "Pod", null)).toBeNull();
+        expect(originCrumbs(FROM_ALL_RESOURCES, "Pod", "")).toBeNull();
     });
 });

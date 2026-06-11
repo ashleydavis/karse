@@ -27,6 +27,7 @@ Single-test-cluster discipline (per `readme.md`): there is only ever ONE test cl
 | [namespace-selector](./namespace-selector/index.md) | Scope views to a chosen namespace. |
 | [namespace-detail](./namespace-detail/index.md) | Namespace detail page and its tabs. |
 | [cluster-overview](./cluster-overview/index.md) | Cluster home page stat tiles. |
+| [all-resources](./all-resources/index.md) | Combined cross-kind table: search, sort, Kind filter, row navigation. |
 | [nodes-view](./nodes-view/index.md) | Read-only, sortable, searchable nodes table. |
 | [node-detail](./node-detail/index.md) | Node detail page and its tabs. |
 | [pods-view](./pods-view/index.md) | Read-only pods table with phase filter. |

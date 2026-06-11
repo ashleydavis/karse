@@ -5169,4 +5169,210 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='deployments-filter-button']")).toHaveText("Filter: All");
         });
     });
+
+    // ── All resources page (combined cross-kind table) ──────────────────────────
+
+    test.describe("all resources page", () => {
+        // A deterministic spread of resources across several kinds so the combined
+        // table's rows, search, sort, Kind filter, and row navigation are stable.
+        // Every kind the page aggregates is routed (the real cluster has nodes but no
+        // workloads), so the assertions never depend on cluster contents.
+        const FAKE_PODS = {
+            pods: [
+                { name: "nginx-pod", namespace: "default", phase: "Running", ready: "1/1", containerCount: 1, restarts: 0, node: "node-worker", createdAt: new Date().toISOString(), labels: { app: "nginx" } },
+            ],
+        };
+        const FAKE_NODES = {
+            nodes: [
+                { name: "node-a", status: "Ready", roles: [], version: "v1.29.0", createdAt: new Date().toISOString(), labels: {} },
+            ],
+        };
+        const FAKE_NAMESPACES = {
+            namespaces: [
+                { name: "default", labels: {}, resourceCount: 1 },
+            ],
+        };
+        const FAKE_DEPLOYMENTS = {
+            deployments: [
+                { name: "web-deploy", namespace: "default", ready: "1/1", upToDate: 1, available: 1, createdAt: new Date().toISOString(), labels: { app: "web" } },
+            ],
+        };
+        const FAKE_STATEFULSETS = {
+            statefulSets: [
+                { name: "db-ss", namespace: "default", ready: "1/1", createdAt: new Date().toISOString(), labels: {} },
+            ],
+        };
+        const FAKE_DAEMONSETS = {
+            daemonSets: [
+                { name: "agent-ds", namespace: "kube-system", desired: 1, current: 1, ready: 1, upToDate: 1, available: 1, createdAt: new Date().toISOString(), labels: {} },
+            ],
+        };
+        const FAKE_WORKLOAD_DETAIL = {
+            kind: "deployments", name: "web-deploy", namespace: "default", createdAt: new Date().toISOString(),
+            labels: { app: "web" }, selector: { app: "web" }, stats: [{ label: "Ready", value: "1/1" }], pods: [], events: [],
+        };
+
+        async function rows() {
+            return page.locator("[data-test-id='all-resource-row']");
+        }
+        // Read the Kind cell (first column) of every visible row.
+        async function kinds(): Promise<string[]> {
+            return page.locator("[data-test-id='all-resource-row'] td:nth-child(1)").allTextContents();
+        }
+        // Read the Name cell (third column) of every visible row.
+        async function names(): Promise<string[]> {
+            return page.locator("[data-test-id='all-resource-row'] td:nth-child(3)").allTextContents();
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => { await route.fulfill({ json: FAKE_PODS }); });
+            await page.route("**/api/cluster/nodes*", async (route) => { await route.fulfill({ json: FAKE_NODES }); });
+            await page.route("**/api/namespaces*", async (route) => { await route.fulfill({ json: FAKE_NAMESPACES }); });
+            await page.route("**/api/deployments/**", async (route) => { await route.fulfill({ json: FAKE_WORKLOAD_DETAIL }); });
+            await page.route("**/api/deployments*", async (route) => { await route.fulfill({ json: FAKE_DEPLOYMENTS }); });
+            await page.route("**/api/statefulsets*", async (route) => { await route.fulfill({ json: FAKE_STATEFULSETS }); });
+            await page.route("**/api/daemonsets*", async (route) => { await route.fulfill({ json: FAKE_DAEMONSETS }); });
+            await page.goto("/all-resources", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='all-resources-table']")).toBeVisible();
+            await expect((await rows()).first()).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+            await page.unroute("**/api/cluster/nodes*");
+            await page.unroute("**/api/namespaces*");
+            await page.unroute("**/api/deployments/**");
+            await page.unroute("**/api/deployments*");
+            await page.unroute("**/api/statefulsets*");
+            await page.unroute("**/api/daemonsets*");
+            setContext(CLUSTER_1);
+        });
+
+        test("the left nav has an All resources entry that opens the page", async () => {
+            await page.locator("[data-test-id='sidebar-nav']").getByRole("link", { name: "all resources" }).click();
+            await expect(page).toHaveURL(/\/all-resources/);
+            await expect(page.locator("[data-test-id='all-resources-table']")).toBeVisible();
+        });
+
+        test("shows rows spanning more than one kind", async () => {
+            await expect(await rows()).toHaveCount(6);
+            const present = await kinds();
+            const distinct = new Set(present);
+            expect(distinct.size).toBeGreaterThan(1);
+            // Every aggregated kind appears.
+            expect(distinct).toEqual(new Set(["Pod", "Node", "Namespace", "Deployment", "StatefulSet", "DaemonSet"]));
+        });
+
+        test("the search box narrows the rows to those matching the typed text", async () => {
+            await page.locator("[data-test-id='all-resources-search'] input").fill("nginx-pod");
+            await expect(await rows()).toHaveCount(1);
+            expect(await names()).toEqual(["nginx-pod"]);
+            await page.locator("[data-test-id='all-resources-search'] input").fill("zzznotfound");
+            await expect(await rows()).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-all-resources-match']")).toBeVisible();
+            await page.locator("[data-test-id='all-resources-search'] input").fill("");
+            await expect(await rows()).toHaveCount(6);
+        });
+
+        test("clicking a column header sorts the table by that column", async () => {
+            // Sort by Kind ascending, then descending, and confirm the order flips.
+            await page.getByRole("columnheader", { name: "Kind", exact: false }).click();
+            const asc = await kinds();
+            await page.getByRole("columnheader", { name: "Kind", exact: false }).click();
+            const desc = await kinds();
+            expect(asc).toEqual([...asc].sort());
+            expect(desc).toEqual([...asc].reverse());
+            // Reset the sort so later tests see the default order.
+            await page.getByRole("columnheader", { name: "Kind", exact: false }).click();
+        });
+
+        test("the shared filter editor filters by Kind and clears back to all", async () => {
+            await expect(page.locator("[data-test-id='all-resources-filter-button']")).toHaveText("Filter: All");
+            await page.locator("[data-test-id='all-resources-filter-button']").click();
+            await expect(page.locator("[data-test-id='all-resources-filter-group-kind']")).toHaveText("Kind");
+            // Restrict to Pods only.
+            await page.locator("[data-test-id='all-resources-filter-item-kind-Pod']").click();
+            await page.keyboard.press("Escape");
+            await expect(await rows()).toHaveCount(1);
+            expect(await kinds()).toEqual(["Pod"]);
+            await expect(page.locator("[data-test-id='all-resources-filter-button']")).toHaveText("Filter: 1 selected");
+            // Add Node: the two kinds are OR'd within the column.
+            await page.locator("[data-test-id='all-resources-filter-button']").click();
+            await page.locator("[data-test-id='all-resources-filter-item-kind-Node']").click();
+            await page.keyboard.press("Escape");
+            await expect(await rows()).toHaveCount(2);
+            expect(new Set(await kinds())).toEqual(new Set(["Pod", "Node"]));
+            // Clear back to all.
+            await page.locator("[data-test-id='all-resources-filter-button']").click();
+            await page.locator("[data-test-id='all-resources-filter-deselect-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(await rows()).toHaveCount(6);
+            await expect(page.locator("[data-test-id='all-resources-filter-button']")).toHaveText("Filter: All");
+        });
+
+        test("clicking a resource row navigates to that resource's detail page", async () => {
+            // The deployment row links to the workload detail page.
+            await page.locator("[data-test-id='all-resource-row']", { hasText: "web-deploy" }).click();
+            await expect(page).toHaveURL(/\/deployments\/default\/web-deploy/);
+            await expect(page.getByRole("heading", { name: "web-deploy" })).toBeVisible();
+            // Return to the page for any later tests.
+            await page.goto("/all-resources", { waitUntil: "networkidle" });
+            await expect((await rows()).first()).toBeVisible();
+        });
+
+        test("a row click tags the destination URL with the All resources origin", async () => {
+            // Clicking a row navigates to the detail page and tags the URL with
+            // from=all-resources, so the detail page can show the origin breadcrumb.
+            await page.locator("[data-test-id='all-resource-row']", { hasText: "web-deploy" }).click();
+            await expect(page).toHaveURL(/\/deployments\/default\/web-deploy/);
+            await expect(page).toHaveURL(/from=all-resources/);
+            // Return to the page for any later tests.
+            await page.goto("/all-resources", { waitUntil: "networkidle" });
+            await expect((await rows()).first()).toBeVisible();
+        });
+
+        test("a detail page opened with the All resources origin shows it in the breadcrumb", async () => {
+            // Opening a resource's detail page with the from=all-resources tag (what a
+            // row click produces, and what a shared link reproduces) shows the
+            // navigation path in the breadcrumb: "All resources > web-deploy" (just the
+            // resource name, no kind prefix), not the deployment's own list trail. The
+            // origin crumb links back.
+            await page.goto("/deployments/default/web-deploy?from=all-resources", { waitUntil: "networkidle" });
+            await expect(page.getByRole("heading", { name: "web-deploy" })).toBeVisible();
+            const crumbs = page.locator("[data-test-id='breadcrumbs'] [data-test-id='breadcrumb-item']");
+            await expect(crumbs).toHaveText(["All resources", "web-deploy"]);
+            // The origin crumb links back to the All resources page.
+            await crumbs.first().click();
+            await expect(page).toHaveURL(/\/all-resources/);
+            await expect((await rows()).first()).toBeVisible();
+        });
+
+        test("a detail page opened with the All resources origin keeps All resources selected in the nav", async () => {
+            // The detail page was reached from the All resources list, so the left nav
+            // keeps "All resources" highlighted rather than the resource's own page
+            // ("Deployments"), reflecting where the navigation came from.
+            await page.goto("/deployments/default/web-deploy?from=all-resources", { waitUntil: "networkidle" });
+            await expect(page.getByRole("heading", { name: "web-deploy" })).toBeVisible();
+            const nav = page.locator("[data-test-id='sidebar-nav']");
+            await expect(nav.locator("a[aria-label='all resources']")).toHaveClass(/Mui-selected/);
+            await expect(nav.locator("a[aria-label='deployments']")).not.toHaveClass(/Mui-selected/);
+            // Return to the page for any later tests.
+            await page.goto("/all-resources", { waitUntil: "networkidle" });
+            await expect((await rows()).first()).toBeVisible();
+        });
+
+        test("the same detail page without the origin tag shows its normal breadcrumb", async () => {
+            // Reaching the deployment directly (no from tag) shows its own trail, not
+            // the All resources origin, so the origin only appears when navigated from
+            // the All resources page.
+            await page.goto("/deployments/default/web-deploy", { waitUntil: "networkidle" });
+            await expect(page.getByRole("heading", { name: "web-deploy" })).toBeVisible();
+            const crumbs = page.locator("[data-test-id='breadcrumbs'] [data-test-id='breadcrumb-item']");
+            await expect(crumbs).not.toContainText(["All resources"]);
+            // Return to the page for any later tests.
+            await page.goto("/all-resources", { waitUntil: "networkidle" });
+            await expect((await rows()).first()).toBeVisible();
+        });
+    });
 });

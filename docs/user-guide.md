@@ -86,6 +86,17 @@ Four cards summarise the active context:
 - **Namespaces**: number of namespaces.
 - **Pods**: number of pods across all namespaces.
 
+## All resources page (`/all-resources`)
+
+One combined, read-only table of every resource in the active context's cluster across all kinds Karse lists (pods, nodes, namespaces, deployments, stateful sets, daemon sets), so you can find anything in one place instead of visiting each kind's own page.
+
+- Columns: **Kind**, **Namespace** (blank for cluster-scoped kinds like Node and Namespace), **Name**, **Status** (the kind's phase, status, or ready ratio), **Age**, and **Labels**.
+- **Search**: type in the search box to filter rows by the displayed text (including labels), the same fuzzy search as the other tables.
+- **Sort**: click a column header to sort by it; click again to reverse.
+- **Filter**: use the **Filter** dropdown (filter icon) to restrict by **Kind** (tick one or more kinds), by **Health** (Healthy / Error), or by a label key. See [Column filtering](#column-filtering) below.
+- **Row navigation**: click a row to open that resource's own detail page. Rows for a kind without a detail page are not clickable.
+- Like the other tables, the page respects the active namespace: namespaced kinds scope to it, while cluster-scoped kinds (nodes, namespaces) always show.
+
 ## Nodes page (`/nodes`)
 
 A read-only table of the cluster's nodes:

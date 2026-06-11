@@ -24,15 +24,14 @@ Karse currently ships the cluster home page, namespace scoping, the core workloa
 13. **OOMKilled and eviction tracker**: highlight pods that have been terminated due to memory pressure or evicted by the kubelet, with the exit reason, timestamp, and how many times it has happened.
 14. **Historical metrics charts**: time-series sparklines or graphs for key signals (cluster CPU, cluster memory, per-node load) so trends and spikes are visible over a configurable lookback window.
 15. **Per-pod CPU and memory charts**: CPU utilisation and memory usage charts on the pod detail page, showing current usage alongside requests and limits, so resource pressure on individual pods is immediately visible.
-16. **All-resources browser**: a dedicated page with a searchable, sortable table listing every resource in the cluster (scoped to the selected namespace or cluster-wide), across all resource kinds, so users can browse the full inventory without knowing the specific resource type in advance.
-17. **Networking views**: read-only, searchable, sortable tables for Services and Ingresses, with detail pages showing spec, status, ports, and associated endpoints.
-18. **Storage views**: read-only, searchable, sortable tables for PersistentVolumes and PersistentVolumeClaims, with detail pages showing capacity, access modes, storage class, and binding status.
-19. **Configuration views**: read-only, searchable, sortable tables for ConfigMaps and Secrets (key names only, values redacted for Secrets), with detail pages.
-20. **Batch workload views**: read-only, searchable, sortable tables for Jobs and CronJobs, with detail pages showing schedule, last run time, and completion status.
-21. **ReplicaSet view**: read-only, searchable, sortable table for ReplicaSets, with detail pages showing desired/ready/available replica counts and owner reference.
-22. **RBAC views**: read-only, searchable, sortable tables for ServiceAccounts, Roles, ClusterRoles, RoleBindings, and ClusterRoleBindings, with detail pages showing rules and subjects.
-23. **CRD browser**: a view listing installed CustomResourceDefinitions and allowing users to browse instances of each CRD kind in a searchable, sortable table.
-24. **Explore-by-labels page** (needs fleshing out): a whole page dedicated to exploring the cluster through labels rather than resource kind. The user picks a label key, then one or more of its values, and sees every resource (across all kinds) carrying that label, searchable and sortable. Distinct from the all-resources browser (item 16, organised by kind/name) and from the per-resource and per-detail-page labels tables: this is a label-first lens over the whole cluster. Came out of the labels-tab work; flesh out the exact interactions, layout, and how it relates to the label-filter dropdown and the labels tabs before ticketing.
+16. **Networking views**: read-only, searchable, sortable tables for Services and Ingresses, with detail pages showing spec, status, ports, and associated endpoints.
+17. **Storage views**: read-only, searchable, sortable tables for PersistentVolumes and PersistentVolumeClaims, with detail pages showing capacity, access modes, storage class, and binding status.
+18. **Configuration views**: read-only, searchable, sortable tables for ConfigMaps and Secrets (key names only, values redacted for Secrets), with detail pages.
+19. **Batch workload views**: read-only, searchable, sortable tables for Jobs and CronJobs, with detail pages showing schedule, last run time, and completion status.
+20. **ReplicaSet view**: read-only, searchable, sortable table for ReplicaSets, with detail pages showing desired/ready/available replica counts and owner reference.
+21. **RBAC views**: read-only, searchable, sortable tables for ServiceAccounts, Roles, ClusterRoles, RoleBindings, and ClusterRoleBindings, with detail pages showing rules and subjects.
+22. **CRD browser**: a view listing installed CustomResourceDefinitions and allowing users to browse instances of each CRD kind in a searchable, sortable table.
+23. **Explore-by-labels page** (needs fleshing out): a whole page dedicated to exploring the cluster through labels rather than resource kind. The user picks a label key, then one or more of its values, and sees every resource (across all kinds) carrying that label, searchable and sortable. Distinct from the all-resources browser (now shipped, organised by kind/name) and from the per-resource and per-detail-page labels tables: this is a label-first lens over the whole cluster. Came out of the labels-tab work; flesh out the exact interactions, layout, and how it relates to the label-filter dropdown and the labels tabs before ticketing.
 
 ## Already shipped
 
@@ -45,5 +44,6 @@ Karse currently ships the cluster home page, namespace scoping, the core workloa
 - **Log viewer**: stream a pod/container's logs read-only (`kubectl logs`), with container selector and tail-line controls.
 - **Events feed**: a recent cluster events view, sorted newest-first.
 - **Resource search**: in-table search and column sorting across the resource tables.
+- **All resources page**: a single "All resources" page (`/all-resources`) listing every resource across all kinds (pods, nodes, namespaces, deployments, stateful sets, daemon sets) in one combined, searchable, sortable, filterable table, with a Kind filter and clickable rows. See `docs/spec/all-resources/detail.md`.
 - **Light/dark theming**: a color-mode setting (light, dark, or system) applied across the app.
 - **Stern firehose bounding (hardening)**: a whole-cluster `.*` all-namespaces stern stream no longer pegs a CPU core. Stern fan-out is capped at the source via an explicit `--max-log-requests` (default 10, overridable via `KARSE_STERN_MAX_LOG_REQUESTS`), and the backend buffers incoming lines in a bounded drop-oldest ring flushed on a timer so a runaway producer cannot OOM the backend. See `docs/spec/stern-live-logs/detail.md`.

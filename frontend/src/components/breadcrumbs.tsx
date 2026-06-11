@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { collapseCrumbs, middleTruncate, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../lib/breadcrumb-trail";
+import { collapseCrumbs, middleTruncate, originCrumbs, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../lib/breadcrumb-trail";
 import type { Crumb } from "../lib/breadcrumb-trail";
 import { useKubeContext } from "../lib/kube-context";
 import { fetchEvents } from "../lib/api-client";
@@ -11,6 +11,7 @@ import { fetchEvents } from "../lib/api-client";
 // Maps a top-level list-page segment to its display label.
 const LIST_LABELS: Record<string, string> = {
     cluster: "Cluster",
+    "all-resources": "All resources",
     contexts: "Contexts",
     nodes: "Nodes",
     namespaces: "Namespaces",
@@ -22,6 +23,18 @@ const LIST_LABELS: Record<string, string> = {
     stern: "Stern",
     events: "Events",
     errors: "Errors",
+};
+
+// Maps a detail route's list-page segment to the singular kind label shown in an
+// origin breadcrumb trail (e.g. "Pod nginx-abc"). Only the kinds the All resources
+// page links to are listed; an unmapped root yields no origin trail.
+const ORIGIN_KIND_LABELS: Record<string, string> = {
+    pods: "Pod",
+    nodes: "Node",
+    namespaces: "Namespace",
+    deployments: "Deployment",
+    statefulsets: "StatefulSet",
+    daemonsets: "DaemonSet",
 };
 
 // Maps a pod detail tab value (from the "tab" query param) to its display label,
@@ -151,7 +164,18 @@ export function Breadcrumbs() {
         ? (eventsData?.events.find((e) => e.uid === params.uid)?.reason ?? null)
         : null;
 
-    const crumbs = collapseCrumbs(buildCrumbs(pathname, params, searchParams.get("tab"), eventName), MAX_TRAIL_ITEMS);
+    // When the detail page was reached from another page (tagged via the "from"
+    // query param), show that page as the breadcrumb origin followed by the
+    // resource name, e.g. "All resources > nginx-abc", instead of the page's own
+    // list-page trail. Falls back to the normal trail when no origin applies.
+    const root = pathname.split("/").filter((s) => s.length > 0)[0] ?? "";
+    const originKind = ORIGIN_KIND_LABELS[root] ?? null;
+    const origin = originCrumbs(searchParams.get("from"), originKind, params.name ?? null);
+
+    const crumbs = collapseCrumbs(
+        origin ?? buildCrumbs(pathname, params, searchParams.get("tab"), eventName),
+        MAX_TRAIL_ITEMS,
+    );
 
     return (
         <MuiBreadcrumbs

@@ -13,6 +13,7 @@ The spec is reverse-engineered from the shipped code and the prose docs (`docs/a
 | [namespace-selector](./namespace-selector/index.md) | Settled | Complete | Scope views to a chosen namespace; tab-local active vs persisted default. |
 | [namespace-detail](./namespace-detail/index.md) | Settled | Complete | `/namespaces/:name` page: phase, labels, annotations, quotas/limits, contained resources, commands, YAML. |
 | [cluster-overview](./cluster-overview/index.md) | Settled | Complete | Cluster home page with four stat tiles for the active context. |
+| [all-resources](./all-resources/index.md) | Settled | Complete | One combined, searchable / sortable / filterable table of every resource across all kinds. |
 | [nodes-view](./nodes-view/index.md) | Settled | Complete | Read-only, sortable, searchable nodes table. |
 | [node-detail](./node-detail/index.md) | Settled | Complete | `/nodes/:name` page: conditions, capacity/allocatable, addresses, pods, events. |
 | [pods-view](./pods-view/index.md) | Settled | Complete | Read-only pods table, scoped to the active namespace or cluster-wide. |
@@ -40,4 +41,4 @@ The spec is reverse-engineered from the shipped code and the prose docs (`docs/a
 
 ## Not yet shipped
 
-The following are on the roadmap (`docs/roadmap.md`) and are deliberately absent from this spec until built: namespace-aware quota/metrics views, multi-cluster overview, auto-refresh/polling controls, a global all-resources browser, networking/storage/config/batch/RBAC/CRD views, performance and metrics dashboards, and the Host-header allowlist / DNS-rebinding guard. The audit log is surfaced on disk only; an in-UI audit-log viewer is not yet shipped.
+The following are on the roadmap (`docs/roadmap.md`) and are deliberately absent from this spec until built: namespace-aware quota/metrics views, multi-cluster overview, auto-refresh/polling controls, networking/storage/config/batch/RBAC/CRD views, performance and metrics dashboards, and the Host-header allowlist / DNS-rebinding guard. The audit log is surfaced on disk only; an in-UI audit-log viewer is not yet shipped.

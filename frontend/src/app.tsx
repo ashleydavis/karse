@@ -19,6 +19,7 @@ import { NodeDetailPage } from "./pages/node-detail";
 import { WorkloadDetailPage } from "./pages/workload-detail";
 import { LiveLogsPage } from "./pages/live-logs";
 import { SternPage } from "./pages/stern";
+import { AllResourcesPage } from "./pages/all-resources";
 
 // Redirects the index route to the cluster home while preserving the shareable query string (context, namespace) so a link to the bare root stays shareable.
 function IndexRedirect() {
@@ -32,6 +33,7 @@ export function App() {
             <Route path="/" element={<AppLayout />}>
                 <Route index element={<IndexRedirect />} />
                 <Route path="cluster" element={<ClusterHomePage />} />
+                <Route path="all-resources" element={<AllResourcesPage />} />
                 <Route path="contexts" element={<ContextsPage />} />
                 <Route path="nodes" element={<NodesPage />} />
                 <Route path="nodes/:name" element={<NodeDetailPage />} />
