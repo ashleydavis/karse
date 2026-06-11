@@ -6,7 +6,6 @@ import {
     Paper,
     IconButton,
     Tooltip,
-    Link as MuiLink,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowLeft, faCircleExclamation, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
@@ -18,6 +17,7 @@ import { useShareableNavigate } from "../../lib/nav-state";
 import { fetchErrors } from "../../lib/api-client";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
+import { ResourceRef } from "../../components/resource-ref";
 
 // Formats a Kubernetes timestamp into a human-readable age string, falling back
 // to "-" when the timestamp is empty/unknown.
@@ -73,19 +73,6 @@ function SourceChip({ source }: { source: ClusterError["source"] }) {
     );
 }
 
-// Returns the detail-page path for the error's related object, or null when the
-// object kind has no detail page in the app (so we render plain text instead of
-// a link). Pods link to the pod detail page; nodes to the node detail page.
-function objectDetailPath(error: ClusterError): string | null {
-    if (error.objectKind === "Pod" && error.objectName !== "") {
-        return `/pods/${error.namespace}/${error.objectName}`;
-    }
-    if (error.objectKind === "Node" && error.objectName !== "") {
-        return `/nodes/${error.objectName}`;
-    }
-    return null;
-}
-
 // Detail page for a single error condition. The Errors list has no stable
 // per-error identifier, so a row links here by its index into the same
 // newest-first list returned by GET /api/errors; this page re-fetches that list
@@ -136,8 +123,6 @@ export function ErrorDetailPage() {
         );
     }
 
-    const detailPath = objectDetailPath(item);
-
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }} data-test-id="error-detail">
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -162,27 +147,15 @@ export function ErrorDetailPage() {
                     </Box>
                     <Box data-test-id="error-detail-object">
                         <Typography variant="caption" color="text.secondary">Object</Typography>
-                        {detailPath !== null
-                            ? (
-                                <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
-                                    <MuiLink
-                                        component="button"
-                                        type="button"
-                                        underline="hover"
-                                        onClick={() => navigate(detailPath)}
-                                        data-test-id="error-detail-object-link"
-                                        sx={{ fontFamily: "monospace", verticalAlign: "baseline" }}
-                                    >
-                                        {item.objectKind}/{item.objectName}
-                                    </MuiLink>
-                                </Typography>
-                            )
-                            : (
-                                <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
-                                    {item.objectKind}/{item.objectName}
-                                </Typography>
-                            )
-                        }
+                        <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                            <ResourceRef
+                                kind={item.objectKind}
+                                name={item.objectName}
+                                namespace={item.namespace}
+                                label={`${item.objectKind}/${item.objectName}`}
+                                testId="error-detail-object-link"
+                            />
+                        </Typography>
                     </Box>
                     <Box data-test-id="error-detail-reason-field">
                         <Typography variant="caption" color="text.secondary">Reason</Typography>

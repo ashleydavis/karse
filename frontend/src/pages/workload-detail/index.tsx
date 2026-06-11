@@ -29,6 +29,7 @@ import { CommandsTab } from "../../components/commands-tab";
 import { LabelsTab } from "../../components/labels-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
+import { ResourceRef } from "../../components/resource-ref";
 import { ResourceStatsHeader } from "../../components/resource-stats-header";
 import { computePodStats } from "../../lib/resource-stats";
 import { tableRowSx } from "../../lib/table-row-style";
@@ -139,8 +140,13 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                     <Paper variant="outlined" sx={{ p: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Details</Typography>
                         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 1.5 }}>
+                            <Box data-test-id="workload-stat">
+                                <Typography variant="caption" color="text.secondary">Namespace</Typography>
+                                <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                                    <ResourceRef kind="Namespace" name={data.namespace} testId="workload-detail-namespace-link" />
+                                </Typography>
+                            </Box>
                             {[
-                                ["Namespace", data.namespace],
                                 ["Age", formatAge(data.createdAt)],
                                 ...data.stats.map((stat): [string, string] => [stat.label, stat.value]),
                             ].map(([label, value]) => (
@@ -246,7 +252,11 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                                                     <TableCell>{pod.phase}</TableCell>
                                                     <TableCell>{pod.ready}</TableCell>
                                                     <TableCell>{pod.restarts}</TableCell>
-                                                    <TableCell>{pod.node || "-"}</TableCell>
+                                                    <TableCell onClick={(e) => e.stopPropagation()}>
+                                                        {pod.node
+                                                            ? <ResourceRef kind="Node" name={pod.node} testId="workload-pod-node-link" />
+                                                            : "-"}
+                                                    </TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>

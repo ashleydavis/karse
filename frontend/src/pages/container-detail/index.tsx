@@ -20,6 +20,7 @@ import { fetchPodDetail } from "../../lib/api-client";
 import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
+import { ResourceRef } from "../../components/resource-ref";
 import { PodLogsPanel } from "../pod-detail/components/pod-logs-panel";
 
 // Renders a colored chip describing a container's current lifecycle state,
@@ -141,9 +142,19 @@ export function ContainerDetailPage() {
                     <Paper variant="outlined" sx={{ p: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Details</Typography>
                         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 1.5 }}>
+                            <Box>
+                                <Typography variant="caption" color="text.secondary">Pod</Typography>
+                                <Typography variant="body2" sx={{ fontFamily: "monospace", overflowWrap: "anywhere" }}>
+                                    <ResourceRef kind="Pod" name={data.name} namespace={data.namespace} testId="container-detail-pod-link" />
+                                </Typography>
+                            </Box>
+                            <Box>
+                                <Typography variant="caption" color="text.secondary">Namespace</Typography>
+                                <Typography variant="body2" sx={{ fontFamily: "monospace", overflowWrap: "anywhere" }}>
+                                    <ResourceRef kind="Namespace" name={data.namespace} testId="container-detail-namespace-link" />
+                                </Typography>
+                            </Box>
                             {[
-                                ["Pod", data.name],
-                                ["Namespace", data.namespace],
                                 ["Image", found.image],
                                 ["State", found.stateReason ? `${found.state}: ${found.stateReason}` : found.state],
                                 ["Ready", found.ready ? "Yes" : "No"],

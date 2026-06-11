@@ -1181,6 +1181,22 @@ test.describe("karse e2e", () => {
             await page.goto("/deployments", { waitUntil: "networkidle" });
         });
 
+        test("the workload Namespace reference links to the namespace detail page", async () => {
+            await page.goto("/deployments/default/nginx", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='workload-detail-namespace-link']").click();
+            await expect(page).toHaveURL(/\/namespaces\/default/);
+            await page.goto("/deployments", { waitUntil: "networkidle" });
+        });
+
+        test("the Node cell on the deployment Pods sub-tab links to the node detail page without triggering the row's pod navigation", async () => {
+            await page.goto("/deployments/default/nginx", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='workload-tab-pods']").click();
+            await page.locator("[data-test-id='workload-pod-node-link']").click();
+            // The node link wins over the row's pod navigation.
+            await expect(page).toHaveURL(/\/nodes\/node-worker/);
+            await page.goto("/deployments", { waitUntil: "networkidle" });
+        });
+
         test("the deployment detail Labels tab shows the workload's own labels", async () => {
             await page.goto("/deployments/default/nginx", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='workload-tab-labels']").click();
@@ -1610,6 +1626,21 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-panel-containers']")).toHaveCount(0);
             await expect(page.locator("[data-test-id='pod-panel-init-containers']")).toHaveCount(0);
             await expect(page.locator("[data-test-id='pod-panel-logs']")).toHaveCount(0);
+        });
+
+        test("the Namespace reference links to the namespace detail page", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-detail-namespace-link']").click();
+            await expect(page).toHaveURL(/\/namespaces\/default/);
+            // Return to the pod detail page for the remaining tests in this block.
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+        });
+
+        test("the Node reference links to the node detail page", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-detail-node-link']").click();
+            await expect(page).toHaveURL(/\/nodes\/node-worker/);
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
         });
 
         test("clicking the Containers tab shows only the regular containers", async () => {
@@ -4374,6 +4405,19 @@ test.describe("karse e2e", () => {
                     firstSeen: "2024-01-02T00:00:00Z",
                     lastSeen: new Date().toISOString(),
                 },
+                {
+                    // A ReplicaSet has no detail page in Karse, so its reference must
+                    // degrade to plain text rather than become a broken link.
+                    source: "Event",
+                    namespace: "default",
+                    objectKind: "ReplicaSet",
+                    objectName: "web-7d9",
+                    reason: "FailedCreate",
+                    message: "Error creating: pods is forbidden",
+                    count: 2,
+                    firstSeen: "2024-01-03T00:00:00Z",
+                    lastSeen: new Date().toISOString(),
+                },
             ],
         };
 
@@ -4430,6 +4474,18 @@ test.describe("karse e2e", () => {
             await page.locator("[data-test-id='error-row']").filter({ hasText: "CrashLoopBackOff" }).click();
             await page.locator("[data-test-id='error-detail-object-link']").click();
             await expect(page).toHaveURL(/\/pods\/default\/crasher-abc/);
+        });
+
+        test("an unresolvable related object renders as plain text, not a broken link", async () => {
+            // The ReplicaSet error has no detail page; its object reference must be
+            // plain text (a span), not an anchor, and must not navigate on click.
+            await page.locator("[data-test-id='error-row']").filter({ hasText: "FailedCreate" }).click();
+            const ref = page.locator("[data-test-id='error-detail-object-link']");
+            await expect(ref).toContainText("ReplicaSet/web-7d9");
+            await expect(ref).toHaveJSProperty("tagName", "SPAN");
+            await ref.click();
+            // Still on the same error detail page: no navigation happened.
+            await expect(page.locator("[data-test-id='error-detail']")).toBeVisible();
         });
 
         test("back navigation returns to the errors list", async () => {

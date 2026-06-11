@@ -19,7 +19,7 @@ Backed by: `GET /api/errors`, `backend/src/routes/errors-route.ts`, `backend/src
 
 - Each error row is clickable and navigates to a per-error detail page at `/errors/:index`, following the cross-cutting `clickable-resource-rows` pattern (whole-row click, shared hover/cursor style). The Errors list has no stable per-error identifier, so a row links by its index into the unfiltered, newest-first list returned by `GET /api/errors`; the detail page re-fetches that same list and selects the matching row.
 - The detail page (`frontend/src/pages/error-detail/`) shows every field shown in the table: source, object (`kind/name`), reason, namespace, count, and age, plus the **full, untruncated** message (the table clips it) and the **first-seen** and **last-seen** timestamps rendered absolutely with a relative age.
-- The detail page links the related object to its own detail page: a `Pod` object links to `/pods/:namespace/:name`, a `Node` object links to `/nodes/:name`. Object kinds without a detail page render as plain text.
+- The detail page links the related object to its own detail page via the shared `ResourceRef` / `resourcePath` resolver (see `clickable-resource-rows`): a `Pod` links to `/pods/:namespace/:name`, a `Node` to `/nodes/:name`, a `Namespace` to `/namespaces/:name`, and a Deployment / StatefulSet / DaemonSet to `/<kind>/:namespace/:name`. Object kinds without a detail page (e.g. ReplicaSet, Job) render as plain text.
 - A back control (left-arrow icon button) and the breadcrumb trail (`Errors > Error`) return to the Errors list. Navigation preserves the shareable `context`/`namespace` query params.
 - If the index no longer resolves to an error in the current list (e.g. the error cleared), the page shows an "Error not found" message with a back control.
 
@@ -36,7 +36,7 @@ Backed by: `GET /api/errors`, `backend/src/routes/errors-route.ts`, `backend/src
 - [x] Each error row is clickable and navigates to a per-error detail page (`/errors/:index`).
 - [x] The detail page shows every table field (source, object, reason, namespace, count, age) plus the full untruncated message.
 - [x] The detail page shows the first-seen and last-seen times.
-- [x] The detail page links the related object to its own detail page (Pod/Node), and there is a back control to the Errors list.
+- [x] The detail page links the related object to its own detail page (via the shared resolver, any kind with a detail page), and there is a back control to the Errors list.
 
 ## Open Questions
 

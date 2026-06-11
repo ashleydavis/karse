@@ -27,6 +27,7 @@ import { CommandsTab } from "../../components/commands-tab";
 import { LabelsTab } from "../../components/labels-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
+import { ResourceRef } from "../../components/resource-ref";
 import { PodContainersPanel, PodInitContainersPanel } from "./components/pod-containers-panel";
 import { PodLogsPanel } from "./components/pod-logs-panel";
 
@@ -174,9 +175,21 @@ export function PodDetailPage() {
                     <Paper variant="outlined" sx={{ p: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Details</Typography>
                         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 1.5 }}>
+                            <Box>
+                                <Typography variant="caption" color="text.secondary">Namespace</Typography>
+                                <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                                    <ResourceRef kind="Namespace" name={data.namespace} testId="pod-detail-namespace-link" />
+                                </Typography>
+                            </Box>
+                            <Box>
+                                <Typography variant="caption" color="text.secondary">Node</Typography>
+                                <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                                    {data.node
+                                        ? <ResourceRef kind="Node" name={data.node} testId="pod-detail-node-link" />
+                                        : "-"}
+                                </Typography>
+                            </Box>
                             {[
-                                ["Namespace", data.namespace],
-                                ["Node", data.node || "-"],
                                 ["Pod IP", data.podIP || "-"],
                                 ["Age", formatAge(data.createdAt)],
                             ].map(([label, value]) => (

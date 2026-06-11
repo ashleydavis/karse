@@ -28,6 +28,7 @@ import { CommandsTab } from "../../components/commands-tab";
 import { LabelsTab } from "../../components/labels-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
+import { ResourceRef } from "../../components/resource-ref";
 import { tableRowSx } from "../../lib/table-row-style";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
@@ -256,7 +257,9 @@ export function NodeDetailPage() {
                                                     sx={tableRowSx(true)}
                                                 >
                                                     <TableCell sx={{ fontFamily: "monospace" }}>{pod.name}</TableCell>
-                                                    <TableCell>{pod.namespace}</TableCell>
+                                                    <TableCell onClick={(e) => e.stopPropagation()}>
+                                                        <ResourceRef kind="Namespace" name={pod.namespace} testId="node-pod-namespace-link" />
+                                                    </TableCell>
                                                     <TableCell>{pod.phase}</TableCell>
                                                     <TableCell>{pod.ready}</TableCell>
                                                     <TableCell>{pod.restarts}</TableCell>

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
     Box,
     Typography,
@@ -7,18 +7,17 @@ import {
     Paper,
     IconButton,
     Tooltip,
-    Link as MuiLink,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleInfo, faTriangleExclamation, faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { ClusterEvent } from "karse-types";
 import { useKubeContext } from "../../lib/kube-context";
-import { useShareableNavigate, useShareableTo } from "../../lib/nav-state";
+import { useShareableNavigate } from "../../lib/nav-state";
 import { fetchEvents } from "../../lib/api-client";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
-import { involvedObjectPath } from "../../lib/involved-object-link";
+import { ResourceRef } from "../../components/resource-ref";
 
 // Formats a Kubernetes timestamp into a human-readable age string (e.g. "5m", "3h").
 // Returns "-" for an empty timestamp.
@@ -93,7 +92,6 @@ export function EventDetailPage() {
     const { uid } = useParams<{ uid: string }>();
     const { current } = useKubeContext();
     const navigate = useShareableNavigate();
-    const shareableTo = useShareableTo();
 
     // The Events page may be scoped to a namespace, but the detail page is reached
     // by uid and must find the event regardless of the active namespace, so it
@@ -135,7 +133,6 @@ export function EventDetailPage() {
         );
     }
 
-    const objectPath = involvedObjectPath(event.objectKind, event.objectName, event.namespace);
     const objectLabel = `${event.objectKind}/${event.objectName}`;
 
     return (
@@ -159,18 +156,13 @@ export function EventDetailPage() {
                     <Box data-test-id="event-field-object">
                         <Typography variant="caption" color="text.secondary">Object</Typography>
                         <Typography variant="body2" sx={{ fontFamily: "monospace", wordBreak: "break-word" }}>
-                            {objectPath !== null
-                                ? (
-                                    <MuiLink
-                                        component={Link}
-                                        to={shareableTo(objectPath)}
-                                        underline="hover"
-                                        data-test-id="event-object-link"
-                                    >
-                                        {objectLabel}
-                                    </MuiLink>
-                                )
-                                : objectLabel}
+                            <ResourceRef
+                                kind={event.objectKind}
+                                name={event.objectName}
+                                namespace={event.namespace}
+                                label={objectLabel}
+                                testId="event-object-link"
+                            />
                         </Typography>
                     </Box>
                     <Field label="Source / Component" value={event.source === "" ? "-" : event.source} testId="event-field-source" />

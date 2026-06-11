@@ -63,6 +63,23 @@ For each of these pages, hover a data row and confirm the row background lighten
 ### Consistency check
 Confirm the highlight colour looks identical across all of the above tables. They all use the same `action.hover` background, so a clickable node row and a static context row should highlight to the same shade.
 
+## Scenario C: Inline resource references navigate to detail pages
+
+Every inline mention of a concrete resource (in a detail field or a single table cell, not a whole row) is a link to that resource's detail page, built by the shared `ResourceRef` component / `resourcePath` resolver.
+
+**Fixture:** [_fixtures-kwok/16-detail-pages-and-logs](../_fixtures-kwok/16-detail-pages-and-logs/) (one node, one multi-container pod). Reuse the cluster set up in Scenario A.
+
+### What to check
+- Pod detail page (`/pods/default/web`), Status tab: the **Namespace** value is a link that navigates to `/namespaces/default`; the **Node** value is a link that navigates to that node's detail page (`/nodes/<node>`).
+- Container detail page (open the pod's Containers tab and click a container): the **Pod** value links to `/pods/default/web` and the **Namespace** value links to `/namespaces/default`.
+- Workload detail page (any deployment / stateful set / daemon set, e.g. `/deployments/:namespace/:name`), Status tab: the **Namespace** value links to that namespace. On the **Pods** sub-tab, each pod's **Node** cell is a link that navigates to that node's detail page; clicking the node link does NOT open the pod (the cell link wins over the row click).
+- Node detail page (`/nodes/<node>`), Pods sub-tab: each pod's **Namespace** cell is a link that navigates to that namespace; clicking it does NOT open the pod.
+- Error detail page (open an error from `/errors`): the **Object** field links to the related resource's detail page when it has one. Event detail page (open an event from `/events`): the **Object** field links to the involved resource's detail page.
+- Graceful degradation: an object whose kind has no detail page (e.g. a ReplicaSet on an error/event detail page) shows as plain text, with no link and no navigation on click.
+
+### Light and dark mode
+Toggle the colour-mode control in the top bar and confirm every inline reference above still reads as a link (it uses the theme's link colour) in both light and dark mode.
+
 Teardown:
 
 ```sh
