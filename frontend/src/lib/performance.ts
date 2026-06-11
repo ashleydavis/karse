@@ -129,6 +129,55 @@ export function buildClusterTreemap(pods: PodUsage[], metric: PerformanceMetric)
     return { id: "cluster", children: nodes };
 }
 
+// Builds the node Breakdown treemap: namespace → pod → container, where each leaf's
+// value is the container's usage for the selected metric. The node's own name is not a
+// level (the view is already scoped to one node), so the top split is by namespace.
+// Containers with no usage (null) or zero usage are filtered out, so the treemap only
+// shows containers that actually consume the metric (an empty rectangle carries no
+// information and breaks nivo's layout). A leaf still navigates to its owning pod's
+// detail page on click, reusing the cluster treemap's leaf navigation fields.
+export function buildNodeTreemap(pods: PodUsage[], metric: PerformanceMetric): TreemapNode {
+    // namespace name → pod name → container leaf list, preserving first-seen order.
+    const byNamespace = new Map<string, Map<string, TreemapNode[]>>();
+
+    for (const pod of pods) {
+        for (const container of pod.containers) {
+            const value = metricValue(container.usage, metric);
+            if (value === null || value <= 0) {
+                continue;
+            }
+            let byPod = byNamespace.get(pod.namespace);
+            if (byPod === undefined) {
+                byPod = new Map<string, TreemapNode[]>();
+                byNamespace.set(pod.namespace, byPod);
+            }
+            let leaves = byPod.get(pod.name);
+            if (leaves === undefined) {
+                leaves = [];
+                byPod.set(pod.name, leaves);
+            }
+            leaves.push({
+                id: `${pod.namespace}/${pod.name}/${container.name}`,
+                value,
+                utilisation: utilisation(container.usage, container.limits, metric),
+                podNamespace: pod.namespace,
+                podName: pod.name,
+            });
+        }
+    }
+
+    const namespaces: TreemapNode[] = [];
+    for (const [namespace, byPod] of byNamespace) {
+        const podNodes: TreemapNode[] = [];
+        for (const [podName, leaves] of byPod) {
+            podNodes.push({ id: `${namespace}/${podName}`, children: leaves });
+        }
+        namespaces.push({ id: namespace, children: podNodes });
+    }
+
+    return { id: "node", children: namespaces };
+}
+
 // Builds the Hot spots heatmap rows: one row per node, with a cell per metric column
 // (cpu% / mem%) holding the node's utilisation (usage ÷ allocatable) as a percentage.
 // A cell is null when usage or allocatable is missing, so nivo renders it blank

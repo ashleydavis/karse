@@ -31,7 +31,7 @@ Then open the frontend at `http://127.0.0.1:5173`. The scenario fixture stands u
 - Navigate to `/nodes` and click the `fake-node-1` row to open `/nodes/fake-node-1`.
 - The tab bar now includes a "Performance" tab (between "Labels" and "Commands").
 - The other tabs (Status, Pods, Events, Labels, Commands, YAML) still render and behave as before.
-- Click the "Performance" tab. A stub panel appears showing the "Performance" heading and "Performance metrics coming soon". The Status cards are not visible on this tab.
+- Click the "Performance" tab. The Status cards are not visible on this tab. The node tab is now **populated** (Breakdown treemap plus Provisioning bars); see the [Node Performance tab (populated)](#node-performance-tab-populated) scenario below.
 
 ### Pod detail Performance tab
 - Navigate to `/pods` and click the `web` pod row to open its detail page.
@@ -39,9 +39,9 @@ Then open the frontend at `http://127.0.0.1:5173`. The scenario fixture stands u
 - The other tabs (Status, Containers, Labels, Logs, Commands, YAML) still render and behave as before.
 - Click the "Performance" tab. A stub panel appears showing the "Performance" heading and "Performance metrics coming soon". The selected tab is reflected in the URL (`?tab=performance`), so reloading the page keeps the Performance tab open.
 
-### Light and dark mode (stubs)
+### Light and dark mode (pod stub)
 - Open the header settings and switch the colour mode between Light and Dark.
-- In both modes the node and pod stub panels are clearly readable: the "Performance" heading and the placeholder text have proper contrast against the panel background.
+- In both modes the pod stub panel is clearly readable: the "Performance" heading and the placeholder text have proper contrast against the panel background.
 
 ## Scenario: Cluster Performance tab (populated) {#cluster-performance-tab-populated}
 
@@ -75,6 +75,36 @@ Open `/cluster`, click the **Performance** tab.
 ### Light and dark mode (cluster Performance tab)
 - With fake metrics on and the tab populated, switch the colour mode between Light and Dark from the header settings.
 - In both modes the treemap, heatmap, toggle, and table are clearly readable with proper contrast. Capture screenshots of the populated tab and the metrics-unavailable state in both modes for review.
+
+## Scenario: Node Performance tab (populated) {#node-performance-tab-populated}
+
+The node Performance tab needs usage data for the pods scheduled on the node. As with the cluster tab, kwok clusters have no metrics-server, so run the app with fake metrics on and seed pods (matching the fake-metrics entries by name) onto the node you open. The fake per-container metrics cover `web`/`api` (`default`), `worker` (`jobs`), and `cache` (`infra`).
+
+```sh
+# Seed namespaces and pods matching the fake-metrics entries, pinned to one node.
+kubectl create namespace jobs
+kubectl create namespace infra
+kubectl run worker -n jobs  --image=nginx --overrides='{"spec":{"nodeName":"<node>"}}'
+kubectl run cache  -n infra --image=nginx --overrides='{"spec":{"nodeName":"<node>"}}'
+
+# Start the app with fake metrics so usage data is returned.
+KARSE_FAKE_METRICS=1 bun run dev
+```
+
+Open `/nodes`, click the `<node>` row, then click the **Performance** tab.
+
+- A **CPU / Memory** toggle shows at the top, with **CPU** selected by default.
+- **Breakdown** (treemap): rectangles for the node's containers, grouped by namespace then pod, sized by the container's usage and coloured green/amber/red by utilisation. Click a rectangle: the app navigates to that pod's detail page on its Performance tab.
+- **Provisioning** (bars): one row per container scheduled on the node, each showing three overlaid bars (**Usage**, **Request**, **Limit**) on a shared per-row scale, with the formatted figures alongside.
+- Toggle to **Memory**: both views re-derive from memory usage (the provisioning figures switch to `Mi`/`Gi`, the treemap rectangles re-size).
+
+### Metrics-unavailable path (node)
+- Stop the app and restart it **without** `KARSE_FAKE_METRICS` (plain `bun run dev`).
+- Open the node's **Performance** tab. The Breakdown treemap is replaced by the "Metrics API is not available" notice, but the **Provisioning** bars still render: the **Usage** bar reads `—` (empty), while **Request** and **Limit** still show their figures from the pod specs, confirming the page degrades cleanly.
+
+### Light and dark mode (node Performance tab)
+- With fake metrics on and the tab populated, switch the colour mode between Light and Dark from the header settings.
+- In both modes the treemap, the provisioning bars, and the toggle are clearly readable with proper contrast. Capture screenshots of the populated tab and the metrics-unavailable state in both modes for review.
 
 ## Data foundation: quantity parsers and fake-metrics mode
 
@@ -139,11 +169,11 @@ render, the metric toggle updates the view, and the drill-down navigations work.
 
 ### Node performance endpoint (`GET /api/nodes/:name/performance`)
 
-The node Performance tab (added in a later ticket) reads its data from
-`GET /api/nodes/:name/performance`, which returns the named node's usage plus the pods
-scheduled on it with per-container usage. There is no UI yet, so exercise the endpoint
-directly with the backend running under fake metrics. Start the app with the fake-metrics
-mode on:
+The node Performance tab reads its data from `GET /api/nodes/:name/performance`, which
+returns the named node's usage plus the pods scheduled on it with per-container usage. The
+UI that consumes it shipped in `performance-tabs-7`; see the [Node Performance tab
+(populated)](#node-performance-tab-populated) scenario above. To exercise the endpoint
+directly, start the backend running under fake metrics with the fake-metrics mode on:
 
 ```sh
 KARSE_FAKE_METRICS=1 bun run dev

@@ -119,6 +119,15 @@ A read-only table of the cluster's nodes:
 
 Click a column header to sort; type in the search box to filter rows. Use the **Filter** dropdown (filter icon, beside the search box) to filter on any of the table's columns: tick **Status** values to show only nodes with those statuses, tick **Health** values to show only **Healthy** or only **Error** nodes (matching the stats header), or tick values under a label key. See [Column filtering](#column-filtering) below. Click the **Columns** button to open a modal where you can drag columns to reorder them and drag them between Visible and Hidden to show or hide them; the layout is saved per table and persists across reloads. The Columns button is available on every resource table.
 
+### Node detail Performance tab
+
+A node's detail page has a **Performance** tab showing the node's point-in-time CPU and memory usage, scoped to that one node. A **CPU / Memory** toggle at the top selects which metric the views show (CPU by default). The tab has two views:
+
+- **Breakdown** (treemap): the node's usage broken down namespace → pod → container, each rectangle sized by the container's usage for the selected metric and coloured green→amber→red by how close it is to its limit. Click a rectangle to open the owning pod's detail page on its Performance tab.
+- **Provisioning** (bars): one row per container on the node, with overlaid **Usage**, **Request**, and **Limit** bars (on a shared per-row scale) and the formatted figures alongside, so over- and under-provisioning is easy to spot.
+
+If the cluster has no Metrics API, the Breakdown treemap is replaced by an information notice and the Usage bars read em-dash with empty bars, while the Request and Limit bars still render from the pod specs.
+
 ## Namespaces page (`/namespaces`)
 
 A table of namespaces for the active context.

@@ -6,7 +6,7 @@ import type {
     WorkloadKind, WorkloadDetail, NamespaceDetail,
     PodDetail, NodeDetail, YamlResourceType, YamlResponse,
     LogStreamLine, LogStreamStarted, EventsResponse, ErrorsResponse,
-    SternStreamLine, SternStreamStarted, ClusterPerformance,
+    SternStreamLine, SternStreamStarted, ClusterPerformance, NodePerformance,
 } from "karse-types";
 
 // Every data request times out after LOAD_TIMEOUT_MS. When the cluster is
@@ -220,6 +220,15 @@ export function streamPodLogs(
 // Fetches the full detail for a single node including conditions, capacity, and scheduled pods.
 export async function fetchNodeDetail(context: string, name: string): Promise<NodeDetail> {
     const response = await http.get<NodeDetail>(`/nodes/${name}`, { params: { context } });
+    return response.data;
+}
+
+// Fetches the node-scoped performance snapshot (the node's usage versus allocatable
+// plus the pods scheduled on it, each with its usage versus requests/limits and its
+// containers) for the given context. metricsAvailable is false when the cluster has no
+// Metrics API; usage fields are then null while requests/limits stay populated.
+export async function fetchNodePerformance(context: string, name: string): Promise<NodePerformance> {
+    const response = await http.get<NodePerformance>(`/nodes/${name}/performance`, { params: { context } });
     return response.data;
 }
 

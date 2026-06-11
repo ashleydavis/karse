@@ -7,9 +7,10 @@ The Performance feature adds a per-scope "Performance" tab to the cluster, node,
 pages, showing point-in-time CPU and memory usage in context. This document describes the
 data sources, scope, degradation behaviour, per-scope tab contents, and the test mode. The
 implementation is **Partial**: the cluster Performance tab (Breakdown treemap, Hot spots
-heatmap, Top consumers table) has shipped, along with the shared chart components and the
-`frontend/src/lib/performance.ts` transform/format helpers. The node and pod tabs are still
-stubs and become Complete in later tickets.
+heatmap, Top consumers table) and the node Performance tab (node-scoped Breakdown treemap
+plus per-container provisioning bars) have shipped, along with the shared chart components
+and the `frontend/src/lib/performance.ts` transform/format helpers. The pod tab is still a
+stub and becomes Complete in a later ticket.
 
 ## Data sources
 
@@ -80,9 +81,18 @@ inconsistent signal.
     dependency), the shared components in `frontend/src/components/performance/`, and the
     pure helpers in `frontend/src/lib/performance.ts` (`formatCpu`, `formatMemory`,
     `metricValue`, `utilisation`, `buildClusterTreemap`, `buildNodeHeatmap`).
-- **Node Performance tab:**
-  - A node-scoped treemap drilling namespace → pod → container.
-  - A provisioning view of the node's pods (usage vs request vs limit).
+- **Node Performance tab** — **implemented**:
+  - A node-scoped "Breakdown" treemap drilling namespace → pod → container, sized by the
+    container's usage for the selected metric, reusing the shared `UsageTreemap`. Leaves are
+    coloured green→amber→red by utilisation and a leaf click opens the owning pod's detail
+    page on its Performance tab. The treemap is hidden when usage is unavailable (nothing to
+    size by).
+  - A "Provisioning" view of the node's pods: one row per container with overlaid
+    usage / request / limit bars on a shared per-row scale and the formatted figures
+    alongside. The bars render even with no Metrics API (requests/limits come from specs;
+    the usage bar is then empty), so the view degrades cleanly.
+  - Built from `fetchNodePerformance`, `buildNodeTreemap`, the shared `MetricToggle` /
+    `UsageTreemap` / `MetricsUnavailable`, and the new `ProvisioningBars` component.
 - **Pod Performance tab** (the leaf):
   - A provisioning view of the pod's containers (usage vs request vs limit). No treemap.
 

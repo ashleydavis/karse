@@ -2311,16 +2311,17 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='cluster-panel-overview']")).toHaveCount(0);
         });
 
-        test("node detail shows a Performance tab whose stub renders when selected", async () => {
+        test("node detail shows a Performance tab that mounts the Performance panel when selected", async () => {
             await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
-            // Existing tabs still render alongside the new Performance tab.
+            // Existing tabs still render alongside the Performance tab.
             await expect(page.locator("[data-test-id='node-tab-detail']")).toBeVisible();
             await expect(page.locator("[data-test-id='node-tab-performance']")).toBeVisible();
             await expect(page.locator("[data-test-id='node-panel-performance']")).toHaveCount(0);
             await page.locator("[data-test-id='node-tab-performance']").click();
             await expect(page.locator("[data-test-id='node-panel-performance']")).toBeVisible();
-            await expect(page.locator("[data-test-id='perf-node-stub']")).toBeVisible();
-            await expect(page.locator("[data-test-id='perf-node-stub']")).toContainText("Performance metrics coming soon");
+            // The node Performance tab is now populated (performance-tabs-7); the old stub
+            // is gone. Its content is asserted in the "Performance tabs (node)" block.
+            await expect(page.locator("[data-test-id='perf-node-stub']")).toHaveCount(0);
         });
 
         test("pod detail shows a Performance tab whose stub renders when selected", async () => {
@@ -5611,6 +5612,95 @@ test.describe("karse e2e", () => {
             await expect(page).toHaveURL(/\/pods\/default\/web/);
             await expect(page).toHaveURL(/tab=performance/);
             await expect(page.locator("[data-test-id='pod-tab-performance']")).toBeVisible();
+        });
+    });
+
+    // ── Performance tabs (node) ─────────────────────────────────────────────────
+    // The backend runs with KARSE_FAKE_METRICS=1 (set in scripts/e2e-tests.sh), so the
+    // pods scheduled on node-cp (worker in jobs, cache in infra) match the canned
+    // per-container fake metrics by name. The node Performance tab therefore renders a
+    // populated namespace → pod → container treemap and per-container provisioning bars.
+    test.describe("Performance tabs (node)", () => {
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+        });
+
+        test("renders the node treemap and the provisioning bars", async () => {
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='node-tab-performance']").click();
+            await expect(page.locator("[data-test-id='perf-node']")).toBeVisible();
+            // The lazy query fires once the tab is active; wait for the charts.
+            await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
+            await expect(page.locator("[data-test-id='perf-provisioning']")).toBeVisible();
+            // node-cp carries the worker and cache pods, each a container row.
+            const rowCount = await page.locator("[data-test-id='perf-provisioning-row']").count();
+            expect(rowCount).toBeGreaterThanOrEqual(2);
+            // CPU is selected by default.
+            await expect(
+                page.locator("[data-test-id='perf-metric-cpu']")
+            ).toHaveAttribute("aria-pressed", "true");
+        });
+
+        test("toggling the metric updates the provisioning bar values", async () => {
+            // Read the first provisioning row's usage figure under CPU, switch to Memory,
+            // and confirm the displayed figure changes (CPU is formatted in m/cores, memory
+            // in Mi/Gi), proving the bars re-derive from the selected metric.
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='node-tab-performance']").click();
+            await expect(page.locator("[data-test-id='perf-provisioning']")).toBeVisible();
+            const firstRow = page.locator("[data-test-id='perf-provisioning-row']").first();
+            const cpuText = (await firstRow.textContent())?.trim();
+            await page.locator("[data-test-id='perf-metric-memory']").click();
+            await expect(
+                page.locator("[data-test-id='perf-metric-memory']")
+            ).toHaveAttribute("aria-pressed", "true");
+            await expect(firstRow).not.toHaveText(cpuText ?? "");
+            // The treemap re-sizes for the new metric and stays populated.
+            await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
+        });
+
+        test("metrics-unavailable: provisioning bars still render and the notice is shown", async () => {
+            // Force the node performance endpoint to report no Metrics API: usage is null
+            // but requests/limits from specs remain, so the provisioning bars still render
+            // (usage bars empty) while the treemap is replaced by the unavailable notice.
+            await page.route("**/api/nodes/node-cp/performance*", async (route) => {
+                await route.fulfill({
+                    json: {
+                        metricsAvailable: false,
+                        node: {
+                            name: "node-cp",
+                            usage: { cpuMillicores: null, memoryBytes: null },
+                            allocatable: { cpuMillicores: 3900, memoryBytes: 7516192768 },
+                        },
+                        pods: [
+                            {
+                                name: "worker",
+                                namespace: "jobs",
+                                node: "node-cp",
+                                usage: { cpuMillicores: null, memoryBytes: null },
+                                requests: { cpuMillicores: 100, memoryBytes: 134217728 },
+                                limits: { cpuMillicores: 500, memoryBytes: 536870912 },
+                                containers: [
+                                    {
+                                        name: "worker",
+                                        usage: { cpuMillicores: null, memoryBytes: null },
+                                        requests: { cpuMillicores: 100, memoryBytes: 134217728 },
+                                        limits: { cpuMillicores: 500, memoryBytes: 536870912 },
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                });
+            });
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='node-tab-performance']").click();
+            await expect(page.locator("[data-test-id='perf-metrics-unavailable']")).toBeVisible();
+            await expect(page.locator("[data-test-id='perf-provisioning']")).toBeVisible();
+            await expect(page.locator("[data-test-id='perf-provisioning-row']")).toHaveCount(1);
+            // The usage-sized treemap is hidden when there is no live usage to size by.
+            await expect(page.locator("[data-test-id='perf-treemap']")).toHaveCount(0);
+            await page.unroute("**/api/nodes/node-cp/performance*");
         });
     });
 });
