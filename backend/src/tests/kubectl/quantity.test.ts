@@ -17,12 +17,18 @@ describe("parseCpuToMillicores", () => {
         expect(parseCpuToMillicores("123456789n")).toBe(123);
     });
 
-    test("parses a decimal-SI k suffix as a core count (kwok allocatable)", () => {
+    test("parses an SI decimal core suffix (k) to millicores", () => {
+        // 1k cores = 1000 cores = 1,000,000 millicores. kwok reports node allocatable
+        // CPU in this form, so it must parse rather than throw.
         expect(parseCpuToMillicores("1k")).toBe(1_000_000);
     });
 
-    test("parses a decimal-SI M suffix as a core count", () => {
+    test("parses larger SI core suffixes (M)", () => {
         expect(parseCpuToMillicores("2M")).toBe(2 * 1000 ** 2 * 1000);
+    });
+
+    test("parses a binary core suffix (Ki) to millicores", () => {
+        expect(parseCpuToMillicores("1Ki")).toBe(1024 * 1000);
     });
 
     test("returns 0 for an empty string", () => {

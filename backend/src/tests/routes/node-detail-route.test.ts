@@ -1,5 +1,6 @@
 jest.mock("../../kubectl/kubectl-adapter", () => ({
     getNodeDetail: jest.fn(),
+    getNodePerformance: jest.fn(),
     listNodes: jest.fn(),
     listPods: jest.fn(),
     listDeployments: jest.fn(),
@@ -35,6 +36,7 @@ afterAll(async () => {
 
 beforeEach(() => {
     kubectlMocks.getNodeDetail.mockReset();
+    kubectlMocks.getNodePerformance.mockReset();
 });
 
 // A minimal valid node detail response returned by the mock adapter.
@@ -77,6 +79,59 @@ describe("GET /api/nodes/:name", () => {
     test("adapter throws returns 500", async () => {
         kubectlMocks.getNodeDetail.mockRejectedValue(new Error("not found"));
         const res = await fetch(`http://127.0.0.1:${port}/api/nodes/node-1?context=my-ctx`);
+        expect(res.status).toBe(500);
+    });
+});
+
+// A minimal valid node performance response returned by the mock adapter.
+const FAKE_NODE_PERFORMANCE = {
+    metricsAvailable: true,
+    node: {
+        name: "node-1",
+        usage: { cpuMillicores: 850, memoryBytes: 2147483648 },
+        allocatable: { cpuMillicores: 4000, memoryBytes: 8589934592 },
+    },
+    pods: [
+        {
+            name: "web",
+            namespace: "default",
+            node: "node-1",
+            usage: { cpuMillicores: 150, memoryBytes: 335544320 },
+            requests: { cpuMillicores: 150, memoryBytes: 201326592 },
+            limits: { cpuMillicores: 350, memoryBytes: 402653184 },
+            containers: [
+                {
+                    name: "nginx",
+                    usage: { cpuMillicores: 120, memoryBytes: 268435456 },
+                    requests: { cpuMillicores: 100, memoryBytes: 134217728 },
+                    limits: { cpuMillicores: 250, memoryBytes: 268435456 },
+                },
+            ],
+        },
+    ],
+};
+
+describe("GET /api/nodes/:name/performance", () => {
+    test("returns node performance for a context", async () => {
+        kubectlMocks.getNodePerformance.mockResolvedValue(FAKE_NODE_PERFORMANCE);
+        const res = await fetch(`http://127.0.0.1:${port}/api/nodes/node-1/performance?context=my-ctx`);
+        const body = await res.json();
+        expect(res.status).toBe(200);
+        expect(body).toEqual(FAKE_NODE_PERFORMANCE);
+        expect(kubectlMocks.getNodePerformance).toHaveBeenCalledWith("my-ctx", "node-1");
+    });
+
+    test("missing context returns 400", async () => {
+        const res = await fetch(`http://127.0.0.1:${port}/api/nodes/node-1/performance`);
+        const body = await res.json();
+        expect(res.status).toBe(400);
+        expect(body).toEqual({ error: "context query parameter is required" });
+        expect(kubectlMocks.getNodePerformance).not.toHaveBeenCalled();
+    });
+
+    test("adapter throws returns 500", async () => {
+        kubectlMocks.getNodePerformance.mockRejectedValue(new Error("boom"));
+        const res = await fetch(`http://127.0.0.1:${port}/api/nodes/node-1/performance?context=my-ctx`);
         expect(res.status).toBe(500);
     });
 });

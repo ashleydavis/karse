@@ -298,6 +298,19 @@ curl -fsS "$BASE/api/nodes/fake-node-1?context=$CURRENT_CTX" \
     > /dev/null
 echo "OK"
 
+echo "--- GET /api/nodes/:name/performance (scoped node + pods) ---"
+# KARSE_FAKE_METRICS=1 is set, so metricsAvailable is true and fake-node-1 carries a
+# usage sample. The response is scoped to fake-node-1: its node usage/allocatable and
+# the pods scheduled on it (smoke-pod, with per-container usage retained).
+NODE_PERF=$(curl -fsS "$BASE/api/nodes/fake-node-1/performance?context=$CURRENT_CTX")
+echo "$NODE_PERF" | jq -e '.metricsAvailable == true' > /dev/null
+echo "$NODE_PERF" | jq -e '.node.name == "fake-node-1" and (.node.usage.cpuMillicores | type == "number") and (.node.allocatable | has("cpuMillicores") and has("memoryBytes"))' > /dev/null
+# Scoped to fake-node-1: every returned pod is on that node, and smoke-pod is present
+# with its two containers retained for the treemap's pod -> container level.
+echo "$NODE_PERF" | jq -e '.pods | all(.node == "fake-node-1")' > /dev/null
+echo "$NODE_PERF" | jq -e '.pods | any(.name == "smoke-pod" and .namespace == "default" and (.containers | length == 2))' > /dev/null
+echo "OK"
+
 echo "--- GET /api/pods/:namespace/:name (drill down into containers) ---"
 curl -fsS "$BASE/api/pods/default/smoke-pod?context=$CURRENT_CTX" \
     | jq -e 'has("containers") and has("events") and (.containers | length == 2)' \

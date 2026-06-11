@@ -8,7 +8,7 @@ import type {
     NodeCondition, NodeAddress, ResourceAmounts, NodeDetail,
     ClusterEvent, WorkloadKind, WorkloadStat, WorkloadDetail, ClusterError,
     NamespaceDetail, NamespaceResource, NamespaceQuota, NamespaceLimit,
-    ClusterPerformance, NodeUsage, PodUsage, ResourceUsage,
+    ClusterPerformance, NodeUsage, PodUsage, ResourceUsage, ContainerUsage, NodePerformance,
 } from "karse-types";
 
 // Base directory for the rolling audit log; overridable via KARSE_LOGS_DIR.
@@ -1523,6 +1523,163 @@ export async function getClusterPerformance(context: string): Promise<ClusterPer
     return {
         metricsAvailable,
         nodes,
+        pods,
+    };
+}
+
+// Parses a {cpu, memory} quantity pair (as the Metrics API and pod specs report it)
+// into a ResourceUsage. A missing field parses as the quantity parsers' empty-string
+// result (0), keeping requests/limits arithmetic on plain numbers.
+function parseUsage(raw: { cpu?: string; memory?: string } | undefined): ResourceUsage {
+    return {
+        cpuMillicores: parseCpuToMillicores(raw?.cpu ?? ""),
+        memoryBytes: parseMemoryToBytes(raw?.memory ?? ""),
+    };
+}
+
+// Sums two ResourceUsage values field-by-field. Used to roll per-container requests,
+// limits, and usage up to the pod level. Treats null as "unknown": if either side is
+// null the summed field stays null rather than silently dropping to the other value.
+function addUsage(a: ResourceUsage, b: ResourceUsage): ResourceUsage {
+    return {
+        cpuMillicores: a.cpuMillicores === null || b.cpuMillicores === null
+            ? null
+            : a.cpuMillicores + b.cpuMillicores,
+        memoryBytes: a.memoryBytes === null || b.memoryBytes === null
+            ? null
+            : a.memoryBytes + b.memoryBytes,
+    };
+}
+
+// Builds a name -> per-container-usage map from a Metrics API pod list, keyed by
+// "<namespace>/<name>". Each container's usage is parsed from nanocore/Ki strings into
+// the canonical millicore/byte units. When metrics are unavailable the map is empty,
+// so every container falls back to NULL_USAGE.
+function indexPodMetrics(metricsData: any): Map<string, Map<string, ResourceUsage>> {
+    const byPod = new Map<string, Map<string, ResourceUsage>>();
+    for (const item of (metricsData?.items ?? []) as any[]) {
+        const ns: string = item.metadata?.namespace ?? "";
+        const name: string = item.metadata?.name ?? "";
+        const byContainer = new Map<string, ResourceUsage>();
+        for (const container of (item.containers ?? []) as any[]) {
+            byContainer.set(container.name, parseUsage(container.usage));
+        }
+        byPod.set(`${ns}/${name}`, byContainer);
+    }
+    return byPod;
+}
+
+// Builds a PodUsage from a raw pod item (kubectl get pods -o json) joined with the
+// per-container usage looked up from the Metrics API. Requests and limits come from the
+// pod spec and are always populated; per-container usage is NULL_USAGE when metrics are
+// unavailable or a container has no metrics entry. The per-container ContainerUsage list
+// is retained on the PodUsage (used by the node treemap's pod -> container level), and
+// the pod-level usage/requests/limits are the sum across containers.
+function buildPodUsage(
+    podItem: any,
+    metricsAvailable: boolean,
+    containerUsageByPod: Map<string, Map<string, ResourceUsage>>,
+): PodUsage {
+    const namespace: string = podItem.metadata?.namespace ?? "";
+    const name: string = podItem.metadata?.name ?? "";
+    const node: string = podItem.spec?.nodeName ?? "";
+    const usageForContainer = containerUsageByPod.get(`${namespace}/${name}`) ?? new Map();
+
+    const containers: ContainerUsage[] = ((podItem.spec?.containers ?? []) as any[]).map((spec) => {
+        const requests = parseUsage(spec.resources?.requests);
+        const limits = parseUsage(spec.resources?.limits);
+        const usage = metricsAvailable
+            ? (usageForContainer.get(spec.name) ?? NULL_USAGE)
+            : NULL_USAGE;
+        return {
+            name: spec.name,
+            usage,
+            requests,
+            limits,
+        };
+    });
+
+    // Roll the per-container values up to the pod. Usage starts from a zeroed pair when
+    // metrics are available (so containers sum cleanly) and from NULL_USAGE when they are
+    // not (so the pod-level usage stays null rather than a false zero).
+    let usage: ResourceUsage = metricsAvailable ? { cpuMillicores: 0, memoryBytes: 0 } : NULL_USAGE;
+    let requests: ResourceUsage = { cpuMillicores: 0, memoryBytes: 0 };
+    let limits: ResourceUsage = { cpuMillicores: 0, memoryBytes: 0 };
+    for (const container of containers) {
+        usage = addUsage(usage, container.usage);
+        requests = addUsage(requests, container.requests);
+        limits = addUsage(limits, container.limits);
+    }
+
+    return {
+        name,
+        namespace,
+        node,
+        usage,
+        requests,
+        limits,
+        containers,
+    };
+}
+
+// Returns a node-scoped point-in-time performance snapshot: the one node's usage joined
+// with its allocatable capacity, plus the pods scheduled on it with per-container usage.
+// Fetches in parallel the node metrics (all-nodes raw endpoint, filtered to this node),
+// the node object (for allocatable), the pod metrics (all-pods raw endpoint), and the
+// pods scheduled on the node (field-selector get). When the Metrics API is unavailable
+// (a cluster with no metrics-server, e.g. kwok), metricsAvailable is false, usage fields
+// are null, and requests/limits are still populated from the pod specs so the
+// provisioning view keeps working. READ-ONLY.
+export async function getNodePerformance(context: string, name: string): Promise<NodePerformance> {
+    const ctx = ["--context", context];
+    const [nodeMetrics, nodeResult, podMetrics, podsResult] = await Promise.all([
+        fetchMetrics(context, "/apis/metrics.k8s.io/v1beta1/nodes"),
+        kubectl([...ctx, "get", "node", name, "-o", "json"]),
+        fetchMetrics(context, "/apis/metrics.k8s.io/v1beta1/pods"),
+        kubectl([...ctx, "get", "pods", "-A", `--field-selector=spec.nodeName=${name}`, "-o", "json"]),
+    ]);
+    if (nodeResult.exitCode !== 0) {
+        throw new Error(nodeResult.stderr);
+    }
+    if (podsResult.exitCode !== 0) {
+        throw new Error(podsResult.stderr);
+    }
+
+    // The Metrics API is available only when both metrics reads succeeded; either being
+    // unavailable degrades the whole snapshot to usage-null + requests/limits-only.
+    const metricsAvailable = nodeMetrics.available && podMetrics.available;
+
+    // Node usage from the node metrics list, scoped to the named node. Absent (or
+    // unavailable) metrics leave usage null; allocatable always comes from node status.
+    const nodeItem = JSON.parse(nodeResult.stdout);
+    const alloc = nodeItem.status?.allocatable ?? {};
+    const allocatable: ResourceUsage = {
+        cpuMillicores: parseCpuToMillicores(alloc.cpu ?? ""),
+        memoryBytes: parseMemoryToBytes(alloc.memory ?? ""),
+    };
+    let nodeUsage: ResourceUsage = NULL_USAGE;
+    if (metricsAvailable) {
+        const metricsItem = ((nodeMetrics.data?.items ?? []) as any[]).find(
+            (item) => item.metadata?.name === name,
+        );
+        nodeUsage = metricsItem ? parseUsage(metricsItem.usage) : NULL_USAGE;
+    }
+    const node: NodeUsage = {
+        name,
+        usage: nodeUsage,
+        allocatable,
+    };
+
+    const containerUsageByPod = metricsAvailable
+        ? indexPodMetrics(podMetrics.data)
+        : new Map<string, Map<string, ResourceUsage>>();
+    const pods: PodUsage[] = ((JSON.parse(podsResult.stdout).items ?? []) as any[]).map((item) =>
+        buildPodUsage(item, metricsAvailable, containerUsageByPod),
+    );
+
+    return {
+        metricsAvailable,
+        node,
         pods,
     };
 }

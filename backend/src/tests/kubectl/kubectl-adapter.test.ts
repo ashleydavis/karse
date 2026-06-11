@@ -23,6 +23,7 @@ import {
     getResourceYaml,
     isYamlResourceType,
     streamPodLogs,
+    getNodePerformance,
 } from "../../kubectl/kubectl-adapter";
 
 // jest.requireMock returns any, so mock methods are accessible without casting.
@@ -2710,5 +2711,211 @@ describe("getClusterPerformance", () => {
             "--context ctx get pods -A -o json": () => ok(JSON.stringify(podsFixture)),
         });
         await expect(getClusterPerformance("ctx")).rejects.toThrow("forbidden");
+    });
+});
+
+describe("getNodePerformance", () => {
+    // Argv keys for the four calls getNodePerformance makes for node-1.
+    const NODE_METRICS_KEY = "--context test-ctx get --raw /apis/metrics.k8s.io/v1beta1/nodes";
+    const POD_METRICS_KEY = "--context test-ctx get --raw /apis/metrics.k8s.io/v1beta1/pods";
+    const NODE_KEY = "--context test-ctx get node node-1 -o json";
+    const PODS_KEY = "--context test-ctx get pods -A --field-selector=spec.nodeName=node-1 -o json";
+
+    // The node object as kubectl get node -o json returns it, carrying allocatable.
+    function makeNodeItem(): object {
+        return {
+            metadata: { name: "node-1" },
+            status: {
+                allocatable: { cpu: "4", memory: "8Gi" },
+            },
+        };
+    }
+
+    // A pod item with two containers and per-container requests/limits in its spec.
+    function makeWebPod(): object {
+        return {
+            metadata: { name: "web", namespace: "default" },
+            spec: {
+                nodeName: "node-1",
+                containers: [
+                    {
+                        name: "nginx",
+                        resources: {
+                            requests: { cpu: "100m", memory: "128Mi" },
+                            limits: { cpu: "250m", memory: "256Mi" },
+                        },
+                    },
+                    {
+                        name: "sidecar",
+                        resources: {
+                            requests: { cpu: "50m", memory: "64Mi" },
+                            limits: { cpu: "100m", memory: "128Mi" },
+                        },
+                    },
+                ],
+            },
+        };
+    }
+
+    // The node-metrics list as the raw endpoint returns it (CPU in nanocores, memory in Ki).
+    function nodeMetricsList(): object {
+        return {
+            kind: "NodeMetricsList",
+            items: [
+                { metadata: { name: "node-1" }, usage: { cpu: "850000000n", memory: "2097152Ki" } },
+                { metadata: { name: "node-2" }, usage: { cpu: "1600000000n", memory: "4194304Ki" } },
+            ],
+        };
+    }
+
+    // The pod-metrics list with per-container usage for the web pod.
+    function podMetricsList(): object {
+        return {
+            kind: "PodMetricsList",
+            items: [
+                {
+                    metadata: { name: "web", namespace: "default" },
+                    containers: [
+                        { name: "nginx", usage: { cpu: "120000000n", memory: "262144Ki" } },
+                        { name: "sidecar", usage: { cpu: "30000000n", memory: "65536Ki" } },
+                    ],
+                },
+            ],
+        };
+    }
+
+    test("returns only the named node's pods with per-container usage joined to spec", async () => {
+        setRunnerHandlers({
+            [NODE_METRICS_KEY]: () => ok(JSON.stringify(nodeMetricsList())),
+            [POD_METRICS_KEY]: () => ok(JSON.stringify(podMetricsList())),
+            [NODE_KEY]: () => ok(JSON.stringify(makeNodeItem())),
+            [PODS_KEY]: () => ok(JSON.stringify({ items: [makeWebPod()] })),
+        });
+
+        const result = await getNodePerformance("test-ctx", "node-1");
+
+        // The field selector restricts the pods to those scheduled on node-1, so only
+        // the web pod is returned (node-2's pods never reach this call).
+        expect(result.pods).toHaveLength(1);
+        const web = result.pods[0]!;
+        expect(web.name).toBe("web");
+        expect(web.namespace).toBe("default");
+        expect(web.node).toBe("node-1");
+
+        // metricsAvailable is true and the node usage is the named node's sample,
+        // parsed from nanocores/Ki: 850000000n -> 850m, 2097152Ki -> 2 GiB.
+        expect(result.metricsAvailable).toBe(true);
+        expect(result.node).toEqual({
+            name: "node-1",
+            usage: { cpuMillicores: 850, memoryBytes: 2097152 * 1024 },
+            allocatable: { cpuMillicores: 4000, memoryBytes: 8 * 1024 ** 3 },
+        });
+
+        // Per-container usage is retained and joined with the spec requests/limits.
+        expect(web.containers).toEqual([
+            {
+                name: "nginx",
+                usage: { cpuMillicores: 120, memoryBytes: 262144 * 1024 },
+                requests: { cpuMillicores: 100, memoryBytes: 128 * 1024 ** 2 },
+                limits: { cpuMillicores: 250, memoryBytes: 256 * 1024 ** 2 },
+            },
+            {
+                name: "sidecar",
+                usage: { cpuMillicores: 30, memoryBytes: 65536 * 1024 },
+                requests: { cpuMillicores: 50, memoryBytes: 64 * 1024 ** 2 },
+                limits: { cpuMillicores: 100, memoryBytes: 128 * 1024 ** 2 },
+            },
+        ]);
+
+        // Pod-level fields are the sum across the two containers.
+        expect(web.usage).toEqual({ cpuMillicores: 150, memoryBytes: (262144 + 65536) * 1024 });
+        expect(web.requests).toEqual({ cpuMillicores: 150, memoryBytes: (128 + 64) * 1024 ** 2 });
+        expect(web.limits).toEqual({ cpuMillicores: 350, memoryBytes: (256 + 128) * 1024 ** 2 });
+    });
+
+    test("uses a field selector scoped to the node when fetching pods", async () => {
+        setRunnerHandlers({
+            [NODE_METRICS_KEY]: () => ok(JSON.stringify(nodeMetricsList())),
+            [POD_METRICS_KEY]: () => ok(JSON.stringify(podMetricsList())),
+            [NODE_KEY]: () => ok(JSON.stringify(makeNodeItem())),
+            [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
+        });
+        await getNodePerformance("test-ctx", "node-1");
+        // setRunnerHandlers throws on any unmocked argv, so reaching here proves the
+        // exact field-selector argv was used.
+        expect(run).toHaveBeenCalledWith(
+            "kubectl",
+            ["--context", "test-ctx", "get", "pods", "-A", "--field-selector=spec.nodeName=node-1", "-o", "json"],
+        );
+    });
+
+    test("degrades to metricsAvailable false with usage null but requests/limits populated", async () => {
+        const unavailable = (): CommandResult => fail("error: the server could not find the requested resource (get nodes.metrics.k8s.io)");
+        setRunnerHandlers({
+            [NODE_METRICS_KEY]: unavailable,
+            [POD_METRICS_KEY]: unavailable,
+            [NODE_KEY]: () => ok(JSON.stringify(makeNodeItem())),
+            [PODS_KEY]: () => ok(JSON.stringify({ items: [makeWebPod()] })),
+        });
+
+        const result = await getNodePerformance("test-ctx", "node-1");
+
+        expect(result.metricsAvailable).toBe(false);
+        // Node usage is null; allocatable still comes from node status.
+        expect(result.node.usage).toEqual({ cpuMillicores: null, memoryBytes: null });
+        expect(result.node.allocatable).toEqual({ cpuMillicores: 4000, memoryBytes: 8 * 1024 ** 3 });
+
+        const web = result.pods[0]!;
+        // Per-container and pod-level usage are null without metrics.
+        expect(web.usage).toEqual({ cpuMillicores: null, memoryBytes: null });
+        expect(web.containers[0]!.usage).toEqual({ cpuMillicores: null, memoryBytes: null });
+        // Requests and limits remain populated from the pod spec.
+        expect(web.containers[0]!.requests).toEqual({ cpuMillicores: 100, memoryBytes: 128 * 1024 ** 2 });
+        expect(web.requests).toEqual({ cpuMillicores: 150, memoryBytes: (128 + 64) * 1024 ** 2 });
+        expect(web.limits).toEqual({ cpuMillicores: 350, memoryBytes: (256 + 128) * 1024 ** 2 });
+    });
+
+    test("returns the fake-metrics scoped snapshot under KARSE_FAKE_METRICS=1", async () => {
+        process.env.KARSE_FAKE_METRICS = "1";
+        try {
+            // The canned FAKE_METRICS node list keys node usage on "fake-node-1", so query
+            // that node. Under fake metrics the two raw reads are not shelled out; only the
+            // node object and the field-selected pods get run, so those are the only
+            // handlers needed. The "web" pod matches the canned fake pod usage by name.
+            const FAKE_NODE_KEY = "--context test-ctx get node fake-node-1 -o json";
+            const FAKE_PODS_KEY = "--context test-ctx get pods -A --field-selector=spec.nodeName=fake-node-1 -o json";
+            setRunnerHandlers({
+                [FAKE_NODE_KEY]: () => ok(JSON.stringify({
+                    metadata: { name: "fake-node-1" },
+                    status: { allocatable: { cpu: "4", memory: "8Gi" } },
+                })),
+                [FAKE_PODS_KEY]: () => ok(JSON.stringify({
+                    items: [{
+                        ...makeWebPod(),
+                        spec: { ...(makeWebPod() as any).spec, nodeName: "fake-node-1" },
+                    }],
+                })),
+            });
+            const result = await getNodePerformance("test-ctx", "fake-node-1");
+            expect(result.metricsAvailable).toBe(true);
+            // fake-node-1 is in the canned FAKE_METRICS node list (850m, 2 GiB).
+            expect(result.node.usage).toEqual({ cpuMillicores: 850, memoryBytes: 2097152 * 1024 });
+            // The web pod's containers match canned fake pod usage by name.
+            const web = result.pods[0]!;
+            expect(web.containers[0]!.usage).toEqual({ cpuMillicores: 120, memoryBytes: 262144 * 1024 });
+        }
+        finally {
+            delete process.env.KARSE_FAKE_METRICS;
+        }
+    });
+
+    test("throws when the node read itself fails", async () => {
+        setRunnerHandlers({
+            [NODE_METRICS_KEY]: () => ok(JSON.stringify(nodeMetricsList())),
+            [POD_METRICS_KEY]: () => ok(JSON.stringify(podMetricsList())),
+            [NODE_KEY]: () => fail("Error from server (NotFound): nodes \"node-1\" not found"),
+            [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
+        });
+        await expect(getNodePerformance("test-ctx", "node-1")).rejects.toThrow("not found");
     });
 });

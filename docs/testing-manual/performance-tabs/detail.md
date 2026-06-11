@@ -99,6 +99,37 @@ bun run smoke
 The cluster Performance tab UI that consumes this endpoint is added and screenshotted in the
 later content ticket (`performance-tabs-6`).
 
+### Node performance endpoint (`GET /api/nodes/:name/performance`)
+
+The node Performance tab (added in a later ticket) reads its data from
+`GET /api/nodes/:name/performance`, which returns the named node's usage plus the pods
+scheduled on it with per-container usage. There is no UI yet, so exercise the endpoint
+directly with the backend running under fake metrics. Start the app with the fake-metrics
+mode on:
+
+```sh
+KARSE_FAKE_METRICS=1 bun run dev
+```
+
+Then, with a kwok cluster selected (the fixture's `fake-node-1` carries `smoke-pod`), query
+the endpoint through the Vite proxy (replace `<ctx>` with the kwok context name):
+
+```sh
+curl -fsS 'http://127.0.0.1:5173/api/nodes/fake-node-1/performance?context=<ctx>' | jq
+```
+
+Confirm:
+- `metricsAvailable` is `true` (fake metrics is on).
+- `node.name` is `fake-node-1`, with a numeric `node.usage.cpuMillicores` and a
+  `node.allocatable` carrying `cpuMillicores`/`memoryBytes` from node status.
+- Every entry in `pods` has `node == "fake-node-1"` (the response is scoped to this node).
+- `smoke-pod` appears in `pods` with its two containers retained under `containers`, each
+  carrying `usage`, `requests`, and `limits`.
+
+With the mode **off** (plain `bun run dev`), the same query returns `metricsAvailable: false`
+with every `usage` field `null`, while `requests`/`limits` and `node.allocatable` stay
+populated from the specs.
+
 Teardown:
 
 ```sh

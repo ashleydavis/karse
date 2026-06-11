@@ -270,3 +270,48 @@ curl -fsS 'http://127.0.0.1:5172/api/pods?context=my-ctx&namespace=default'
   ]
 }
 ```
+
+## GET /api/nodes/:name/performance
+
+Returns a point-in-time performance snapshot scoped to a single node: the node's CPU/memory usage joined with its allocatable capacity, plus the pods scheduled on it with per-container usage. Backs the node Performance tab.
+
+- **Request query**: `context` (required) — the kubeconfig context name.
+- **Response 200**: `NodePerformance` — `{ "metricsAvailable": boolean, "node": NodeUsage, "pods": PodUsage[] }`. Each `NodeUsage` is `{ name, usage, allocatable }` and each `PodUsage` is `{ name, namespace, node, usage, requests, limits, containers[] }`, where `containers[]` is `ContainerUsage` (`{ name, usage, requests, limits }`). Every `usage`/`requests`/`limits` is a `ResourceUsage` (`{ cpuMillicores, memoryBytes }`). CPU is reported in millicores and memory in bytes (parsed from the Metrics API's nanocore/`Ki` quantities and the pod-spec quantities).
+- **Metrics-unavailable degradation**: on a cluster with no metrics-server, `metricsAvailable` is `false`, every `usage` field (`cpuMillicores`, `memoryBytes`) is `null`, and `requests`/`limits` (and node `allocatable`) are still populated from the pod specs and node status, so the provisioning view keeps working. The adapter treats a metrics read whose stderr names the Metrics API being unavailable as `metricsAvailable: false` rather than failing the request.
+- **Response 400**: `{ "error": "context query parameter is required" }` when `context` is missing or blank.
+- **Response 500**: `{ "error": "<kubectl stderr>" }` when the node read or the scoped pod read fails.
+
+Setting `KARSE_FAKE_METRICS=1` makes the backend return canned, Metrics-API-shaped usage instead of shelling out, so the endpoint can be exercised against a cluster with no metrics-server (e.g. kwok).
+
+```sh
+curl -fsS 'http://127.0.0.1:5172/api/nodes/ctrl-0/performance?context=my-ctx'
+```
+
+```json
+{
+  "metricsAvailable": true,
+  "node": {
+    "name": "ctrl-0",
+    "usage": { "cpuMillicores": 850, "memoryBytes": 2147483648 },
+    "allocatable": { "cpuMillicores": 4000, "memoryBytes": 8589934592 }
+  },
+  "pods": [
+    {
+      "name": "web",
+      "namespace": "default",
+      "node": "ctrl-0",
+      "usage": { "cpuMillicores": 150, "memoryBytes": 335544320 },
+      "requests": { "cpuMillicores": 150, "memoryBytes": 201326592 },
+      "limits": { "cpuMillicores": 350, "memoryBytes": 402653184 },
+      "containers": [
+        {
+          "name": "nginx",
+          "usage": { "cpuMillicores": 120, "memoryBytes": 268435456 },
+          "requests": { "cpuMillicores": 100, "memoryBytes": 134217728 },
+          "limits": { "cpuMillicores": 250, "memoryBytes": 268435456 }
+        }
+      ]
+    }
+  ]
+}
+```
