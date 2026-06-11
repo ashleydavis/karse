@@ -8,7 +8,8 @@ import type {
     NodeCondition, NodeAddress, ResourceAmounts, NodeDetail,
     ClusterEvent, WorkloadKind, WorkloadStat, WorkloadDetail, ClusterError,
     NamespaceDetail, NamespaceResource, NamespaceQuota, NamespaceLimit,
-    ClusterPerformance, NodeUsage, PodUsage, ResourceUsage, ContainerUsage, NodePerformance,
+    ClusterPerformance, NodeUsage, PodUsage, ResourceUsage,
+    ContainerUsage, NodePerformance, PodPerformance,
 } from "karse-types";
 
 // Base directory for the rolling audit log; overridable via KARSE_LOGS_DIR.
@@ -1681,5 +1682,82 @@ export async function getNodePerformance(context: string, name: string): Promise
         metricsAvailable,
         node,
         pods,
+    };
+}
+
+// Returns the pod-scoped (leaf) performance snapshot for a single pod: the pod's
+// per-container usage joined with each container's requests/limits from its spec.
+// Fetches the pod's own metrics (the namespaced single-pod metrics endpoint) and the
+// pod spec in parallel. metricsAvailable is false when the cluster has no Metrics API
+// (the metrics fetch degrades rather than throwing); usage fields are then null while
+// requests/limits remain populated from the spec, so the Provisioning view still works.
+// READ-ONLY.
+export async function getPodPerformance(
+    context: string,
+    namespace: string,
+    name: string,
+): Promise<PodPerformance> {
+    const [metricsResult, podResult] = await Promise.all([
+        fetchMetrics(context, `/apis/metrics.k8s.io/v1beta1/namespaces/${namespace}/pods/${name}`),
+        kubectl(["--context", context, "-n", namespace, "get", "pod", name, "-o", "json"]),
+    ]);
+    if (podResult.exitCode !== 0) {
+        throw new Error(podResult.stderr);
+    }
+    const pod = JSON.parse(podResult.stdout);
+    const node: string = pod.spec?.nodeName ?? "";
+    const specContainers: any[] = pod.spec?.containers ?? [];
+    const metricsAvailable = metricsResult.available;
+
+    // Index per-container usage by container name. The real single-pod metrics endpoint
+    // returns one PodMetrics object with a containers[] array. The fake-metrics payload
+    // is the shared PodMetricsList, so when items[] is present (no top-level containers)
+    // pick the matching pod from the list by name. Either way, map names to usage so each
+    // spec container can be joined to its reading (absent when metrics are off).
+    const usageByContainer = new Map<string, any>();
+    if (metricsAvailable && metricsResult.data !== null) {
+        let metricContainers: any[] = metricsResult.data.containers ?? [];
+        if (metricContainers.length === 0 && Array.isArray(metricsResult.data.items)) {
+            const match = metricsResult.data.items.find((p: any) => p.metadata?.name === name);
+            metricContainers = match?.containers ?? [];
+        }
+        for (const mc of metricContainers) {
+            usageByContainer.set(mc.name, mc.usage);
+        }
+    }
+
+    // One ContainerUsage per spec container: its usage reading joined with the
+    // requests/limits declared in the spec. Spec order is preserved. Usage is null
+    // when metrics are unavailable or this container has no reading; requests/limits
+    // come from the spec (absent blocks yield zeroes via the quantity parsers).
+    const containers: ContainerUsage[] = specContainers.map((c) => {
+        const usage = usageByContainer.get(c.name);
+        const requests = c.resources?.requests ?? {};
+        const limits = c.resources?.limits ?? {};
+        return {
+            name: c.name,
+            usage: metricsAvailable && usage
+                ? toResourceUsage(usage.cpu, usage.memory)
+                : NULL_USAGE,
+            requests: toResourceUsage(requests.cpu, requests.memory),
+            limits: toResourceUsage(limits.cpu, limits.memory),
+        };
+    });
+
+    // Pod totals: sum the per-container usage, requests, and limits.
+    const podUsage: PodUsage = {
+        name: pod.metadata.name,
+        namespace: pod.metadata.namespace,
+        node,
+        usage: metricsAvailable ? sumUsage(containers.map((c) => c.usage)) : NULL_USAGE,
+        requests: sumUsage(containers.map((c) => c.requests)),
+        limits: sumUsage(containers.map((c) => c.limits)),
+        containers,
+    };
+
+    return {
+        metricsAvailable,
+        pod: podUsage,
+        containers,
     };
 }

@@ -1,5 +1,6 @@
 jest.mock("../../kubectl/kubectl-adapter", () => ({
     getPodDetail: jest.fn(),
+    getPodPerformance: jest.fn(),
     getPodLogs: jest.fn(),
     streamPodLogs: jest.fn(),
     // The server mounts other routers too; stub their adapter functions so Express
@@ -38,6 +39,7 @@ afterAll(async () => {
 
 beforeEach(() => {
     kubectlMocks.getPodDetail.mockReset();
+    kubectlMocks.getPodPerformance.mockReset();
     kubectlMocks.getPodLogs.mockReset();
     kubectlMocks.streamPodLogs.mockReset();
 });
@@ -85,6 +87,57 @@ describe("GET /api/pods/:namespace/:name", () => {
     test("adapter throws returns 500", async () => {
         kubectlMocks.getPodDetail.mockRejectedValue(new Error("not found"));
         const res = await fetch(`http://127.0.0.1:${port}/api/pods/default/nginx-abc?context=my-ctx`);
+        expect(res.status).toBe(500);
+    });
+});
+
+describe("GET /api/pods/:namespace/:name/performance", () => {
+    // A minimal valid pod performance response returned by the mock adapter.
+    const FAKE_POD_PERFORMANCE = {
+        metricsAvailable: true,
+        pod: {
+            name: "nginx-abc",
+            namespace: "default",
+            node: "node-1",
+            usage: { cpuMillicores: 120, memoryBytes: 268435456 },
+            requests: { cpuMillicores: 100, memoryBytes: 134217728 },
+            limits: { cpuMillicores: 500, memoryBytes: 268435456 },
+            containers: [],
+        },
+        containers: [
+            {
+                name: "nginx",
+                usage: { cpuMillicores: 120, memoryBytes: 268435456 },
+                requests: { cpuMillicores: 100, memoryBytes: 134217728 },
+                limits: { cpuMillicores: 500, memoryBytes: 268435456 },
+            },
+        ],
+    };
+
+    test("returns pod performance for a context", async () => {
+        kubectlMocks.getPodPerformance.mockResolvedValue(FAKE_POD_PERFORMANCE);
+        const res = await fetch(
+            `http://127.0.0.1:${port}/api/pods/default/nginx-abc/performance?context=my-ctx`
+        );
+        const body = await res.json();
+        expect(res.status).toBe(200);
+        expect(body).toEqual(FAKE_POD_PERFORMANCE);
+        expect(kubectlMocks.getPodPerformance).toHaveBeenCalledWith("my-ctx", "default", "nginx-abc");
+    });
+
+    test("missing context returns 400", async () => {
+        const res = await fetch(`http://127.0.0.1:${port}/api/pods/default/nginx-abc/performance`);
+        const body = await res.json();
+        expect(res.status).toBe(400);
+        expect(body).toEqual({ error: "context query parameter is required" });
+        expect(kubectlMocks.getPodPerformance).not.toHaveBeenCalled();
+    });
+
+    test("adapter throws returns 500", async () => {
+        kubectlMocks.getPodPerformance.mockRejectedValue(new Error("boom"));
+        const res = await fetch(
+            `http://127.0.0.1:${port}/api/pods/default/nginx-abc/performance?context=my-ctx`
+        );
         expect(res.status).toBe(500);
     });
 });

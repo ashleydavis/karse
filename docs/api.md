@@ -315,3 +315,66 @@ curl -fsS 'http://127.0.0.1:5172/api/nodes/ctrl-0/performance?context=my-ctx'
   ]
 }
 ```
+
+## GET /api/pods/:namespace/:name/performance
+
+Returns the pod-scoped (leaf) performance snapshot: each container's point-in-time CPU/memory usage joined with that container's requests and limits from the pod spec, plus pod totals summed across containers. CPU is reported in millicores and memory in bytes.
+
+The usage reading is point-in-time: it is a single sample from the Kubernetes Metrics API (`/apis/metrics.k8s.io/v1beta1/namespaces/<ns>/pods/<name>`). When the cluster has no metrics-server the Metrics API is unavailable; `metricsAvailable` is then `false`, every `usage` field is `null`, and `requests`/`limits` (which come from the pod spec) are still populated, so the Provisioning view still renders. Setting `KARSE_FAKE_METRICS=1` on the backend supplies deterministic fake usage instead of shelling out (used by smoke/e2e against clusters with no metrics-server).
+
+- **Request query**: `context` (required).
+- **Response 200**: `PodPerformance` — `{ "metricsAvailable": boolean, "pod": PodUsage, "containers": ContainerUsage[] }`.
+- **Response 400**: `{ "error": "context query parameter is required" }` when `context` is missing or blank.
+- **Response 500**: `{ "error": "<kubectl stderr>" }` when fetching the pod spec fails.
+
+```sh
+curl -fsS 'http://127.0.0.1:5172/api/pods/default/nginx-abc/performance?context=my-ctx'
+```
+
+```json
+{
+  "metricsAvailable": true,
+  "pod": {
+    "name": "nginx-abc",
+    "namespace": "default",
+    "node": "ctrl-0",
+    "usage": { "cpuMillicores": 120, "memoryBytes": 268435456 },
+    "requests": { "cpuMillicores": 100, "memoryBytes": 134217728 },
+    "limits": { "cpuMillicores": 500, "memoryBytes": 268435456 },
+    "containers": [
+      {
+        "name": "nginx",
+        "usage": { "cpuMillicores": 120, "memoryBytes": 268435456 },
+        "requests": { "cpuMillicores": 100, "memoryBytes": 134217728 },
+        "limits": { "cpuMillicores": 500, "memoryBytes": 268435456 }
+      }
+    ]
+  },
+  "containers": [
+    {
+      "name": "nginx",
+      "usage": { "cpuMillicores": 120, "memoryBytes": 268435456 },
+      "requests": { "cpuMillicores": 100, "memoryBytes": 134217728 },
+      "limits": { "cpuMillicores": 500, "memoryBytes": 268435456 }
+    }
+  ]
+}
+```
+
+When the Metrics API is unavailable, `metricsAvailable` is `false` and usage fields are `null`:
+
+```json
+{
+  "metricsAvailable": false,
+  "pod": {
+    "name": "nginx-abc",
+    "namespace": "default",
+    "node": "ctrl-0",
+    "usage": { "cpuMillicores": null, "memoryBytes": null },
+    "requests": { "cpuMillicores": 100, "memoryBytes": 134217728 },
+    "limits": { "cpuMillicores": 500, "memoryBytes": 268435456 },
+    "containers": [ "..." ]
+  },
+  "containers": [ "..." ]
+}
+```

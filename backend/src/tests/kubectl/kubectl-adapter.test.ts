@@ -16,6 +16,7 @@ import {
     isWorkloadKind,
     getClusterOverview,
     getClusterPerformance,
+    getPodPerformance,
     listPods,
     listEvents,
     listClusterErrors,
@@ -2508,6 +2509,7 @@ describe("streamPodLogs", () => {
     });
 });
 
+
 describe("getClusterPerformance", () => {
     // Raw Metrics API NodeMetricsList fixture: CPU in nanocores, memory in Ki.
     const nodeMetricsFixture = {
@@ -2917,5 +2919,205 @@ describe("getNodePerformance", () => {
             [PODS_KEY]: () => ok(JSON.stringify({ items: [] })),
         });
         await expect(getNodePerformance("test-ctx", "node-1")).rejects.toThrow("not found");
+    });
+});
+
+describe("getPodPerformance", () => {
+    afterEach(() => {
+        delete process.env.KARSE_FAKE_METRICS;
+    });
+
+    const METRICS_KEY =
+        "--context ctx get --raw /apis/metrics.k8s.io/v1beta1/namespaces/default/pods/web";
+    const POD_KEY = "--context ctx -n default get pod web -o json";
+
+    // A pod with two containers, each declaring requests and limits in its spec.
+    const POD_SPEC = {
+        metadata: {
+            name: "web",
+            namespace: "default",
+        },
+        spec: {
+            nodeName: "node-1",
+            containers: [
+                {
+                    name: "nginx",
+                    resources: {
+                        requests: {
+                            cpu: "100m",
+                            memory: "128Mi",
+                        },
+                        limits: {
+                            cpu: "500m",
+                            memory: "256Mi",
+                        },
+                    },
+                },
+                {
+                    name: "sidecar",
+                    resources: {
+                        requests: {
+                            cpu: "50m",
+                            memory: "64Mi",
+                        },
+                        limits: {
+                            cpu: "200m",
+                            memory: "128Mi",
+                        },
+                    },
+                },
+            ],
+        },
+    };
+
+    // The single-pod metrics endpoint returns one PodMetrics with a containers[]
+    // array of per-container usage (CPU nanocores, memory Ki, as the real API does).
+    const POD_METRICS = {
+        metadata: {
+            name: "web",
+            namespace: "default",
+        },
+        containers: [
+            {
+                name: "nginx",
+                usage: {
+                    cpu: "120000000n",
+                    memory: "262144Ki",
+                },
+            },
+            {
+                name: "sidecar",
+                usage: {
+                    cpu: "30000000n",
+                    memory: "65536Ki",
+                },
+            },
+        ],
+    };
+
+    test("joins per-container usage with the container's requests and limits", async () => {
+        setRunnerHandlers({
+            [METRICS_KEY]: () => ok(JSON.stringify(POD_METRICS)),
+            [POD_KEY]: () => ok(JSON.stringify(POD_SPEC)),
+        });
+
+        const result = await getPodPerformance("ctx", "default", "web");
+
+        expect(result.metricsAvailable).toBe(true);
+        expect(result.pod.name).toBe("web");
+        expect(result.pod.namespace).toBe("default");
+        expect(result.pod.node).toBe("node-1");
+
+        // Per-container join: usage from metrics (120000000n -> 120m, 262144Ki -> 256Mi
+        // bytes), requests/limits from spec.
+        expect(result.containers).toEqual([
+            {
+                name: "nginx",
+                usage: { cpuMillicores: 120, memoryBytes: 262144 * 1024 },
+                requests: { cpuMillicores: 100, memoryBytes: 128 * 1024 ** 2 },
+                limits: { cpuMillicores: 500, memoryBytes: 256 * 1024 ** 2 },
+            },
+            {
+                name: "sidecar",
+                usage: { cpuMillicores: 30, memoryBytes: 65536 * 1024 },
+                requests: { cpuMillicores: 50, memoryBytes: 64 * 1024 ** 2 },
+                limits: { cpuMillicores: 200, memoryBytes: 128 * 1024 ** 2 },
+            },
+        ]);
+        // pod.containers carries the same per-container join.
+        expect(result.pod.containers).toEqual(result.containers);
+
+        // Pod totals sum the per-container values.
+        expect(result.pod.usage).toEqual({
+            cpuMillicores: 150,
+            memoryBytes: (262144 + 65536) * 1024,
+        });
+        expect(result.pod.requests).toEqual({
+            cpuMillicores: 150,
+            memoryBytes: (128 + 64) * 1024 ** 2,
+        });
+        expect(result.pod.limits).toEqual({
+            cpuMillicores: 700,
+            memoryBytes: (256 + 128) * 1024 ** 2,
+        });
+    });
+
+    test("degrades to metricsAvailable:false with null usage but populated requests/limits", async () => {
+        setRunnerHandlers({
+            // Metrics API absent: kubectl get --raw fails naming metrics.k8s.io.
+            [METRICS_KEY]: () =>
+                fail('error: the server could not find the requested resource (get pods.metrics.k8s.io web)'),
+            [POD_KEY]: () => ok(JSON.stringify(POD_SPEC)),
+        });
+
+        const result = await getPodPerformance("ctx", "default", "web");
+
+        expect(result.metricsAvailable).toBe(false);
+        // Usage is null per container and at the pod level, but requests/limits remain.
+        for (const c of result.containers) {
+            expect(c.usage).toEqual({ cpuMillicores: null, memoryBytes: null });
+        }
+        expect(result.pod.usage).toEqual({ cpuMillicores: null, memoryBytes: null });
+        expect(result.pod.requests).toEqual({
+            cpuMillicores: 150,
+            memoryBytes: (128 + 64) * 1024 ** 2,
+        });
+        expect(result.containers[0]!.requests).toEqual({
+            cpuMillicores: 100,
+            memoryBytes: 128 * 1024 ** 2,
+        });
+    });
+
+    test("treats a container with no resources block as zero requests/limits", async () => {
+        const podNoResources = {
+            metadata: { name: "web", namespace: "default" },
+            spec: {
+                nodeName: "node-1",
+                containers: [{ name: "nginx" }],
+            },
+        };
+        setRunnerHandlers({
+            [METRICS_KEY]: () =>
+                ok(JSON.stringify({
+                    metadata: { name: "web", namespace: "default" },
+                    containers: [{ name: "nginx", usage: { cpu: "0", memory: "0" } }],
+                })),
+            [POD_KEY]: () => ok(JSON.stringify(podNoResources)),
+        });
+
+        const result = await getPodPerformance("ctx", "default", "web");
+
+        expect(result.containers).toEqual([
+            {
+                name: "nginx",
+                usage: { cpuMillicores: 0, memoryBytes: 0 },
+                requests: { cpuMillicores: 0, memoryBytes: 0 },
+                limits: { cpuMillicores: 0, memoryBytes: 0 },
+            },
+        ]);
+    });
+
+    test("uses the canned fake metrics under KARSE_FAKE_METRICS without shelling out for metrics", async () => {
+        process.env.KARSE_FAKE_METRICS = "1";
+        // Only the pod spec is fetched via kubectl; the metrics fetch is canned.
+        setRunnerHandlers({
+            [POD_KEY]: () => ok(JSON.stringify(POD_SPEC)),
+        });
+
+        const result = await getPodPerformance("ctx", "default", "web");
+
+        expect(result.metricsAvailable).toBe(true);
+        // The fake pod-metrics payload has a "web" pod with nginx + sidecar usage,
+        // which joins to the spec's containers.
+        expect(result.pod.usage.cpuMillicores).toBe(150);
+        expect(result.containers.map((c) => c.name)).toEqual(["nginx", "sidecar"]);
+    });
+
+    test("throws when the pod spec fetch fails", async () => {
+        setRunnerHandlers({
+            [METRICS_KEY]: () => ok(JSON.stringify(POD_METRICS)),
+            [POD_KEY]: () => fail("Error from server (NotFound): pods \"web\" not found"),
+        });
+        await expect(getPodPerformance("ctx", "default", "web")).rejects.toThrow("not found");
     });
 });

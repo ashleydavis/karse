@@ -1,7 +1,7 @@
 import { Router } from "express";
 import * as kubectl from "../kubectl/kubectl-adapter";
 
-// Router handling GET /pods/:namespace/:name and GET /pods/:namespace/:name/logs.
+// Router handling GET /pods/:namespace/:name, /performance, and /logs (incl. streaming).
 export const podDetailRouter = Router();
 
 podDetailRouter.get("/pods/:namespace/:name", async (req, res) => {
@@ -13,6 +13,21 @@ podDetailRouter.get("/pods/:namespace/:name", async (req, res) => {
     const { namespace, name } = req.params;
     const detail = await kubectl.getPodDetail(context, namespace!, name!);
     res.json(detail);
+});
+
+// Pod-scoped (leaf) performance: per-container usage joined with each container's
+// requests/limits from the spec. Validates context, then delegates to the adapter,
+// which degrades to metricsAvailable:false (usage null, requests/limits still set)
+// when the cluster has no Metrics API. READ-ONLY.
+podDetailRouter.get("/pods/:namespace/:name/performance", async (req, res) => {
+    const context = req.query.context;
+    if (typeof context !== "string" || context.trim() === "") {
+        res.status(400).json({ error: "context query parameter is required" });
+        return;
+    }
+    const { namespace, name } = req.params;
+    const performance = await kubectl.getPodPerformance(context, namespace!, name!);
+    res.json(performance);
 });
 
 podDetailRouter.get("/pods/:namespace/:name/logs", async (req, res) => {

@@ -168,6 +168,39 @@ With the mode **off** (plain `bun run dev`), the same query returns `metricsAvai
 with every `usage` field `null`, while `requests`/`limits` and `node.allocatable` stay
 populated from the specs.
 
+### Pod performance endpoint (backend)
+
+The pod Performance tab (added in a later ticket) is fed by `GET
+/api/pods/:namespace/:name/performance`, which joins each container's point-in-time
+usage with that container's requests/limits from the pod spec. The endpoint can be
+exercised today with `curl` while the pod-tab UI is still pending.
+
+Start the app with the fake-metrics mode on so usage is populated even though the kwok
+cluster has no metrics-server:
+
+```sh
+KARSE_FAKE_METRICS=1 bun run dev:test
+```
+
+Then open the frontend at `http://127.0.0.1:5173`, select the `kwok-karse-test`
+context, and find a pod (e.g. on the Pods page). With the backend on port 5172, query
+the endpoint for that pod (substitute its namespace/name and your context):
+
+```sh
+curl -fsS 'http://127.0.0.1:5172/api/pods/default/web/performance?context=kwok-karse-test' | jq
+```
+
+Confirm:
+- `metricsAvailable` is `true`.
+- `containers` is an array, one entry per spec container, each with `usage`,
+  `requests`, and `limits` blocks (CPU in millicores, memory in bytes).
+- `pod.usage`, `pod.requests`, and `pod.limits` are the per-container sums.
+
+Now restart **without** `KARSE_FAKE_METRICS` (plain `bun run dev`) and re-run the same
+curl: `metricsAvailable` is `false`, every `usage` field is `null`, and `requests` /
+`limits` are still populated from the pod spec. This is the metrics-unavailable
+degradation the Provisioning view relies on.
+
 Teardown:
 
 ```sh

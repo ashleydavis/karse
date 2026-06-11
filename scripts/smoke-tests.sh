@@ -317,6 +317,27 @@ curl -fsS "$BASE/api/pods/default/smoke-pod?context=$CURRENT_CTX" \
     > /dev/null
 echo "OK"
 
+echo "--- GET /api/pods/:namespace/:name/performance ---"
+# KARSE_FAKE_METRICS=1 is set, so the Metrics API reports available. The response
+# carries the pod's per-container usage joined with each container's requests/limits.
+# smoke-pod has two containers (nginx, sidecar), so containers must list both and the
+# pod block must carry usage/requests/limits.
+PERF_RESP=$(curl -fsS "$BASE/api/pods/default/smoke-pod/performance?context=$CURRENT_CTX")
+echo "$PERF_RESP" | jq -e '.metricsAvailable == true' > /dev/null
+echo "$PERF_RESP" | jq -e 'has("pod") and (.pod | has("usage") and has("requests") and has("limits") and has("containers"))' > /dev/null
+echo "$PERF_RESP" | jq -e '(.containers | type == "array") and (.containers | length == 2)' > /dev/null
+echo "$PERF_RESP" | jq -e '[.containers[].name] | sort == ["nginx", "sidecar"]' > /dev/null
+echo "$PERF_RESP" | jq -e '.containers[] | has("usage") and has("requests") and has("limits")' > /dev/null
+echo "OK"
+
+echo "--- GET /api/pods/:namespace/:name/performance (missing context rejected) ---"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/pods/default/smoke-pod/performance")
+if [[ "$HTTP_CODE" != "400" ]]; then
+    echo "Expected HTTP 400 for missing context on pod performance, got $HTTP_CODE" >&2
+    exit 1
+fi
+echo "OK"
+
 echo "--- GET /api/pods/:namespace/:name/logs ---"
 # KARSE_FAKE_LOGS=1 is set, so the backend returns realistic fake log lines.
 LOGS_RESP=$(curl -fsS "$BASE/api/pods/default/smoke-pod/logs?context=$CURRENT_CTX&container=nginx")
