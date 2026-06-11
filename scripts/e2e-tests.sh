@@ -108,6 +108,114 @@ kubectl wait --for=condition=Ready node/node-cp node/node-worker --timeout=120s
 retry kubectl patch node node-notready --subresource=status --type=merge -p \
   '{"status":{"conditions":[{"type":"Ready","status":"False","reason":"KubeletNotReady","message":"Simulated NotReady node","lastHeartbeatTime":"2024-01-01T00:00:00Z","lastTransitionTime":"2024-01-01T00:00:00Z"}],"nodeInfo":{"kubeletVersion":"fake"}}}'
 
+# Pods for the Performance tab. Their names/namespaces match the KARSE_FAKE_METRICS
+# pod-metrics entries (web/api in default, worker in jobs, cache in infra) so the
+# cluster Breakdown treemap and Top consumers table render with usage cells. Each
+# carries requests/limits so the provisioning fields are populated too. They are
+# spread across node-cp and node-worker so the treemap shows both node groups.
+apply_manifest "" <<'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: jobs
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: infra
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web
+  namespace: default
+spec:
+  nodeName: node-worker
+  automountServiceAccountToken: false
+  containers:
+  - name: nginx
+    image: nginx:latest
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+  - name: sidecar
+    image: busybox:latest
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "200m"
+        memory: "128Mi"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: api
+  namespace: default
+spec:
+  nodeName: node-worker
+  automountServiceAccountToken: false
+  containers:
+  - name: api
+    image: api:latest
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "256Mi"
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: worker
+  namespace: jobs
+spec:
+  nodeName: node-cp
+  automountServiceAccountToken: false
+  containers:
+  - name: worker
+    image: worker:latest
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cache
+  namespace: infra
+spec:
+  nodeName: node-cp
+  automountServiceAccountToken: false
+  containers:
+  - name: redis
+    image: redis:latest
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "250m"
+        memory: "256Mi"
+EOF
+
+# Wait until kwok has run the performance pods so the cluster is settled (Running,
+# not Pending) before the backend starts and the e2e Performance tests query it.
+kubectl wait --for=condition=Ready --timeout=120s -n default pod/web pod/api
+kubectl wait --for=condition=Ready --timeout=120s -n jobs pod/worker
+kubectl wait --for=condition=Ready --timeout=120s -n infra pod/cache
+
 # ── Cluster 2 nodes ──────────────────────────────────────────────────────────
 echo "--- Populating cluster 2 ---"
 apply_manifest "kwok-$KWOK_CLUSTER_2" <<'EOF'
@@ -144,7 +252,7 @@ kubectl config use-context "kwok-$KWOK_CLUSTER_1"
 # KARSE_PORT=0 asks the OS for a free port; the backend writes it to KARSE_PORT_FILE.
 echo "--- Starting backend (OS-assigned free port) ---"
 : > "$PORT_FILE"
-(cd backend && KARSE_FAKE_LOGS=1 KARSE_FAKE_STERN=1 KARSE_PORT=0 KARSE_PORT_FILE="$PORT_FILE" bun src/index.ts) 2>/dev/null &
+(cd backend && KARSE_FAKE_LOGS=1 KARSE_FAKE_STERN=1 KARSE_FAKE_METRICS=1 KARSE_PORT=0 KARSE_PORT_FILE="$PORT_FILE" bun src/index.ts) 2>/dev/null &
 BACKEND_PID=$!
 
 for _ in $(seq 1 100); do

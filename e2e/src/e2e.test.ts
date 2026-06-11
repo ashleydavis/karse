@@ -2293,15 +2293,20 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='cluster-panel-overview']")).toBeVisible();
             await expect(page.locator("[data-test-id='stat-server-version']")).toBeVisible();
             await expect(page.locator("[data-test-id='cluster-panel-performance']")).toHaveCount(0);
+            // The cluster Performance content (performance-tabs-6) replaced the old stub.
             await expect(page.locator("[data-test-id='perf-cluster-stub']")).toHaveCount(0);
         });
 
-        test("selecting the cluster Performance tab renders its stub placeholder", async () => {
+        test("selecting the cluster Performance tab mounts the Performance panel", async () => {
+            // The cluster Performance tab is now populated (treemap/heatmap/table); its
+            // detailed content is asserted in the "Performance tabs (cluster)" block. Here
+            // we only confirm the tab switch mounts the Performance panel and unmounts
+            // Overview, the scaffold behaviour this block covers.
             await page.goto("/cluster", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='cluster-tab-performance']").click();
             await expect(page.locator("[data-test-id='cluster-panel-performance']")).toBeVisible();
-            await expect(page.locator("[data-test-id='perf-cluster-stub']")).toBeVisible();
-            await expect(page.locator("[data-test-id='perf-cluster-stub']")).toContainText("Performance metrics coming soon");
+            // The old stub placeholder is gone.
+            await expect(page.locator("[data-test-id='perf-cluster-stub']")).toHaveCount(0);
             // The Overview panel is no longer mounted once Performance is selected.
             await expect(page.locator("[data-test-id='cluster-panel-overview']")).toHaveCount(0);
         });
@@ -5519,6 +5524,93 @@ test.describe("karse e2e", () => {
             // Return to the page for any later tests.
             await page.goto("/all-resources", { waitUntil: "networkidle" });
             await expect((await rows()).first()).toBeVisible();
+        });
+    });
+
+    // ── Performance tabs (cluster) ──────────────────────────────────────────────
+    // The backend runs with KARSE_FAKE_METRICS=1 (set in scripts/e2e-tests.sh), so the
+    // Metrics API returns canned usage for the seeded pods (web/api in default, worker
+    // in jobs, cache in infra). The cluster Performance tab therefore renders a
+    // populated Breakdown treemap, Hot spots heatmap, and Top consumers table.
+    test.describe("Performance tabs (cluster)", () => {
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='cluster-tab-performance']")).toBeVisible();
+            await page.locator("[data-test-id='cluster-tab-performance']").click();
+            // The lazy query fires only once the tab is active; wait for the charts.
+            await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
+        });
+
+        test("renders the treemap, heatmap, and top-consumers table", async () => {
+            await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
+            await expect(page.locator("[data-test-id='perf-heatmap']")).toBeVisible();
+            await expect(page.locator("[data-test-id='perf-top-consumers']")).toBeVisible();
+            // The table ranks the seeded pods, so it has at least the four pod rows.
+            await expect(
+                page.locator("[data-test-id='perf-top-consumers-row']").first()
+            ).toBeVisible();
+            const rowCount = await page.locator("[data-test-id='perf-top-consumers-row']").count();
+            expect(rowCount).toBeGreaterThanOrEqual(4);
+        });
+
+        test("the metric toggle is present with CPU selected by default", async () => {
+            await expect(page.locator("[data-test-id='perf-metric-toggle']")).toBeVisible();
+            await expect(
+                page.locator("[data-test-id='perf-metric-cpu']")
+            ).toHaveAttribute("aria-pressed", "true");
+        });
+
+        test("toggling to Memory updates the top-consumers usage values", async () => {
+            // Read the first row's usage cell under CPU, switch to Memory, and confirm
+            // the displayed usage changes (memory is formatted in Mi/Gi, CPU in m/cores),
+            // proving the toggle re-derives the view from the selected metric.
+            const firstUsage = page
+                .locator("[data-test-id='perf-top-consumers-row']")
+                .first()
+                .locator("td")
+                .last();
+            const cpuText = (await firstUsage.textContent())?.trim();
+            await page.locator("[data-test-id='perf-metric-memory']").click();
+            await expect(
+                page.locator("[data-test-id='perf-metric-memory']")
+            ).toHaveAttribute("aria-pressed", "true");
+            await expect(firstUsage).not.toHaveText(cpuText ?? "");
+            // Restore CPU for any later assertions / a clean state.
+            await page.locator("[data-test-id='perf-metric-cpu']").click();
+        });
+
+        test("clicking a top-consumers row opens that pod's Performance tab", async () => {
+            // The row-click reuses the shared navigation, landing on the pod detail page
+            // with ?tab=performance so the pod's own Performance tab is selected.
+            const webRow = page
+                .locator("[data-test-id='perf-top-consumers-row']")
+                .filter({ hasText: "web" })
+                .first();
+            await webRow.click();
+            await expect(page).toHaveURL(/\/pods\/default\/web/);
+            await expect(page).toHaveURL(/tab=performance/);
+            await expect(page.locator("[data-test-id='pod-tab-performance']")).toBeVisible();
+            // Return to the cluster Performance tab for any later assertions.
+            await page.goto("/cluster?tab=performance", { waitUntil: "networkidle" });
+        });
+
+        test("clicking a treemap leaf navigates to the pod detail page", async () => {
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='cluster-tab-performance']").click();
+            await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
+            // nivo renders each leaf as an SVG rect with the pod label as text. Clicking
+            // the "web" leaf label drills into the pod detail page on its Performance tab,
+            // the same drill spine the table row uses. force: the label text sits over the
+            // rect that carries the click handler, so the event still reaches the node.
+            await page
+                .locator("[data-test-id='perf-treemap'] text")
+                .filter({ hasText: /^web$/ })
+                .first()
+                .click({ force: true });
+            await expect(page).toHaveURL(/\/pods\/default\/web/);
+            await expect(page).toHaveURL(/tab=performance/);
+            await expect(page.locator("[data-test-id='pod-tab-performance']")).toBeVisible();
         });
     });
 });

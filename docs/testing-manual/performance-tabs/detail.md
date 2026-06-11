@@ -1,6 +1,8 @@
 # performance-tabs manual tests
 
-Manual tests for the Performance tab scaffold. The cluster home page becomes tabbed (Overview + Performance), and the node and pod detail pages each gain a Performance tab. Each Performance tab currently renders a labelled stub placeholder ("Performance metrics coming soon"); the content tickets fill these in later.
+Manual tests for the Performance tabs. The cluster home page is tabbed (Overview + Performance) and its **Performance tab is now populated** (Breakdown treemap, Hot spots heatmap, Top consumers table). The node and pod detail pages each have a Performance tab that is still a labelled stub ("Performance metrics coming soon"); the content tickets fill those in later.
+
+To see the populated cluster Performance tab against a kwok cluster (which has no metrics-server), start the app with the fake-metrics mode on: `KARSE_FAKE_METRICS=1 bun run dev`. See the [Cluster Performance tab](#cluster-performance-tab-populated) scenario below.
 
 Start the app first. From the repo root run:
 
@@ -22,8 +24,8 @@ Then open the frontend at `http://127.0.0.1:5173`. The scenario fixture stands u
 - Navigate to `/cluster` (the Karse home page).
 - A tab bar shows two tabs: "Overview" and "Performance".
 - "Overview" is selected by default. The existing stat tiles (Server version, Nodes, Namespaces, Pods, Errors) and the Pod status row render exactly as before.
-- Click the "Performance" tab. The stat tiles disappear and a stub panel appears showing the "Performance" heading and the text "Performance metrics coming soon".
-- Click back to "Overview". The stat tiles reappear and the stub panel disappears.
+- Click the "Performance" tab. The stat tiles disappear and the populated Performance hub appears (see the scenario below).
+- Click back to "Overview". The stat tiles reappear and the Performance hub disappears.
 
 ### Node detail Performance tab
 - Navigate to `/nodes` and click the `fake-node-1` row to open `/nodes/fake-node-1`.
@@ -37,9 +39,42 @@ Then open the frontend at `http://127.0.0.1:5173`. The scenario fixture stands u
 - The other tabs (Status, Containers, Labels, Logs, Commands, YAML) still render and behave as before.
 - Click the "Performance" tab. A stub panel appears showing the "Performance" heading and "Performance metrics coming soon". The selected tab is reflected in the URL (`?tab=performance`), so reloading the page keeps the Performance tab open.
 
-### Light and dark mode
+### Light and dark mode (stubs)
 - Open the header settings and switch the colour mode between Light and Dark.
-- In both modes the stub panel is clearly readable: the "Performance" heading and the placeholder text have proper contrast against the panel background.
+- In both modes the node and pod stub panels are clearly readable: the "Performance" heading and the placeholder text have proper contrast against the panel background.
+
+## Scenario: Cluster Performance tab (populated) {#cluster-performance-tab-populated}
+
+The cluster Performance tab needs usage data. kwok clusters have no metrics-server, so run the app with fake metrics on, and seed pods whose names match the fake-metrics entries (`web`/`api` in `default`, `worker` in `jobs`, `cache` in `infra`).
+
+```sh
+# Seed namespaces and pods matching the fake-metrics entries.
+kubectl create namespace jobs
+kubectl create namespace infra
+kubectl run web   -n default --image=nginx
+kubectl run api   -n default --image=nginx
+kubectl run worker -n jobs   --image=nginx
+kubectl run cache -n infra   --image=nginx
+
+# Start the app with fake metrics so usage data is returned.
+KARSE_FAKE_METRICS=1 bun run dev
+```
+
+Open `/cluster`, click the **Performance** tab.
+
+- A **CPU / Memory** toggle shows at the top, with **CPU** selected by default.
+- **Breakdown** (treemap): rectangles for the seeded pods, grouped by node then namespace, sized by usage. Rectangles are coloured green/amber/red by utilisation. Click a rectangle for a pod (e.g. `web`): the app navigates to `/pods/default/web?tab=performance` and the pod's Performance tab is selected.
+- **Hot spots** (heatmap): a row per node with `cpu%` and `mem%` cells. Click a cell: the app navigates to that node's detail page on its Performance tab.
+- **Top consumers** (table): the pods ranked by the selected metric's usage. Click the **Usage** header to reverse the order. Click a row: the app navigates to that pod's Performance tab.
+- Toggle to **Memory**: every view re-derives from memory usage (the Top consumers usage column switches to `Mi`/`Gi` figures, the treemap rectangles re-size).
+
+### Metrics-unavailable path
+- Stop the app and restart it **without** `KARSE_FAKE_METRICS` (plain `bun run dev`).
+- Open `/cluster` → **Performance**. Because the kwok cluster has no metrics-server, the views are replaced by an information notice (the "Metrics API is not available" alert), confirming the page degrades cleanly rather than erroring.
+
+### Light and dark mode (cluster Performance tab)
+- With fake metrics on and the tab populated, switch the colour mode between Light and Dark from the header settings.
+- In both modes the treemap, heatmap, toggle, and table are clearly readable with proper contrast. Capture screenshots of the populated tab and the metrics-unavailable state in both modes for review.
 
 ## Data foundation: quantity parsers and fake-metrics mode
 
@@ -96,8 +131,11 @@ usage joined (non-null), and every pod carrying its join and resource fields. Ru
 bun run smoke
 ```
 
-The cluster Performance tab UI that consumes this endpoint is added and screenshotted in the
-later content ticket (`performance-tabs-6`).
+The cluster Performance tab UI that consumes this endpoint shipped in `performance-tabs-6`;
+see the [Cluster Performance tab (populated)](#cluster-performance-tab-populated) scenario
+above. The e2e suite (`scripts/e2e-tests.sh`) runs the backend with `KARSE_FAKE_METRICS=1`
+and seeds the matching pods, then asserts the treemap, heatmap, and top-consumers table
+render, the metric toggle updates the view, and the drill-down navigations work.
 
 ### Node performance endpoint (`GET /api/nodes/:name/performance`)
 

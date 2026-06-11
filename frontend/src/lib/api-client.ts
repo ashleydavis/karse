@@ -6,7 +6,7 @@ import type {
     WorkloadKind, WorkloadDetail, NamespaceDetail,
     PodDetail, NodeDetail, YamlResourceType, YamlResponse,
     LogStreamLine, LogStreamStarted, EventsResponse, ErrorsResponse,
-    SternStreamLine, SternStreamStarted,
+    SternStreamLine, SternStreamStarted, ClusterPerformance,
 } from "karse-types";
 
 // Every data request times out after LOAD_TIMEOUT_MS. When the cluster is
@@ -40,6 +40,15 @@ export async function switchContext(name: string): Promise<ContextsResponse> {
 
 export async function fetchClusterOverview(context: string): Promise<ClusterOverview> {
     const response = await http.get<ClusterOverview>("/cluster/overview", { params: { context } });
+    return response.data;
+}
+
+// Fetches the cluster-scoped performance snapshot (per-node usage versus allocatable
+// and per-pod usage versus requests/limits) for the given context. metricsAvailable
+// is false when the cluster has no Metrics API; usage fields are then null while
+// requests/limits stay populated.
+export async function fetchClusterPerformance(context: string): Promise<ClusterPerformance> {
+    const response = await http.get<ClusterPerformance>("/cluster/performance", { params: { context } });
     return response.data;
 }
 

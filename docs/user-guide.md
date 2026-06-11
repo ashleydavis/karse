@@ -77,7 +77,11 @@ A table of all kubeconfig contexts. Each row shows the context name, cluster, us
 
 ## Cluster home page (`/`)
 
-### Stat tiles
+The cluster home page has two tabs: **Overview** (the default) and **Performance**. The selected tab is remembered in the URL (`?tab=performance`), so a shared or reloaded link reopens the same tab.
+
+### Overview tab
+
+#### Stat tiles
 
 Four cards summarise the active context:
 
@@ -85,6 +89,16 @@ Four cards summarise the active context:
 - **Nodes**: total node count.
 - **Namespaces**: number of namespaces.
 - **Pods**: number of pods across all namespaces.
+
+### Performance tab
+
+A point-in-time view of cluster CPU and memory usage, read from the Kubernetes Metrics API. A **CPU / Memory** toggle at the top selects which metric every view below shows (CPU is selected by default). The tab has three views:
+
+- **Breakdown** (treemap): cluster usage broken down node → namespace → pod, each rectangle sized by the pod's usage for the selected metric. Rectangles are coloured green→amber→red by how close the pod is to its limit. Click a rectangle to open that pod's detail page on its Performance tab.
+- **Hot spots** (heatmap): a row per node with **cpu%** and **mem%** cells (usage ÷ allocatable). Click a cell to open that node's detail page on its Performance tab.
+- **Top consumers** (table): pods ranked by the selected metric's usage. Click the **Usage** header to reverse the order; click a row to open that pod's detail page on its Performance tab.
+
+If the cluster has no Metrics API (no metrics-server installed), the views are replaced by an information notice: live usage cannot be read, and only requests and limits from pod specs are available.
 
 ## All resources page (`/all-resources`)
 

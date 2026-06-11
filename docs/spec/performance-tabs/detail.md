@@ -1,13 +1,15 @@
 # performance-tabs
 
 **Spec:** Draft
-**Implementation:** None
+**Implementation:** Partial
 
 The Performance feature adds a per-scope "Performance" tab to the cluster, node, and pod
 pages, showing point-in-time CPU and memory usage in context. This document describes the
 data sources, scope, degradation behaviour, per-scope tab contents, and the test mode. The
-spec stays **Draft** / **Implementation: None** until the tabs ship; later tickets bump the
-implementation status to Partial then Complete as the per-scope backends and UI land.
+implementation is **Partial**: the cluster Performance tab (Breakdown treemap, Hot spots
+heatmap, Top consumers table) has shipped, along with the shared chart components and the
+`frontend/src/lib/performance.ts` transform/format helpers. The node and pod tabs are still
+stubs and become Complete in later tickets.
 
 ## Data sources
 
@@ -66,11 +68,18 @@ The shared metric toggle offers **CPU** and **Memory** only. Disk is excluded: t
 API does not report disk usage, and an "allocated/requested" disk figure would be a weaker,
 inconsistent signal.
 
-- **Cluster Performance tab** (the hub):
+- **Cluster Performance tab** (the hub) — **implemented**:
   - A "Breakdown" treemap drilling cluster → node → namespace → pod, sized by usage for the
-    selected metric.
-  - A "Hot spots" heatmap of node × metric (CPU%, memory% = usage ÷ allocatable).
-  - A "Top consumers" table of pods ranked by the selected metric.
+    selected metric. Leaves are coloured green→amber→red by utilisation (usage ÷ limit), and
+    clicking a leaf opens that pod's detail page on its Performance tab.
+  - A "Hot spots" heatmap of node × metric (CPU%, memory% = usage ÷ allocatable). Clicking a
+    cell opens that node's detail page on its Performance tab.
+  - A "Top consumers" table of pods ranked by the selected metric, sortable, with row-click
+    navigation to the pod's Performance tab.
+  - The cluster tab is built from `@nivo/treemap` / `@nivo/heatmap` (the first charting
+    dependency), the shared components in `frontend/src/components/performance/`, and the
+    pure helpers in `frontend/src/lib/performance.ts` (`formatCpu`, `formatMemory`,
+    `metricValue`, `utilisation`, `buildClusterTreemap`, `buildNodeHeatmap`).
 - **Node Performance tab:**
   - A node-scoped treemap drilling namespace → pod → container.
   - A provisioning view of the node's pods (usage vs request vs limit).
