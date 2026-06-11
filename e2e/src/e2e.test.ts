@@ -2185,6 +2185,105 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Performance tabs (scaffold stubs) ───────────────────────────────────────
+
+    test.describe("Performance tabs", () => {
+        const FAKE_PERF_NODE_DETAIL = {
+            name: "node-cp",
+            status: "Ready",
+            roles: ["control-plane"],
+            version: "v1.29.0",
+            createdAt: new Date().toISOString(),
+            conditions: [
+                {
+                    type: "Ready",
+                    status: "True",
+                    message: "kubelet is posting ready status",
+                    lastTransition: new Date().toISOString(),
+                },
+            ],
+            capacity: { cpu: "4", memory: "8Gi", pods: "110" },
+            allocatable: { cpu: "3900m", memory: "7Gi", pods: "110" },
+            addresses: [{ type: "InternalIP", address: "192.168.1.1" }],
+            labels: { "kubernetes.io/hostname": "node-cp" },
+            pods: [],
+            events: [],
+        };
+
+        const FAKE_PERF_POD_DETAIL = {
+            name: "nginx-abc",
+            namespace: "default",
+            phase: "Running",
+            node: "node-cp",
+            podIP: "10.0.0.5",
+            createdAt: new Date().toISOString(),
+            labels: {},
+            containers: [],
+            initContainers: [],
+            events: [],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/nodes/node-cp*", async (route) => {
+                await route.fulfill({ json: FAKE_PERF_NODE_DETAIL });
+            });
+            await page.route("**/api/pods/default/nginx-abc*", async (route) => {
+                await route.fulfill({ json: FAKE_PERF_POD_DETAIL });
+            });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/nodes/node-cp*");
+            await page.unroute("**/api/pods/default/nginx-abc*");
+        });
+
+        test("cluster home shows Overview and Performance tabs, defaulting to Overview", async () => {
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='cluster-tab-overview']")).toBeVisible();
+            await expect(page.locator("[data-test-id='cluster-tab-performance']")).toBeVisible();
+            // Overview is the default panel and still renders the stat tiles unchanged.
+            await expect(page.locator("[data-test-id='cluster-panel-overview']")).toBeVisible();
+            await expect(page.locator("[data-test-id='stat-server-version']")).toBeVisible();
+            await expect(page.locator("[data-test-id='cluster-panel-performance']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='perf-cluster-stub']")).toHaveCount(0);
+        });
+
+        test("selecting the cluster Performance tab renders its stub placeholder", async () => {
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='cluster-tab-performance']").click();
+            await expect(page.locator("[data-test-id='cluster-panel-performance']")).toBeVisible();
+            await expect(page.locator("[data-test-id='perf-cluster-stub']")).toBeVisible();
+            await expect(page.locator("[data-test-id='perf-cluster-stub']")).toContainText("Performance metrics coming soon");
+            // The Overview panel is no longer mounted once Performance is selected.
+            await expect(page.locator("[data-test-id='cluster-panel-overview']")).toHaveCount(0);
+        });
+
+        test("node detail shows a Performance tab whose stub renders when selected", async () => {
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+            // Existing tabs still render alongside the new Performance tab.
+            await expect(page.locator("[data-test-id='node-tab-detail']")).toBeVisible();
+            await expect(page.locator("[data-test-id='node-tab-performance']")).toBeVisible();
+            await expect(page.locator("[data-test-id='node-panel-performance']")).toHaveCount(0);
+            await page.locator("[data-test-id='node-tab-performance']").click();
+            await expect(page.locator("[data-test-id='node-panel-performance']")).toBeVisible();
+            await expect(page.locator("[data-test-id='perf-node-stub']")).toBeVisible();
+            await expect(page.locator("[data-test-id='perf-node-stub']")).toContainText("Performance metrics coming soon");
+        });
+
+        test("pod detail shows a Performance tab whose stub renders when selected", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            // Existing tabs still render alongside the new Performance tab.
+            await expect(page.locator("[data-test-id='pod-tab-detail']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-tab-performance']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-panel-performance']")).toHaveCount(0);
+            await page.locator("[data-test-id='pod-tab-performance']").click();
+            await expect(page.locator("[data-test-id='pod-panel-performance']")).toBeVisible();
+            await expect(page.locator("[data-test-id='perf-pod-stub']")).toBeVisible();
+            await expect(page.locator("[data-test-id='perf-pod-stub']")).toContainText("Performance metrics coming soon");
+        });
+    });
+
     // ── Namespace detail page ───────────────────────────────────────────────────
 
     test.describe("namespace detail page", () => {

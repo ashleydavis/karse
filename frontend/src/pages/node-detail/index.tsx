@@ -29,6 +29,7 @@ import { LabelsTab } from "../../components/labels-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { ResourceRef } from "../../components/resource-ref";
+import { NodePerformanceTab } from "../../components/performance/node-performance-tab";
 import { tableRowSx } from "../../lib/table-row-style";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
@@ -82,7 +83,7 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
 }
 
 // The set of tabs available on the node detail page.
-type NodeDetailTab = "detail" | "pods" | "events" | "labels" | "commands" | "yaml";
+type NodeDetailTab = "detail" | "pods" | "events" | "labels" | "performance" | "commands" | "yaml";
 
 // Detail page for a single node, organizing its content into Status, Pods, and Events tabs.
 export function NodeDetailPage() {
@@ -130,6 +131,7 @@ export function NodeDetailPage() {
                     <Tab label="Pods" value="pods" data-test-id="node-tab-pods" />
                     <Tab label="Events" value="events" data-test-id="node-tab-events" />
                     <Tab label="Labels" value="labels" data-test-id="node-tab-labels" />
+                    <Tab label="Performance" value="performance" data-test-id="node-tab-performance" />
                     <Tab label="Commands" value="commands" data-test-id="node-tab-commands" />
                     <Tab label="YAML" value="yaml" data-test-id="node-tab-yaml" />
                 </Tabs>
@@ -312,6 +314,12 @@ export function NodeDetailPage() {
                             )
                         }
                     </Paper>
+                </Box>
+            )}
+
+            {activeTab === "performance" && (
+                <Box data-test-id="node-panel-performance">
+                    <NodePerformanceTab nodeName={data.name} active={activeTab === "performance"} />
                 </Box>
             )}
 

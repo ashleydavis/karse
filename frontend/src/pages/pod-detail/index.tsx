@@ -30,6 +30,7 @@ import { LoadError } from "../../components/load-error";
 import { ResourceRef } from "../../components/resource-ref";
 import { PodContainersPanel, PodInitContainersPanel } from "./components/pod-containers-panel";
 import { PodLogsPanel } from "./components/pod-logs-panel";
+import { PodPerformanceTab } from "../../components/performance/pod-performance-tab";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -79,12 +80,12 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
 }
 
 // The set of tabs available on the pod detail page.
-type PodDetailTab = "detail" | "containers" | "init-containers" | "labels" | "logs" | "commands" | "yaml";
+type PodDetailTab = "detail" | "containers" | "init-containers" | "labels" | "performance" | "logs" | "commands" | "yaml";
 
 // Reads the active tab from the URL, falling back to the Detail tab for any
 // missing or unrecognized value so the page always has a valid selection.
 function parseTab(value: string | null): PodDetailTab {
-    if (value === "containers" || value === "init-containers" || value === "labels" || value === "logs" || value === "commands" || value === "yaml") {
+    if (value === "containers" || value === "init-containers" || value === "labels" || value === "performance" || value === "logs" || value === "commands" || value === "yaml") {
         return value;
     }
     return "detail";
@@ -164,6 +165,7 @@ export function PodDetailPage() {
                         />
                     )}
                     <Tab label="Labels" value="labels" data-test-id="pod-tab-labels" />
+                    <Tab label="Performance" value="performance" data-test-id="pod-tab-performance" />
                     <Tab label="Logs" value="logs" data-test-id="pod-tab-logs" />
                     <Tab label="Commands" value="commands" data-test-id="pod-tab-commands" />
                     <Tab label="YAML" value="yaml" data-test-id="pod-tab-yaml" />
@@ -248,6 +250,12 @@ export function PodDetailPage() {
             {effectiveTab === "labels" && (
                 <Box data-test-id="pod-panel-labels">
                     <LabelsTab labels={data.labels} />
+                </Box>
+            )}
+
+            {effectiveTab === "performance" && (
+                <Box data-test-id="pod-panel-performance">
+                    <PodPerformanceTab namespace={data.namespace} name={data.name} active={effectiveTab === "performance"} />
                 </Box>
             )}
 
