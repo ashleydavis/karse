@@ -1,5 +1,6 @@
 import { run, stream, type CommandResult, type StreamHandle } from "../command-runner";
 import { audit, formatLocalISO } from "../audit-log";
+import { parseCpuToMillicores, parseMemoryToBytes } from "./quantity";
 import type {
     Context, NodeStatus, Node, ClusterOverview, Namespace, Pod, PodPhase,
     Deployment, StatefulSet, DaemonSet,
@@ -7,6 +8,7 @@ import type {
     NodeCondition, NodeAddress, ResourceAmounts, NodeDetail,
     ClusterEvent, WorkloadKind, WorkloadStat, WorkloadDetail, ClusterError,
     NamespaceDetail, NamespaceResource, NamespaceQuota, NamespaceLimit,
+    ClusterPerformance, NodeUsage, PodUsage, ResourceUsage,
 } from "karse-types";
 
 // Base directory for the rolling audit log; overridable via KARSE_LOGS_DIR.
@@ -1375,5 +1377,152 @@ export async function getClusterOverview(context: string): Promise<ClusterOvervi
         pendingPodCount,
         failedPodCount,
         errorCount,
+    };
+}
+
+// Builds a ResourceUsage from raw CPU and memory quantity strings, parsing CPU to
+// millicores and memory to bytes. Either input may be undefined (a spec container
+// with no request/limit set, or a metrics entry without one), which yields 0 via
+// the quantity parsers' empty-string handling.
+function toResourceUsage(cpu: string | undefined, memory: string | undefined): ResourceUsage {
+    return {
+        cpuMillicores: parseCpuToMillicores(cpu ?? ""),
+        memoryBytes: parseMemoryToBytes(memory ?? ""),
+    };
+}
+
+// A usage reading with both fields null, used when the Metrics API is unavailable.
+const NULL_USAGE: ResourceUsage = {
+    cpuMillicores: null,
+    memoryBytes: null,
+};
+
+// Sums a set of ResourceUsage readings field by field. A null field on any input
+// is treated as 0 for the sum, but if every input is null for a field the result
+// stays null. Used to total per-container requests/limits into a per-pod figure.
+function sumUsage(parts: ResourceUsage[]): ResourceUsage {
+    let cpu: number | null = null;
+    let mem: number | null = null;
+    for (const part of parts) {
+        if (part.cpuMillicores !== null) {
+            cpu = (cpu ?? 0) + part.cpuMillicores;
+        }
+        if (part.memoryBytes !== null) {
+            mem = (mem ?? 0) + part.memoryBytes;
+        }
+    }
+    return {
+        cpuMillicores: cpu,
+        memoryBytes: mem,
+    };
+}
+
+// Returns cluster-scoped performance data: per-node usage versus allocatable and
+// per-pod usage versus its summed requests and limits. Fetches four sources in
+// parallel: node metrics and pod metrics from the raw Metrics API (via fetchMetrics,
+// which degrades to available:false on a cluster with no metrics-server), plus node
+// and pod specs from kubectl get -o json for allocatable and requests/limits.
+//
+// metricsAvailable is the AND of the two metrics fetches: when either is unavailable,
+// every usage field is null while allocatable, requests, and limits stay populated
+// from the specs, so the Provisioning view still renders without a metrics-server.
+// READ-ONLY.
+export async function getClusterPerformance(context: string): Promise<ClusterPerformance> {
+    const ctx = ["--context", context];
+    const [nodeMetrics, podMetrics, nodesResult, podsResult] = await Promise.all([
+        fetchMetrics(context, "/apis/metrics.k8s.io/v1beta1/nodes"),
+        fetchMetrics(context, "/apis/metrics.k8s.io/v1beta1/pods"),
+        kubectl([...ctx, "get", "nodes", "-o", "json"]),
+        kubectl([...ctx, "get", "pods", "-A", "-o", "json"]),
+    ]);
+    if (nodesResult.exitCode !== 0) {
+        throw new Error(nodesResult.stderr);
+    }
+    if (podsResult.exitCode !== 0) {
+        throw new Error(podsResult.stderr);
+    }
+
+    const metricsAvailable = nodeMetrics.available && podMetrics.available;
+
+    // Index node usage by node name from the NodeMetricsList.
+    const nodeUsageByName = new Map<string, ResourceUsage>();
+    if (metricsAvailable) {
+        for (const item of (nodeMetrics.data?.items ?? []) as any[]) {
+            const name: string = item.metadata?.name ?? "";
+            const usage = item.usage ?? {};
+            nodeUsageByName.set(name, toResourceUsage(usage.cpu, usage.memory));
+        }
+    }
+
+    // Index per-container pod usage by "namespace/name" from the PodMetricsList, so a
+    // pod's usage can be summed across its containers and joined to its spec by key.
+    const podUsageByKey = new Map<string, Map<string, ResourceUsage>>();
+    if (metricsAvailable) {
+        for (const item of (podMetrics.data?.items ?? []) as any[]) {
+            const ns: string = item.metadata?.namespace ?? "";
+            const name: string = item.metadata?.name ?? "";
+            const byContainer = new Map<string, ResourceUsage>();
+            for (const c of (item.containers ?? []) as any[]) {
+                const usage = c.usage ?? {};
+                byContainer.set(c.name, toResourceUsage(usage.cpu, usage.memory));
+            }
+            podUsageByKey.set(`${ns}/${name}`, byContainer);
+        }
+    }
+
+    // Build per-node usage joined with allocatable from node status.
+    const nodes: NodeUsage[] = ((nodesResult.stdout ? JSON.parse(nodesResult.stdout).items : []) as any[])
+        .map((item) => {
+            const name: string = item.metadata?.name ?? "";
+            const alloc = item.status?.allocatable ?? {};
+            return {
+                name,
+                usage: metricsAvailable ? (nodeUsageByName.get(name) ?? NULL_USAGE) : NULL_USAGE,
+                allocatable: toResourceUsage(alloc.cpu, alloc.memory),
+            };
+        });
+
+    // Build per-pod usage joined with requests/limits summed from the spec containers.
+    const pods: PodUsage[] = ((podsResult.stdout ? JSON.parse(podsResult.stdout).items : []) as any[])
+        .map((item) => {
+            const name: string = item.metadata?.name ?? "";
+            const namespace: string = item.metadata?.namespace ?? "";
+            const node: string = item.spec?.nodeName ?? "";
+            const containerUsage = podUsageByKey.get(`${namespace}/${name}`) ?? new Map<string, ResourceUsage>();
+
+            const containers = ((item.spec?.containers ?? []) as any[]).map((c) => {
+                const resources = c.resources ?? {};
+                const requests = resources.requests ?? {};
+                const limits = resources.limits ?? {};
+                const usage = metricsAvailable
+                    ? (containerUsage.get(c.name) ?? NULL_USAGE)
+                    : NULL_USAGE;
+                return {
+                    name: c.name,
+                    usage,
+                    requests: toResourceUsage(requests.cpu, requests.memory),
+                    limits: toResourceUsage(limits.cpu, limits.memory),
+                };
+            });
+
+            const podUsage: ResourceUsage = metricsAvailable
+                ? sumUsage(containers.map((c) => c.usage))
+                : NULL_USAGE;
+
+            return {
+                name,
+                namespace,
+                node,
+                usage: podUsage,
+                requests: sumUsage(containers.map((c) => c.requests)),
+                limits: sumUsage(containers.map((c) => c.limits)),
+                containers,
+            };
+        });
+
+    return {
+        metricsAvailable,
+        nodes,
+        pods,
     };
 }

@@ -23,3 +23,13 @@ clusterRouter.get("/cluster/nodes", async (req, res) => {
     const nodes = await kubectl.listNodes(context);
     res.json({ nodes });
 });
+
+clusterRouter.get("/cluster/performance", async (req, res) => {
+    const context = req.query.context;
+    if (typeof context !== "string" || context.trim() === "") {
+        res.status(400).json({ error: "context query parameter is required" });
+        return;
+    }
+    const performance = await kubectl.getClusterPerformance(context);
+    res.json(performance);
+});

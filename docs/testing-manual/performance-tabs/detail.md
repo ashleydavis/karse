@@ -79,6 +79,26 @@ dev`), the metrics-unavailable path is what the Performance tabs will show on a 
 no usage, but requests/limits from pod specs still render. The per-scope Performance views
 that consume this data are added and screenshotted in the later content tickets.
 
+### Cluster performance endpoint (GET /api/cluster/performance)
+
+The cluster-scoped data source is served by `GET /api/cluster/performance?context=<ctx>`,
+returning `ClusterPerformance` (`metricsAvailable`, `nodes[]`, `pods[]`). Each node carries
+its usage versus allocatable; each pod carries its usage versus summed requests/limits plus
+its containers. With no metrics-server, `metricsAvailable` is `false` and every `usage` field
+is `null` while allocatable/requests/limits stay populated from node status and pod specs.
+
+The smoke suite (`scripts/smoke-tests.sh`) launches the backend with `KARSE_FAKE_METRICS=1`
+(alongside `KARSE_FAKE_LOGS=1` and `KARSE_FAKE_STERN=1`) and asserts this endpoint returns
+`200` with `metricsAvailable: true`, non-empty `nodes` and `pods`, the `fake-node-1` node
+usage joined (non-null), and every pod carrying its join and resource fields. Run it with:
+
+```sh
+bun run smoke
+```
+
+The cluster Performance tab UI that consumes this endpoint is added and screenshotted in the
+later content ticket (`performance-tabs-6`).
+
 Teardown:
 
 ```sh

@@ -25,7 +25,8 @@ The Metrics API reports **CPU in nanocores** and **memory in `Ki`-style quantiti
 the raw strings are normalised by the quantity parsers in `backend/src/kubectl/quantity.ts`:
 
 - `parseCpuToMillicores(quantity)` — `"250m"` → 250, `"1"`/`"1.5"` → 1000/1500, nanocores
-  `"123456789n"` → 123 (floor of nanocores ÷ 1e6), empty string → 0. Throws on a malformed
+  `"123456789n"` → 123 (floor of nanocores ÷ 1e6), decimal-SI core counts `"1k"` → 1,000,000
+  (kwok reports node allocatable CPU this way), empty string → 0. Throws on a malformed
   non-empty value.
 - `parseMemoryToBytes(quantity)` — binary suffixes `Ki/Mi/Gi/Ti/Pi/Ei`, decimal suffixes
   `K/M/G/T/P/E`, plain integer bytes, empty string → 0. Throws on a malformed non-empty

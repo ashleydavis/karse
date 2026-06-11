@@ -1,7 +1,7 @@
 jest.mock("../../kubectl/kubectl-adapter");
 
 import type { Server } from "node:http";
-import type { Node as KubeNode } from "karse-types";
+import type { Node as KubeNode, ClusterPerformance } from "karse-types";
 import { createServer } from "../../server";
 
 // jest.requireMock returns any, so mock methods are accessible without casting.
@@ -31,6 +31,7 @@ afterAll(async () => {
 beforeEach(() => {
     kubectlMocks.getClusterOverview.mockReset();
     kubectlMocks.listNodes.mockReset();
+    kubectlMocks.getClusterPerformance.mockReset();
 });
 
 describe("GET /api/cluster/overview", () => {
@@ -111,6 +112,64 @@ describe("GET /api/cluster/nodes", () => {
         expect(res.status).toBe(500);
         expect(body).toEqual({
             error: "denied",
+        });
+    });
+});
+
+describe("GET /api/cluster/performance", () => {
+    const payload: ClusterPerformance = {
+        metricsAvailable: true,
+        nodes: [
+            {
+                name: "ctrl-0",
+                usage: { cpuMillicores: 850, memoryBytes: 2147483648 },
+                allocatable: { cpuMillicores: 4000, memoryBytes: 8589934592 },
+            },
+        ],
+        pods: [
+            {
+                name: "web",
+                namespace: "default",
+                node: "ctrl-0",
+                usage: { cpuMillicores: 120, memoryBytes: 268435456 },
+                requests: { cpuMillicores: 100, memoryBytes: 134217728 },
+                limits: { cpuMillicores: 500, memoryBytes: 536870912 },
+                containers: [
+                    {
+                        name: "nginx",
+                        usage: { cpuMillicores: 120, memoryBytes: 268435456 },
+                        requests: { cpuMillicores: 100, memoryBytes: 134217728 },
+                        limits: { cpuMillicores: 500, memoryBytes: 536870912 },
+                    },
+                ],
+            },
+        ],
+    };
+
+    test("with ?context forwards it to adapter", async () => {
+        kubectlMocks.getClusterPerformance.mockResolvedValue(payload);
+        const res = await fetch(`http://127.0.0.1:${port}/api/cluster/performance?context=my-ctx`);
+        const body = await res.json();
+        expect(res.status).toBe(200);
+        expect(body).toEqual(payload);
+        expect(kubectlMocks.getClusterPerformance).toHaveBeenCalledWith("my-ctx");
+    });
+
+    test("without ?context returns 400", async () => {
+        const res = await fetch(`http://127.0.0.1:${port}/api/cluster/performance`);
+        const body = await res.json();
+        expect(res.status).toBe(400);
+        expect(body).toEqual({ error: "context query parameter is required" });
+        expect(kubectlMocks.getClusterPerformance).not.toHaveBeenCalled();
+    });
+
+    test("adapter throws returns 500", async () => {
+        kubectlMocks.getClusterPerformance.mockRejectedValue(new Error("unreachable"));
+        const res = await fetch(`http://127.0.0.1:${port}/api/cluster/performance?context=my-ctx`);
+        const body = await res.json();
+        expect(res.status).toBe(500);
+        expect(body).toEqual({
+            error: "unreachable",
         });
     });
 });

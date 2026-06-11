@@ -15,6 +15,7 @@ import {
     podBelongsToWorkload,
     isWorkloadKind,
     getClusterOverview,
+    getClusterPerformance,
     listPods,
     listEvents,
     listClusterErrors,
@@ -2503,5 +2504,211 @@ describe("streamPodLogs", () => {
         handle.stop();
         await new Promise((resolve) => setTimeout(resolve, 0));
         expect(onClose).not.toHaveBeenCalled();
+    });
+});
+
+describe("getClusterPerformance", () => {
+    // Raw Metrics API NodeMetricsList fixture: CPU in nanocores, memory in Ki.
+    const nodeMetricsFixture = {
+        kind: "NodeMetricsList",
+        items: [
+            {
+                metadata: { name: "node-a" },
+                usage: { cpu: "850000000n", memory: "2097152Ki" },
+            },
+            {
+                metadata: { name: "node-b" },
+                usage: { cpu: "1600000000n", memory: "4194304Ki" },
+            },
+        ],
+    };
+
+    // Raw Metrics API PodMetricsList fixture: per-container usage for two pods.
+    const podMetricsFixture = {
+        kind: "PodMetricsList",
+        items: [
+            {
+                metadata: { name: "web", namespace: "default" },
+                containers: [
+                    { name: "nginx", usage: { cpu: "120000000n", memory: "262144Ki" } },
+                    { name: "sidecar", usage: { cpu: "30000000n", memory: "65536Ki" } },
+                ],
+            },
+            {
+                metadata: { name: "api", namespace: "default" },
+                containers: [
+                    { name: "api", usage: { cpu: "300000000n", memory: "524288Ki" } },
+                ],
+            },
+        ],
+    };
+
+    // Node spec fixture carrying allocatable capacity from node status.
+    const nodesFixture = {
+        items: [
+            {
+                metadata: { name: "node-a" },
+                status: { allocatable: { cpu: "4", memory: "8Gi" } },
+            },
+            {
+                metadata: { name: "node-b" },
+                status: { allocatable: { cpu: "8", memory: "16Gi" } },
+            },
+        ],
+    };
+
+    // Pod spec fixture carrying container requests/limits and the scheduling node.
+    const podsFixture = {
+        items: [
+            {
+                metadata: { name: "web", namespace: "default" },
+                spec: {
+                    nodeName: "node-a",
+                    containers: [
+                        {
+                            name: "nginx",
+                            resources: {
+                                requests: { cpu: "100m", memory: "128Mi" },
+                                limits: { cpu: "500m", memory: "256Mi" },
+                            },
+                        },
+                        {
+                            name: "sidecar",
+                            resources: {
+                                requests: { cpu: "50m", memory: "64Mi" },
+                                limits: { cpu: "100m", memory: "128Mi" },
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                metadata: { name: "api", namespace: "default" },
+                spec: {
+                    nodeName: "node-b",
+                    containers: [
+                        {
+                            name: "api",
+                            resources: {
+                                requests: { cpu: "200m", memory: "256Mi" },
+                                limits: { cpu: "1", memory: "512Mi" },
+                            },
+                        },
+                    ],
+                },
+            },
+        ],
+    };
+
+    test("joins node/pod metrics with allocatable and spec requests/limits", async () => {
+        setRunnerHandlers({
+            "--context ctx get --raw /apis/metrics.k8s.io/v1beta1/nodes": () => ok(JSON.stringify(nodeMetricsFixture)),
+            "--context ctx get --raw /apis/metrics.k8s.io/v1beta1/pods": () => ok(JSON.stringify(podMetricsFixture)),
+            "--context ctx get nodes -o json": () => ok(JSON.stringify(nodesFixture)),
+            "--context ctx get pods -A -o json": () => ok(JSON.stringify(podsFixture)),
+        });
+
+        const result = await getClusterPerformance("ctx");
+
+        expect(result.metricsAvailable).toBe(true);
+
+        // Nodes: usage parsed from metrics (nanocores -> millicores, Ki -> bytes),
+        // allocatable parsed from node status (cores -> millicores, Gi -> bytes).
+        expect(result.nodes).toEqual([
+            {
+                name: "node-a",
+                usage: { cpuMillicores: 850, memoryBytes: 2097152 * 1024 },
+                allocatable: { cpuMillicores: 4000, memoryBytes: 8 * 1024 ** 3 },
+            },
+            {
+                name: "node-b",
+                usage: { cpuMillicores: 1600, memoryBytes: 4194304 * 1024 },
+                allocatable: { cpuMillicores: 8000, memoryBytes: 16 * 1024 ** 3 },
+            },
+        ]);
+
+        // web pod: usage summed over nginx + sidecar; requests/limits summed too.
+        const web = result.pods.find((p) => p.name === "web")!;
+        expect(web.namespace).toBe("default");
+        expect(web.node).toBe("node-a");
+        expect(web.usage).toEqual({
+            cpuMillicores: 120 + 30,
+            memoryBytes: (262144 + 65536) * 1024,
+        });
+        expect(web.requests).toEqual({
+            cpuMillicores: 100 + 50,
+            memoryBytes: 128 * 1024 ** 2 + 64 * 1024 ** 2,
+        });
+        expect(web.limits).toEqual({
+            cpuMillicores: 500 + 100,
+            memoryBytes: 256 * 1024 ** 2 + 128 * 1024 ** 2,
+        });
+        expect(web.containers).toHaveLength(2);
+        expect(web.containers[0]).toEqual({
+            name: "nginx",
+            usage: { cpuMillicores: 120, memoryBytes: 262144 * 1024 },
+            requests: { cpuMillicores: 100, memoryBytes: 128 * 1024 ** 2 },
+            limits: { cpuMillicores: 500, memoryBytes: 256 * 1024 ** 2 },
+        });
+
+        // api pod: single container, scheduled on node-b.
+        const api = result.pods.find((p) => p.name === "api")!;
+        expect(api.node).toBe("node-b");
+        expect(api.usage).toEqual({ cpuMillicores: 300, memoryBytes: 524288 * 1024 });
+        expect(api.requests).toEqual({ cpuMillicores: 200, memoryBytes: 256 * 1024 ** 2 });
+        expect(api.limits).toEqual({ cpuMillicores: 1000, memoryBytes: 512 * 1024 ** 2 });
+    });
+
+    test("metrics-API-unavailable -> metricsAvailable false, usage null, requests/limits populated", async () => {
+        setRunnerHandlers({
+            "--context ctx get --raw /apis/metrics.k8s.io/v1beta1/nodes": () =>
+                fail("error: the server could not find the requested resource"),
+            "--context ctx get --raw /apis/metrics.k8s.io/v1beta1/pods": () =>
+                fail("error: the server could not find the requested resource"),
+            "--context ctx get nodes -o json": () => ok(JSON.stringify(nodesFixture)),
+            "--context ctx get pods -A -o json": () => ok(JSON.stringify(podsFixture)),
+        });
+
+        const result = await getClusterPerformance("ctx");
+
+        expect(result.metricsAvailable).toBe(false);
+
+        // Node usage is null, but allocatable is still read from node status.
+        for (const node of result.nodes) {
+            expect(node.usage).toEqual({ cpuMillicores: null, memoryBytes: null });
+        }
+        expect(result.nodes[0]!.allocatable).toEqual({
+            cpuMillicores: 4000,
+            memoryBytes: 8 * 1024 ** 3,
+        });
+
+        // Pod usage is null, but requests/limits are still populated from specs.
+        const web = result.pods.find((p) => p.name === "web")!;
+        expect(web.usage).toEqual({ cpuMillicores: null, memoryBytes: null });
+        expect(web.requests).toEqual({
+            cpuMillicores: 150,
+            memoryBytes: 192 * 1024 ** 2,
+        });
+        expect(web.limits).toEqual({
+            cpuMillicores: 600,
+            memoryBytes: 384 * 1024 ** 2,
+        });
+        for (const container of web.containers) {
+            expect(container.usage).toEqual({ cpuMillicores: null, memoryBytes: null });
+        }
+        expect(web.containers[0]!.requests).toEqual({
+            cpuMillicores: 100,
+            memoryBytes: 128 * 1024 ** 2,
+        });
+    });
+
+    test("throws when the node spec read fails", async () => {
+        setRunnerHandlers({
+            "--context ctx get --raw /apis/metrics.k8s.io/v1beta1/nodes": () => ok(JSON.stringify(nodeMetricsFixture)),
+            "--context ctx get --raw /apis/metrics.k8s.io/v1beta1/pods": () => ok(JSON.stringify(podMetricsFixture)),
+            "--context ctx get nodes -o json": () => fail("forbidden"),
+            "--context ctx get pods -A -o json": () => ok(JSON.stringify(podsFixture)),
+        });
+        await expect(getClusterPerformance("ctx")).rejects.toThrow("forbidden");
     });
 });

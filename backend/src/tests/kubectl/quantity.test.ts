@@ -17,6 +17,14 @@ describe("parseCpuToMillicores", () => {
         expect(parseCpuToMillicores("123456789n")).toBe(123);
     });
 
+    test("parses a decimal-SI k suffix as a core count (kwok allocatable)", () => {
+        expect(parseCpuToMillicores("1k")).toBe(1_000_000);
+    });
+
+    test("parses a decimal-SI M suffix as a core count", () => {
+        expect(parseCpuToMillicores("2M")).toBe(2 * 1000 ** 2 * 1000);
+    });
+
     test("returns 0 for an empty string", () => {
         expect(parseCpuToMillicores("")).toBe(0);
     });

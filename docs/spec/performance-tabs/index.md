@@ -2,7 +2,7 @@
 
 **ID:** performance-tabs
 **Spec:** Draft
-**Implementation:** None
+**Implementation:** Partial
 
 A "Performance" tab on the cluster, node, and pod pages showing point-in-time CPU and
 memory usage scoped to whatever the user is viewing, read from the Kubernetes Metrics

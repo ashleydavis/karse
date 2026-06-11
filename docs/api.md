@@ -118,6 +118,53 @@ curl -fsS http://127.0.0.1:5172/api/cluster/nodes
 }
 ```
 
+## GET /api/cluster/performance
+
+Returns the cluster-scoped performance snapshot for the given context: per-node usage versus allocatable capacity, and per-pod usage versus the pod's summed requests and limits. Backs the cluster Performance tab.
+
+Usage is read from the Kubernetes Metrics API (`/apis/metrics.k8s.io/v1beta1/nodes` and `.../pods`, via `kubectl get --raw`). Allocatable comes from node status; requests and limits come from the pod specs. CPU is normalised to millicores, memory to bytes. The read is a single point-in-time sample (no history).
+
+- **Request query**: `context` (required) — the kubeconfig context name.
+- **Response 200**: `ClusterPerformance` — `{ "metricsAvailable": boolean, "nodes": NodeUsage[], "pods": PodUsage[] }`. Each `NodeUsage` is `{ name, usage, allocatable }`; each `PodUsage` is `{ name, namespace, node, usage, requests, limits, containers[] }`. A `ResourceUsage` is `{ "cpuMillicores": number | null, "memoryBytes": number | null }`.
+- **`metricsAvailable: false`**: on a cluster with no metrics-server, the Metrics API read degrades rather than failing. `metricsAvailable` is then `false`, every `usage` field (node, pod, and container) is `null`, and `allocatable`, `requests`, and `limits` are still populated from node status and pod specs so the provisioning view renders.
+- **Response 400**: `{ "error": "context query parameter is required" }` when `context` is missing or blank.
+- **Response 500**: `{ "error": "<kubectl stderr>" }` when the node or pod spec read fails.
+
+```sh
+curl -fsS 'http://127.0.0.1:5172/api/cluster/performance?context=my-ctx'
+```
+
+```json
+{
+  "metricsAvailable": true,
+  "nodes": [
+    {
+      "name": "node-a",
+      "usage": { "cpuMillicores": 850, "memoryBytes": 2147483648 },
+      "allocatable": { "cpuMillicores": 4000, "memoryBytes": 8589934592 }
+    }
+  ],
+  "pods": [
+    {
+      "name": "web",
+      "namespace": "default",
+      "node": "node-a",
+      "usage": { "cpuMillicores": 150, "memoryBytes": 335544320 },
+      "requests": { "cpuMillicores": 150, "memoryBytes": 201326592 },
+      "limits": { "cpuMillicores": 600, "memoryBytes": 402653184 },
+      "containers": [
+        {
+          "name": "nginx",
+          "usage": { "cpuMillicores": 120, "memoryBytes": 268435456 },
+          "requests": { "cpuMillicores": 100, "memoryBytes": 134217728 },
+          "limits": { "cpuMillicores": 500, "memoryBytes": 268435456 }
+        }
+      ]
+    }
+  ]
+}
+```
+
 ## GET /api/namespaces
 
 Lists all namespaces in the cluster for the given context.

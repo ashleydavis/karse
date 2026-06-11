@@ -145,7 +145,7 @@ echo "--- Starting backend (OS-assigned free port) ---"
 # KARSE_PORT=0 asks the OS for the next free port, avoiding conflicts with any
 # already-running instance. The backend writes the chosen port to KARSE_PORT_FILE.
 : > "$PORT_FILE"
-(cd backend && KARSE_FAKE_LOGS=1 KARSE_FAKE_STERN=1 KARSE_PORT=0 KARSE_PORT_FILE="$PORT_FILE" bun src/index.ts) &
+(cd backend && KARSE_FAKE_LOGS=1 KARSE_FAKE_STERN=1 KARSE_FAKE_METRICS=1 KARSE_PORT=0 KARSE_PORT_FILE="$PORT_FILE" bun src/index.ts) &
 BACKEND_PID=$!
 
 # Wait for the backend to write its actual port, then build the base URL.
@@ -181,6 +181,21 @@ echo "$NODES_RESP" | jq -e 'has("nodes")' > /dev/null
 # Verify mixed node statuses derive correctly: Ready nodes and the NotReady node.
 echo "$NODES_RESP" | jq -e '[.nodes[] | select(.status == "Ready")] | length >= 2' > /dev/null
 echo "$NODES_RESP" | jq -e '.nodes[] | select(.name == "fake-node-notready") | .status == "NotReady"' > /dev/null
+echo "OK"
+
+echo "--- GET /api/cluster/performance ---"
+# KARSE_FAKE_METRICS=1 is set on the backend, so the Metrics API returns canned
+# usage data: metricsAvailable is true and both nodes and pods are non-empty.
+PERF_RESP=$(curl -fsS "$BASE/api/cluster/performance?context=$CURRENT_CTX")
+echo "$PERF_RESP" | jq -e '.metricsAvailable == true' > /dev/null
+echo "$PERF_RESP" | jq -e '(.nodes | type == "array") and (.nodes | length > 0)' > /dev/null
+echo "$PERF_RESP" | jq -e '(.pods | type == "array") and (.pods | length > 0)' > /dev/null
+# The fake metrics include fake-node-1, so its node usage joins and is non-null,
+# with allocatable carried from node status (kwok reports it, so it is non-null too).
+echo "$PERF_RESP" | jq -e '.nodes[] | select(.name == "fake-node-1") | .usage.cpuMillicores != null and .usage.memoryBytes != null and .allocatable.cpuMillicores != null' > /dev/null
+# Every pod carries the join fields (namespace, node) and the resource shapes,
+# whether or not its usage matched a fake-metrics entry.
+echo "$PERF_RESP" | jq -e '.pods | all(has("namespace") and has("node") and (.requests | has("cpuMillicores")) and (.limits | has("cpuMillicores")) and (.usage | has("cpuMillicores")) and (.containers | type == "array"))' > /dev/null
 echo "OK"
 
 echo "--- GET /api/namespaces ---"
