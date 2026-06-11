@@ -1122,6 +1122,179 @@ export function streamPodLogs(
     };
 }
 
+// Deterministic fake Metrics API payloads returned when KARSE_FAKE_METRICS=1 is set.
+// Mirrors the shape of the raw metrics.k8s.io endpoints (a NodeMetricsList for the
+// nodes path and a PodMetricsList for the pods path) so the per-scope adapter methods
+// can parse the fake data exactly as they parse real metrics. The numbers are large
+// enough and varied enough that the treemap and heatmap render with several cells.
+// CPU is reported in nanocores and memory in Ki, matching what the real API returns.
+const FAKE_METRICS = {
+    // Node usage, keyed for the /apis/metrics.k8s.io/v1beta1/nodes raw endpoint.
+    nodes: {
+        kind: "NodeMetricsList",
+        apiVersion: "metrics.k8s.io/v1beta1",
+        items: [
+            {
+                metadata: {
+                    name: "fake-node-1",
+                },
+                usage: {
+                    cpu: "850000000n",
+                    memory: "2097152Ki",
+                },
+            },
+            {
+                metadata: {
+                    name: "fake-node-2",
+                },
+                usage: {
+                    cpu: "1600000000n",
+                    memory: "4194304Ki",
+                },
+            },
+        ],
+    },
+    // Pod (per-container) usage, keyed for the /apis/metrics.k8s.io/v1beta1/pods endpoint.
+    pods: {
+        kind: "PodMetricsList",
+        apiVersion: "metrics.k8s.io/v1beta1",
+        items: [
+            {
+                metadata: {
+                    name: "web",
+                    namespace: "default",
+                },
+                containers: [
+                    {
+                        name: "nginx",
+                        usage: {
+                            cpu: "120000000n",
+                            memory: "262144Ki",
+                        },
+                    },
+                    {
+                        name: "sidecar",
+                        usage: {
+                            cpu: "30000000n",
+                            memory: "65536Ki",
+                        },
+                    },
+                ],
+            },
+            {
+                metadata: {
+                    name: "api",
+                    namespace: "default",
+                },
+                containers: [
+                    {
+                        name: "api",
+                        usage: {
+                            cpu: "300000000n",
+                            memory: "524288Ki",
+                        },
+                    },
+                ],
+            },
+            {
+                metadata: {
+                    name: "worker",
+                    namespace: "jobs",
+                },
+                containers: [
+                    {
+                        name: "worker",
+                        usage: {
+                            cpu: "450000000n",
+                            memory: "393216Ki",
+                        },
+                    },
+                ],
+            },
+            {
+                metadata: {
+                    name: "cache",
+                    namespace: "infra",
+                },
+                containers: [
+                    {
+                        name: "redis",
+                        usage: {
+                            cpu: "75000000n",
+                            memory: "131072Ki",
+                        },
+                    },
+                ],
+            },
+        ],
+    },
+};
+
+// Whether the fake-metrics test mode is enabled (KARSE_FAKE_METRICS=1). When on,
+// fetchMetrics returns the canned FAKE_METRICS payload instead of shelling out to
+// kubectl, so the Performance views can be exercised against clusters with no
+// metrics server (e.g. the kwok clusters used in e2e).
+export function metricsEnabledFake(): boolean {
+    return process.env.KARSE_FAKE_METRICS === "1";
+}
+
+// Result of a metrics fetch: data carries the parsed JSON payload; available is
+// false when the cluster has no Metrics API rather than the call having errored.
+export type MetricsFetchResult = {
+    available: boolean;
+    data: any;
+};
+
+// stderr fragments that signal the Metrics API is simply not installed/available,
+// as opposed to a genuine kubectl failure. Matching any of these degrades the fetch
+// to available:false so the Provisioning view (requests/limits only) still works.
+const METRICS_UNAVAILABLE_MARKERS = [
+    "the server could not find the requested resource",
+    "metrics.k8s.io",
+    "Metrics API not available",
+];
+
+// Selects the canned FAKE_METRICS payload that matches a raw metrics path. The nodes
+// list is returned for the nodes endpoint; the pods list for any pod metrics path
+// (the all-pods list, a namespaced list, or a single pod), which the per-scope methods
+// then filter to the scope they need.
+function fakeMetricsFor(raw: string): any {
+    if (raw.includes("/nodes")) {
+        return FAKE_METRICS.nodes;
+    }
+    return FAKE_METRICS.pods;
+}
+
+// Fetches a raw Metrics API resource via "kubectl get --raw <raw>" and returns its
+// parsed JSON. A non-zero exit whose stderr names the metrics API being unavailable
+// returns { available: false, data: null } rather than throwing, so callers can
+// degrade gracefully on clusters without a metrics server. Any other non-zero exit
+// throws. Under KARSE_FAKE_METRICS=1 the matching canned payload is returned without
+// shelling out. READ-ONLY.
+async function fetchMetrics(context: string, raw: string): Promise<MetricsFetchResult> {
+    if (metricsEnabledFake()) {
+        return {
+            available: true,
+            data: fakeMetricsFor(raw),
+        };
+    }
+    const result = await kubectl(["--context", context, "get", "--raw", raw]);
+    if (result.exitCode !== 0) {
+        const unavailable = METRICS_UNAVAILABLE_MARKERS.some((marker) => result.stderr.includes(marker));
+        if (unavailable) {
+            return {
+                available: false,
+                data: null,
+            };
+        }
+        throw new Error(result.stderr);
+    }
+    return {
+        available: true,
+        data: JSON.parse(result.stdout),
+    };
+}
+
 // Returns aggregate cluster statistics (version + node/namespace/pod counts).
 // Runs four kubectl calls in parallel. The version branch tolerates failures
 // (returns null); the three count branches re-throw on any failure.

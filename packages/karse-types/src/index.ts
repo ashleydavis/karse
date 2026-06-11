@@ -335,6 +335,72 @@ export type NamespaceDetail = {
     limits: NamespaceLimit[];
 };
 
+// A point-in-time resource sample for CPU and memory. Each field is null when the
+// Metrics API is unavailable (usage cannot be read) so requests/limits, which come
+// from pod specs, can still be carried alongside an absent usage reading.
+export type ResourceUsage = {
+    cpuMillicores: number | null;
+    memoryBytes: number | null;
+};
+
+// Per-container usage joined with the container's requests and limits from its
+// pod spec, used by the pod and node Performance tabs.
+export type ContainerUsage = {
+    name: string;
+    usage: ResourceUsage;
+    requests: ResourceUsage;
+    limits: ResourceUsage;
+};
+
+// A single pod's usage, summed from its container usage, joined with the pod's
+// summed requests and limits and its containers. node carries the scheduling node.
+export type PodUsage = {
+    name: string;
+    namespace: string;
+    node: string;
+    usage: ResourceUsage;
+    requests: ResourceUsage;
+    limits: ResourceUsage;
+    containers: ContainerUsage[];
+};
+
+// A single node's usage joined with its allocatable capacity, used to compute the
+// node-utilisation heatmap (usage / allocatable).
+export type NodeUsage = {
+    name: string;
+    usage: ResourceUsage;
+    allocatable: ResourceUsage;
+};
+
+// Cluster-scoped performance snapshot, returned by GET /api/cluster/performance.
+// metricsAvailable is false when the Metrics API is absent; usage fields are then
+// null while requests/limits remain populated from specs.
+export type ClusterPerformance = {
+    metricsAvailable: boolean;
+    nodes: NodeUsage[];
+    pods: PodUsage[];
+};
+
+// Node-scoped performance snapshot, returned by GET /api/nodes/:name/performance.
+// Carries the one node's usage plus the pods scheduled on it.
+export type NodePerformance = {
+    metricsAvailable: boolean;
+    node: NodeUsage;
+    pods: PodUsage[];
+};
+
+// Pod-scoped performance snapshot, returned by GET /api/pods/:namespace/:name/performance.
+// Carries the pod's usage plus its per-container usage versus requests and limits.
+export type PodPerformance = {
+    metricsAvailable: boolean;
+    pod: PodUsage;
+    containers: ContainerUsage[];
+};
+
+// The shared metric-toggle token selecting which resource a Performance view shows.
+// Disk is deliberately excluded: the Metrics API does not report disk usage.
+export type PerformanceMetric = "cpu" | "memory";
+
 // The resource types whose raw YAML can be viewed in the dashboard.
 export type YamlResourceType =
     "nodes" | "pods" | "deployments" | "daemonsets" | "statefulsets" | "namespaces";
