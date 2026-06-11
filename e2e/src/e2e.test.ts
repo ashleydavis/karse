@@ -601,6 +601,53 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Contexts page: empty-state guidance ───────────────────────────────────
+
+    test.describe("contexts page empty state", () => {
+        // A genuinely-empty context list is not reproducible against the live
+        // kwok clusters, so the contexts payload is mocked for these tests.
+        const EMPTY_PAYLOAD = { contexts: [], current: null };
+        const ONE_CONTEXT_PAYLOAD = {
+            contexts: [{ name: "only-context", cluster: "only-cluster", user: "only-user", namespace: null }],
+            current: "only-context",
+        };
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/contexts");
+        });
+
+        test("genuinely-empty state shows EKS and AKS add-a-context commands", async () => {
+            await page.route("**/api/contexts", async (route) => {
+                await route.fulfill({ json: EMPTY_PAYLOAD });
+            });
+            await page.goto("/contexts", { waitUntil: "networkidle" });
+
+            const empty = page.locator("[data-test-id='no-contexts-empty']");
+            await expect(empty).toBeVisible();
+            await expect(empty).toContainText("No contexts found.");
+            await expect(empty).toContainText("reload this page");
+            await expect(empty).toContainText("aws eks update-kubeconfig --name <cluster-name> --region <region>");
+            await expect(empty).toContainText("az aks get-credentials --resource-group <resource-group> --name <cluster-name>");
+            await expect(page.locator("[data-test-id='no-contexts-match']")).toHaveCount(0);
+        });
+
+        test("filtered-empty state shows the search message, not the add-a-context commands", async () => {
+            await page.route("**/api/contexts", async (route) => {
+                await route.fulfill({ json: ONE_CONTEXT_PAYLOAD });
+            });
+            await page.goto("/contexts", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='context-row']")).toHaveCount(1);
+
+            await page.locator("[data-test-id='contexts-search'] input").fill("no-such-context-zzz");
+            const match = page.locator("[data-test-id='no-contexts-match']");
+            await expect(match).toBeVisible();
+            await expect(match).toContainText("No contexts match the search.");
+            await expect(match).not.toContainText("aws eks update-kubeconfig");
+            await expect(page.locator("[data-test-id='no-contexts-empty']")).toHaveCount(0);
+            await page.locator("[data-test-id='contexts-search'] input").fill("");
+        });
+    });
+
     // ── Namespaces page ───────────────────────────────────────────────────────
 
     test.describe("namespaces page", () => {

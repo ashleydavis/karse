@@ -12,6 +12,7 @@ Backed by: `GET /api/contexts`, `POST /api/contexts/current`, `backend/src/route
 - `POST /api/contexts/current` with body `{ name }` runs `kubectl config use-context <name>` and returns the refreshed contexts payload. It responds 400 when `name` is missing/empty/whitespace or starts with `-`, and 500 with kubectl's stderr when kubectl rejects the name.
 - The frontend holds the **active** context in a React Context (`kube-context.tsx`). It is tab-local and resets on reload. Each query key includes the active context, so switching it refetches all views automatically.
 - The contexts page (`/contexts`) lists every context with name, cluster, user, and default namespace, and per row offers "Set as active" (tab-local) and "Set as default" (writes the kubeconfig current-context). An `active` chip marks the tab's active context; a `default` chip marks the kubeconfig current-context.
+- When the kubeconfig has no contexts at all, the contexts page empty state (`no-contexts-empty`) shows brief, display-only guidance: a "No contexts found." heading, a line telling the user to add a context and reload the page, and copy-ready commands for Amazon EKS (`aws eks update-kubeconfig --name <cluster-name> --region <region>`) and Azure AKS (`az aks get-credentials --resource-group <resource-group> --name <cluster-name>`), each labelled with its cloud and rendered in monospace. This is read-only: Karse never runs the commands or shells out to `aws`/`az`. The separate filtered-empty state (`no-contexts-match`, shown when contexts exist but the search hides them all) is unchanged and shows no add-a-context guidance.
 - The header has a dropdown showing the current context and a quick-picker button (link icon, `Ctrl+K`) that opens a searchable dropdown of contexts; selecting one switches the tab's active context.
 - The active context (and namespace) are reflected in the URL query string so a view is shareable.
 
@@ -24,6 +25,7 @@ Backed by: `GET /api/contexts`, `POST /api/contexts/current`, `backend/src/route
 - [x] Switching the active context refetches all context-scoped views.
 - [x] The contexts page can set active and set default per context, with active/default chips.
 - [x] A header dropdown and a `Ctrl+K` quick-picker switch the active context.
+- [x] When there are no contexts at all, the contexts page empty state shows display-only EKS and AKS add-a-context commands plus a reload hint; the filtered-empty state (`no-contexts-match`) is unchanged.
 
 ## Open Questions
 

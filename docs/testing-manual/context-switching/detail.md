@@ -30,7 +30,11 @@ KUBECONFIG=/tmp/karse-no-contexts.yaml bun run dev:test
 
 ### What to check
 - **Header dropdown**: shows "no context" chip with nothing selectable.
-- **Contexts page** (`/contexts`): table is empty.
+- **Contexts page** (`/contexts`): the table body shows the empty-state guidance (`no-contexts-empty`), not a bare "table is empty" message. It must show:
+  - the "No contexts found." heading and a line telling you to add a context and reload the page,
+  - an **Amazon EKS** label with the monospace command `aws eks update-kubeconfig --name <cluster-name> --region <region>`,
+  - an **Azure AKS** label with the monospace command `az aks get-credentials --resource-group <resource-group> --name <cluster-name>`.
+  This guidance is display-only: nothing runs the commands. Check it in both light and dark mode (toggle via the header color-mode button) and on a narrow window (commands wrap, no clipping). The add-a-context guidance shows only when there are zero contexts; the filtered "No contexts match the search." message (with no add-a-context commands) is the separate state seen in Scenario B/C when a search hides all existing rows.
 - **Context quick picker** (link icon or Ctrl+K): "No contexts match" message.
 - **Cluster home page**: shows the "Select a context to see cluster overview." message.
 - **Nodes page**: does not fire a request (no `/api/cluster/nodes` call in the network panel).

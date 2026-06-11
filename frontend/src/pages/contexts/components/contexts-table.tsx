@@ -16,6 +16,7 @@ import {
     TableCell,
     TableContainer,
     Paper,
+    Box,
     Chip,
     TextField,
     Typography,
@@ -26,6 +27,7 @@ import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/fr
 import type { Context } from "karse-types";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
+import { addContextCommands, addContextHeading, addContextIntro } from "../lib/add-context-help";
 
 type Props = {
     contexts: Context[];
@@ -153,9 +155,41 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
                         {rows.length === 0 && contexts.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={columns.length}>
-                                    <Typography color="text.secondary" data-test-id="no-contexts-empty">
-                                        No contexts found.
-                                    </Typography>
+                                    <Box
+                                        data-test-id="no-contexts-empty"
+                                        sx={{ display: "flex", flexDirection: "column", gap: 1.5, py: 1 }}
+                                    >
+                                        <Typography color="text.secondary">
+                                            {addContextHeading}
+                                        </Typography>
+                                        <Typography color="text.secondary" variant="body2">
+                                            {addContextIntro}
+                                        </Typography>
+                                        {addContextCommands.map((cmd) => (
+                                            <Box key={cmd.label} sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                    {cmd.label}
+                                                </Typography>
+                                                <Box
+                                                    component="code"
+                                                    data-test-id="add-context-command"
+                                                    sx={{
+                                                        fontFamily: "monospace",
+                                                        fontSize: "0.85rem",
+                                                        bgcolor: "action.hover",
+                                                        color: "text.primary",
+                                                        px: 1,
+                                                        py: 0.75,
+                                                        borderRadius: 1,
+                                                        whiteSpace: "pre-wrap",
+                                                        wordBreak: "break-all",
+                                                    }}
+                                                >
+                                                    {cmd.command}
+                                                </Box>
+                                            </Box>
+                                        ))}
+                                    </Box>
                                 </TableCell>
                             </TableRow>
                         )}
