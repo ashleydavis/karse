@@ -1,7 +1,7 @@
 # performance-tabs
 
 **Spec:** Draft
-**Implementation:** Partial
+**Implementation:** Complete
 
 The Performance feature adds a per-scope "Performance" tab to the cluster, node, and pod
 pages, showing point-in-time CPU and memory usage in context. This document describes the
@@ -102,8 +102,8 @@ page and its Performance tab, reusing the existing row-navigation pattern.
 
 ## Shared types
 
-The performance types live in `packages/karse-types/src/index.ts` and are consumed by every
-later ticket: `ResourceUsage`, `ContainerUsage`, `PodUsage`, `NodeUsage`,
+The performance types live in `packages/karse-types/src/index.ts` and are consumed across
+the feature: `ResourceUsage`, `ContainerUsage`, `PodUsage`, `NodeUsage`,
 `ClusterPerformance`, `NodePerformance`, `PodPerformance`, and the `PerformanceMetric`
 toggle token. A `ResourceUsage` carries `cpuMillicores` and `memoryBytes`, each `null` when
 usage is unavailable.

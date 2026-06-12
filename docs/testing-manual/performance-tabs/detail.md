@@ -132,8 +132,8 @@ Open `/pods`, click the `web` row, then click the **Performance** tab.
 
 The Performance tabs read point-in-time CPU and memory usage from the Kubernetes Metrics
 API. This data layer (the quantity parsers, the shared types, and the fake-metrics mode)
-underpins every Performance view; the live charts land in later tickets. The pieces that can
-be exercised today:
+underpins every Performance view. With the feature complete, the live charts are in place;
+the data foundation can also be exercised directly:
 
 ### Quantity parsers (backend unit tests)
 
@@ -222,10 +222,10 @@ populated from the specs.
 
 ### Pod performance endpoint (backend)
 
-The pod Performance tab (added in a later ticket) is fed by `GET
+The pod Performance tab is fed by `GET
 /api/pods/:namespace/:name/performance`, which joins each container's point-in-time
 usage with that container's requests/limits from the pod spec. The endpoint can be
-exercised today with `curl` while the pod-tab UI is still pending.
+exercised directly with `curl`, independent of the pod-tab UI.
 
 Start the app with the fake-metrics mode on so usage is populated even though the kwok
 cluster has no metrics-server:
