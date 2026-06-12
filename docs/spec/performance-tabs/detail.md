@@ -110,6 +110,17 @@ inconsistent signal.
 Drilling a treemap leaf, a heatmap cell, or a table row navigates to that resource's detail
 page and its Performance tab, reusing the existing row-navigation pattern.
 
+A treemap leaf drill records its origin (the cluster or node Performance page it came from)
+via the `from` query param, reusing the same origin/breadcrumb mechanism as the All
+resources page (`frontend/src/lib/breadcrumb-trail.ts`, `performanceOrigin`). On the pod
+detail page this origin drives both the breadcrumb trail and the back button: the trail
+shows the Performance page as the origin crumb (e.g. `node-cp > <pod>` or `Cluster > <pod>`)
+and the back button returns to that same Performance page (the node's or cluster's
+Performance tab), not the Pods list, so the two never diverge. A pod reached by the normal
+path (no `from`) still backs to the Pods list. To make the back target reopen the originating
+tab, the cluster home and node detail pages keep their active tab in the `tab` query param
+(matching the pod detail page).
+
 ## Shared types
 
 The performance types live in `packages/karse-types/src/index.ts` and are consumed across

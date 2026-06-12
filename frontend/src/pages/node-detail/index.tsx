@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
     Box,
     Typography,
@@ -85,12 +84,34 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
 // The set of tabs available on the node detail page.
 type NodeDetailTab = "detail" | "pods" | "events" | "labels" | "performance" | "commands" | "yaml";
 
+// Reads the active tab from the URL, falling back to the Detail tab for any missing
+// or unrecognized value so the page always has a valid selection. The tab lives in
+// the URL (matching the pod detail page) so returning to this page from a drill-down
+// can reopen the originating tab, e.g. the Performance tab after a treemap back-nav.
+function parseTab(value: string | null): NodeDetailTab {
+    if (value === "pods" || value === "events" || value === "labels" || value === "performance" || value === "commands" || value === "yaml") {
+        return value;
+    }
+    return "detail";
+}
+
 // Detail page for a single node, organizing its content into Status, Pods, and Events tabs.
 export function NodeDetailPage() {
     const { name } = useParams<{ name: string }>();
     const { current } = useKubeContext();
     const navigate = useShareableNavigate();
-    const [activeTab, setActiveTab] = useState<NodeDetailTab>("detail");
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = parseTab(searchParams.get("tab"));
+
+    // Persists the active tab in the URL so a drill-down can return to it and the
+    // view stays shareable.
+    function setActiveTab(tab: NodeDetailTab): void {
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.set("tab", tab);
+            return next;
+        }, { replace: true });
+    }
 
     const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["node-detail", current, name],

@@ -10,6 +10,7 @@ import { LoadingIndicator } from "../loading-indicator";
 import { LoadError } from "../load-error";
 import { MetricToggle } from "./metric-toggle";
 import { UsageTreemap } from "./usage-treemap";
+import { FROM_CLUSTER_PERFORMANCE } from "../../lib/breadcrumb-trail";
 import { UsageHeatmap } from "./usage-heatmap";
 import { TopConsumersTable } from "./top-consumers-table";
 import { MetricsUnavailable } from "./metrics-unavailable";
@@ -76,7 +77,7 @@ export function ClusterPerformanceTab({ active }: ClusterPerformanceTabProps) {
             {data.metricsAvailable && (
                 <>
                     <Section title="Breakdown">
-                        <UsageTreemap root={treemap} colorByUtilisation />
+                        <UsageTreemap root={treemap} colorByUtilisation origin={FROM_CLUSTER_PERFORMANCE} />
                     </Section>
 
                     <Section title="Hot spots">

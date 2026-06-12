@@ -31,6 +31,7 @@ import { ResourceRef } from "../../components/resource-ref";
 import { PodContainersPanel, PodInitContainersPanel } from "./components/pod-containers-panel";
 import { PodLogsPanel } from "./components/pod-logs-panel";
 import { PodPerformanceTab } from "../../components/performance/pod-performance-tab";
+import { performanceOrigin, PERFORMANCE_TAB } from "../../lib/breadcrumb-trail";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -99,6 +100,21 @@ export function PodDetailPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const activeTab = parseTab(searchParams.get("tab"));
 
+    // The back button returns to wherever the pod was reached from. When it was
+    // drilled into from a Performance treemap (tagged via the "from" param), that is
+    // the originating Performance page, so the back target matches the breadcrumb
+    // origin and the two never diverge; otherwise it falls back to the Pods list.
+    const origin = performanceOrigin(searchParams.get("from"));
+    const backLabel = origin !== null ? origin.crumbLabel : "pods";
+    function goBack(): void {
+        if (origin !== null)
+        {
+            navigate(origin.path, { tab: PERFORMANCE_TAB });
+            return;
+        }
+        navigate("/pods");
+    }
+
     // Persists the active tab in the URL so the breadcrumb can show it and the
     // view stays shareable.
     function selectTab(tab: PodDetailTab): void {
@@ -137,8 +153,8 @@ export function PodDetailPage() {
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <Tooltip title="Back to pods">
-                    <IconButton size="small" onClick={() => navigate("/pods")}>
+                <Tooltip title={`Back to ${backLabel}`}>
+                    <IconButton size="small" onClick={goBack} data-test-id="pod-detail-back">
                         <FontAwesomeIcon icon={faArrowLeft} />
                     </IconButton>
                 </Tooltip>

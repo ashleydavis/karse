@@ -1826,6 +1826,17 @@ test.describe("karse e2e", () => {
             expect(commands).not.toContain("kubectl describe pod nginx-abc -n default");
             await page.locator("[data-test-id='commands-search'] input").fill("");
         });
+
+        test("the back button returns to the Pods list when the pod was reached the normal way", async () => {
+            // Regression for performance-back-nav-1: a pod opened directly (no "from"
+            // origin) backs to the Pods list, the default target.
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-detail-back']")).toBeVisible();
+            await page.locator("[data-test-id='pod-detail-back']").click();
+            await expect(page).toHaveURL(/\/pods(\?|$)/);
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Pods");
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+        });
     });
 
     // ── Labels tab (per-detail-page, single resource's own labels) ──────────────
@@ -5636,6 +5647,27 @@ test.describe("karse e2e", () => {
             await expect(page).toHaveURL(/tab=performance/);
             await expect(page.locator("[data-test-id='pod-tab-performance']")).toBeVisible();
         });
+
+        test("drilling into a pod from the cluster treemap and clicking back returns to the cluster Performance hub", async () => {
+            // performance-back-nav-1: the same back-nav fix applies to the cluster
+            // treemap. Back returns to the cluster Performance hub, not the Pods list,
+            // and the breadcrumb origin agrees.
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='cluster-tab-performance']").click();
+            await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
+            await page
+                .locator("[data-test-id='perf-treemap'] text")
+                .filter({ hasText: /^web$/ })
+                .first()
+                .click({ force: true });
+            await expect(page).toHaveURL(/\/pods\/default\/web/);
+            await expect(page).toHaveURL(/from=cluster-performance/);
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Cluster");
+            await page.locator("[data-test-id='pod-detail-back']").click();
+            await expect(page).toHaveURL(/\/cluster/);
+            await expect(page).toHaveURL(/tab=performance/);
+            await expect(page.locator("[data-test-id='cluster-panel-performance']")).toBeVisible();
+        });
     });
 
     // ── Performance tabs (node) ─────────────────────────────────────────────────
@@ -5672,6 +5704,37 @@ test.describe("karse e2e", () => {
             await expect(
                 page.locator("[data-test-id='perf-metric-cpu']")
             ).toHaveAttribute("aria-pressed", "true");
+        });
+
+        test("drilling into a pod and clicking back returns to this node's Performance page", async () => {
+            // performance-back-nav-1: from the node Performance treemap, click a leaf to
+            // open the pod, then click back. The back button must return to THIS node's
+            // Performance page (not the Pods list), and the breadcrumb origin crumb must
+            // point at the same place, so the trail and the back target agree.
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='node-tab-performance']").click();
+            await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
+            // The node treemap nests namespace -> pod -> container, so only the container
+            // leaves are navigable. The cache pod (infra) has a container named "redis",
+            // a label that appears only as that leaf (not as a parent row), so clicking it
+            // unambiguously drills into the cache pod's Performance tab, tagged
+            // from=node-performance:node-cp. force: the label text sits over the rect that
+            // carries the click handler.
+            await page
+                .locator("[data-test-id='perf-treemap'] text")
+                .filter({ hasText: /^redis$/ })
+                .first()
+                .click({ force: true });
+            await expect(page).toHaveURL(/\/pods\/infra\/cache/);
+            await expect(page).toHaveURL(/from=node-performance%3Anode-cp/);
+            // The breadcrumb origin crumb shows the node, not the Pods trail.
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("node-cp");
+            // Click back: it returns to node-cp's Performance tab, not the Pods list.
+            await expect(page.locator("[data-test-id='pod-detail-back']")).toBeVisible();
+            await page.locator("[data-test-id='pod-detail-back']").click();
+            await expect(page).toHaveURL(/\/nodes\/node-cp/);
+            await expect(page).toHaveURL(/tab=performance/);
+            await expect(page.locator("[data-test-id='node-panel-performance']")).toBeVisible();
         });
 
         test("Provisioning subtab: search narrows the rows", async () => {

@@ -1,4 +1,4 @@
-import { middleTruncate, collapseCrumbs, originCrumbs, tabLabel, POD_TAB_LABELS, CONTAINER_TAB_LABELS, FROM_ALL_RESOURCES, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../../lib/breadcrumb-trail";
+import { middleTruncate, collapseCrumbs, originCrumbs, performanceOrigin, tabLabel, POD_TAB_LABELS, CONTAINER_TAB_LABELS, FROM_ALL_RESOURCES, FROM_CLUSTER_PERFORMANCE, FROM_NODE_PERFORMANCE, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../../lib/breadcrumb-trail";
 import type { Crumb } from "../../lib/breadcrumb-trail";
 
 describe("middleTruncate", () => {
@@ -163,5 +163,68 @@ describe("originCrumbs", () => {
     test("returns null when the name is missing or empty", () => {
         expect(originCrumbs(FROM_ALL_RESOURCES, "Pod", null)).toBeNull();
         expect(originCrumbs(FROM_ALL_RESOURCES, "Pod", "")).toBeNull();
+    });
+
+    test("builds a node Performance origin trail linking back to that node's Performance tab", () => {
+        // A pod drilled into from a node's Performance treemap shows the node as the
+        // origin crumb; the crumb links to the node's Performance tab (so the trail
+        // and the back button agree) and the pod is the current leaf.
+        const result = originCrumbs(`${FROM_NODE_PERFORMANCE}:node-cp`, "Pod", "web-abc");
+        expect(result).toEqual([
+            { label: "node-cp", to: "/nodes/node-cp?tab=performance" },
+            { label: "web-abc" },
+        ]);
+    });
+
+    test("builds a cluster Performance origin trail linking back to the cluster Performance tab", () => {
+        const result = originCrumbs(FROM_CLUSTER_PERFORMANCE, "Pod", "web-abc");
+        expect(result).toEqual([
+            { label: "Cluster", to: "/cluster?tab=performance" },
+            { label: "web-abc" },
+        ]);
+    });
+
+    test("builds a Performance origin trail even when the kind is unknown (treemap links only pods)", () => {
+        // Unlike the All resources origin, the Performance origin does not need a kind:
+        // the treemap only ever drills into pods, so a missing kind must not suppress it.
+        const result = originCrumbs(FROM_CLUSTER_PERFORMANCE, null, "web-abc");
+        expect(result).not.toBeNull();
+        expect(result![0].label).toBe("Cluster");
+    });
+});
+
+describe("performanceOrigin", () => {
+    test("resolves the cluster Performance origin to the cluster hub's Performance tab", () => {
+        expect(performanceOrigin(FROM_CLUSTER_PERFORMANCE)).toEqual({
+            path: "/cluster",
+            backTo: "/cluster?tab=performance",
+            crumbLabel: "Cluster",
+        });
+    });
+
+    test("resolves a node Performance origin to that node's Performance tab", () => {
+        expect(performanceOrigin(`${FROM_NODE_PERFORMANCE}:node-cp`)).toEqual({
+            path: "/nodes/node-cp",
+            backTo: "/nodes/node-cp?tab=performance",
+            crumbLabel: "node-cp",
+        });
+    });
+
+    test("middle-truncates a long node name in the crumb label but not in the path", () => {
+        const name = "really-long-node-name-that-exceeds-the-breadcrumb-limit-0123456789";
+        const result = performanceOrigin(`${FROM_NODE_PERFORMANCE}:${name}`);
+        expect(result!.path).toBe(`/nodes/${name}`);
+        expect(result!.crumbLabel).toContain("...");
+        expect(result!.crumbLabel.length).toBe(MAX_NAME_LENGTH);
+    });
+
+    test("returns null for a non-Performance 'from' so the normal Pods back target is used", () => {
+        expect(performanceOrigin(null)).toBeNull();
+        expect(performanceOrigin(FROM_ALL_RESOURCES)).toBeNull();
+        expect(performanceOrigin("somewhere-else")).toBeNull();
+    });
+
+    test("returns null when a node origin carries no node name", () => {
+        expect(performanceOrigin(`${FROM_NODE_PERFORMANCE}:`)).toBeNull();
     });
 });

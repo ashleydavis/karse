@@ -59,7 +59,7 @@ KARSE_FAKE_METRICS=1 bun run dev
 Open `/cluster`, click the **Performance** tab.
 
 - A **CPU / Memory** toggle shows at the top, with **CPU** selected by default.
-- **Breakdown** (treemap): rectangles for the seeded pods, grouped by node then namespace, sized by usage. Rectangles are coloured green/amber/red by utilisation. Click a rectangle for a pod (e.g. `web`): the app navigates to `/pods/default/web?tab=performance` and the pod's Performance tab is selected.
+- **Breakdown** (treemap): rectangles for the seeded pods, grouped by node then namespace, sized by usage. Rectangles are coloured green/amber/red by utilisation. Click a rectangle for a pod (e.g. `web`): the app navigates to `/pods/default/web?tab=performance` and the pod's Performance tab is selected. The breadcrumb trail now reads `Cluster > web` (the cluster hub is the origin), and the **back button** (left of the pod name) returns to the cluster **Performance** tab, not the Pods list.
 - **Hot spots** (heatmap): a row per node with `cpu%` and `mem%` cells. Click a cell: the app navigates to that node's detail page on its Performance tab.
 - **Top consumers** (table): the pods ranked by the selected metric's usage. Click the **Usage** header to reverse the order. Click a row: the app navigates to that pod's Performance tab.
 - Toggle to **Memory**: every view re-derives from memory usage (the Top consumers usage column switches to `Mi`/`Gi` figures, the treemap rectangles re-size).
@@ -94,7 +94,7 @@ Open `/nodes`, click the `<node>` row, then click the **Performance** tab.
 
 - A **CPU / Memory** toggle shows at the top, with **CPU** selected by default.
 - The tab is split into two **subtabs**: **Breakdown** (shown first) and **Provisioning**.
-- **Breakdown subtab** (treemap): rectangles for the node's containers, grouped by namespace then pod, sized by the container's usage and coloured green/amber/red by utilisation. Click a rectangle: the app navigates to that pod's detail page on its Performance tab.
+- **Breakdown subtab** (treemap): rectangles for the node's containers, grouped by namespace then pod, sized by the container's usage and coloured green/amber/red by utilisation. Click a rectangle: the app navigates to that pod's detail page on its Performance tab. The breadcrumb trail reads `<node> > <pod>` (the node is the origin), and the **back button** (left of the pod name) returns to **this node's Performance tab**, not the Pods list. (Regression check for performance-back-nav-1: before the fix the back button always returned to the Pods page.) A pod opened the normal way from the Pods list still backs to the Pods list.
 - Click the **Provisioning** subtab. It shows a **table**, one row per container scheduled on the node, each row showing three overlaid bars (**Usage**, **Request**, **Limit**) on a shared per-row scale with the formatted figures alongside. Confirm:
   - **Search:** type part of a container/pod name into the **Search containers...** box. Only the matching rows remain; clear it and all rows return.
   - **Sort:** click a column header (e.g. **Usage**). The rows reorder by that column; click again to reverse.

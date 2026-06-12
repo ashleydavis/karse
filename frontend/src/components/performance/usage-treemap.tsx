@@ -21,14 +21,18 @@ function leafColor(utilisation: number | null | undefined): string {
 
 // Wraps nivo's ResponsiveTreeMap to render the Breakdown view. Leaves are coloured by
 // utilisation when colorByUtilisation is set; clicking a leaf navigates to that pod's
-// detail page (its Performance tab). Interior nodes (nodes/namespaces) are not
-// navigable. The chart needs an explicit height because its parent is flex/auto-sized.
+// detail page (its Performance tab), tagging it with `origin` (a "from" value) so the
+// pod page's breadcrumb and back button return here rather than to the Pods list.
+// Interior nodes (nodes/namespaces) are not navigable. The chart needs an explicit
+// height because its parent is flex/auto-sized.
 export function UsageTreemap({
     root,
     colorByUtilisation,
+    origin,
 }: {
     root: TreemapNode;
     colorByUtilisation: boolean;
+    origin: string;
 }) {
     const navigate = useShareableNavigate();
     const muiTheme = useTheme();
@@ -82,6 +86,7 @@ export function UsageTreemap({
                     if (data.podNamespace && data.podName) {
                         navigate(`/pods/${data.podNamespace}/${data.podName}`, {
                             tab: "performance",
+                            from: origin,
                         });
                     }
                 }}

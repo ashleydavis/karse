@@ -9,6 +9,7 @@ import { LoadingIndicator } from "../loading-indicator";
 import { LoadError } from "../load-error";
 import { MetricToggle } from "./metric-toggle";
 import { UsageTreemap } from "./usage-treemap";
+import { FROM_NODE_PERFORMANCE } from "../../lib/breadcrumb-trail";
 import { ProvisioningTable } from "./provisioning-table";
 import { MetricsUnavailable } from "./metrics-unavailable";
 
@@ -93,7 +94,7 @@ export function NodePerformanceTab({ nodeName, active }: NodePerformanceTabProps
                 <Box data-test-id="perf-node-panel-breakdown">
                     {data.metricsAvailable ? (
                         <Section title="Breakdown">
-                            <UsageTreemap root={treemap} colorByUtilisation />
+                            <UsageTreemap root={treemap} colorByUtilisation origin={`${FROM_NODE_PERFORMANCE}:${nodeName}`} />
                         </Section>
                     ) : (
                         <Typography color="text.secondary" data-test-id="perf-node-breakdown-unavailable">
