@@ -64,6 +64,9 @@ Open `/cluster`, click the **Performance** tab.
 - **Top consumers** (table): the pods ranked by the selected metric's usage. Click the **Usage** header to reverse the order. Click a row: the app navigates to that pod's Performance tab.
 - Toggle to **Memory**: every view re-derives from memory usage (the Top consumers usage column switches to `Mi`/`Gi` figures, the treemap rectangles re-size).
 
+### Microcore (`u`) CPU usage
+- The fake metrics report several CPU usages in the microcore (`u`) form the real Metrics API can return, including the exact `398u` value from the field report (the `sidecar` container of the `web` pod). Confirm the cluster Performance tab still loads fully (treemap, heatmap, Top consumers) with **no** "Could not load data / invalid CPU quantity: 398u" error. This is the regression the microcore parse fix addresses.
+
 ### Metrics-unavailable path
 - Stop the app and restart it **without** `KARSE_FAKE_METRICS` (plain `bun run dev`).
 - Open `/cluster` → **Performance**. Because the kwok cluster has no metrics-server, the views are replaced by an information notice (the "Metrics API is not available" alert), confirming the page degrades cleanly rather than erroring.

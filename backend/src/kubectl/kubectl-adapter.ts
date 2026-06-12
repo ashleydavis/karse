@@ -1130,7 +1130,11 @@ export function streamPodLogs(
 // nodes path and a PodMetricsList for the pods path) so the per-scope adapter methods
 // can parse the fake data exactly as they parse real metrics. The numbers are large
 // enough and varied enough that the treemap and heatmap render with several cells.
-// CPU is reported in nanocores and memory in Ki, matching what the real API returns.
+// CPU is reported as the Metrics API returns it: a mix of nanocore ("n") and microcore
+// ("u") suffixes (1 millicore = 1e6 nanocores = 1000 microcores), and memory in Ki. The
+// microcore entries (e.g. "850000u" = 850m, and the "398u" container from the field
+// report) keep the cluster Performance views exercising the microcore parse path that
+// previously broke the page with "invalid CPU quantity: 398u".
 const FAKE_METRICS = {
     // Node usage, keyed for the /apis/metrics.k8s.io/v1beta1/nodes raw endpoint.
     nodes: {
@@ -1142,7 +1146,8 @@ const FAKE_METRICS = {
                     name: "fake-node-1",
                 },
                 usage: {
-                    cpu: "850000000n",
+                    // Microcore form (850000u = 850m), as the Metrics API can report.
+                    cpu: "850000u",
                     memory: "2097152Ki",
                 },
             },
@@ -1171,14 +1176,17 @@ const FAKE_METRICS = {
                     {
                         name: "nginx",
                         usage: {
-                            cpu: "120000000n",
+                            // Microcore form (120000u = 120m).
+                            cpu: "120000u",
                             memory: "262144Ki",
                         },
                     },
                     {
                         name: "sidecar",
                         usage: {
-                            cpu: "30000000n",
+                            // The exact microcore value from the field report ("398u"),
+                            // which previously broke the cluster Performance page.
+                            cpu: "398u",
                             memory: "65536Ki",
                         },
                     },

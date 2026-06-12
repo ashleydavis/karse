@@ -3107,9 +3107,11 @@ describe("getPodPerformance", () => {
         const result = await getPodPerformance("ctx", "default", "web");
 
         expect(result.metricsAvailable).toBe(true);
-        // The fake pod-metrics payload has a "web" pod with nginx + sidecar usage,
-        // which joins to the spec's containers.
-        expect(result.pod.usage.cpuMillicores).toBe(150);
+        // The fake pod-metrics payload has a "web" pod whose CPU usages are in the
+        // microcore ("u") form the Metrics API can return: nginx "120000u" (120m) and
+        // sidecar "398u" (0m after flooring 398/1000). The summed pod usage is 120m,
+        // which also proves the microcore parse path runs without throwing.
+        expect(result.pod.usage.cpuMillicores).toBe(120);
         expect(result.containers.map((c) => c.name)).toEqual(["nginx", "sidecar"]);
     });
 

@@ -5567,6 +5567,17 @@ test.describe("karse e2e", () => {
             expect(rowCount).toBeGreaterThanOrEqual(4);
         });
 
+        test("loads on microcore (u-suffixed) CPU usage without an error", async () => {
+            // The fake Metrics API reports several CPU usages in the microcore ("u")
+            // form, including the exact "398u" value from the field report. Before the
+            // parser handled "u", that value fell through to a throw and the page showed
+            // "Could not load data / invalid CPU quantity: 398u". Confirm the charts
+            // rendered (above) and that neither error string is present.
+            await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
+            await expect(page.getByText("invalid CPU quantity")).toHaveCount(0);
+            await expect(page.getByText("Could not load data")).toHaveCount(0);
+        });
+
         test("the metric toggle is present with CPU selected by default", async () => {
             await expect(page.locator("[data-test-id='perf-metric-toggle']")).toBeVisible();
             await expect(
