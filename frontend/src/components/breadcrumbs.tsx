@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { collapseCrumbs, middleTruncate, originCrumbs, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../lib/breadcrumb-trail";
+import { collapseCrumbs, middleTruncate, originCrumbs, tabLabel, POD_TAB_LABELS, CONTAINER_TAB_LABELS, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../lib/breadcrumb-trail";
 import type { Crumb } from "../lib/breadcrumb-trail";
 import { useKubeContext } from "../lib/kube-context";
 import { fetchEvents } from "../lib/api-client";
@@ -37,24 +37,6 @@ const ORIGIN_KIND_LABELS: Record<string, string> = {
     daemonsets: "DaemonSet",
 };
 
-// Maps a pod detail tab value (from the "tab" query param) to its display label,
-// so the breadcrumb trail reflects the currently selected sub tab.
-const POD_TAB_LABELS: Record<string, string> = {
-    detail: "Status",
-    containers: "Containers",
-    "init-containers": "Init Containers",
-    logs: "Logs",
-};
-
-// Maps a container detail tab value (from the "tab" query param) to its display
-// label, so the breadcrumb trail reflects the currently selected container sub tab.
-const CONTAINER_TAB_LABELS: Record<string, string> = {
-    detail: "Status",
-    logs: "Logs",
-    commands: "Commands",
-    yaml: "YAML",
-};
-
 // Builds the breadcrumb trail from the current pathname, route params, and the
 // active sub tab (the "tab" query param, used by resources that have sub tabs).
 function buildCrumbs(
@@ -76,25 +58,23 @@ function buildCrumbs(
     // Pods > <namespace> > <name> > <container> > <tab>
     if (root === "pods" && params.namespace && params.name && params.container)
     {
-        const tabLabel = CONTAINER_TAB_LABELS[tab ?? "detail"] ?? CONTAINER_TAB_LABELS.detail;
         return [
             { label: "Pods", to: "/pods" },
             { label: params.namespace },
             { label: params.name, to: `/pods/${params.namespace}/${params.name}` },
             { label: params.container, to: `/pods/${params.namespace}/${params.name}/containers/${params.container}` },
-            { label: tabLabel },
+            { label: tabLabel(CONTAINER_TAB_LABELS, tab) },
         ];
     }
 
     // Pod detail: /pods/:namespace/:name -> Pods > <namespace> > <name> > <tab>
     if (root === "pods" && params.namespace && params.name)
     {
-        const tabLabel = POD_TAB_LABELS[tab ?? "detail"] ?? POD_TAB_LABELS.detail;
         return [
             { label: "Pods", to: "/pods" },
             { label: middleTruncate(params.namespace, MAX_NAME_LENGTH) },
             { label: middleTruncate(params.name, MAX_NAME_LENGTH), to: `/pods/${params.namespace}/${params.name}` },
-            { label: tabLabel },
+            { label: tabLabel(POD_TAB_LABELS, tab) },
         ];
     }
 

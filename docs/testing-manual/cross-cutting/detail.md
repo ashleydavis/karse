@@ -42,7 +42,7 @@ A node and a pod. Exercises the breadcrumb trail in the top navbar and confirms 
 
 ### Pod detail page
 - Navigate to `/pods` and click the `web` row. Confirm the breadcrumb trail shows "Pods > default > web > Status", with "Pods" in large title-sized text.
-- Switch to the Containers and Logs tabs. Confirm the last crumb updates to "Containers" then "Logs", matching the selected sub tab.
+- Switch to the Containers, Performance, and Logs tabs. Confirm the last crumb updates to "Containers", then "Performance", then "Logs", matching the selected sub tab. Every pod tab (Status, Containers, Init Containers, Labels, Performance, Logs, Commands, YAML) has its own crumb label.
 - Confirm "Pods" and the pod name ("web") are clickable links, while the namespace ("default") and the current sub-tab crumbs are not links.
 - Click the "Pods" breadcrumb. Confirm the browser navigates back to `/pods` and the trail collapses to a single "Pods" crumb.
 

@@ -3379,6 +3379,17 @@ test.describe("karse e2e", () => {
             expect(items).toEqual(["Pods", "default", "nginx-abc", "Logs"]);
         });
 
+        test("the sub-tab breadcrumb reads Performance on the pod Performance tab", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-performance']").click();
+            await expect(page).toHaveURL(/tab=performance/);
+            // Regression: this leaf crumb used to read "Status" for every tab the
+            // breadcrumb label map omitted (including Performance).
+            await expect(page.locator("[data-test-id='breadcrumb-item']").last()).toHaveText("Performance");
+            const items = await page.locator("[data-test-id='breadcrumb-item']").allTextContents();
+            expect(items).toEqual(["Pods", "default", "nginx-abc", "Performance"]);
+        });
+
         test("clicking the Pods breadcrumb navigates back to the pods list", async () => {
             await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='breadcrumb-item']").filter({ hasText: "Pods" }).click();

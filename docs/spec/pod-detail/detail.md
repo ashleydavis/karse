@@ -14,6 +14,7 @@ Backed by: `GET /api/pods/:namespace/:name`, `backend/src/routes/pod-detail-rout
 - The page shows pod metadata, the containers and init containers panel, the events list, and an embedded log viewer (see `log-viewer`). It offers guided commands for the pod (see `guided-commands`) and a raw-YAML view (see `yaml-viewer`).
 - The pod's own labels are shown on a Labels tab as a searchable, sortable Key / Value table (see `labels-tab`), not inline on the Status tab.
 - Each row in the Containers and Init Containers tables is clickable and drills down to that container's detail page (see `container-detail`).
+- The active tab is stored in the `tab` query param (so the view is shareable), and the breadcrumb trail's trailing crumb reflects it: `Pods > <namespace> > <name> > <tab label>`. Every tab has its own crumb label (Status, Containers, Init Containers, Labels, Performance, Logs, Commands, YAML).
 
 ## Acceptance Criteria
 
@@ -22,6 +23,7 @@ Backed by: `GET /api/pods/:namespace/:name`, `backend/src/routes/pod-detail-rout
 - [x] Events are fetched via the involvedObject field selector and degrade to empty on failure.
 - [x] The page embeds the log viewer for the pod's containers.
 - [x] The page offers guided commands and a raw-YAML view for the pod.
+- [x] The breadcrumb's trailing crumb reflects the active tab (its own label per tab), not a fixed "Status".
 
 ## Open Questions
 

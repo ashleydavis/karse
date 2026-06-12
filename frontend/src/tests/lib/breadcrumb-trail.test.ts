@@ -1,4 +1,4 @@
-import { middleTruncate, collapseCrumbs, originCrumbs, FROM_ALL_RESOURCES, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../../lib/breadcrumb-trail";
+import { middleTruncate, collapseCrumbs, originCrumbs, tabLabel, POD_TAB_LABELS, CONTAINER_TAB_LABELS, FROM_ALL_RESOURCES, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../../lib/breadcrumb-trail";
 import type { Crumb } from "../../lib/breadcrumb-trail";
 
 describe("middleTruncate", () => {
@@ -84,6 +84,37 @@ describe("breadcrumb constants", () => {
 
     test("the name length limit is twenty-four", () => {
         expect(MAX_NAME_LENGTH).toBe(24);
+    });
+});
+
+describe("tabLabel", () => {
+    test("resolves the active pod tab to its label", () => {
+        expect(tabLabel(POD_TAB_LABELS, "performance")).toBe("Performance");
+        expect(tabLabel(POD_TAB_LABELS, "containers")).toBe("Containers");
+        expect(tabLabel(POD_TAB_LABELS, "init-containers")).toBe("Init Containers");
+        expect(tabLabel(POD_TAB_LABELS, "labels")).toBe("Labels");
+        expect(tabLabel(POD_TAB_LABELS, "logs")).toBe("Logs");
+        expect(tabLabel(POD_TAB_LABELS, "commands")).toBe("Commands");
+        expect(tabLabel(POD_TAB_LABELS, "yaml")).toBe("YAML");
+    });
+
+    test("falls back to the Status (detail) label for a missing or unknown tab", () => {
+        expect(tabLabel(POD_TAB_LABELS, null)).toBe("Status");
+        expect(tabLabel(POD_TAB_LABELS, "detail")).toBe("Status");
+        expect(tabLabel(POD_TAB_LABELS, "does-not-exist")).toBe("Status");
+    });
+
+    test("does not read 'Status' for the Performance tab (regression: hard-coded Status)", () => {
+        // The pod breadcrumb used to show "Status" for every non-stub tab because
+        // its label map omitted them; the Performance tab must read "Performance".
+        expect(tabLabel(POD_TAB_LABELS, "performance")).not.toBe("Status");
+    });
+
+    test("covers every tab the container detail page exposes", () => {
+        expect(tabLabel(CONTAINER_TAB_LABELS, "logs")).toBe("Logs");
+        expect(tabLabel(CONTAINER_TAB_LABELS, "commands")).toBe("Commands");
+        expect(tabLabel(CONTAINER_TAB_LABELS, "yaml")).toBe("YAML");
+        expect(tabLabel(CONTAINER_TAB_LABELS, null)).toBe("Status");
     });
 });
 

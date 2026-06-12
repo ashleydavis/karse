@@ -53,6 +53,38 @@ export function collapseCrumbs(crumbs: Crumb[], maxItems: number): Crumb[] {
     ];
 }
 
+// Maps a pod detail tab value (from the "tab" query param) to its breadcrumb
+// display label, so the trail reflects the currently selected sub tab. Every tab
+// the pod detail page renders must appear here; a missing entry would silently
+// fall back to the Detail label and show the wrong (stale) crumb.
+export const POD_TAB_LABELS: Record<string, string> = {
+    detail: "Status",
+    containers: "Containers",
+    "init-containers": "Init Containers",
+    labels: "Labels",
+    performance: "Performance",
+    logs: "Logs",
+    commands: "Commands",
+    yaml: "YAML",
+};
+
+// Maps a container detail tab value (from the "tab" query param) to its
+// breadcrumb display label. Every tab the container detail page renders must
+// appear here, for the same reason as POD_TAB_LABELS.
+export const CONTAINER_TAB_LABELS: Record<string, string> = {
+    detail: "Status",
+    logs: "Logs",
+    commands: "Commands",
+    yaml: "YAML",
+};
+
+// Resolves a "tab" query-param value to its breadcrumb label using the given
+// tab-label map, falling back to the Detail label (the default tab) for a
+// missing or unrecognised value, so the leaf crumb always has a label.
+export function tabLabel(labels: Record<string, string>, tab: string | null): string {
+    return labels[tab ?? "detail"] ?? labels.detail;
+}
+
 // The "from" value the All resources page tags its row links with, so a detail
 // page reached from that page can show it as the breadcrumb origin.
 export const FROM_ALL_RESOURCES = "all-resources";
