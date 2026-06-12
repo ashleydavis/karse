@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Box, Paper, Typography } from "@mui/material";
+import { Box, Paper, Tab, Tabs, Typography } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import type { PerformanceMetric } from "karse-types";
 import { useKubeContext } from "../../lib/kube-context";
@@ -9,7 +9,7 @@ import { LoadingIndicator } from "../loading-indicator";
 import { LoadError } from "../load-error";
 import { MetricToggle } from "./metric-toggle";
 import { UsageTreemap } from "./usage-treemap";
-import { ProvisioningBars } from "./provisioning-bars";
+import { ProvisioningTable } from "./provisioning-table";
 import { MetricsUnavailable } from "./metrics-unavailable";
 
 // Props for the node Performance tab. `active` is true only when this tab is the
@@ -20,8 +20,12 @@ type NodePerformanceTabProps = {
     active: boolean;
 };
 
-// A titled section wrapping one of the node views (Breakdown / Provisioning), matching
-// the cluster hub's panel layout so the two read consistently.
+// The two subtabs of the node Performance view. Breakdown is the usage treemap;
+// Provisioning is the searchable/sortable/filterable per-container table.
+type NodePerformanceSubtab = "breakdown" | "provisioning";
+
+// A titled section wrapping one of the node views, matching the cluster hub's panel
+// layout so the two read consistently.
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
     return (
         <Paper variant="outlined" sx={{ p: 2 }}>
@@ -33,16 +37,18 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     );
 }
 
-// The node Performance view: a CPU/Memory toggle over a node-scoped Breakdown treemap
-// (namespace → pod → container) and a Provisioning view (per-container usage vs request
-// vs limit bars) for the pods scheduled on this node. Data comes from
-// GET /nodes/:name/performance, fetched lazily when the tab is active. The provisioning
-// bars render even with no Metrics API (requests/limits come from specs); when usage is
-// unavailable the MetricsUnavailable alert is shown above the bars and the treemap is
-// hidden (it has no usage to size by).
+// The node Performance view: a CPU/Memory toggle over two subtabs. The Breakdown
+// subtab is a node-scoped treemap (namespace → pod → container); the Provisioning
+// subtab is the per-container usage/request/limit table (searchable, sortable, and
+// filterable by the shared Logs Pod filter) for the pods scheduled on this node.
+// Data comes from GET /nodes/:name/performance, fetched lazily when the tab is
+// active. The provisioning rows render even with no Metrics API (requests/limits
+// come from specs); when usage is unavailable the MetricsUnavailable alert is shown
+// and the Breakdown treemap is hidden (it has no usage to size by).
 export function NodePerformanceTab({ nodeName, active }: NodePerformanceTabProps) {
     const { current } = useKubeContext();
     const [metric, setMetric] = useState<PerformanceMetric>("cpu");
+    const [subtab, setSubtab] = useState<NodePerformanceSubtab>("breakdown");
 
     const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["node-performance", current, nodeName],
@@ -72,15 +78,39 @@ export function NodePerformanceTab({ nodeName, active }: NodePerformanceTabProps
 
             {!data.metricsAvailable && <MetricsUnavailable />}
 
-            {data.metricsAvailable && (
-                <Section title="Breakdown">
-                    <UsageTreemap root={treemap} colorByUtilisation />
-                </Section>
+            <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+                <Tabs
+                    value={subtab}
+                    onChange={(_, value) => setSubtab(value)}
+                    data-test-id="perf-node-subtabs"
+                >
+                    <Tab label="Breakdown" value="breakdown" data-test-id="perf-node-subtab-breakdown" />
+                    <Tab label="Provisioning" value="provisioning" data-test-id="perf-node-subtab-provisioning" />
+                </Tabs>
+            </Box>
+
+            {subtab === "breakdown" && (
+                <Box data-test-id="perf-node-panel-breakdown">
+                    {data.metricsAvailable ? (
+                        <Section title="Breakdown">
+                            <UsageTreemap root={treemap} colorByUtilisation />
+                        </Section>
+                    ) : (
+                        <Typography color="text.secondary" data-test-id="perf-node-breakdown-unavailable">
+                            The Breakdown treemap needs live usage from the Metrics API, which is
+                            unavailable. Use the Provisioning subtab to see requests and limits.
+                        </Typography>
+                    )}
+                </Box>
             )}
 
-            <Section title="Provisioning">
-                <ProvisioningBars pods={data.pods} metric={metric} />
-            </Section>
+            {subtab === "provisioning" && (
+                <Box data-test-id="perf-node-panel-provisioning">
+                    <Section title="Provisioning">
+                        <ProvisioningTable pods={data.pods} metric={metric} />
+                    </Section>
+                </Box>
+            )}
         </Box>
     );
 }

@@ -121,12 +121,17 @@ Click a column header to sort; type in the search box to filter rows. Use the **
 
 ### Node detail Performance tab
 
-A node's detail page has a **Performance** tab showing the node's point-in-time CPU and memory usage, scoped to that one node. A **CPU / Memory** toggle at the top selects which metric the views show (CPU by default). The tab has two views:
+A node's detail page has a **Performance** tab showing the node's point-in-time CPU and memory usage, scoped to that one node. A **CPU / Memory** toggle at the top selects which metric the views show (CPU by default). The tab is split into two **subtabs** (Breakdown is shown first):
 
 - **Breakdown** (treemap): the node's usage broken down namespace → pod → container, each rectangle sized by the container's usage for the selected metric and coloured green→amber→red by how close it is to its limit. Click a rectangle to open the owning pod's detail page on its Performance tab.
-- **Provisioning** (bars): one row per container on the node, with overlaid **Usage**, **Request**, and **Limit** bars (on a shared per-row scale) and the formatted figures alongside, so over- and under-provisioning is easy to spot.
+- **Provisioning** (table): one row per container on the node, each with overlaid **Usage**, **Request**, and **Limit** bars (on a shared per-row scale) and the formatted figures alongside, so over- and under-provisioning is easy to spot. The table is:
+  - **Searchable:** a **Search containers...** box narrows the rows by namespace / pod / container name.
+  - **Sortable:** click a column header to sort by it.
+  - **Filterable:** a **pod picker** (the same searchable Pod filter used on the Logs page) narrows the rows to the pods you tick; with nothing ticked, its own search box acts as a pod-name filter.
 
-If the cluster has no Metrics API, the Breakdown treemap is replaced by an information notice and the Usage bars read em-dash with empty bars, while the Request and Limit bars still render from the pod specs.
+  The view is read-only.
+
+If the cluster has no Metrics API, the Breakdown subtab shows a short note pointing you at the Provisioning subtab, and on Provisioning the Usage bars read em-dash with empty bars while the Request and Limit bars still render from the pod specs.
 
 ### Pod detail Performance tab
 

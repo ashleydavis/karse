@@ -83,17 +83,27 @@ inconsistent signal.
     pure helpers in `frontend/src/lib/performance.ts` (`formatCpu`, `formatMemory`,
     `metricValue`, `utilisation`, `buildClusterTreemap`, `buildNodeHeatmap`).
 - **Node Performance tab** — **implemented**:
-  - A node-scoped "Breakdown" treemap drilling namespace → pod → container, sized by the
-    container's usage for the selected metric, reusing the shared `UsageTreemap`. Leaves are
-    coloured green→amber→red by utilisation and a leaf click opens the owning pod's detail
-    page on its Performance tab. The treemap is hidden when usage is unavailable (nothing to
-    size by).
-  - A "Provisioning" view of the node's pods: one row per container with overlaid
-    usage / request / limit bars on a shared per-row scale and the formatted figures
-    alongside. The bars render even with no Metrics API (requests/limits come from specs;
-    the usage bar is then empty), so the view degrades cleanly.
+  - The node Performance tab is split into two **subtabs**, **Breakdown** and
+    **Provisioning**, under a shared CPU/Memory toggle. Breakdown is shown first.
+  - **Breakdown subtab:** a node-scoped treemap drilling namespace → pod → container, sized
+    by the container's usage for the selected metric, reusing the shared `UsageTreemap`.
+    Leaves are coloured green→amber→red by utilisation and a leaf click opens the owning
+    pod's detail page on its Performance tab. The treemap needs live usage, so when the
+    Metrics API is unavailable the subtab shows a short note pointing the user at the
+    Provisioning subtab instead.
+  - **Provisioning subtab:** the node's pods as a **searchable, sortable, filterable table**,
+    one row per container, each row carrying overlaid usage / request / limit bars on a
+    shared per-row scale with the formatted figures alongside. A free-text search box
+    (the shared fuzzy filter) narrows the rows by namespace/pod/container text; the columns
+    sort; and the **shared Logs Pod filter** (the same `PodFilter` component the Logs page
+    uses) narrows the rows to the ticked pods (or, with none ticked, its search box acts as
+    a pod-name substring filter). The bars render even with no Metrics API (requests/limits
+    come from specs; the usage bar is then empty), so the view degrades cleanly. The view is
+    read-only.
   - Built from `fetchNodePerformance`, `buildNodeTreemap`, the shared `MetricToggle` /
-    `UsageTreemap` / `MetricsUnavailable`, and the new `ProvisioningBars` component.
+    `UsageTreemap` / `MetricsUnavailable` / `PodFilter`, the shared `fuzzyGlobalFilter`, and
+    the `ProvisioningTable` component. (The pod Performance leaf still uses the simpler
+    `ProvisioningBars` list.)
 - **Pod Performance tab** (the leaf):
   - A provisioning view of the pod's containers (usage vs request vs limit). No treemap.
 

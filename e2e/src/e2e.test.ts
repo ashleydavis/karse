@@ -5637,13 +5637,23 @@ test.describe("karse e2e", () => {
             setContext(CLUSTER_1);
         });
 
-        test("renders the node treemap and the provisioning bars", async () => {
+        test("renders the Breakdown treemap and a Provisioning subtab", async () => {
             await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='node-tab-performance']").click();
             await expect(page.locator("[data-test-id='perf-node']")).toBeVisible();
-            // The lazy query fires once the tab is active; wait for the charts.
+            // The two subtabs are present; Breakdown is shown first.
+            await expect(page.locator("[data-test-id='perf-node-subtab-breakdown']")).toBeVisible();
+            await expect(page.locator("[data-test-id='perf-node-subtab-provisioning']")).toBeVisible();
+            // The lazy query fires once the tab is active; the Breakdown treemap shows.
             await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
+            // Provisioning is not rendered until its subtab is selected.
+            await expect(page.locator("[data-test-id='perf-provisioning']")).toHaveCount(0);
+            // Open the Provisioning subtab: the searchable/sortable table appears and the
+            // treemap is no longer mounted.
+            await page.locator("[data-test-id='perf-node-subtab-provisioning']").click();
             await expect(page.locator("[data-test-id='perf-provisioning']")).toBeVisible();
+            await expect(page.locator("[data-test-id='perf-provisioning-table']")).toBeVisible();
+            await expect(page.locator("[data-test-id='perf-treemap']")).toHaveCount(0);
             // node-cp carries the worker and cache pods, each a container row.
             const rowCount = await page.locator("[data-test-id='perf-provisioning-row']").count();
             expect(rowCount).toBeGreaterThanOrEqual(2);
@@ -5653,12 +5663,71 @@ test.describe("karse e2e", () => {
             ).toHaveAttribute("aria-pressed", "true");
         });
 
-        test("toggling the metric updates the provisioning bar values", async () => {
-            // Read the first provisioning row's usage figure under CPU, switch to Memory,
-            // and confirm the displayed figure changes (CPU is formatted in m/cores, memory
-            // in Mi/Gi), proving the bars re-derive from the selected metric.
+        test("Provisioning subtab: search narrows the rows", async () => {
             await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='node-tab-performance']").click();
+            await page.locator("[data-test-id='perf-node-subtab-provisioning']").click();
+            await expect(page.locator("[data-test-id='perf-provisioning']")).toBeVisible();
+            const allRows = await page.locator("[data-test-id='perf-provisioning-row']").count();
+            expect(allRows).toBeGreaterThanOrEqual(2);
+            // Search for the "worker" container: only its row(s) remain, fewer than the full set.
+            await page.locator("[data-test-id='perf-provisioning-search'] input").fill("worker");
+            const narrowed = await page.locator("[data-test-id='perf-provisioning-row']").count();
+            expect(narrowed).toBeGreaterThanOrEqual(1);
+            expect(narrowed).toBeLessThan(allRows);
+            await expect(page.locator("[data-test-id='perf-provisioning-row']").first()).toContainText("worker");
+            // Clearing the search restores every row.
+            await page.locator("[data-test-id='perf-provisioning-search'] input").fill("");
+            await expect(page.locator("[data-test-id='perf-provisioning-row']")).toHaveCount(allRows);
+        });
+
+        test("Provisioning subtab: a column sort reorders the rows", async () => {
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='node-tab-performance']").click();
+            await page.locator("[data-test-id='perf-node-subtab-provisioning']").click();
+            await expect(page.locator("[data-test-id='perf-provisioning']")).toBeVisible();
+            // Sort ascending by the Usage column, capture the order, then sort descending
+            // and confirm the order changes while staying a permutation of the same rows.
+            // Comparing asc vs desc is deterministic for two or more distinct usage values,
+            // regardless of the initial (unsorted) row order.
+            const usageHeader = page.locator("[data-test-id='perf-provisioning-table'] th").filter({ hasText: "Usage" });
+            await usageHeader.click();
+            const ascending = await page.locator("[data-test-id='perf-provisioning-row']").allInnerTexts();
+            await usageHeader.click();
+            const descending = await page.locator("[data-test-id='perf-provisioning-row']").allInnerTexts();
+            expect(descending).not.toEqual(ascending);
+            expect(descending.slice().sort()).toEqual(ascending.slice().sort());
+        });
+
+        test("Provisioning subtab: the Pod filter narrows the rows", async () => {
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='node-tab-performance']").click();
+            await page.locator("[data-test-id='perf-node-subtab-provisioning']").click();
+            await expect(page.locator("[data-test-id='perf-provisioning']")).toBeVisible();
+            const allRows = await page.locator("[data-test-id='perf-provisioning-row']").count();
+            expect(allRows).toBeGreaterThanOrEqual(2);
+            // Open the shared Pod filter and tick the first pod: the rows narrow to that pod.
+            await page.locator("[data-test-id='perf-provisioning-picker-trigger']").click();
+            await expect(page.locator("[data-test-id='perf-provisioning-pod-dropdown']")).toBeVisible();
+            await page.locator("[data-test-id='perf-provisioning-pod-checkbox']").first().click();
+            await page.keyboard.press("Escape");
+            const narrowed = await page.locator("[data-test-id='perf-provisioning-row']").count();
+            expect(narrowed).toBeGreaterThanOrEqual(1);
+            expect(narrowed).toBeLessThan(allRows);
+            // Clearing the selection restores every row.
+            await page.locator("[data-test-id='perf-provisioning-picker-trigger']").click();
+            await page.locator("[data-test-id='perf-provisioning-clear']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='perf-provisioning-row']")).toHaveCount(allRows);
+        });
+
+        test("toggling the metric updates the provisioning row values", async () => {
+            // Read the first provisioning row's figures under CPU, switch to Memory, and
+            // confirm the displayed figure changes (CPU is formatted in m/cores, memory in
+            // Mi/Gi), proving the rows re-derive from the selected metric.
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='node-tab-performance']").click();
+            await page.locator("[data-test-id='perf-node-subtab-provisioning']").click();
             await expect(page.locator("[data-test-id='perf-provisioning']")).toBeVisible();
             const firstRow = page.locator("[data-test-id='perf-provisioning-row']").first();
             const cpuText = (await firstRow.textContent())?.trim();
@@ -5667,14 +5736,12 @@ test.describe("karse e2e", () => {
                 page.locator("[data-test-id='perf-metric-memory']")
             ).toHaveAttribute("aria-pressed", "true");
             await expect(firstRow).not.toHaveText(cpuText ?? "");
-            // The treemap re-sizes for the new metric and stays populated.
-            await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
         });
 
-        test("metrics-unavailable: provisioning bars still render and the notice is shown", async () => {
+        test("metrics-unavailable: provisioning rows still render and the notice is shown", async () => {
             // Force the node performance endpoint to report no Metrics API: usage is null
-            // but requests/limits from specs remain, so the provisioning bars still render
-            // (usage bars empty) while the treemap is replaced by the unavailable notice.
+            // but requests/limits from specs remain, so the provisioning rows still render
+            // (usage bars empty) while the Breakdown subtab shows a note instead of a treemap.
             await page.route("**/api/nodes/node-cp/performance*", async (route) => {
                 await route.fulfill({
                     json: {
@@ -5708,10 +5775,13 @@ test.describe("karse e2e", () => {
             await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='node-tab-performance']").click();
             await expect(page.locator("[data-test-id='perf-metrics-unavailable']")).toBeVisible();
+            // The Breakdown subtab shows the note, not the treemap.
+            await expect(page.locator("[data-test-id='perf-node-breakdown-unavailable']")).toBeVisible();
+            await expect(page.locator("[data-test-id='perf-treemap']")).toHaveCount(0);
+            // The Provisioning subtab still renders its row from the spec request/limit.
+            await page.locator("[data-test-id='perf-node-subtab-provisioning']").click();
             await expect(page.locator("[data-test-id='perf-provisioning']")).toBeVisible();
             await expect(page.locator("[data-test-id='perf-provisioning-row']")).toHaveCount(1);
-            // The usage-sized treemap is hidden when there is no live usage to size by.
-            await expect(page.locator("[data-test-id='perf-treemap']")).toHaveCount(0);
             await page.unroute("**/api/nodes/node-cp/performance*");
         });
     });
