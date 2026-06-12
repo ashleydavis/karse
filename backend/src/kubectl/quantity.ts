@@ -45,7 +45,8 @@ const CPU_SUFFIXES: Record<string, number> = {
 
 // Parses a CPU quantity into millicores. Handles the millicore form ("250m" -> 250),
 // whole and fractional cores ("1" -> 1000, "1.5" -> 1500), the nanocore form the Metrics
-// API returns ("123456789n" -> 123, floored after dividing by 1e6), and SI/binary
+// API returns ("123456789n" -> 123, floored after dividing by 1e6), the microcore form
+// the Metrics API also returns ("398u" -> 0, floored after dividing by 1000), and SI/binary
 // core suffixes ("1k" -> 1,000,000 millicores). An empty string yields 0. Any other
 // non-empty value throws.
 export function parseCpuToMillicores(quantity: string): number {
@@ -56,6 +57,12 @@ export function parseCpuToMillicores(quantity: string): number {
     const nanoMatch = /^(\d+)n$/.exec(quantity);
     if (nanoMatch !== null) {
         return Math.floor(Number(nanoMatch[1]) / 1e6);
+    }
+    // Microcores: integer followed by "u". The Metrics API can return this form
+    // (e.g. "398u"). Floor of microcores / 1000 gives millicores.
+    const microMatch = /^(\d+)u$/.exec(quantity);
+    if (microMatch !== null) {
+        return Math.floor(Number(microMatch[1]) / 1000);
     }
     // Millicores: a (possibly fractional) number followed by "m".
     const milliMatch = /^(\d+(?:\.\d+)?)m$/.exec(quantity);

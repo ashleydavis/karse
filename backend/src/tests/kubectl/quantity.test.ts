@@ -17,6 +17,16 @@ describe("parseCpuToMillicores", () => {
         expect(parseCpuToMillicores("123456789n")).toBe(123);
     });
 
+    test("parses microcores, flooring after dividing by 1000", () => {
+        // 1,500,000 microcores = 1500 millicores.
+        expect(parseCpuToMillicores("1500000u")).toBe(1500);
+    });
+
+    test("parses the 398u case from the bug report (floors to 0 millicores)", () => {
+        // 398 microcores is below one millicore, so it floors to 0 rather than throwing.
+        expect(parseCpuToMillicores("398u")).toBe(0);
+    });
+
     test("parses an SI decimal core suffix (k) to millicores", () => {
         // 1k cores = 1000 cores = 1,000,000 millicores. kwok reports node allocatable
         // CPU in this form, so it must parse rather than throw.

@@ -142,9 +142,10 @@ the data foundation can also be exercised directly:
 ### Quantity parsers (backend unit tests)
 
 The parsers in `backend/src/kubectl/quantity.ts` normalise Metrics API strings: CPU to
-millicores (handling `"250m"`, whole/fractional cores, and nanocores like `"123456789n"`),
-memory to bytes (handling binary `Ki/Mi/Gi/...` and decimal `K/M/G/...` suffixes and plain
-bytes). They are covered by `backend/src/tests/kubectl/quantity.test.ts`. Run them with:
+millicores (handling `"250m"`, whole/fractional cores, nanocores like `"123456789n"`, and
+microcores like `"398u"`), memory to bytes (handling binary `Ki/Mi/Gi/...` and decimal
+`K/M/G/...` suffixes and plain bytes). They are covered by
+`backend/src/tests/kubectl/quantity.test.ts`. Run them with:
 
 ```sh
 bun run test
