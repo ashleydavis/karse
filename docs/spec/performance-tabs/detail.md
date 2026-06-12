@@ -6,11 +6,12 @@
 The Performance feature adds a per-scope "Performance" tab to the cluster, node, and pod
 pages, showing point-in-time CPU and memory usage in context. This document describes the
 data sources, scope, degradation behaviour, per-scope tab contents, and the test mode. The
-implementation is **Partial**: the cluster Performance tab (Breakdown treemap, Hot spots
-heatmap, Top consumers table) and the node Performance tab (node-scoped Breakdown treemap
-plus per-container provisioning bars) have shipped, along with the shared chart components
-and the `frontend/src/lib/performance.ts` transform/format helpers. The pod tab is still a
-stub and becomes Complete in a later ticket.
+implementation is **Complete**: the cluster Performance tab (Breakdown treemap, Hot spots
+heatmap, Top consumers table), the node Performance tab (node-scoped Breakdown treemap plus
+per-container provisioning bars), and the pod Performance tab (the leaf: per-container
+provisioning bars, no treemap) have all shipped, along with the shared chart components and
+the `frontend/src/lib/performance.ts` transform/format helpers. Time-series Trends and
+per-pod history remain out of scope (they need a persistent sampler).
 
 ## Data sources
 

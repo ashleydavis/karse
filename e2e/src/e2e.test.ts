@@ -2324,7 +2324,7 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='perf-node-stub']")).toHaveCount(0);
         });
 
-        test("pod detail shows a Performance tab whose stub renders when selected", async () => {
+        test("pod detail shows a Performance tab that mounts the Performance panel when selected", async () => {
             await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
             // Existing tabs still render alongside the new Performance tab.
             await expect(page.locator("[data-test-id='pod-tab-detail']")).toBeVisible();
@@ -2332,8 +2332,9 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-panel-performance']")).toHaveCount(0);
             await page.locator("[data-test-id='pod-tab-performance']").click();
             await expect(page.locator("[data-test-id='pod-panel-performance']")).toBeVisible();
-            await expect(page.locator("[data-test-id='perf-pod-stub']")).toBeVisible();
-            await expect(page.locator("[data-test-id='perf-pod-stub']")).toContainText("Performance metrics coming soon");
+            // The pod Performance tab is now populated (performance-tabs-8); the old stub
+            // is gone. Its content is asserted in the "Performance tabs (pod)" block.
+            await expect(page.locator("[data-test-id='perf-pod-stub']")).toHaveCount(0);
         });
     });
 
@@ -5701,6 +5702,106 @@ test.describe("karse e2e", () => {
             // The usage-sized treemap is hidden when there is no live usage to size by.
             await expect(page.locator("[data-test-id='perf-treemap']")).toHaveCount(0);
             await page.unroute("**/api/nodes/node-cp/performance*");
+        });
+    });
+
+    // ── Performance tabs (pod) ──────────────────────────────────────────────────
+    // The backend runs with KARSE_FAKE_METRICS=1 (set in scripts/e2e-tests.sh), so the
+    // seeded `web` pod (nginx + sidecar containers in the default namespace) matches the
+    // canned per-container fake metrics by name. The pod Performance tab (the leaf)
+    // therefore renders per-container provisioning bars (usage vs request vs limit) with
+    // no treemap.
+    test.describe("Performance tabs (pod)", () => {
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+        });
+
+        test("renders the provisioning bars with no treemap", async () => {
+            await page.goto("/pods/default/web", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-performance']").click();
+            await expect(page.locator("[data-test-id='perf-pod']")).toBeVisible();
+            // The lazy query fires once the tab is active; wait for the bars.
+            await expect(page.locator("[data-test-id='perf-provisioning']")).toBeVisible();
+            // The web pod has two containers (nginx, sidecar), each a provisioning row.
+            await expect(page.locator("[data-test-id='perf-provisioning-row']")).toHaveCount(2);
+            // The leaf has no treemap.
+            await expect(page.locator("[data-test-id='perf-treemap']")).toHaveCount(0);
+            // CPU is selected by default.
+            await expect(
+                page.locator("[data-test-id='perf-metric-cpu']")
+            ).toHaveAttribute("aria-pressed", "true");
+        });
+
+        test("toggling the metric updates the provisioning bar values", async () => {
+            // Read the first row's figures under CPU, switch to Memory, and confirm the
+            // displayed text changes (CPU in m/cores, memory in Mi/Gi), proving the bars
+            // re-derive from the selected metric.
+            await page.goto("/pods/default/web", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-performance']").click();
+            await expect(page.locator("[data-test-id='perf-provisioning']")).toBeVisible();
+            const firstRow = page.locator("[data-test-id='perf-provisioning-row']").first();
+            const cpuText = (await firstRow.textContent())?.trim();
+            await page.locator("[data-test-id='perf-metric-memory']").click();
+            await expect(
+                page.locator("[data-test-id='perf-metric-memory']")
+            ).toHaveAttribute("aria-pressed", "true");
+            await expect(firstRow).not.toHaveText(cpuText ?? "");
+        });
+
+        test("metrics-unavailable: provisioning bars still render and the notice is shown", async () => {
+            // Force the pod performance endpoint to report no Metrics API: usage is null
+            // but requests/limits from the spec remain, so the provisioning bars still
+            // render (usage bars empty) while the unavailable notice is shown above them.
+            await page.route("**/api/pods/default/web/performance*", async (route) => {
+                await route.fulfill({
+                    json: {
+                        metricsAvailable: false,
+                        pod: {
+                            name: "web",
+                            namespace: "default",
+                            node: "node-worker",
+                            usage: { cpuMillicores: null, memoryBytes: null },
+                            requests: { cpuMillicores: 150, memoryBytes: 201326592 },
+                            limits: { cpuMillicores: 700, memoryBytes: 671088640 },
+                            containers: [
+                                {
+                                    name: "nginx",
+                                    usage: { cpuMillicores: null, memoryBytes: null },
+                                    requests: { cpuMillicores: 100, memoryBytes: 134217728 },
+                                    limits: { cpuMillicores: 500, memoryBytes: 536870912 },
+                                },
+                                {
+                                    name: "sidecar",
+                                    usage: { cpuMillicores: null, memoryBytes: null },
+                                    requests: { cpuMillicores: 50, memoryBytes: 67108864 },
+                                    limits: { cpuMillicores: 200, memoryBytes: 134217728 },
+                                },
+                            ],
+                        },
+                        containers: [
+                            {
+                                name: "nginx",
+                                usage: { cpuMillicores: null, memoryBytes: null },
+                                requests: { cpuMillicores: 100, memoryBytes: 134217728 },
+                                limits: { cpuMillicores: 500, memoryBytes: 536870912 },
+                            },
+                            {
+                                name: "sidecar",
+                                usage: { cpuMillicores: null, memoryBytes: null },
+                                requests: { cpuMillicores: 50, memoryBytes: 67108864 },
+                                limits: { cpuMillicores: 200, memoryBytes: 134217728 },
+                            },
+                        ],
+                    },
+                });
+            });
+            await page.goto("/pods/default/web", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-performance']").click();
+            await expect(page.locator("[data-test-id='perf-metrics-unavailable']")).toBeVisible();
+            await expect(page.locator("[data-test-id='perf-provisioning']")).toBeVisible();
+            // Both containers still render their request/limit bars from the spec.
+            await expect(page.locator("[data-test-id='perf-provisioning-row']")).toHaveCount(2);
+            await page.unroute("**/api/pods/default/web/performance*");
         });
     });
 });

@@ -128,6 +128,14 @@ A node's detail page has a **Performance** tab showing the node's point-in-time 
 
 If the cluster has no Metrics API, the Breakdown treemap is replaced by an information notice and the Usage bars read em-dash with empty bars, while the Request and Limit bars still render from the pod specs.
 
+### Pod detail Performance tab
+
+A pod's detail page has a **Performance** tab showing the pod's point-in-time CPU and memory usage, scoped to that one pod (the leaf of the Performance feature). A **CPU / Memory** toggle at the top selects which metric the view shows (CPU by default). The tab has a single view:
+
+- **Provisioning** (bars): one row per container in the pod, with overlaid **Usage**, **Request**, and **Limit** bars (on a shared per-row scale) and the formatted figures alongside, so over- and under-provisioning is easy to spot. There is no treemap at the pod level.
+
+If the cluster has no Metrics API, an information notice is shown above the bars and the Usage bars read em-dash (empty), while the Request and Limit bars still render from the pod spec.
+
 ## Namespaces page (`/namespaces`)
 
 A table of namespaces for the active context.

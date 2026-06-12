@@ -15,6 +15,8 @@ Karse currently ships the cluster home page, namespace scoping, the core workloa
 
 ## Performance monitoring
 
+> **Delivered by the Performance tabs feature** (cluster/node/pod Performance tabs, point-in-time CPU and memory from the Metrics API): items 7-11, and the point-in-time part of item 15 (current pod usage alongside requests and limits, shown as provisioning bars on the pod Performance tab). Still open: time-series **Trends** and per-pod **history** (items 14 and the time-series part of 15), which need a persistent metrics sampler that Karse does not yet have.
+
 7. **Cluster performance dashboard**: aggregate CPU utilisation %, memory utilisation %, and allocatable vs used capacity across all nodes, shown as a summary bar or gauge on the cluster home page.
 8. **Node performance view**: per-node CPU %, memory %, network I/O (bytes in/out), and disk I/O on the node detail page, pulling from the Metrics API or `kubectl top node`.
 9. **Pod resource usage table**: actual CPU and memory consumption per pod alongside its requests and limits, so over- and under-provisioned workloads are immediately visible (`kubectl top pod`).
