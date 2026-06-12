@@ -77,7 +77,7 @@ export function ClusterPerformanceTab({ active }: ClusterPerformanceTabProps) {
             {data.metricsAvailable && (
                 <>
                     <Section title="Breakdown">
-                        <UsageTreemap root={treemap} colorByUtilisation origin={FROM_CLUSTER_PERFORMANCE} />
+                        <UsageTreemap root={treemap} colorByUtilisation origin={FROM_CLUSTER_PERFORMANCE} metric={metric} />
                     </Section>
 
                     <Section title="Hot spots">

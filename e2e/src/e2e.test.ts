@@ -5668,6 +5668,25 @@ test.describe("karse e2e", () => {
             await expect(page).toHaveURL(/tab=performance/);
             await expect(page.locator("[data-test-id='cluster-panel-performance']")).toBeVisible();
         });
+
+        test("hovering a treemap leaf shows a tooltip with the cell label and its usage", async () => {
+            // The default nivo tooltip rendered an empty box; the custom tooltip shows the
+            // cell label plus its usage for the selected metric. Hovering the "web" leaf
+            // surfaces a tooltip naming that leaf and a non-empty usage figure.
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='cluster-tab-performance']").click();
+            await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
+            await page
+                .locator("[data-test-id='perf-treemap'] text")
+                .filter({ hasText: /^web$/ })
+                .first()
+                .hover({ force: true });
+            const tooltip = page.locator("[data-test-id='perf-treemap-tooltip']");
+            await expect(tooltip).toBeVisible();
+            await expect(tooltip).toContainText("web");
+            // CPU is the default metric, so the usage figure is a millicore/core value.
+            await expect(tooltip).toContainText(/\d/);
+        });
     });
 
     // ── Performance tabs (node) ─────────────────────────────────────────────────
@@ -5857,6 +5876,24 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='perf-provisioning']")).toBeVisible();
             await expect(page.locator("[data-test-id='perf-provisioning-row']")).toHaveCount(1);
             await page.unroute("**/api/nodes/node-cp/performance*");
+        });
+
+        test("hovering a treemap leaf shows a tooltip with the cell label and its usage", async () => {
+            // The shared treemap's custom tooltip applies on the node tab too: hovering the
+            // "worker" container leaf surfaces a tooltip naming that leaf and a usage figure,
+            // instead of nivo's empty default box.
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='node-tab-performance']").click();
+            await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
+            await page
+                .locator("[data-test-id='perf-treemap'] text")
+                .filter({ hasText: /^worker$/ })
+                .first()
+                .hover({ force: true });
+            const tooltip = page.locator("[data-test-id='perf-treemap-tooltip']");
+            await expect(tooltip).toBeVisible();
+            await expect(tooltip).toContainText("worker");
+            await expect(tooltip).toContainText(/\d/);
         });
     });
 

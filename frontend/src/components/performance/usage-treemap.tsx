@@ -1,6 +1,8 @@
-import { Box, useTheme } from "@mui/material";
+import { Box, Paper, Typography, useTheme } from "@mui/material";
 import { ResponsiveTreeMap } from "@nivo/treemap";
+import type { PerformanceMetric } from "karse-types";
 import { useShareableNavigate } from "../../lib/nav-state";
+import { formatCpu, formatMemory } from "../../lib/performance";
 import type { TreemapNode } from "../../lib/performance";
 
 // Colours a leaf green→amber→red by its utilisation (usage ÷ limit). A leaf with no
@@ -19,20 +21,32 @@ function leafColor(utilisation: number | null | undefined): string {
     return "#16a34a"; // green: comfortable
 }
 
+// The display label for a treemap cell: the segment after the last "/" of its id (the
+// pod name on a cluster leaf, the container name on a node leaf, the namespace/pod on
+// an interior row), falling back to the whole id when there is no "/".
+function cellLabel(id: string): string {
+    const slash = id.lastIndexOf("/");
+    return slash === -1 ? id : id.slice(slash + 1);
+}
+
 // Wraps nivo's ResponsiveTreeMap to render the Breakdown view. Leaves are coloured by
 // utilisation when colorByUtilisation is set; clicking a leaf navigates to that pod's
 // detail page (its Performance tab), tagging it with `origin` (a "from" value) so the
 // pod page's breadcrumb and back button return here rather than to the Pods list.
-// Interior nodes (nodes/namespaces) are not navigable. The chart needs an explicit
-// height because its parent is flex/auto-sized.
+// Interior nodes (nodes/namespaces) are not navigable. Hovering a leaf shows a tooltip
+// with the cell label and its usage for the selected metric (replacing nivo's empty
+// default tooltip). The chart needs an explicit height because its parent is
+// flex/auto-sized.
 export function UsageTreemap({
     root,
     colorByUtilisation,
     origin,
+    metric,
 }: {
     root: TreemapNode;
     colorByUtilisation: boolean;
     origin: string;
+    metric: PerformanceMetric;
 }) {
     const navigate = useShareableNavigate();
     const muiTheme = useTheme();
@@ -63,11 +77,25 @@ export function UsageTreemap({
                 identity="id"
                 value="value"
                 // Show the pod name (the segment after the last "/") on each leaf.
-                label={(node) => {
-                    const id = String(node.id);
-                    const slash = id.lastIndexOf("/");
-                    return slash === -1 ? id : id.slice(slash + 1);
-                }}
+                label={(node) => cellLabel(String(node.id))}
+                // Replace nivo's empty default tooltip with the cell label and its usage
+                // for the selected metric (CPU in m/cores, memory in Mi/Gi).
+                tooltip={({ node }) => (
+                    <Paper
+                        data-test-id="perf-treemap-tooltip"
+                        elevation={3}
+                        sx={{ px: 1.5, py: 1 }}
+                    >
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {cellLabel(String(node.id))}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                            {metric === "cpu"
+                                ? formatCpu(node.value)
+                                : formatMemory(node.value)}
+                        </Typography>
+                    </Paper>
+                )}
                 labelSkipSize={16}
                 leavesOnly={false}
                 enableParentLabel

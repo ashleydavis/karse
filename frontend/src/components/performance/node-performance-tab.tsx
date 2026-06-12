@@ -94,7 +94,7 @@ export function NodePerformanceTab({ nodeName, active }: NodePerformanceTabProps
                 <Box data-test-id="perf-node-panel-breakdown">
                     {data.metricsAvailable ? (
                         <Section title="Breakdown">
-                            <UsageTreemap root={treemap} colorByUtilisation origin={`${FROM_NODE_PERFORMANCE}:${nodeName}`} />
+                            <UsageTreemap root={treemap} colorByUtilisation origin={`${FROM_NODE_PERFORMANCE}:${nodeName}`} metric={metric} />
                         </Section>
                     ) : (
                         <Typography color="text.secondary" data-test-id="perf-node-breakdown-unavailable">

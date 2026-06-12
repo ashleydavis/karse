@@ -94,7 +94,7 @@ Four cards summarise the active context:
 
 A point-in-time view of cluster CPU and memory usage, read from the Kubernetes Metrics API. A **CPU / Memory** toggle at the top selects which metric every view below shows (CPU is selected by default). The tab has three views:
 
-- **Breakdown** (treemap): cluster usage broken down node → namespace → pod, each rectangle sized by the pod's usage for the selected metric. Rectangles are coloured green→amber→red by how close the pod is to its limit. Click a rectangle to open that pod's detail page on its Performance tab.
+- **Breakdown** (treemap): cluster usage broken down node → namespace → pod, each rectangle sized by the pod's usage for the selected metric. Rectangles are coloured green→amber→red by how close the pod is to its limit. Hover a rectangle to see a tooltip with its label and its usage for the selected metric (CPU in m/cores, memory in Mi/Gi); click a rectangle to open that pod's detail page on its Performance tab.
 - **Hot spots** (heatmap): a row per node with **cpu%** and **mem%** cells (usage ÷ allocatable). Click a cell to open that node's detail page on its Performance tab.
 - **Top consumers** (table): pods ranked by the selected metric's usage. Click the **Usage** header to reverse the order; click a row to open that pod's detail page on its Performance tab.
 
@@ -123,7 +123,7 @@ Click a column header to sort; type in the search box to filter rows. Use the **
 
 A node's detail page has a **Performance** tab showing the node's point-in-time CPU and memory usage, scoped to that one node. A **CPU / Memory** toggle at the top selects which metric the views show (CPU by default). The tab is split into two **subtabs** (Breakdown is shown first):
 
-- **Breakdown** (treemap): the node's usage broken down namespace → pod → container, each rectangle sized by the container's usage for the selected metric and coloured green→amber→red by how close it is to its limit. Click a rectangle to open the owning pod's detail page on its Performance tab.
+- **Breakdown** (treemap): the node's usage broken down namespace → pod → container, each rectangle sized by the container's usage for the selected metric and coloured green→amber→red by how close it is to its limit. Hover a rectangle to see a tooltip with its label and its usage for the selected metric (CPU in m/cores, memory in Mi/Gi); click a rectangle to open the owning pod's detail page on its Performance tab.
 - **Provisioning** (table): one row per container on the node, each with overlaid **Usage**, **Request**, and **Limit** bars (on a shared per-row scale) and the formatted figures alongside, so over- and under-provisioning is easy to spot. The table is:
   - **Searchable:** a **Search containers...** box narrows the rows by namespace / pod / container name.
   - **Sortable:** click a column header to sort by it.

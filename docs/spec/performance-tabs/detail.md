@@ -73,7 +73,8 @@ inconsistent signal.
 - **Cluster Performance tab** (the hub) — **implemented**:
   - A "Breakdown" treemap drilling cluster → node → namespace → pod, sized by usage for the
     selected metric. Leaves are coloured green→amber→red by utilisation (usage ÷ limit), and
-    clicking a leaf opens that pod's detail page on its Performance tab.
+    clicking a leaf opens that pod's detail page on its Performance tab. Hovering a cell shows
+    a tooltip with the cell's label and its usage for the selected metric (no empty box).
   - A "Hot spots" heatmap of node × metric (CPU%, memory% = usage ÷ allocatable). Clicking a
     cell opens that node's detail page on its Performance tab.
   - A "Top consumers" table of pods ranked by the selected metric, sortable, with row-click
