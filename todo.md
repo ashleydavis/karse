@@ -1,6 +1,13 @@
 # Todo
 
+- Test
+    - Performance stuff.
+    - Live logging.
+    - Get rid of stern.
 - The status page for the cluster should include very basic performance metrics. (Likely already covered by the merged Performance tabs feature; confirm before queuing.)
+- Make sure it is only available locally and not over the local internet.
+- Make sure it supports HPAs (maybe just through the 'All resources' page?)
+- Get Claude to take some screenshots to put in the readme in git.
 
 ## Later
 
