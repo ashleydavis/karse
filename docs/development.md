@@ -50,7 +50,7 @@ To remove every test cluster at once (after running fixtures, or to clean up lef
 
 ## Setting up
 
-Install all workspace dependencies from the repo root:
+See [setup.md](setup.md) for prerequisites and the full setup (including per-worktree setup). In short, install all workspace dependencies from the repo root:
 
 ```sh
 bun install

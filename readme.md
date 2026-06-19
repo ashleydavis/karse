@@ -45,5 +45,6 @@ The guide files under `docs/`:
 - [`user-guide.md`](docs/user-guide.md): end-user tour of the cluster home page.
 - [`audit-log.md`](docs/audit-log.md): what Karse logs, where, in what format, and for how long.
 - [`security.md`](docs/security.md): safety and security Q&A (read-only invariant, network exposure, accepted risks).
+- [`setup.md`](docs/setup.md): how to set up the project (and a worktree) to run, test, and develop.
 - [`development.md`](docs/development.md): development setup, testing, and contributing guide.
 - [`roadmap.md`](docs/roadmap.md): upcoming features and what has already shipped.
