@@ -53,6 +53,7 @@ Single-test-cluster discipline (per `readme.md`): there is only ever ONE test cl
 | [labels-tab](./labels-tab/index.md) | Per-detail-page Labels tab: a resource's own labels, searchable and sortable. |
 | [performance-tabs](./performance-tabs/index.md) | Performance tab scaffold: tabbed cluster home and Performance tab stubs on cluster, node, and pod pages. |
 | [audit-log](./audit-log/index.md) | On-disk kubectl audit log. |
+| [about-page](./about-page/index.md) | About page: what Karse is, how it works, author, GitHub link. |
 
 ## Cross-cutting guides
 

@@ -23,6 +23,7 @@ const LIST_LABELS: Record<string, string> = {
     stern: "Stern",
     events: "Events",
     errors: "Errors",
+    about: "About",
 };
 
 // Maps a detail route's list-page segment to the singular kind label shown in an

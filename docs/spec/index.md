@@ -38,6 +38,7 @@ The spec is reverse-engineered from the shipped code and the prose docs (`docs/a
 | [yaml-viewer](./yaml-viewer/index.md) | Settled | Complete | View the raw YAML of a viewable resource on a detail-page sub tab. |
 | [labels-tab](./labels-tab/index.md) | Settled | Complete | A Labels sub tab on each resource detail page: that resource's own labels as a searchable, sortable table. |
 | [audit-log](./audit-log/index.md) | Settled | Complete | Every kubectl call is appended to a rolling on-disk audit log. |
+| [about-page](./about-page/index.md) | Settled | Complete | Static About page: what Karse is, how it works, who made it, and a GitHub link. |
 
 ## Not yet shipped
 

@@ -5996,4 +5996,44 @@ test.describe("karse e2e", () => {
             await page.unroute("**/api/pods/default/web/performance*");
         });
     });
+
+    // ── About page ──────────────────────────────────────────────────────────────
+    test.describe("about page", () => {
+        test.beforeAll(() => {
+            setContext(CLUSTER_1);
+        });
+
+        test("is reachable from the sidebar nav", async () => {
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='sidebar-bottom-nav'] [aria-label='about']").click();
+            await expect(page).toHaveURL(/\/about(\?|$)/);
+            await expect(page.locator("[data-test-id='about-page']")).toBeVisible();
+        });
+
+        test("explains what Karse is and how it works", async () => {
+            await page.goto("/about", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='about-what']")).toContainText("read-only Kubernetes dashboard");
+            await expect(page.locator("[data-test-id='about-what']")).toContainText("kubectl");
+            await expect(page.locator("[data-test-id='about-how']")).toContainText("read-only cluster queries");
+            await expect(page.locator("[data-test-id='about-how']")).toContainText("use-context");
+        });
+
+        test("states who made it", async () => {
+            await page.goto("/about", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='about-author']")).toContainText("Ashley Davis");
+        });
+
+        test("links to the GitHub repo and opens in a new tab", async () => {
+            await page.goto("/about", { waitUntil: "networkidle" });
+            const link = page.locator("[data-test-id='about-github-link']");
+            await expect(link).toHaveAttribute("href", "https://github.com/ashleydavis/karse");
+            await expect(link).toHaveAttribute("target", "_blank");
+            await expect(link).toHaveAttribute("rel", /noopener/);
+        });
+
+        test("shows About in the breadcrumb trail", async () => {
+            await page.goto("/about", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("About");
+        });
+    });
 });

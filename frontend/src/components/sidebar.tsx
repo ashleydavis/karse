@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Box, Typography, List, ListItemButton, ListItemIcon, ListItemText, Divider, Tooltip, IconButton } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
-import { faLink, faDharmachakra, faServer, faLayerGroup, faCube, faCubes, faDatabase, faSitemap, faBell, faStream, faTowerBroadcast, faCircleExclamation, faList, faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
+import { faLink, faDharmachakra, faServer, faLayerGroup, faCube, faCubes, faDatabase, faSitemap, faBell, faStream, faTowerBroadcast, faCircleExclamation, faList, faChevronLeft, faChevronRight, faCircleInfo } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useShareableTo } from "../lib/nav-state";
 import { FROM_ALL_RESOURCES } from "../lib/breadcrumb-trail";
@@ -22,6 +22,11 @@ const NAV_ITEMS = [
     { to: "/events",       icon: faBell,          label: "Events"       },
     { to: "/logs",         icon: faStream,        label: "Logs"         },
     { to: "/stern",        icon: faTowerBroadcast, label: "Stern"       },
+];
+
+// Nav items pinned to the bottom of the sidebar, below the main resource nav.
+const BOTTOM_NAV_ITEMS = [
+    { to: "/about", icon: faCircleInfo, label: "About" },
 ];
 
 export function Sidebar() {
@@ -114,6 +119,12 @@ export function Sidebar() {
 
             <List sx={{ flex: 1, pt: 1, px: 0.75 }} disablePadding data-test-id="sidebar-nav">
                 {NAV_ITEMS.map((item) => renderNavItem(item))}
+            </List>
+
+            <Divider />
+
+            <List sx={{ pt: 1, px: 0.75 }} disablePadding data-test-id="sidebar-bottom-nav">
+                {BOTTOM_NAV_ITEMS.map((item) => renderNavItem(item))}
             </List>
 
             <Divider />
