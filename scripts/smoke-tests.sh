@@ -183,6 +183,27 @@ echo "Backend bound to port $PORT"
 
 bunx wait-on "$BASE/api/contexts" --timeout 10000
 
+echo "--- Backend binds to loopback only (not the LAN) ---"
+# Karse is a local-only tool: the backend must bind to 127.0.0.1, never 0.0.0.0.
+# 127.0.0.1 must serve; the machine's routable LAN IP must NOT accept a connection
+# on the backend port. Find a non-loopback IPv4 address to probe; if the machine has
+# none (no LAN interface), there is nothing to prove unreachable, so skip that half.
+curl -fsS "$BASE/api/contexts" > /dev/null
+echo "loopback 127.0.0.1:$PORT serves: OK"
+LAN_IP="$(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1 || true)"
+if [[ -n "$LAN_IP" ]]; then
+    # --connect-timeout caps the wait; a loopback-only bind refuses (or never
+    # answers on) the LAN IP. A non-zero curl exit (refused/timeout) is the pass; a
+    # successful fetch means the backend is exposed on the LAN, which is a failure.
+    if curl -fsS --connect-timeout 3 "http://$LAN_IP:$PORT/api/contexts" > /dev/null 2>&1; then
+        echo "Backend is reachable on LAN IP $LAN_IP:$PORT -- it must bind to 127.0.0.1 only" >&2
+        exit 1
+    fi
+    echo "LAN IP $LAN_IP:$PORT refused: OK"
+else
+    echo "No routable LAN IP on this machine: SKIP LAN-unreachable check"
+fi
+
 echo "--- GET /api/contexts ---"
 CONTEXTS_RESP=$(curl -fsS $BASE/api/contexts)
 echo "$CONTEXTS_RESP" | jq '.contexts, .current'
@@ -502,6 +523,30 @@ BACKEND_PID=""
 echo "--- Frontend build ---"
 (cd frontend && bun run build)
 echo "OK"
+
+echo "--- Frontend binds to loopback only (dev + preview host = 127.0.0.1) ---"
+# Karse is local-only: the Vite dev server and preview server must bind to
+# 127.0.0.1, never 0.0.0.0, so neither is reachable from another machine on the
+# LAN. Resolve the real Vite config (KARSE_NO_OPEN=1 keeps it from opening a
+# browser) and assert both hosts, rather than launching a server. Vite's resolveConfig
+# is invoked once per mode because dev and preview merge different config branches.
+HOSTS=$(cd frontend && KARSE_NO_OPEN=1 bun -e '
+import { resolveConfig } from "vite";
+const dev = await resolveConfig({}, "serve");
+const preview = await resolveConfig({}, "serve");
+process.stdout.write(`${dev.server.host}|${preview.preview.host}`);
+')
+DEV_HOST="${HOSTS%%|*}"
+PREVIEW_HOST="${HOSTS##*|}"
+if [[ "$DEV_HOST" != "127.0.0.1" ]]; then
+    echo "Expected Vite dev server.host=127.0.0.1, got '$DEV_HOST'" >&2
+    exit 1
+fi
+if [[ "$PREVIEW_HOST" != "127.0.0.1" ]]; then
+    echo "Expected Vite preview.host=127.0.0.1, got '$PREVIEW_HOST'" >&2
+    exit 1
+fi
+echo "dev host=$DEV_HOST, preview host=$PREVIEW_HOST: OK"
 
 echo "--- Dev-launch browser-open suppression (KARSE_NO_OPEN=1) ---"
 # Every non-interactive launch must suppress the browser-open so no Chrome window

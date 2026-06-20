@@ -17,9 +17,14 @@ The one thing Karse writes is the active context in your local `~/.kube/config` 
 
 No. Karse is entirely local. The backend binds to `127.0.0.1:5172` and never makes outbound network connections of its own. The only external communication is between `kubectl` and the Kubernetes API server of the cluster your context points to -- the same connection `kubectl` makes when you run it yourself in a terminal.
 
-## Can another machine on my network reach the Karse backend?
+## Can another machine on my network reach the Karse backend or frontend?
 
-No. The backend binds to `127.0.0.1` (loopback) only, not to `0.0.0.0`. Connections from any other machine -- even on the same LAN -- are refused at the OS level before they reach the application.
+No. Both servers bind to `127.0.0.1` (loopback) only, never to `0.0.0.0`:
+
+- The backend (Express, port 5172) binds to `127.0.0.1` (`backend/src/index.ts`).
+- The frontend (Vite dev server and `preview` server, port 5173) binds to `127.0.0.1` (`frontend/vite.config.ts` sets `server.host` and `preview.host` explicitly, rather than relying on Vite's default host).
+
+Connections from any other machine -- even on the same LAN -- are refused at the OS level before they reach either application. The smoke tests verify this: the backend serves on `127.0.0.1` but refuses a connection to the machine's routable LAN IP, and the resolved Vite config reports `127.0.0.1` for both the dev and preview hosts.
 
 ## Can a malicious website silently send requests to Karse while my browser has it open?
 

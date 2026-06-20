@@ -272,11 +272,13 @@ bunx wait-on "http://127.0.0.1:$BACKEND_PORT/api/contexts" --timeout 10000
 # ── Frontend ──────────────────────────────────────────────────────────────────
 # KARSE_FRONTEND_PORT=0 lets Vite pick a free port; KARSE_PORT points the /api
 # proxy at the backend's dynamic port. The chosen frontend port is scraped from
-# Vite's "Local:" output line.
+# Vite's "Local:" output line. Karse pins the dev server to 127.0.0.1 (loopback
+# only), so the banner reads "Local: http://127.0.0.1:<port>/"; the scrape below
+# matches both 127.0.0.1 and localhost so it is robust to the bound host.
 echo "--- Starting frontend dev server (OS-assigned free port) ---"
 # NO_COLOR keeps Vite's banner plain so the port scrape below works. In CI
 # (CI=true) Vite would otherwise colorize, inserting an ANSI escape between
-# "localhost:" and the port. Only affects the test run; normal `dev` stays colored.
+# the host and the port. Only affects the test run; normal `dev` stays colored.
 # KARSE_NO_WATCH=1 disables Vite's file watcher: e2e needs no hot reload, and it
 # avoids exhausting the host inotify instance limit when several runs (parallel
 # worktrees under pb:next) each start a dev server at once.
@@ -285,7 +287,7 @@ FRONTEND_PID=$!
 
 FRONTEND_PORT=""
 for _ in $(seq 1 600); do
-    FRONTEND_PORT="$(grep -oE 'localhost:[0-9]+' "$FRONTEND_LOG" | head -n1 | cut -d: -f2 || true)"
+    FRONTEND_PORT="$(grep -oE '(127\.0\.0\.1|localhost):[0-9]+' "$FRONTEND_LOG" | head -n1 | cut -d: -f2 || true)"
     [[ -n "$FRONTEND_PORT" ]] && break
     sleep 0.1
 done
@@ -295,14 +297,14 @@ if [[ -z "$FRONTEND_PORT" ]]; then
     exit 1
 fi
 echo "Frontend bound to port $FRONTEND_PORT"
-bunx wait-on "http://localhost:$FRONTEND_PORT" --timeout 60000
+bunx wait-on "http://127.0.0.1:$FRONTEND_PORT" --timeout 60000
 
 # ── E2E tests ─────────────────────────────────────────────────────────────────
 echo "--- Running e2e tests ---"
 (
     export KWOK_CLUSTER_1="kwok-$KWOK_CLUSTER_1"
     export KWOK_CLUSTER_2="kwok-$KWOK_CLUSTER_2"
-    export KARSE_E2E_URL="http://localhost:$FRONTEND_PORT"
+    export KARSE_E2E_URL="http://127.0.0.1:$FRONTEND_PORT"
     cd e2e && bunx playwright test
 )
 

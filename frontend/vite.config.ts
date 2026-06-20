@@ -34,14 +34,25 @@ if (open && process.env.BROWSER === undefined) {
     }
 }
 
+// Karse is a local-only tool: both the dev server and the preview server bind to
+// 127.0.0.1 (loopback) only, never 0.0.0.0, so neither is reachable from another
+// machine on the LAN. This is set explicitly rather than relying on Vite's default
+// host so the local-only guarantee does not depend on a framework default.
+const host = "127.0.0.1";
+
 export default defineConfig({
     plugins: [react(), tailwindcss()],
     server: {
+        host,
         port: Number(process.env.KARSE_FRONTEND_PORT ?? "5173"),
         open,
         watch: process.env.KARSE_NO_WATCH === "1" ? null : undefined,
         proxy: {
             "/api": "http://127.0.0.1:" + (process.env.KARSE_PORT ?? "5172"),
         },
+    },
+    preview: {
+        host,
+        port: Number(process.env.KARSE_FRONTEND_PORT ?? "5173"),
     },
 });

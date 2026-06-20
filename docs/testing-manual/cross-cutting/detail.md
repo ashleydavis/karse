@@ -119,6 +119,25 @@ The URL should already contain everything: the page and resource in the path, an
 - **Params survive navigation**: with a context/namespace selected, click around the sidebar and into/out of detail pages. The query params stay attached the whole time.
 - **Backward compatible default**: open `/cluster` with no query params. The app falls back to the terminal's current context (cluster 1) and "all namespaces".
 
+## Local-only binding (loopback only)
+
+Karse is a local-only tool: neither the backend nor the frontend may be reachable from another machine on the LAN. Both bind to `127.0.0.1` only, never `0.0.0.0`. This needs no fixture.
+
+Start the app (`bun run dev`), then find the machine's routable LAN IP:
+
+```sh
+ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | head -n1
+```
+
+### What to check
+- **Backend serves on loopback**: `curl -fsS http://127.0.0.1:5172/api/contexts` returns JSON.
+- **Backend refused on the LAN IP**: `curl -fsS --connect-timeout 3 http://<LAN_IP>:5172/api/contexts` fails (connection refused / no route), confirming the backend is not exposed on the network.
+- **Frontend serves on loopback**: open `http://127.0.0.1:5173` in the browser; the app loads.
+- **Frontend refused on the LAN IP**: `curl -fsS --connect-timeout 3 http://<LAN_IP>:5173/` fails, confirming the Vite dev server is loopback-only.
+- **(Optional) Preview server too**: `bun run --filter karse-frontend preview` then repeat the loopback-serves / LAN-refused checks on port 5173.
+
+(The smoke tests automate the backend LAN-refused check and assert the resolved Vite `server.host` and `preview.host` are both `127.0.0.1`.)
+
 Teardown:
 
 ```sh
