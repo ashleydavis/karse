@@ -4,7 +4,7 @@
 **Spec:** Settled
 **Implementation:** Complete
 
-The pod/container log viewer embedded on the pod detail page. When opened it automatically loads the last N lines and follows the log live via `kubectl logs -f` streamed over Server-Sent Events, with a container selector, a tail-line control, and a refresh button (no button to start streaming). Read-only.
+The pod log viewer embedded on the pod detail page (the Logs tab). It is the same shared component the dedicated Logs page (`/logs`) uses, so both surfaces expose the same options. When opened it automatically streams the pod's logs live over Server-Sent Events and follows them, with no button to start streaming, no "Tail" option, and no Refresh button. Read-only.
 
 ## Sub-features
 None.

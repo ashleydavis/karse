@@ -28,6 +28,8 @@ Both bounds preserve the read-only invariant: stern is still tail-only and no mu
 
 The kubectl-based multi-pod Logs page (`/logs`, `frontend/src/pages/live-logs/`) streams `kubectl logs -f` from every chosen pod. Once a stream is open the logs are live and update automatically (no manual refresh): each `kubectl logs -f` follow pushes new lines to the backend, which forwards them over SSE to the viewer as they arrive.
 
+The Logs page and the Pod detail Logs tab render a single shared component, `frontend/src/components/log-viewer.tsx` (`LogViewer`), so both surfaces expose the same options. The Logs page uses its full picker mode (namespace selector + pod picker + Stream/Stop); the Pod detail Logs tab passes a `fixedPod` so the component hides the picker and auto-streams that one pod. Neither surface has a "Tail" option or a Refresh button (see [log-viewer](../log-viewer/detail.md)).
+
 The page replaces the old single-select pod dropdown with a **searchable, multi-select pod picker dropdown** so it stays usable when there are many pods. The picker is a trigger button (labelled "Search pods...", or summarising the current selection/search) that, when clicked, drops an overlay panel DOWN below it. The pod list is collapsed until the trigger is used, rather than always expanded inline on the page. The dropdown panel holds, top to bottom:
 
 - A visible **"Search pods..."** input that filters the pod list by case-insensitive substring (the pure `filterPods` helper in `frontend/src/lib/filter-pods.ts`).

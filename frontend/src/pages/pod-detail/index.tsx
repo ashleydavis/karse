@@ -29,7 +29,7 @@ import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { ResourceRef } from "../../components/resource-ref";
 import { PodContainersPanel, PodInitContainersPanel } from "./components/pod-containers-panel";
-import { PodLogsPanel } from "./components/pod-logs-panel";
+import { LogViewer } from "../../components/log-viewer";
 import { PodPerformanceTab } from "../../components/performance/pod-performance-tab";
 import { performanceOrigin, PERFORMANCE_TAB } from "../../lib/breadcrumb-trail";
 
@@ -138,11 +138,6 @@ export function PodDetailPage() {
     if (isLoading || !data) {
         return <LoadingIndicator />;
     }
-
-    const allContainerNames = [
-        ...data.containers.map((c) => c.name),
-        ...data.initContainers.map((c) => c.name),
-    ];
 
     const hasInitContainers = data.initContainers.length > 0;
     // The Init Containers tab is hidden when there are none, so fall back to
@@ -276,11 +271,10 @@ export function PodDetailPage() {
             )}
 
             {effectiveTab === "logs" && (
-                <Box data-test-id="pod-panel-logs">
-                    <PodLogsPanel
-                        namespace={data.namespace}
-                        podName={data.name}
-                        containers={allContainerNames}
+                <Box data-test-id="pod-panel-logs" sx={{ display: "flex", minHeight: 400 }}>
+                    <LogViewer
+                        testIdPrefix="pod-logs"
+                        fixedPod={{ namespace: data.namespace, podName: data.name }}
                     />
                 </Box>
             )}

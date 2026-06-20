@@ -1708,6 +1708,30 @@ test.describe("karse e2e", () => {
             ],
         };
 
+        // The Pod detail Logs tab now uses the shared LogViewer, which streams the
+        // pod over the multi-pod /api/logs/stream endpoint (SSE: a "started" event
+        // then one "line" event per pod). This canned body mirrors that shape for
+        // the pinned pod, so the tab can be exercised without a real cluster.
+        function buildPodDetailSseBody(podName: string): string {
+            const started = `event: started\ndata: ${JSON.stringify({ pods: [{ namespace: "default", name: podName }] })}\n\n`;
+            const lines = [
+                `event: line\ndata: ${JSON.stringify({ namespace: "default", pod: podName, line: "kube-probe/1.29 GET /healthz" })}\n\n`,
+                `event: line\ndata: ${JSON.stringify({ namespace: "default", pod: podName, line: "start worker processes" })}\n\n`,
+            ].join("");
+            return started + lines;
+        }
+
+        async function interceptPodLogsStream(): Promise<void> {
+            await page.route("**/api/logs/stream*", async (route) => {
+                const selected = new URL(route.request().url()).searchParams.getAll("pods");
+                const podName = selected[0] ?? "nginx-abc";
+                await route.fulfill({
+                    headers: { "Content-Type": "text/event-stream" },
+                    body: buildPodDetailSseBody(podName),
+                });
+            });
+        }
+
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
             await page.route("**/api/pods/default/nginx-abc*", async (route) => {
@@ -1715,10 +1739,12 @@ test.describe("karse e2e", () => {
                     json: FAKE_POD_DETAIL,
                 });
             });
+            await interceptPodLogsStream();
             await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
         });
 
         test.afterAll(async () => {
+            await page.unroute("**/api/logs/stream*");
             await page.unroute("**/api/pods/default/nginx-abc*");
         });
 
@@ -1778,83 +1804,63 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-panel-containers']")).toHaveCount(0);
         });
 
-        test("clicking the Logs tab auto-loads and streams the log viewer with realistic content", async () => {
-            // Opening the Logs tab starts the live stream automatically: no button to
-            // load logs or start streaming, and the stream request fires on mount.
-            const streamRequest = page.waitForRequest((req) => req.url().includes("/logs/stream"));
+        test("clicking the Logs tab auto-loads and streams the shared log viewer for the pinned pod", async () => {
+            // The Logs tab uses the shared LogViewer pinned to this pod, so the live
+            // stream starts automatically on mount via the multi-pod /api/logs/stream
+            // endpoint scoped to this one pod (pods=nginx-abc). No button starts it.
+            const streamRequest = page.waitForRequest((req) => req.url().includes("/api/logs/stream") && req.url().includes("pods=nginx-abc"));
             await page.locator("[data-test-id='pod-tab-logs']").click();
             await streamRequest;
             await expect(page.locator("[data-test-id='pod-panel-logs']")).toBeVisible();
-            await expect(page.locator("[data-test-id='log-viewer']")).toBeVisible();
-            await expect(page.locator("[data-test-id='log-viewer']")).toContainText("kube-probe/1.29");
-            await expect(page.locator("[data-test-id='log-viewer']")).toContainText("start worker processes");
+            await expect(page.locator("[data-test-id='pod-logs-viewer']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-logs-viewer']")).toContainText("kube-probe/1.29");
+            await expect(page.locator("[data-test-id='pod-logs-viewer']")).toContainText("start worker processes");
+            // Each line is prefixed with its pod name, like the Logs page.
+            await expect(page.locator("[data-test-id='pod-logs-viewer']")).toContainText("default/nginx-abc");
         });
 
-        test("there is no load-logs or start-stream button", async () => {
-            // Logs auto-load and auto-stream, so no explicit load/start control exists.
+        test("the Logs tab exposes the same options as the Logs page, with no Tail option and no Refresh button", async () => {
+            await expect(page.locator("[data-test-id='pod-logs-viewer']")).toBeVisible();
+            // The shared component carries none of the dropped controls: no Tail
+            // selector, no Refresh button, and (the picker is pinned away) no
+            // container selector or load/start button.
+            await expect(page.locator("[data-test-id='log-tail-select']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='log-refresh']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='log-container-select']")).toHaveCount(0);
             await expect(page.locator("[data-test-id='log-load']")).toHaveCount(0);
             await expect(page.locator("[data-test-id='log-live-toggle']")).toHaveCount(0);
+            // The pod is fixed here, so the Logs page's namespace/pod picker and
+            // Stream button are not shown on this tab.
+            await expect(page.locator("[data-test-id='pod-logs-namespace-select']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='pod-logs-pod-picker']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='pod-logs-start']")).toHaveCount(0);
         });
 
         test("while streaming with no lines yet the log panel shows the progress indicator, not loading text", async () => {
             // Intercept the stream and delay its first line so the pre-line streaming
-            // state is observable; the panel must show the spinner, not "(waiting for logs...)".
-            await page.route("**/api/pods/default/nginx-abc/logs/stream*", async (route) => {
+            // state is observable; the panel must show the spinner, not loading text.
+            await page.route("**/api/logs/stream*", async (route) => {
+                const podName = new URL(route.request().url()).searchParams.getAll("pods")[0] ?? "nginx-abc";
                 await new Promise((resolve) => setTimeout(resolve, 1500));
-                // The pod log stream uses the default SSE `message` event (raw lines).
                 await route.fulfill({
                     headers: { "Content-Type": "text/event-stream" },
-                    body: `data: start worker processes\n\n`,
+                    body: buildPodDetailSseBody(podName),
                 });
             });
             await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='pod-tab-logs']").click();
-            // The spinner stands in for the loading state; no "(waiting for logs...)" text.
-            await expect(page.locator("[data-test-id='log-viewer'] [data-test-id='loading-indicator']")).toBeVisible();
-            await expect(page.locator("[data-test-id='log-viewer']")).not.toContainText("waiting for logs");
+            // The spinner stands in for the loading state; no loading text.
+            await expect(page.locator("[data-test-id='pod-logs-viewer'] [data-test-id='loading-indicator']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-logs-viewer']")).not.toContainText("waiting for logs");
             // Once a line arrives, the indicator is gone and the line is shown.
-            await expect(page.locator("[data-test-id='log-viewer']")).toContainText("start worker processes");
-            await expect(page.locator("[data-test-id='log-viewer'] [data-test-id='loading-indicator']")).toHaveCount(0);
-            // Restore the real backend stream and re-open the Logs tab for later tests.
-            await page.unroute("**/api/pods/default/nginx-abc/logs/stream*");
+            await expect(page.locator("[data-test-id='pod-logs-viewer']")).toContainText("start worker processes");
+            await expect(page.locator("[data-test-id='pod-logs-viewer'] [data-test-id='loading-indicator']")).toHaveCount(0);
+            // Restore the immediate stream and re-open the Logs tab for later tests.
+            await page.unroute("**/api/logs/stream*");
+            await interceptPodLogsStream();
             await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='pod-tab-logs']").click();
-            await expect(page.locator("[data-test-id='log-viewer']")).toBeVisible();
-        });
-
-        test("container selector is visible and lists both containers", async () => {
-            await expect(page.locator("[data-test-id='log-viewer']")).toBeVisible();
-            await expect(page.locator("[data-test-id='log-container-select']")).toBeVisible();
-            await page.locator("[data-test-id='log-container-select'] [role='combobox']").click();
-            const options = await page.locator("[data-test-id='log-container-option']").allTextContents();
-            expect(options).toContain("nginx");
-            expect(options).toContain("sidecar");
-            await page.keyboard.press("Escape");
-        });
-
-        test("switching container restarts the stream with the correct container param", async () => {
-            const requestPromise = page.waitForRequest((req) => req.url().includes("/logs/stream") && req.url().includes("container=sidecar"));
-            await page.locator("[data-test-id='log-container-select'] [role='combobox']").click();
-            await page.locator("[data-test-id='log-container-option']").filter({ hasText: "sidecar" }).click();
-            await requestPromise;
-        });
-
-        test("changing tail lines restarts the stream with the correct tail param", async () => {
-            const requestPromise = page.waitForRequest((req) => req.url().includes("/logs/stream") && req.url().includes("tail=50"));
-            await page.locator("[data-test-id='log-tail-select'] [role='combobox']").click();
-            await page.locator("[data-test-id='log-tail-option']").filter({ hasText: /^50$/ }).click();
-            await requestPromise;
-        });
-
-        test("refresh button re-opens the log stream", async () => {
-            // The fake-logs backend closes the stream after emitting its lines, so the
-            // refresh button re-enables. Clicking it restarts the stream from scratch.
-            const refresh = page.locator("[data-test-id='log-refresh']");
-            await expect(refresh).toBeEnabled();
-            const requestPromise = page.waitForRequest((req) => req.url().includes("/logs/stream"));
-            await refresh.click();
-            await requestPromise;
-            await expect(page.locator("[data-test-id='log-viewer']")).toContainText("start worker processes");
+            await expect(page.locator("[data-test-id='pod-logs-viewer']")).toBeVisible();
         });
 
         test("commands tab shows the read-only guided commands", async () => {
@@ -3606,6 +3612,15 @@ test.describe("karse e2e", () => {
             await expect(dropdown.locator("[data-test-id='live-logs-selected-count']")).toBeVisible();
             await expect(dropdown.locator("[data-test-id='live-logs-clear']")).toBeVisible();
             await closePicker();
+        });
+
+        test("has no Tail option and no Refresh button", async () => {
+            // The Logs page and the Pod detail Logs tab share one component, and
+            // neither exposes a "Tail" selector or a Refresh button.
+            await expect(page.locator("[data-test-id='log-tail-select']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='live-logs-tail-select']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='log-refresh']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='live-logs-refresh']")).toHaveCount(0);
         });
 
         test("typing in the search box filters the pod checkbox list", async () => {
