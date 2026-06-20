@@ -450,6 +450,72 @@ test.describe("karse e2e", () => {
             await page.locator("[aria-label='refresh']").click();
             await responsePromise;
         });
+
+        test("clicking refresh empties the on-disk cache", async () => {
+            setContext(CLUSTER_1);
+            await navigateTo();
+            await waitForStatTiles();
+            // The refresh button clears the server-side cache before re-fetching, so a
+            // POST to /api/cache/clear must accompany the click.
+            const clearPromise = page.waitForResponse(res =>
+                res.url().includes("/api/cache/clear") && res.request().method() === "POST");
+            await page.locator("[aria-label='refresh']").click();
+            const cleared = await clearPromise;
+            expect(cleared.status()).toBe(200);
+        });
+    });
+
+    // ── Config page (cluster-data cache) ───────────────────────────────────────
+
+    test.describe("config page", () => {
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+        });
+
+        async function navigateToConfig(): Promise<void> {
+            await page.goto("/config", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='config-cache-panel']")).toBeVisible();
+        }
+
+        test("config nav item opens the config page", async () => {
+            await navigateTo();
+            await page.locator("[data-test-id='sidebar-nav'] [aria-label='config']").click();
+            await expect(page).toHaveURL(/\/config/);
+            await expect(page.locator("[data-test-id='config-cache-panel']")).toBeVisible();
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Config");
+        });
+
+        test("shows the current staleness threshold", async () => {
+            await navigateToConfig();
+            const input = page.locator("[data-test-id='config-staleness-input']");
+            // The default threshold is a non-empty numeric value.
+            await expect(input).not.toHaveValue("");
+            const value = await input.inputValue();
+            expect(Number.isFinite(Number(value))).toBe(true);
+        });
+
+        test("rejects a negative threshold (save disabled, no request)", async () => {
+            await navigateToConfig();
+            const input = page.locator("[data-test-id='config-staleness-input']");
+            await input.fill("-5");
+            await expect(page.locator("[data-test-id='config-save-button']")).toBeDisabled();
+        });
+
+        test("saves a new threshold and persists it across reloads", async () => {
+            await navigateToConfig();
+            const input = page.locator("[data-test-id='config-staleness-input']");
+            await input.fill("7");
+            const savePromise = page.waitForResponse(res =>
+                res.url().includes("/api/cache/config") && res.request().method() === "PUT");
+            await page.locator("[data-test-id='config-save-button']").click();
+            const saved = await savePromise;
+            expect(saved.status()).toBe(200);
+            await expect(page.locator("[data-test-id='config-saved-alert']")).toBeVisible();
+
+            // Reload: the persisted value is read back from the server.
+            await navigateToConfig();
+            await expect(page.locator("[data-test-id='config-staleness-input']")).toHaveValue("7");
+        });
     });
 
     // ── Context switch ────────────────────────────────────────────────────────

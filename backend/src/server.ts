@@ -13,6 +13,7 @@ import { logsStreamRouter } from "./routes/logs-stream-route";
 import { sternStreamRouter } from "./routes/stern-stream-route";
 import { eventsRouter } from "./routes/events-route";
 import { errorsRouter } from "./routes/errors-route";
+import { cacheRouter } from "./routes/cache-route";
 
 // Builds and returns the configured Express application.
 // Applies JSON body parsing, mounts both API routers, and installs the
@@ -36,6 +37,7 @@ export function createServer(): express.Express {
     app.use("/api", sternStreamRouter);
     app.use("/api", eventsRouter);
     app.use("/api", errorsRouter);
+    app.use("/api", cacheRouter);
     const errorHandler: ErrorRequestHandler = (err: Error, _req, res, _next) => {
         res.status(500).json({
             error: err.message,

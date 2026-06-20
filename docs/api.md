@@ -378,3 +378,40 @@ When the Metrics API is unavailable, `metricsAvailable` is `false` and usage fie
   "containers": [ "..." ]
 }
 ```
+
+## GET /api/cache/config
+
+Returns the on-disk cache configuration. `stalenessSeconds` is how long a cached read is served before Karse re-fetches it from the cluster; `0` disables the cache. See `docs/spec/cluster-cache`.
+
+- **Response 200**: `CacheConfigResponse` — `{ "stalenessSeconds": number }`.
+
+```sh
+curl -fsS 'http://127.0.0.1:5172/api/cache/config'
+```
+
+```json
+{ "stalenessSeconds": 60 }
+```
+
+## PUT /api/cache/config
+
+Updates the cache staleness threshold and persists it server-side.
+
+- **Request body**: `{ "stalenessSeconds": number }` (a non-negative number).
+- **Response 200**: the stored `CacheConfigResponse`.
+- **Response 400**: `{ "error": "stalenessSeconds must be a non-negative number" }`.
+
+```sh
+curl -fsS -X PUT -H 'Content-Type: application/json' \
+  -d '{"stalenessSeconds": 120}' 'http://127.0.0.1:5172/api/cache/config'
+```
+
+## POST /api/cache/clear
+
+Empties the on-disk cache (deletes every cached query entry; the threshold in `config.json` is preserved). Backs the navbar refresh button so the next request re-fetches fresh `kubectl` data.
+
+- **Response 200**: `CacheClearResponse` — `{ "cleared": true }`.
+
+```sh
+curl -fsS -X POST 'http://127.0.0.1:5172/api/cache/clear'
+```

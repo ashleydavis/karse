@@ -27,11 +27,16 @@ FRONTEND_LOG="$KARSE_KWOK_STATE_DIR/e2e-$RUN_ID.frontend.log"
 # racing on the single shared kubeconfig.
 KUBECONFIG="$KARSE_KWOK_STATE_DIR/e2e-$RUN_ID.kubeconfig"
 export KUBECONFIG
+# Per-run isolated on-disk cache dir so concurrent e2e runs never share cached
+# cluster data. Lives under the kwok state dir (never /tmp, per project rule).
+KARSE_CACHE_DIR="$KARSE_KWOK_STATE_DIR/e2e-$RUN_ID.cache"
+export KARSE_CACHE_DIR
 
 cleanup() {
     [[ -n "$FRONTEND_PID" ]] && kill "$FRONTEND_PID" 2>/dev/null || true
     [[ -n "$BACKEND_PID" ]]  && kill "$BACKEND_PID"  2>/dev/null || true
     rm -f "$PORT_FILE" "$FRONTEND_LOG" "$KUBECONFIG"
+    rm -rf "$KARSE_CACHE_DIR"
     kwokctl delete cluster --name "$KWOK_CLUSTER_1" 2>/dev/null || true
     kwokctl delete cluster --name "$KWOK_CLUSTER_2" 2>/dev/null || true
     release_ports

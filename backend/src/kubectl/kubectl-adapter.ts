@@ -1,5 +1,8 @@
 import { run, stream, type CommandResult, type StreamHandle } from "../command-runner";
 import { audit, formatLocalISO } from "../audit-log";
+import {
+    cacheKey, readCacheEntry, writeCacheEntry, readCacheConfig, isFresh,
+} from "./cache";
 import { parseCpuToMillicores, parseMemoryToBytes } from "./quantity";
 import type {
     Context, NodeStatus, Node, ClusterOverview, Namespace, Pod, PodPhase,
@@ -15,12 +18,53 @@ import type {
 // Base directory for the rolling audit log; overridable via KARSE_LOGS_DIR.
 const LOGS_DIR = process.env.KARSE_LOGS_DIR ?? "../logs";
 
+// Whether a kubectl argv is a *cluster* read that may be served from / stored in the
+// on-disk cache. Only cluster-touching reads are cached (`get …`, `version`, the raw
+// Metrics API reads). Every `kubectl config …` command is excluded: the writes
+// (use-context / set-context / unset) must run live, and the reads (config view /
+// current-context) reflect local kubeconfig state that the user changes from the UI,
+// so they must always be read fresh — caching them would make a context/namespace
+// switch invisible until the entry expired. Local config reads are cheap anyway, so
+// there is nothing to gain by caching them.
+function isCacheableRead(args: readonly string[]): boolean {
+    return args[0] !== "config";
+}
+
 // Writes an audit entry, prints to stdout, then shells out to kubectl.
+// Read commands are served from the on-disk cache when a fresh entry exists, and
+// their successful results are cached (date-stamped) for the next request. This
+// avoids re-running kubectl on every request while keeping the cluster read-only:
+// the cache stores read output only, never a write. Stale or absent cache entries,
+// and all kubeconfig writes, fall through to a live kubectl invocation. A failed
+// read is never cached, and a cache write failure never fails the request.
 async function kubectl(args: readonly string[]): Promise<CommandResult> {
+    const cacheable = isCacheableRead(args);
+
+    if (cacheable) {
+        const { stalenessSeconds } = await readCacheConfig();
+        const cached = await readCacheEntry(cacheKey(args));
+        if (cached !== null && isFresh(cached.savedAt, stalenessSeconds)) {
+            return cached.result;
+        }
+    }
+
     const now = new Date();
     await audit(LOGS_DIR, "kubectl", args, now);
     console.log(formatLocalISO(now) + " kubectl " + args.join(" "));
-    return run("kubectl", args);
+    const result = await run("kubectl", args);
+
+    // Cache only successful reads, stamped with the time they were saved. A failed
+    // read (non-zero exit) is left uncached so a transient error is not served back.
+    if (cacheable && result.exitCode === 0) {
+        try {
+            await writeCacheEntry(args, result, undefined, now);
+        }
+        catch {
+            // A cache write failure must not fail the request; serve the live result.
+        }
+    }
+
+    return result;
 }
 
 // Returns every context defined in the active kubeconfig.

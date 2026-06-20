@@ -1,0 +1,38 @@
+# cluster-cache
+
+## Overview
+
+To avoid re-running `kubectl` on every request, Karse caches each read-only cluster query on disk. A read is served from the cache while it is still fresh; once it is older than the configured staleness threshold it is re-fetched from the cluster. The cache holds read output only and never a cluster write, so the read-only invariant (see `read-only-invariant`) still holds.
+
+Backed by: `backend/src/kubectl/cache.ts` (the cache store and config), `backend/src/kubectl/kubectl-adapter.ts` (the private `kubectl(args)` helper reads/writes the cache), `backend/src/routes/cache-route.ts` (the config + clear endpoints), `frontend/src/pages/config/index.tsx` (the config page), and `frontend/src/components/header.tsx` (the navbar refresh button clears the cache).
+
+## Behaviour
+
+- Every successful *cluster* read routed through the adapter's `kubectl(args)` helper (`kubectl get …`, `kubectl version`, the raw Metrics API reads) is written to the cache as a JSON file, stamped with the local-ISO date/time it was saved.
+- The per-query cache key is a SHA-256 digest of the kubectl argv (joined by spaces), so distinct argvs — including different `--context`, namespace, or resource kind — never collide on one key.
+- On a read, if a cached entry exists and its saved stamp is within the staleness threshold, the cached result is returned without spawning `kubectl`. Otherwise (stale or absent) `kubectl` is run live and the fresh successful result re-cached.
+- A failed read (non-zero exit) is never cached, so a transient error is not served back on the next request.
+- No `kubectl config …` command is cached. The writes (`config use-context`, `config set-context --namespace`, `config unset contexts.*.namespace`) always run live; the local-kubeconfig reads (`config view`, `config current-context`) are also always read fresh so a context/namespace switch is reflected immediately rather than masked by a still-fresh cache entry. Streamed reads (`kubectl logs -f`, `stern`) are not cached.
+- The staleness threshold is configurable in the UI on the Config page (`/config`), persisted server-side, and read on every request. A threshold of `0` disables the cache (every read is treated as stale and re-fetched).
+- The cache directory is `KARSE_CACHE_DIR` (default `../cache`, which resolves to the repo-root `cache/` given the backend's `backend/` cwd). It holds one JSON file per cached query plus a single `config.json` holding the threshold.
+- Clicking the navbar refresh button empties the cache (deletes every cached entry, preserving the threshold) and then re-fetches, so the next request returns fresh `kubectl` data.
+
+## API
+
+- `GET /api/cache/config` → `{ stalenessSeconds: number }`: the current threshold.
+- `PUT /api/cache/config` with `{ stalenessSeconds: number }` → the stored config. Rejects a non-number or negative value with 400.
+- `POST /api/cache/clear` → `{ cleared: true }`: empties the cache (entries only; the config is preserved).
+
+## Acceptance Criteria
+
+- [x] `kubectl` results are cached to local JSON files as they are fetched.
+- [x] Each cached file is stamped with the local date/time it was saved.
+- [x] When cached data is older than the configured threshold, Karse fetches fresh data via `kubectl`; otherwise it serves the cache.
+- [x] The staleness threshold is configurable from a config page in the UI and persisted.
+- [x] The navbar refresh button empties the local cache (then re-fetches).
+- [x] The read-only invariant is preserved: only read output is cached, never a cluster write, and write commands bypass the cache.
+- [x] A failed read is not cached.
+
+## Open Questions
+
+None.

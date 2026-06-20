@@ -54,6 +54,7 @@ Single-test-cluster discipline (per `readme.md`): there is only ever ONE test cl
 | [performance-tabs](./performance-tabs/index.md) | Performance tab scaffold: tabbed cluster home and Performance tab stubs on cluster, node, and pod pages. |
 | [audit-log](./audit-log/index.md) | On-disk kubectl audit log. |
 | [about-page](./about-page/index.md) | About page: what Karse is, how it works, author, GitHub link. |
+| [cluster-cache](./cluster-cache/index.md) | On-disk cache of cluster data with a UI-configurable staleness threshold and a refresh that empties it. |
 
 ## Cross-cutting guides
 

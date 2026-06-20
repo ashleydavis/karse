@@ -64,7 +64,7 @@ The header bar has two quick-picker buttons:
 - **Context picker** (link icon, `Ctrl+K`): opens a searchable list of contexts. Click a row to switch the active context for the tab.
 - **Namespace picker** (layers icon, `Ctrl+Shift+K`): opens a searchable list of namespaces for the active context. Click "All namespaces" to clear the namespace selection, or click a namespace name to scope all views to that namespace.
 
-The header also has a dropdown showing the current context and a **Refresh** button that re-fetches all data.
+The header also has a dropdown showing the current context and a **Refresh** button (circular-arrows icon) that empties the on-disk cluster-data cache and re-fetches all data fresh from the cluster. See the Config page below for the cache.
 
 ## Contexts page (`/contexts`)
 
@@ -213,6 +213,14 @@ Breadcrumbs show the full trail: Pods > namespace > pod > container > tab.
 | `KARSE_PORT` | `5172` | Port the backend listens on. |
 | `KARSE_FRONTEND_PORT` | `5173` | Port the Vite frontend listens on. |
 | `KARSE_LOGS_DIR` | `../logs` (repo root `logs/`) | Directory for audit log files. Set to an absolute path to write logs elsewhere. |
+| `KARSE_CACHE_DIR` | `../cache` (repo root `cache/`) | Directory for the on-disk cluster-data cache. Set to an absolute path to cache elsewhere. |
+
+## Config page (`/config`)
+
+Karse caches read-only cluster data fetched with `kubectl` on disk (under `cache/`) so it does not re-run `kubectl` on every request. The **Config** page (gear icon in the sidebar) controls the cache:
+
+- **Staleness threshold (seconds)**: how long a cached read is served before Karse re-fetches it from the cluster. Lower it for fresher data, raise it to spare more kubectl calls. Set it to **0** to disable the cache entirely. The value is saved server-side and persists across restarts.
+- The navbar **Refresh** button empties the cache (the threshold is kept) and re-fetches, so you always have a one-click way to get fresh data regardless of the threshold.
 
 ## Audit log
 

@@ -9,6 +9,7 @@ e2e/.last-run.json
 .env*
 backend/dist/
 logs/
+cache/
 frontend/dist/
 .claude/permissions-debug.log
 .claude/permissions-log/

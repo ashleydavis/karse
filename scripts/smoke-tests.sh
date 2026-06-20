@@ -22,12 +22,18 @@ PORT_FILE="$KARSE_KWOK_STATE_DIR/smoke-$RUN_ID.port"
 # reads it, so this run never touches the developer's real ~/.kube/config.
 KUBECONFIG="$KARSE_KWOK_STATE_DIR/smoke-$RUN_ID.kubeconfig"
 export KUBECONFIG
+# Per-run isolated cache dir so concurrent smoke runs never share cached entries,
+# and the cache assertions below operate on a known-clean directory. Lives under the
+# kwok state dir (never /tmp, per project rule), unique per run via RUN_ID.
+KARSE_CACHE_DIR="$KARSE_KWOK_STATE_DIR/smoke-$RUN_ID.cache"
+export KARSE_CACHE_DIR
 
 cleanup() {
     if [[ -n "$BACKEND_PID" ]] && kill -0 "$BACKEND_PID" 2>/dev/null; then
         kill "$BACKEND_PID"
     fi
     rm -f "$PORT_FILE" "$KUBECONFIG"
+    rm -rf "$KARSE_CACHE_DIR"
     kwokctl delete cluster --name "$KWOK_CLUSTER" 2>/dev/null || true
     release_ports
 }
@@ -514,6 +520,50 @@ else
     fi
     echo "Empty context name returns 400: OK"
 fi
+
+echo "--- GET /api/cache/config (default threshold) ---"
+CACHE_CFG=$(curl -fsS "$BASE/api/cache/config")
+echo "$CACHE_CFG" | jq -e 'has("stalenessSeconds") and (.stalenessSeconds | type == "number")' > /dev/null
+echo "OK"
+
+echo "--- PUT /api/cache/config (update threshold) ---"
+UPDATED=$(curl -fsS -X PUT -H "Content-Type: application/json" \
+    -d '{"stalenessSeconds": 5}' "$BASE/api/cache/config")
+echo "$UPDATED" | jq -e '.stalenessSeconds == 5' > /dev/null
+# The change must persist: a fresh GET reports the new value.
+curl -fsS "$BASE/api/cache/config" | jq -e '.stalenessSeconds == 5' > /dev/null
+echo "OK"
+
+echo "--- PUT /api/cache/config (invalid threshold rejected) ---"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
+    -H "Content-Type: application/json" -d '{"stalenessSeconds": -1}' \
+    "$BASE/api/cache/config")
+if [[ "$HTTP_CODE" != "400" ]]; then
+    echo "Expected HTTP 400 for negative staleness, got $HTTP_CODE" >&2
+    exit 1
+fi
+echo "OK"
+
+echo "--- Cache populates and POST /api/cache/clear empties it ---"
+# A read request populates the on-disk cache (KARSE_CACHE_DIR set on the backend
+# below). Confirm at least one cached entry file exists, then clear and confirm
+# only the config file remains (clear preserves the threshold, drops entries).
+curl -fsS "$BASE/api/cluster/nodes?context=$CURRENT_CTX" > /dev/null
+ENTRY_COUNT=$(find "$KARSE_CACHE_DIR" -maxdepth 1 -name '*.json' ! -name 'config.json' | wc -l | tr -d ' ')
+if [[ "$ENTRY_COUNT" -lt 1 ]]; then
+    echo "Expected at least one cached entry after a read, found $ENTRY_COUNT" >&2
+    exit 1
+fi
+CLEARED=$(curl -fsS -X POST "$BASE/api/cache/clear")
+echo "$CLEARED" | jq -e '.cleared == true' > /dev/null
+ENTRY_COUNT=$(find "$KARSE_CACHE_DIR" -maxdepth 1 -name '*.json' ! -name 'config.json' | wc -l | tr -d ' ')
+if [[ "$ENTRY_COUNT" -ne 0 ]]; then
+    echo "Expected 0 cached entries after clear, found $ENTRY_COUNT" >&2
+    exit 1
+fi
+# The config file (threshold) survives the clear.
+test -f "$KARSE_CACHE_DIR/config.json" || { echo "Expected config.json to survive cache clear" >&2; exit 1; }
+echo "OK"
 
 if [[ -n "$BACKEND_PID" ]] && kill -0 "$BACKEND_PID" 2>/dev/null; then
     kill "$BACKEND_PID"

@@ -8,7 +8,7 @@ import type {
     PodDetail, NodeDetail, YamlResourceType, YamlResponse,
     LogStreamLine, LogStreamStarted, EventsResponse, ErrorsResponse,
     SternStreamLine, SternStreamStarted, ClusterPerformance, NodePerformance,
-    PodPerformance,
+    PodPerformance, CacheConfigResponse, CacheClearResponse,
 } from "karse-types";
 
 // Every data request times out after LOAD_TIMEOUT_MS. When the cluster is
@@ -32,6 +32,26 @@ http.interceptors.response.use(
 
 export async function fetchContexts(): Promise<ContextsResponse> {
     const response = await http.get<ContextsResponse>("/contexts");
+    return response.data;
+}
+
+// Fetches the on-disk cache configuration (the staleness threshold in seconds).
+export async function fetchCacheConfig(): Promise<CacheConfigResponse> {
+    const response = await http.get<CacheConfigResponse>("/cache/config");
+    return response.data;
+}
+
+// Updates the cache staleness threshold (seconds). Cached kubectl data older than
+// this is re-fetched from the cluster; data younger than it is served from disk.
+export async function setCacheConfig(stalenessSeconds: number): Promise<CacheConfigResponse> {
+    const response = await http.put<CacheConfigResponse>("/cache/config", { stalenessSeconds });
+    return response.data;
+}
+
+// Empties the on-disk cache so the next request re-fetches fresh kubectl data.
+// Backs the navbar refresh button.
+export async function clearCache(): Promise<CacheClearResponse> {
+    const response = await http.post<CacheClearResponse>("/cache/clear");
     return response.data;
 }
 

@@ -1,5 +1,6 @@
 jest.mock("../../command-runner");
 jest.mock("../../audit-log");
+jest.mock("../../kubectl/cache");
 
 import type { CommandResult } from "../../command-runner";
 import {

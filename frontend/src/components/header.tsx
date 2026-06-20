@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
 import { useConfig } from "../lib/config";
+import { clearCache } from "../lib/api-client";
 import { ContextPicker } from "./context-picker";
 import { ContextQuickPicker } from "./context-quick-picker";
 import { NamespaceQuickPicker } from "./namespace-quick-picker";
@@ -41,6 +42,9 @@ export function Header() {
     const colorModeIcon = colorMode === "dark" ? faSun : colorMode === "light" ? faMoon : faCircleHalfStroke;
 
     async function handleRefresh(): Promise<void> {
+        // Empty the on-disk cluster-data cache first so the invalidated queries below
+        // re-fetch fresh kubectl data rather than re-reading a still-fresh cache entry.
+        await clearCache();
         await qc.invalidateQueries({ queryKey: ["contexts"] });
         await qc.invalidateQueries({ queryKey: ["cluster"] });
         await qc.invalidateQueries({ queryKey: ["namespaces"] });

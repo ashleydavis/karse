@@ -431,3 +431,15 @@ export type YamlResourceType =
 export type YamlResponse = {
     yaml: string;
 };
+
+// Cache configuration, returned by GET /api/cache/config and accepted (as a partial)
+// by PUT /api/cache/config. stalenessSeconds is how long a cached kubectl result is
+// served before Karse re-fetches fresh data from the cluster.
+export type CacheConfigResponse = {
+    stalenessSeconds: number;
+};
+
+// Response body for POST /api/cache/clear: confirms the local cache was emptied.
+export type CacheClearResponse = {
+    cleared: true;
+};

@@ -69,7 +69,8 @@ graph TD
 - **Express backend**: `server.ts` builds the app, applies `express.json()`, mounts the two route modules under `/api`, and installs a single error middleware. Routes are thin: they call adapter functions and shape the JSON response.
 - **kubectl adapter** (`kubectl/kubectl-adapter.ts`): a module of free async functions that build kubectl argv, run them through the private `kubectl(args)` helper, and parse the JSON output into the shared contract types from `karse-types`. This is the only place that invokes kubectl.
 - **command-runner** (`command-runner.ts`): a thin `node:child_process.spawn` wrapper exporting the free function `run`, which accumulates stdout/stderr and resolves a `CommandResult`.
-- **audit-log** (`audit-log.ts`): appends one line per kubectl call to a rolling text file and prunes old logs at startup.
+- **cache** (`kubectl/cache.ts`): an on-disk cache of read-only cluster data. The adapter's `kubectl(args)` helper serves a successful read from a date-stamped JSON file while it is within the configured staleness threshold, and re-caches a fresh read otherwise. Kubeconfig writes and failed reads bypass it, so the read-only invariant holds. The threshold (`config.json`) and the `/api/cache/*` endpoints (`routes/cache-route.ts`) let the UI configure staleness and empty the cache (the navbar refresh button). The cache dir is `KARSE_CACHE_DIR` (default `../cache`). See `docs/spec/cluster-cache`.
+- **audit-log** (`audit-log.ts`): appends one line per kubectl call to a rolling text file and prunes old logs at startup. A cache hit serves without spawning kubectl, so it produces no audit line; only live reads are audited.
 - **lib/** (`src/lib/`): reusable server-side modules shared across routes and adapters. Analogous to the frontend's `lib/`.
 
 ## How kubectl failures surface
