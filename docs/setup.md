@@ -6,9 +6,9 @@ How to get Karse ready to run, test, and develop. Once set up, see [development.
 
 - **`bun`** on `PATH` (the [official installer](https://bun.sh), or `mise install` for the pinned version).
 - **`kubectl`** on `PATH`, configured against at least one kubeconfig context (`mise install` provides the pinned version).
-- **`jq`**, **`curl`**, and **`kwokctl`** on `PATH` for the smoke and e2e tests (kwokctl install is in [development.md](development.md#installing-kwokctl)).
+- **`jq`**, **`curl`**, and **`kwokctl`** on `PATH` for the smoke and e2e tests (`mise install` provides the pinned `kwokctl`; manual install is in [development.md](development.md#installing-kwokctl)).
 
-If you use [mise](https://mise.jdx.dev), `mise trust && mise install` at the repo root installs the pinned `bun` and `kubectl`.
+If you use [mise](https://mise.jdx.dev), `mise trust && mise install` at the repo root installs the pinned `bun`, `kubectl`, and `kwokctl`.
 
 ## Set up the project
 

@@ -7,24 +7,24 @@ This guide covers everything needed to develop, test, and contribute to Karse. F
 - **`bun`** on `PATH`. Install it however you prefer: the [official installer](https://bun.sh), Homebrew, mise, or your system package manager. See [Installing Bun via mise](#installing-bun-via-mise) below.
 - **`kubectl`** on `PATH`, configured against at least one kubeconfig context. The repo's `mise.toml` pins a `kubectl` version, so `mise install` provides it (see [Installing Bun via mise](#installing-bun-via-mise)).
 - **`jq`** and **`curl`** on `PATH` (required by `scripts/smoke-tests.sh`).
-- **`kwokctl`** and **`kubectl`** on `PATH` (required by `scripts/smoke-tests.sh` and `scripts/e2e-tests.sh` to spin up local fake clusters). See [Installing kwokctl](#installing-kwokctl) below; kubectl is available via your system package manager or via the Kubernetes docs.
+- **`kwokctl`** on `PATH` (required by `scripts/smoke-tests.sh` and `scripts/e2e-tests.sh` to spin up local fake clusters). The repo's `mise.toml` pins a version, so `mise install` provides it (see [Installing Bun via mise](#installing-bun-via-mise)); otherwise see [Installing kwokctl](#installing-kwokctl) below.
 
 ### Installing Bun via mise
 
-If you use [mise](https://mise.jdx.dev), the repo includes a `mise.toml` that pins the Bun version. After cloning:
+If you use [mise](https://mise.jdx.dev), the repo includes a `mise.toml` that pins `bun`, `kubectl`, and `kwokctl`. After cloning:
 
 ```sh
 mise trust   # approve the mise.toml in this repo
-mise install # install the pinned Bun version
+mise install # install the pinned bun, kubectl, and kwokctl
 ```
 
 `mise trust` is required because mise will not read a `mise.toml` from an untrusted directory. You only need to run it once per clone. After that, `mise install` (or any `bun` invocation in the repo) will use the pinned version automatically.
 
 ### Installing kwokctl
 
-[kwok](https://kwok.sigs.k8s.io) is only needed to run the testing manual's KWOK fixtures under [`docs/testing-manual/_fixtures-kwok/`](docs/testing-manual/_fixtures-kwok/FIXTURES.md) and the smoke/e2e tests; Karse itself does not require it. A kwok release ships two binaries (`kwok` and `kwokctl`); the test scripts only use `kwokctl`.
+[kwok](https://kwok.sigs.k8s.io) is only needed to run the testing manual's KWOK fixtures under [`docs/testing-manual/_fixtures-kwok/`](docs/testing-manual/_fixtures-kwok/FIXTURES.md) and the smoke/e2e tests; Karse itself does not require it. A kwok release ships two binaries (`kwok` and `kwokctl`); the test scripts only use `kwokctl`. If you use mise, `mise install` at the repo root installs the pinned version from `mise.toml`.
 
-Install `kwokctl` manually (pinned to `v0.7.0`):
+Otherwise install `kwokctl` manually (pinned to `v0.7.0`):
 
 ```sh
 KWOK_VERSION=v0.7.0
