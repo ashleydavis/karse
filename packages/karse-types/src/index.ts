@@ -118,6 +118,28 @@ export type DaemonSetsResponse = {
     daemonSets: DaemonSet[];
 };
 
+// A single Kubernetes horizontal pod autoscaler (HPA) in the active cluster.
+// reference is the scale target it manages, e.g. "Deployment/web". minReplicas,
+// maxReplicas, and currentReplicas summarise its scaling bounds and current scale;
+// targets is the metric summary kubectl shows (e.g. "cpu: 40%/80%"), or "<none>"
+// when no metric status is available yet.
+export type HorizontalPodAutoscaler = {
+    name: string;
+    namespace: string;
+    reference: string;
+    minReplicas: number;
+    maxReplicas: number;
+    currentReplicas: number;
+    targets: string;
+    createdAt: string;
+    labels: Record<string, string>;  // metadata.labels; empty object when none
+};
+
+// Response body for GET /api/horizontalpodautoscalers.
+export type HorizontalPodAutoscalersResponse = {
+    horizontalPodAutoscalers: HorizontalPodAutoscaler[];
+};
+
 // The lifecycle state of a container within a pod.
 export type ContainerState = "Running" | "Waiting" | "Terminated" | "Unknown";
 

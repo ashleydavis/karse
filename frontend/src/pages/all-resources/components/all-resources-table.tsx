@@ -28,6 +28,7 @@ import { useShareableNavigate } from "../../../lib/nav-state";
 import {
     fetchPods, fetchNodes, fetchNamespaces,
     fetchDeployments, fetchStatefulSets, fetchDaemonSets,
+    fetchHorizontalPodAutoscalers,
 } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
@@ -146,10 +147,11 @@ export function AllResourcesTable() {
             { queryKey: ["deployments", current, namespace], queryFn: () => fetchDeployments(current!, namespace ?? undefined), enabled: current !== null },
             { queryKey: ["statefulsets", current, namespace], queryFn: () => fetchStatefulSets(current!, namespace ?? undefined), enabled: current !== null },
             { queryKey: ["daemonsets", current, namespace], queryFn: () => fetchDaemonSets(current!, namespace ?? undefined), enabled: current !== null },
+            { queryKey: ["horizontalpodautoscalers", current, namespace], queryFn: () => fetchHorizontalPodAutoscalers(current!, namespace ?? undefined), enabled: current !== null },
         ],
     });
 
-    const [podsResult, nodesResult, namespacesResult, deploymentsResult, statefulSetsResult, daemonSetsResult] = results;
+    const [podsResult, nodesResult, namespacesResult, deploymentsResult, statefulSetsResult, daemonSetsResult, hpasResult] = results;
 
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
@@ -163,6 +165,7 @@ export function AllResourcesTable() {
         deployments: deploymentsResult.data?.deployments,
         statefulSets: statefulSetsResult.data?.statefulSets,
         daemonSets: daemonSetsResult.data?.daemonSets,
+        horizontalPodAutoscalers: hpasResult.data?.horizontalPodAutoscalers,
     });
 
     // The filterable columns the shared editor offers: the Kind and Health value

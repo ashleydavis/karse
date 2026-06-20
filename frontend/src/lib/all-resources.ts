@@ -1,5 +1,6 @@
 import type {
     Pod, Node, Namespace, Deployment, StatefulSet, DaemonSet,
+    HorizontalPodAutoscaler,
 } from "karse-types";
 import { resourcePath } from "./resource-link";
 import {
@@ -34,6 +35,7 @@ export type AllResource = {
 // before its list has loaded.
 export const ALL_RESOURCE_KINDS = [
     "Pod", "Node", "Namespace", "Deployment", "StatefulSet", "DaemonSet",
+    "HorizontalPodAutoscaler",
 ] as const;
 
 // The per-kind lists fed into the aggregator. Each is optional so the page can
@@ -46,6 +48,7 @@ export type AllResourceInputs = {
     deployments?: Deployment[];
     statefulSets?: StatefulSet[];
     daemonSets?: DaemonSet[];
+    horizontalPodAutoscalers?: HorizontalPodAutoscaler[];
 };
 
 function podRow(pod: Pod): AllResource {
@@ -131,6 +134,23 @@ function daemonSetRow(daemonSet: DaemonSet): AllResource {
     };
 }
 
+// HPAs carry no Healthy/Error notion of their own in Karse's list shape, so they
+// are classified Other (no health checkbox) and counted toward the total only.
+// The status reads the metric summary (e.g. "cpu: 40%/80%"), and there is no HPA
+// detail page so the row has no detail route and degrades to plain text.
+function horizontalPodAutoscalerRow(hpa: HorizontalPodAutoscaler): AllResource {
+    return {
+        kind: "HorizontalPodAutoscaler",
+        namespace: hpa.namespace,
+        name: hpa.name,
+        status: hpa.targets,
+        health: "Other",
+        createdAt: hpa.createdAt,
+        detailPath: resourcePath("HorizontalPodAutoscaler", hpa.name, hpa.namespace),
+        labels: hpa.labels ?? {},
+    };
+}
+
 // Normalises every per-kind list into one combined array of AllResource rows, one
 // row per resource, with the shared fields (kind, namespace, name, status, health,
 // age, detail route, labels) populated per kind. The order is grouped by kind in
@@ -156,6 +176,9 @@ export function aggregateResources(inputs: AllResourceInputs): AllResource[] {
     }
     for (const daemonSet of inputs.daemonSets ?? []) {
         rows.push(daemonSetRow(daemonSet));
+    }
+    for (const hpa of inputs.horizontalPodAutoscalers ?? []) {
+        rows.push(horizontalPodAutoscalerRow(hpa));
     }
     return rows;
 }

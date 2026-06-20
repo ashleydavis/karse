@@ -2,7 +2,7 @@
 
 ## Overview
 
-A single top-level page that unifies every per-kind resource list into one combined table, so the user can find any resource in the active cluster from one place. Today each kind (pods, nodes, namespaces, deployments, stateful sets, daemon sets) has its own page; the All resources page presents them all together, searchable, sortable, and filterable by kind.
+A single top-level page that unifies every per-kind resource list into one combined table, so the user can find any resource in the active cluster from one place. Today each kind has its own page (pods, nodes, namespaces, deployments, stateful sets, daemon sets); the All resources page presents them all together, plus horizontal pod autoscalers (HPAs), which have no page of their own. The table is searchable, sortable, and filterable by kind.
 
 Reached from the "All resources" entry in the left nav (`frontend/src/components/sidebar.tsx`) at the route `/all-resources` (`frontend/src/app.tsx`). Read-only, consistent with [read-only-invariant](../read-only-invariant/detail.md): it issues only the existing read-only list queries and offers no mutating action.
 
@@ -13,17 +13,23 @@ Backed by:
 
 ## Data aggregation
 
-- The page composes the existing per-kind list queries rather than adding a new backend endpoint. It runs one query per kind (`fetchPods`, `fetchNodes`, `fetchNamespaces`, `fetchDeployments`, `fetchStatefulSets`, `fetchDaemonSets`) via TanStack `useQueries`, reusing the same query keys and functions as the per-kind pages so the cache is shared with them.
+- The page composes the existing per-kind list queries rather than adding a new backend endpoint. It runs one query per kind (`fetchPods`, `fetchNodes`, `fetchNamespaces`, `fetchDeployments`, `fetchStatefulSets`, `fetchDaemonSets`, `fetchHorizontalPodAutoscalers`) via TanStack `useQueries`, reusing the same query keys and functions as the per-kind pages so the cache is shared with them. HPAs have no per-kind page, so their list endpoint (`GET /api/horizontalpodautoscalers`) and `fetchHorizontalPodAutoscalers` exist only to feed this page.
 - `aggregateResources` normalises each kind into one common row shape, `AllResource`:
-  - `kind`: the singular display kind ("Pod", "Node", "Namespace", "Deployment", "StatefulSet", "DaemonSet").
+  - `kind`: the singular display kind ("Pod", "Node", "Namespace", "Deployment", "StatefulSet", "DaemonSet", "HorizontalPodAutoscaler").
   - `namespace`: the resource's namespace, or `""` for cluster-scoped kinds (Node, Namespace).
   - `name`: the resource name.
-  - `status`: a short human-readable summary per kind: pod phase, node status, "Active" for a namespace, the ready ratio (`x/y`) for deployments and stateful sets, and `ready/desired` for daemon sets.
-  - `health`: the derived `Healthy` / `Error` / `Other` classification, reusing the same per-kind classifiers as the resource-stats headers, so the health filter agrees with every other table. Namespaces have no health and are `Other`.
+  - `status`: a short human-readable summary per kind: pod phase, node status, "Active" for a namespace, the ready ratio (`x/y`) for deployments and stateful sets, `ready/desired` for daemon sets, and the metric summary (e.g. `cpu: 40%/80%`, or `<none>` when no metric status is available yet) for HPAs.
+  - `health`: the derived `Healthy` / `Error` / `Other` classification, reusing the same per-kind classifiers as the resource-stats headers, so the health filter agrees with every other table. Namespaces and HPAs have no health notion and are `Other`.
   - `createdAt`: the ISO creation timestamp the UI turns into an age; namespaces carry none, so their age shows as `-`.
-  - `detailPath`: the in-app route to that resource's own detail page, resolved through the single `resourcePath` helper, or `null` when the kind has no detail page.
+  - `detailPath`: the in-app route to that resource's own detail page, resolved through the single `resourcePath` helper, or `null` when the kind has no detail page. HPAs have no detail page, so their rows always degrade to plain text.
   - `labels`: the resource's label map, for label search and filtering.
 - Rows are grouped by kind in a fixed display order; within a kind the source order is preserved. A kind whose list has not loaded contributes no rows, so the table assembles progressively, but the page shows the shared loading spinner until every kind's first load has settled. If any kind's query fails, the shared load-error panel is shown with a retry that refetches all kinds.
+
+## Resource type coverage
+
+The All resources page does not enumerate every type `kubectl api-resources` exposes; it lists the kinds Karse has chosen to surface. The supported set is: Pod, Node, Namespace, Deployment, StatefulSet, DaemonSet, and HorizontalPodAutoscaler.
+
+Other common types (ReplicaSet, Job, CronJob, Service, Ingress, ConfigMap, Secret, PersistentVolume, PersistentVolumeClaim, and the long tail of CRDs) are intentionally out of scope for now: Karse is a focused read-only dashboard, not a generic object browser, and most of these either duplicate information already shown via their owning workload or carry sensitive data (Secrets) that the read-only dashboard deliberately does not surface. They can be added later by following the same pattern HPA uses (a list adapter, a list endpoint, a `fetch*` client, an `AllResource` row mapper, and a `resourcePath` case if a detail page exists). HorizontalPodAutoscaler was added because it is a first-class scaling control with no other home in Karse; unlike a detailed kind it has no per-kind page, so it appears only here and its rows are non-clickable.
 
 ## Behaviour
 
@@ -31,7 +37,7 @@ Backed by:
 
 - Columns: Kind, Namespace, Name, Status, Age, Labels. A hidden Health column backs the health filter (never rendered), matching the other tables.
 - Namespace is blank for cluster-scoped kinds (Node, Namespace). Age shows `-` for kinds whose list carries no creation timestamp (namespaces).
-- The page is scoped by the active namespace like the other tables: when a namespace is selected, the namespaced kinds (pods, deployments, stateful sets, daemon sets) are scoped to it; the cluster-scoped kinds (nodes, namespaces) are always shown.
+- The page is scoped by the active namespace like the other tables: when a namespace is selected, the namespaced kinds (pods, deployments, stateful sets, daemon sets, HPAs) are scoped to it; the cluster-scoped kinds (nodes, namespaces) are always shown.
 
 ### Search
 
@@ -62,6 +68,8 @@ Backed by:
 - [x] The table is searchable, consistent with the existing resource tables.
 - [x] The table is sortable by clicking a column header.
 - [x] The table is filterable via the shared dropdown filter editor, including a Kind filter restricting to one or more kinds.
-- [x] Each row links to that resource's detail page, degrading gracefully for kinds without one.
+- [x] Each row links to that resource's detail page, degrading gracefully for kinds without one (HPAs have no detail page and are non-clickable).
 - [x] The page is read-only, consistent with `read-only-invariant`.
+- [x] HorizontalPodAutoscalers appear on the page and are selectable in the Kind filter.
+- [x] The supported resource types are audited against what `kubectl` exposes; the supported set and the intentionally out-of-scope types are documented (see Resource type coverage).
 - [x] Spec and testing manual cover the page, its search, sort, filter, and row navigation.

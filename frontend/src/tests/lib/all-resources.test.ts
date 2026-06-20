@@ -1,4 +1,4 @@
-import type { Pod, Node, Namespace, Deployment, StatefulSet, DaemonSet } from "karse-types";
+import type { Pod, Node, Namespace, Deployment, StatefulSet, DaemonSet, HorizontalPodAutoscaler } from "karse-types";
 import { aggregateResources, presentKinds, ALL_RESOURCE_KINDS } from "../../lib/all-resources";
 
 function makePod(name: string, phase: Pod["phase"], namespace = "default"): Pod {
@@ -70,6 +70,20 @@ function makeDaemonSet(name: string, ready: number, desired: number): DaemonSet 
     };
 }
 
+function makeHpa(name: string, targets = "cpu: 40%/80%"): HorizontalPodAutoscaler {
+    return {
+        name,
+        namespace: "default",
+        reference: "Deployment/web",
+        minReplicas: 1,
+        maxReplicas: 10,
+        currentReplicas: 3,
+        targets,
+        createdAt: "2024-06-01T00:00:00Z",
+        labels: { app: name },
+    };
+}
+
 describe("aggregateResources", () => {
     test("returns no rows for empty inputs", () => {
         expect(aggregateResources({})).toEqual([]);
@@ -83,9 +97,10 @@ describe("aggregateResources", () => {
             deployments: [makeDeployment("d1", "1/1")],
             statefulSets: [makeStatefulSet("s1", "2/2")],
             daemonSets: [makeDaemonSet("ds1", 3, 3)],
+            horizontalPodAutoscalers: [makeHpa("hpa1")],
         });
-        // One row per input resource, six in total.
-        expect(rows).toHaveLength(6);
+        // One row per input resource, seven in total.
+        expect(rows).toHaveLength(7);
     });
 
     test("normalises a pod row with the shared fields", () => {
@@ -159,6 +174,21 @@ describe("aggregateResources", () => {
         expect(broken.health).toBe("Error");
     });
 
+    test("shows an HPA's metric summary as status, Other health, and no detail path", () => {
+        const [row] = aggregateResources({ horizontalPodAutoscalers: [makeHpa("web-hpa", "cpu: 55%/80%")] });
+        expect(row).toEqual({
+            kind: "HorizontalPodAutoscaler",
+            namespace: "default",
+            name: "web-hpa",
+            status: "cpu: 55%/80%",
+            health: "Other",
+            createdAt: "2024-06-01T00:00:00Z",
+            // HPAs have no detail page, so the row degrades to plain text.
+            detailPath: null,
+            labels: { app: "web-hpa" },
+        });
+    });
+
     test("groups rows by kind in display order, preserving input order within a kind", () => {
         const rows = aggregateResources({
             deployments: [makeDeployment("d2", "1/1"), makeDeployment("d1", "1/1")],
@@ -183,8 +213,9 @@ describe("presentKinds", () => {
             daemonSets: [makeDaemonSet("ds", 1, 1)],
             pods: [makePod("p", "Running")],
             namespaces: [makeNamespace("ns")],
+            horizontalPodAutoscalers: [makeHpa("hpa")],
         });
-        expect(presentKinds(rows)).toEqual(["Pod", "Namespace", "DaemonSet"]);
+        expect(presentKinds(rows)).toEqual(["Pod", "Namespace", "DaemonSet", "HorizontalPodAutoscaler"]);
     });
 
     test("returns an empty list when there are no rows", () => {

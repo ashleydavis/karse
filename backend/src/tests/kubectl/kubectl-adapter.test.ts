@@ -18,6 +18,7 @@ import {
     getClusterPerformance,
     getPodPerformance,
     listPods,
+    listHorizontalPodAutoscalers,
     listEvents,
     listClusterErrors,
     getPodLogs,
@@ -1706,6 +1707,114 @@ describe("listNamespaces", () => {
             "--context test-ctx get pods -A -o json": () => ok(podsFixture()),
         });
         await expect(listNamespaces("test-ctx")).rejects.toThrow("denied");
+    });
+});
+
+describe("listHorizontalPodAutoscalers", () => {
+    // A fully-populated autoscaling/v2 HPA item with resource (cpu) metric status.
+    const fullHpa = {
+        metadata: {
+            name: "web",
+            namespace: "default",
+            creationTimestamp: "2024-06-01T00:00:00Z",
+            labels: { app: "web" },
+        },
+        spec: {
+            scaleTargetRef: { kind: "Deployment", name: "web" },
+            minReplicas: 2,
+            maxReplicas: 10,
+            metrics: [
+                { type: "Resource", resource: { name: "cpu", target: { averageUtilization: 80 } } },
+            ],
+        },
+        status: {
+            currentReplicas: 4,
+            currentMetrics: [
+                { type: "Resource", resource: { name: "cpu", current: { averageUtilization: 55 } } },
+            ],
+        },
+    };
+
+    test("parses an HPA with a cpu metric, reference, bounds, and targets", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get horizontalpodautoscalers -A -o json": () =>
+                ok(JSON.stringify({ items: [fullHpa] })),
+        });
+        const result = await listHorizontalPodAutoscalers("test-ctx");
+        expect(result).toEqual([
+            {
+                name: "web",
+                namespace: "default",
+                reference: "Deployment/web",
+                minReplicas: 2,
+                maxReplicas: 10,
+                currentReplicas: 4,
+                targets: "cpu: 55%/80%",
+                createdAt: "2024-06-01T00:00:00Z",
+                labels: { app: "web" },
+            },
+        ]);
+    });
+
+    test("scopes to a namespace when given", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get horizontalpodautoscalers -n team-a -o json": () =>
+                ok(JSON.stringify({ items: [] })),
+        });
+        const result = await listHorizontalPodAutoscalers("test-ctx", "team-a");
+        expect(result).toEqual([]);
+    });
+
+    test("reports <none> targets when the HPA has no metrics", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get horizontalpodautoscalers -A -o json": () =>
+                ok(JSON.stringify({
+                    items: [{
+                        metadata: { name: "bare", namespace: "default", creationTimestamp: "2024-06-01T00:00:00Z" },
+                        spec: { scaleTargetRef: { kind: "Deployment", name: "bare" }, minReplicas: 1, maxReplicas: 5 },
+                        status: { currentReplicas: 1 },
+                    }],
+                })),
+        });
+        const result = await listHorizontalPodAutoscalers("test-ctx");
+        expect(result[0]!).toEqual({
+            name: "bare",
+            namespace: "default",
+            reference: "Deployment/bare",
+            minReplicas: 1,
+            maxReplicas: 5,
+            currentReplicas: 1,
+            targets: "<none>",
+            createdAt: "2024-06-01T00:00:00Z",
+            labels: {},
+        });
+    });
+
+    test("shows <unknown> for a target metric whose current value has not populated yet", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get horizontalpodautoscalers -A -o json": () =>
+                ok(JSON.stringify({
+                    items: [{
+                        metadata: { name: "warming", namespace: "default", creationTimestamp: "2024-06-01T00:00:00Z" },
+                        spec: {
+                            scaleTargetRef: { kind: "Deployment", name: "warming" },
+                            minReplicas: 1,
+                            maxReplicas: 5,
+                            metrics: [{ type: "Resource", resource: { name: "cpu", target: { averageUtilization: 80 } } }],
+                        },
+                        status: { currentReplicas: 1, currentMetrics: [] },
+                    }],
+                })),
+        });
+        const result = await listHorizontalPodAutoscalers("test-ctx");
+        expect(result[0]!.targets).toBe("cpu: <unknown>/80%");
+    });
+
+    test("throws when kubectl fails", async () => {
+        setRunnerHandlers({
+            "--context test-ctx get horizontalpodautoscalers -A -o json": () => fail("forbidden"),
+        });
+        await expect(listHorizontalPodAutoscalers("test-ctx")).rejects.toThrow("forbidden");
     });
 });
 

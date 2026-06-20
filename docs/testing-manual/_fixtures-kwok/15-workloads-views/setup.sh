@@ -87,6 +87,26 @@ spec:
       containers:
       - name: fluentd
         image: fluentd:latest
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nginx
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nginx
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
 EOF
 
 echo "Cluster ready. Select the 'kwok-karse-test' context in Karse."

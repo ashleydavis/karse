@@ -3,7 +3,7 @@ import { audit, formatLocalISO } from "../audit-log";
 import { parseCpuToMillicores, parseMemoryToBytes } from "./quantity";
 import type {
     Context, NodeStatus, Node, ClusterOverview, Namespace, Pod, PodPhase,
-    Deployment, StatefulSet, DaemonSet,
+    Deployment, StatefulSet, DaemonSet, HorizontalPodAutoscaler,
     ContainerInfo, ContainerState, KubeEvent, PodDetail,
     NodeCondition, NodeAddress, ResourceAmounts, NodeDetail,
     ClusterEvent, WorkloadKind, WorkloadStat, WorkloadDetail, ClusterError,
@@ -257,6 +257,60 @@ export async function listDaemonSets(context: string, namespace?: string): Promi
         createdAt: item.metadata.creationTimestamp,
         labels: item.metadata.labels ?? {},
     }));
+}
+
+// Summarises an HPA's current metric status the way kubectl's TARGETS column
+// does, e.g. "cpu: 40%/80%" or "memory: 60%/70%, cpu: 30%/80%". Returns "<none>"
+// when no metric status is available yet (a freshly created HPA, or one whose
+// metrics API is unreachable), matching kubectl's own placeholder.
+function formatHpaTargets(item: any): string {
+    const currentMetrics: any[] = item.status?.currentMetrics ?? [];
+    const targetMetrics: any[] = item.spec?.metrics ?? [];
+    if (targetMetrics.length === 0) {
+        return "<none>";
+    }
+    const parts: string[] = [];
+    for (let i = 0; i < targetMetrics.length; i++) {
+        const target = targetMetrics[i];
+        const current = currentMetrics[i];
+        // Resource metrics (cpu/memory) are the common case; report the metric name
+        // with current/target utilisation. Anything else falls back to "<unknown>"
+        // for the current side so the row still shows the target.
+        const name = target?.resource?.name ?? target?.name ?? "?";
+        const targetUtil = target?.resource?.target?.averageUtilization;
+        const currentUtil = current?.resource?.current?.averageUtilization;
+        const targetStr = targetUtil !== undefined ? `${targetUtil}%` : "auto";
+        const currentStr = currentUtil !== undefined && currentUtil !== null ? `${currentUtil}%` : "<unknown>";
+        parts.push(`${name}: ${currentStr}/${targetStr}`);
+    }
+    return parts.length > 0 ? parts.join(", ") : "<none>";
+}
+
+// Returns horizontal pod autoscalers (HPAs) for the given context, optionally
+// scoped to a namespace. Mirrors the other list helpers: all-namespaces by
+// default, or a single namespace when given.
+export async function listHorizontalPodAutoscalers(context: string, namespace?: string): Promise<HorizontalPodAutoscaler[]> {
+    const nsArgs = namespace ? ["-n", namespace] : ["-A"];
+    const result = await kubectl(["--context", context, "get", "horizontalpodautoscalers", ...nsArgs, "-o", "json"]);
+    if (result.exitCode !== 0) {
+        throw new Error(result.stderr);
+    }
+    const data = JSON.parse(result.stdout);
+    return (data.items as any[]).map((item) => {
+        const target = item.spec?.scaleTargetRef ?? {};
+        const reference = target.kind && target.name ? `${target.kind}/${target.name}` : "";
+        return {
+            name: item.metadata.name,
+            namespace: item.metadata.namespace,
+            reference,
+            minReplicas: item.spec?.minReplicas ?? 0,
+            maxReplicas: item.spec?.maxReplicas ?? 0,
+            currentReplicas: item.status?.currentReplicas ?? 0,
+            targets: formatHpaTargets(item),
+            createdAt: item.metadata.creationTimestamp,
+            labels: item.metadata.labels ?? {},
+        };
+    });
 }
 
 // Returns Kubernetes events for the given context, optionally scoped to a namespace.

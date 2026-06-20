@@ -139,6 +139,26 @@ spec:
       containers:
       - name: nginx
         image: nginx:latest
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: smoke-hpa
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: smoke-deploy
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
 EOF
 
 echo "--- Starting backend (OS-assigned free port) ---"
@@ -251,6 +271,20 @@ echo "OK"
 echo "--- GET /api/daemonsets ---"
 curl -fsS "$BASE/api/daemonsets?context=$CURRENT_CTX" \
     | jq -e 'has("daemonSets")' \
+    > /dev/null
+echo "OK"
+
+echo "--- GET /api/horizontalpodautoscalers ---"
+# The fixture defines one HPA (smoke-hpa); each item must carry the list fields
+# the All resources page reads (reference, min/max/current replicas, targets).
+curl -fsS "$BASE/api/horizontalpodautoscalers?context=$CURRENT_CTX" \
+    | jq -e 'has("horizontalPodAutoscalers") and (.horizontalPodAutoscalers | all(has("name") and has("namespace") and has("reference") and has("minReplicas") and has("maxReplicas") and has("currentReplicas") and has("targets")))' \
+    > /dev/null
+echo "OK"
+
+echo "--- GET /api/horizontalpodautoscalers (namespace scoped) ---"
+curl -fsS "$BASE/api/horizontalpodautoscalers?context=$CURRENT_CTX&namespace=default" \
+    | jq -e 'has("horizontalPodAutoscalers")' \
     > /dev/null
 echo "OK"
 

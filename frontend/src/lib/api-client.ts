@@ -3,6 +3,7 @@ import { LOAD_TIMEOUT_MS, loadErrorMessage } from "./load-error";
 import type {
     ContextsResponse, ClusterOverview, Node, NamespacesResponse, PodsResponse,
     DeploymentsResponse, StatefulSetsResponse, DaemonSetsResponse,
+    HorizontalPodAutoscalersResponse,
     WorkloadKind, WorkloadDetail, NamespaceDetail,
     PodDetail, NodeDetail, YamlResourceType, YamlResponse,
     LogStreamLine, LogStreamStarted, EventsResponse, ErrorsResponse,
@@ -114,6 +115,17 @@ export async function fetchDaemonSets(context: string, namespace?: string): Prom
         params.namespace = namespace;
     }
     const response = await http.get<DaemonSetsResponse>("/daemonsets", { params });
+    return response.data;
+}
+
+// Fetches horizontal pod autoscalers (HPAs) for the given context, optionally
+// scoped to a namespace.
+export async function fetchHorizontalPodAutoscalers(context: string, namespace?: string): Promise<HorizontalPodAutoscalersResponse> {
+    const params: Record<string, string> = { context };
+    if (namespace) {
+        params.namespace = namespace;
+    }
+    const response = await http.get<HorizontalPodAutoscalersResponse>("/horizontalpodautoscalers", { params });
     return response.data;
 }
 

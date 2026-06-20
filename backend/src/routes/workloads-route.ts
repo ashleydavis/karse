@@ -63,3 +63,14 @@ workloadsRouter.get("/daemonsets", async (req, res) => {
     const daemonSets = await kubectl.listDaemonSets(context, namespace);
     res.json({ daemonSets });
 });
+
+workloadsRouter.get("/horizontalpodautoscalers", async (req, res) => {
+    const context = req.query.context;
+    if (typeof context !== "string" || context.trim() === "") {
+        res.status(400).json({ error: "context query parameter is required" });
+        return;
+    }
+    const namespace = parseNs(req.query.namespace);
+    const horizontalPodAutoscalers = await kubectl.listHorizontalPodAutoscalers(context, namespace);
+    res.json({ horizontalPodAutoscalers });
+});

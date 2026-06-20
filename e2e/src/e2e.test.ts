@@ -5385,6 +5385,11 @@ test.describe("karse e2e", () => {
                 { name: "agent-ds", namespace: "kube-system", desired: 1, current: 1, ready: 1, upToDate: 1, available: 1, createdAt: new Date().toISOString(), labels: {} },
             ],
         };
+        const FAKE_HPAS = {
+            horizontalPodAutoscalers: [
+                { name: "web-hpa", namespace: "default", reference: "Deployment/web-deploy", minReplicas: 1, maxReplicas: 10, currentReplicas: 3, targets: "cpu: 40%/80%", createdAt: new Date().toISOString(), labels: { app: "web" } },
+            ],
+        };
         const FAKE_WORKLOAD_DETAIL = {
             kind: "deployments", name: "web-deploy", namespace: "default", createdAt: new Date().toISOString(),
             labels: { app: "web" }, selector: { app: "web" }, stats: [{ label: "Ready", value: "1/1" }], pods: [], events: [],
@@ -5411,6 +5416,7 @@ test.describe("karse e2e", () => {
             await page.route("**/api/deployments*", async (route) => { await route.fulfill({ json: FAKE_DEPLOYMENTS }); });
             await page.route("**/api/statefulsets*", async (route) => { await route.fulfill({ json: FAKE_STATEFULSETS }); });
             await page.route("**/api/daemonsets*", async (route) => { await route.fulfill({ json: FAKE_DAEMONSETS }); });
+            await page.route("**/api/horizontalpodautoscalers*", async (route) => { await route.fulfill({ json: FAKE_HPAS }); });
             await page.goto("/all-resources", { waitUntil: "networkidle" });
             await expect(page.locator("[data-test-id='all-resources-table']")).toBeVisible();
             await expect((await rows()).first()).toBeVisible();
@@ -5424,6 +5430,7 @@ test.describe("karse e2e", () => {
             await page.unroute("**/api/deployments*");
             await page.unroute("**/api/statefulsets*");
             await page.unroute("**/api/daemonsets*");
+            await page.unroute("**/api/horizontalpodautoscalers*");
             setContext(CLUSTER_1);
         });
 
@@ -5434,12 +5441,12 @@ test.describe("karse e2e", () => {
         });
 
         test("shows rows spanning more than one kind", async () => {
-            await expect(await rows()).toHaveCount(6);
+            await expect(await rows()).toHaveCount(7);
             const present = await kinds();
             const distinct = new Set(present);
             expect(distinct.size).toBeGreaterThan(1);
-            // Every aggregated kind appears.
-            expect(distinct).toEqual(new Set(["Pod", "Node", "Namespace", "Deployment", "StatefulSet", "DaemonSet"]));
+            // Every aggregated kind appears, including HorizontalPodAutoscaler.
+            expect(distinct).toEqual(new Set(["Pod", "Node", "Namespace", "Deployment", "StatefulSet", "DaemonSet", "HorizontalPodAutoscaler"]));
         });
 
         test("the search box narrows the rows to those matching the typed text", async () => {
@@ -5450,7 +5457,7 @@ test.describe("karse e2e", () => {
             await expect(await rows()).toHaveCount(0);
             await expect(page.locator("[data-test-id='no-all-resources-match']")).toBeVisible();
             await page.locator("[data-test-id='all-resources-search'] input").fill("");
-            await expect(await rows()).toHaveCount(6);
+            await expect(await rows()).toHaveCount(7);
         });
 
         test("clicking a column header sorts the table by that column", async () => {
@@ -5485,8 +5492,23 @@ test.describe("karse e2e", () => {
             await page.locator("[data-test-id='all-resources-filter-button']").click();
             await page.locator("[data-test-id='all-resources-filter-deselect-all']").click();
             await page.keyboard.press("Escape");
-            await expect(await rows()).toHaveCount(6);
+            await expect(await rows()).toHaveCount(7);
             await expect(page.locator("[data-test-id='all-resources-filter-button']")).toHaveText("Filter: All");
+        });
+
+        test("the Kind filter offers HorizontalPodAutoscaler and narrows to the HPA row", async () => {
+            // HPAs are selectable in the All resources filter and show on the page.
+            await page.locator("[data-test-id='all-resources-filter-button']").click();
+            await page.locator("[data-test-id='all-resources-filter-item-kind-HorizontalPodAutoscaler']").click();
+            await page.keyboard.press("Escape");
+            await expect(await rows()).toHaveCount(1);
+            expect(await kinds()).toEqual(["HorizontalPodAutoscaler"]);
+            expect(await names()).toEqual(["web-hpa"]);
+            // Clear back to all so later tests see the full set.
+            await page.locator("[data-test-id='all-resources-filter-button']").click();
+            await page.locator("[data-test-id='all-resources-filter-deselect-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(await rows()).toHaveCount(7);
         });
 
         test("clicking a resource row navigates to that resource's detail page", async () => {
