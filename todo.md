@@ -1,20 +1,41 @@
 # Todo
 
-- Test
-    - Performance stuff.
-    - Live logging.
-    - Get rid of stern.
-- The status page for the cluster should include very basic performance metrics. (Likely already covered by the merged Performance tabs feature; confirm before queuing.)
-- Make sure it is only available locally and not over the local internet.
-- Make sure it supports HPAs (maybe just through the 'All resources' page?)
+- Cluster performance
+    - The cluster overview page should be renamed "Status" and show an indicator for the percentage of cluster resources that are consumed vs free (cpu/memory/disk/network/etc)
+    - The tree map on the performance tab is unsable. 
+        - There's too many boxes.
+        - There's too much text.
+        - This should show nodes, not pods. That would make it simpler and easier to read.
+    - What do I really want to see here?
+        - Just the nodes in the heatmap.
+            - What's going on with them for cpu, memory, disk and network.
+            - It should the percentage of the total the node is using.
+    - Get rid of the hotspots chart which doesn't seem useful.
+    - Top consumers isn't useful. Get rid of it.
+- Node performance
+    - The Node status page should show an indicator for the percentage of node resources being consumed vs the percentage free (cpu/memory/disk/network/etc).
+    - The tree map on the Performance tab should show the percentage of the node the pod is consuming for cpu/memory/disk/network/etc.
+    - The Provisioning sub tab isn't needed. Remove it and fold the "Breakdown" sub tab into the Performance tab.
+- Pod performance
+    - The Pod status page should show an indicator for the node resources this pod is consuming for cpu/memory/network/disk/etc.
+    - The performance tab for a pod isn't very useful.
+    - I'd like to know: what percentage of the node is the pod using for cpu/memory/disk/network/etc?
+- The drop down table filter should have multiple columns so that we don't have to scroll offscreen to see all the checkboxes and labels.
+- Make sure the Pod selector/filter is reused anywhere that pods can be selected.
+    - It should show selected pods at the top of the list so they are easily visible compared to the unselected ones (that should be below). Besides that ordering the pods should be listed in alphanumerical order.
+- The table of nodes should have columns so I can sort by resource consumption. I want to know which nodes have the most cpu/memory/network/disk consumed.
+- The main table of pods should have columns so I can sort by resource consumption. I want to know which pods have the most cpu/memory/network/disk consumed.
+- The table of pods under each node should have columns so I can sort by resource consumption. I want to know which pods have the most cpu/memory/network/disk consumed.
+- Make sure the rest api and front end are only available locally and not over the local internet.
+- Make sure Karse supports HPAs
+    - These should be visible in the "All resources" page but I can't find them in the filter.
+    - I bet other types of resources are missing as well.
 - Get Claude to take some screenshots to put in the readme in git.
-
-## Later
-
 - Be great to implement an on disk cache of the cluster state.
     - As we get data with `kubectl` store it locally as JSON files.
     - Stamp the saved data with the current date.
     - When it's too far out of date (this should be configurable in a config page in the UI) we use `kubectl` get updated data.
     - Clicking the refresh button on the navbar empties the local cache.
-
+- Remove the Stern page and all support for stern. I don't want to bother with this.
+- The logs component should be reusable so that both the Logs page and the Logs tab under Pod detail have the same options. This should be based on what's currently in the Log page. There doesn't need to be a "Tail" option or a Refresh button.
 
