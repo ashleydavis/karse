@@ -6,12 +6,18 @@
 The Performance feature adds a per-scope "Performance" tab to the cluster, node, and pod
 pages, showing point-in-time CPU and memory usage in context. This document describes the
 data sources, scope, degradation behaviour, per-scope tab contents, and the test mode. The
-implementation is **Complete**: the cluster Performance tab (Breakdown treemap, Hot spots
-heatmap, Top consumers table), the node Performance tab (node-scoped Breakdown treemap plus
-per-container provisioning bars), and the pod Performance tab (the leaf: per-container
-provisioning bars, no treemap) have all shipped, along with the shared chart components and
-the `frontend/src/lib/performance.ts` transform/format helpers. Time-series Trends and
-per-pod history remain out of scope (they need a persistent sampler).
+implementation is **Complete**: the cluster Performance tab (a node treemap), the node
+Performance tab (node-scoped Breakdown treemap plus per-container provisioning bars), and the
+pod Performance tab (the leaf: per-container provisioning bars, no treemap) have all shipped,
+along with the shared chart components and the `frontend/src/lib/performance.ts`
+transform/format helpers. Time-series Trends and per-pod history remain out of scope (they
+need a persistent sampler).
+
+The cluster tab was reworked by **cluster-performance-1**: its treemap now shows the
+cluster's **nodes** (one box per node, sized by usage, labelled with each node's share of the
+cluster total for the selected metric) instead of a node → namespace → pod drill, and the
+**Hot spots heatmap** and **Top consumers table** were removed as not useful. The shared
+metric toggle still offers CPU and memory only.
 
 ## Data sources
 
@@ -70,19 +76,19 @@ The shared metric toggle offers **CPU** and **Memory** only. Disk is excluded: t
 API does not report disk usage, and an "allocated/requested" disk figure would be a weaker,
 inconsistent signal.
 
-- **Cluster Performance tab** (the hub) — **implemented**:
-  - A "Breakdown" treemap drilling cluster → node → namespace → pod, sized by usage for the
-    selected metric. Leaves are coloured green→amber→red by utilisation (usage ÷ limit), and
-    clicking a leaf opens that pod's detail page on its Performance tab. Hovering a cell shows
-    a tooltip with the cell's label and its usage for the selected metric (no empty box).
-  - A "Hot spots" heatmap of node × metric (CPU%, memory% = usage ÷ allocatable). Clicking a
-    cell opens that node's detail page on its Performance tab.
-  - A "Top consumers" table of pods ranked by the selected metric, sortable, with row-click
-    navigation to the pod's Performance tab.
-  - The cluster tab is built from `@nivo/treemap` / `@nivo/heatmap` (the first charting
-    dependency), the shared components in `frontend/src/components/performance/`, and the
-    pure helpers in `frontend/src/lib/performance.ts` (`formatCpu`, `formatMemory`,
-    `metricValue`, `utilisation`, `buildClusterTreemap`, `buildNodeHeatmap`).
+- **Cluster Performance tab** (the hub) — **implemented** (reworked by cluster-performance-1):
+  - A treemap of the cluster's **nodes**: one box per node, sized by that node's usage for the
+    selected metric, coloured green→amber→red by utilisation (usage ÷ allocatable), and
+    labelled inline with the node's name and its **share of the cluster total** (a whole-number
+    percentage, e.g. "node-cp 62%"). Hovering a box shows a tooltip with the node name, its
+    usage for the selected metric, and its "% of cluster" share. Clicking a node box opens that
+    node's detail page on its Performance tab (tagged with the cluster-performance origin so the
+    back button and breadcrumb return to the cluster hub).
+  - The Hot spots heatmap and Top consumers table were **removed** (not useful).
+  - The cluster tab is built from `@nivo/treemap`, the shared `UsageTreemap` / `MetricToggle` /
+    `MetricsUnavailable` components in `frontend/src/components/performance/`, and the pure
+    helpers in `frontend/src/lib/performance.ts` (`formatCpu`, `formatMemory`, `metricValue`,
+    `utilisation`, `clusterMetricTotal`, `nodeShareOfCluster`, `buildClusterNodeTreemap`).
 - **Node Performance tab** — **implemented**:
   - The node Performance tab is split into two **subtabs**, **Breakdown** and
     **Provisioning**, under a shared CPU/Memory toggle. Breakdown is shown first.

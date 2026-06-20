@@ -71,7 +71,8 @@ test.describe("karse e2e", () => {
         });
 
         test("shows page title for cluster home", async () => {
-            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Cluster");
+            // The cluster home page is titled "Status" (cluster-performance-1).
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Status");
         });
 
         test("updates page title when navigating to nodes", async () => {
@@ -2296,11 +2297,13 @@ test.describe("karse e2e", () => {
             await page.unroute("**/api/pods/default/nginx-abc*");
         });
 
-        test("cluster home shows Overview and Performance tabs, defaulting to Overview", async () => {
+        test("cluster home shows Status and Performance tabs, defaulting to Status", async () => {
             await page.goto("/cluster", { waitUntil: "networkidle" });
-            await expect(page.locator("[data-test-id='cluster-tab-overview']")).toBeVisible();
+            // The first tab is labelled "Status" (cluster-performance-1) but keeps its
+            // "overview" URL value / test-id so existing shareable links still work.
+            await expect(page.locator("[data-test-id='cluster-tab-overview']")).toHaveText("Status");
             await expect(page.locator("[data-test-id='cluster-tab-performance']")).toBeVisible();
-            // Overview is the default panel and still renders the stat tiles unchanged.
+            // Status is the default panel and still renders the stat tiles unchanged.
             await expect(page.locator("[data-test-id='cluster-panel-overview']")).toBeVisible();
             await expect(page.locator("[data-test-id='stat-server-version']")).toBeVisible();
             await expect(page.locator("[data-test-id='cluster-panel-performance']")).toHaveCount(0);
@@ -2309,16 +2312,16 @@ test.describe("karse e2e", () => {
         });
 
         test("selecting the cluster Performance tab mounts the Performance panel", async () => {
-            // The cluster Performance tab is now populated (treemap/heatmap/table); its
-            // detailed content is asserted in the "Performance tabs (cluster)" block. Here
-            // we only confirm the tab switch mounts the Performance panel and unmounts
-            // Overview, the scaffold behaviour this block covers.
+            // The cluster Performance tab is now populated (a node treemap); its detailed
+            // content is asserted in the "Performance tabs (cluster)" block. Here we only
+            // confirm the tab switch mounts the Performance panel and unmounts the Status
+            // panel, the scaffold behaviour this block covers.
             await page.goto("/cluster", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='cluster-tab-performance']").click();
             await expect(page.locator("[data-test-id='cluster-panel-performance']")).toBeVisible();
             // The old stub placeholder is gone.
             await expect(page.locator("[data-test-id='perf-cluster-stub']")).toHaveCount(0);
-            // The Overview panel is no longer mounted once Performance is selected.
+            // The Status panel is no longer mounted once Performance is selected.
             await expect(page.locator("[data-test-id='cluster-panel-overview']")).toHaveCount(0);
         });
 
@@ -5553,40 +5556,51 @@ test.describe("karse e2e", () => {
 
     // ── Performance tabs (cluster) ──────────────────────────────────────────────
     // The backend runs with KARSE_FAKE_METRICS=1 (set in scripts/e2e-tests.sh), so the
-    // Metrics API returns canned usage for the seeded pods (web/api in default, worker
-    // in jobs, cache in infra). The cluster Performance tab therefore renders a
-    // populated Breakdown treemap, Hot spots heatmap, and Top consumers table.
+    // Metrics API returns canned node usage keyed by the seeded node names (node-cp,
+    // node-worker). The cluster Performance tab therefore renders a Breakdown treemap
+    // whose leaves are those nodes, each sized by usage and labelled with its share of
+    // the cluster total. (cluster-performance-1 reworked this from a pod treemap, and
+    // removed the Hot spots heatmap and Top consumers table.)
     test.describe("Performance tabs (cluster)", () => {
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
             await page.goto("/cluster", { waitUntil: "networkidle" });
             await expect(page.locator("[data-test-id='cluster-tab-performance']")).toBeVisible();
             await page.locator("[data-test-id='cluster-tab-performance']").click();
-            // The lazy query fires only once the tab is active; wait for the charts.
+            // The lazy query fires only once the tab is active; wait for the treemap.
             await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
         });
 
-        test("renders the treemap, heatmap, and top-consumers table", async () => {
+        test("renders the node treemap with no heatmap or top-consumers table", async () => {
             await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
-            await expect(page.locator("[data-test-id='perf-heatmap']")).toBeVisible();
-            await expect(page.locator("[data-test-id='perf-top-consumers']")).toBeVisible();
-            // The table ranks the seeded pods, so it has at least the four pod rows.
-            await expect(
-                page.locator("[data-test-id='perf-top-consumers-row']").first()
-            ).toBeVisible();
-            const rowCount = await page.locator("[data-test-id='perf-top-consumers-row']").count();
-            expect(rowCount).toBeGreaterThanOrEqual(4);
+            // The Hot spots heatmap and Top consumers table were removed.
+            await expect(page.locator("[data-test-id='perf-heatmap']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='perf-top-consumers']")).toHaveCount(0);
         });
 
-        test("loads on microcore (u-suffixed) CPU usage without an error", async () => {
-            // The fake Metrics API reports several CPU usages in the microcore ("u")
-            // form, including the exact "398u" value from the field report. Before the
-            // parser handled "u", that value fell through to a throw and the page showed
-            // "Could not load data / invalid CPU quantity: 398u". Confirm the charts
-            // rendered (above) and that neither error string is present.
+        test("the treemap shows node boxes, not pod boxes", async () => {
             await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
-            await expect(page.getByText("invalid CPU quantity")).toHaveCount(0);
-            await expect(page.getByText("Could not load data")).toHaveCount(0);
+            const labels = await page
+                .locator("[data-test-id='perf-treemap'] text")
+                .allTextContents();
+            const joined = labels.join(" ");
+            // The seeded cluster nodes appear as treemap leaves.
+            expect(joined).toContain("node-cp");
+            expect(joined).toContain("node-worker");
+            // Pods are no longer treemap cells: the seeded pod names must be absent.
+            expect(joined).not.toContain("web");
+            expect(joined).not.toContain("api");
+        });
+
+        test("each node box shows its percentage of the cluster total", async () => {
+            await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
+            const labels = await page
+                .locator("[data-test-id='perf-treemap'] text")
+                .allTextContents();
+            // At least one node leaf carries a "<name> <n>%" label (the share of total).
+            const withShare = labels.filter((t) => /%/.test(t));
+            expect(withShare.length).toBeGreaterThan(0);
+            expect(withShare.some((t) => /node-(cp|worker)\s+\d+%/.test(t))).toBe(true);
         });
 
         test("the metric toggle is present with CPU selected by default", async () => {
@@ -5596,96 +5610,80 @@ test.describe("karse e2e", () => {
             ).toHaveAttribute("aria-pressed", "true");
         });
 
-        test("toggling to Memory updates the top-consumers usage values", async () => {
-            // Read the first row's usage cell under CPU, switch to Memory, and confirm
-            // the displayed usage changes (memory is formatted in Mi/Gi, CPU in m/cores),
-            // proving the toggle re-derives the view from the selected metric.
-            const firstUsage = page
-                .locator("[data-test-id='perf-top-consumers-row']")
-                .first()
-                .locator("td")
-                .last();
-            const cpuText = (await firstUsage.textContent())?.trim();
+        test("toggling to Memory keeps the node treemap rendered", async () => {
             await page.locator("[data-test-id='perf-metric-memory']").click();
             await expect(
                 page.locator("[data-test-id='perf-metric-memory']")
             ).toHaveAttribute("aria-pressed", "true");
-            await expect(firstUsage).not.toHaveText(cpuText ?? "");
+            await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
+            const labels = await page
+                .locator("[data-test-id='perf-treemap'] text")
+                .allTextContents();
+            expect(labels.join(" ")).toContain("node-cp");
             // Restore CPU for any later assertions / a clean state.
             await page.locator("[data-test-id='perf-metric-cpu']").click();
         });
 
-        test("clicking a top-consumers row opens that pod's Performance tab", async () => {
-            // The row-click reuses the shared navigation, landing on the pod detail page
-            // with ?tab=performance so the pod's own Performance tab is selected.
-            const webRow = page
-                .locator("[data-test-id='perf-top-consumers-row']")
-                .filter({ hasText: "web" })
-                .first();
-            await webRow.click();
-            await expect(page).toHaveURL(/\/pods\/default\/web/);
-            await expect(page).toHaveURL(/tab=performance/);
-            await expect(page.locator("[data-test-id='pod-tab-performance']")).toBeVisible();
-            // Return to the cluster Performance tab for any later assertions.
-            await page.goto("/cluster?tab=performance", { waitUntil: "networkidle" });
-        });
-
-        test("clicking a treemap leaf navigates to the pod detail page", async () => {
+        test("clicking a node box navigates to that node's Performance tab", async () => {
             await page.goto("/cluster", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='cluster-tab-performance']").click();
             await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
-            // nivo renders each leaf as an SVG rect with the pod label as text. Clicking
-            // the "web" leaf label drills into the pod detail page on its Performance tab,
-            // the same drill spine the table row uses. force: the label text sits over the
-            // rect that carries the click handler, so the event still reaches the node.
+            // nivo renders each leaf as an SVG rect with the node label as text. Clicking
+            // the node-cp leaf label drills into that node's detail page on its Performance
+            // tab. force: the label text sits over the rect that carries the click handler.
             await page
                 .locator("[data-test-id='perf-treemap'] text")
-                .filter({ hasText: /^web$/ })
+                .filter({ hasText: /node-cp/ })
                 .first()
                 .click({ force: true });
-            await expect(page).toHaveURL(/\/pods\/default\/web/);
+            await expect(page).toHaveURL(/\/nodes\/node-cp/);
             await expect(page).toHaveURL(/tab=performance/);
-            await expect(page.locator("[data-test-id='pod-tab-performance']")).toBeVisible();
+            await expect(page.locator("[data-test-id='node-tab-performance']")).toBeVisible();
         });
 
-        test("drilling into a pod from the cluster treemap and clicking back returns to the cluster Performance hub", async () => {
-            // performance-back-nav-1: the same back-nav fix applies to the cluster
-            // treemap. Back returns to the cluster Performance hub, not the Pods list,
-            // and the breadcrumb origin agrees.
+        test("hovering a node box shows a tooltip with the node and its cluster share", async () => {
             await page.goto("/cluster", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='cluster-tab-performance']").click();
             await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
             await page
                 .locator("[data-test-id='perf-treemap'] text")
-                .filter({ hasText: /^web$/ })
-                .first()
-                .click({ force: true });
-            await expect(page).toHaveURL(/\/pods\/default\/web/);
-            await expect(page).toHaveURL(/from=cluster-performance/);
-            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Cluster");
-            await page.locator("[data-test-id='pod-detail-back']").click();
-            await expect(page).toHaveURL(/\/cluster/);
-            await expect(page).toHaveURL(/tab=performance/);
-            await expect(page.locator("[data-test-id='cluster-panel-performance']")).toBeVisible();
-        });
-
-        test("hovering a treemap leaf shows a tooltip with the cell label and its usage", async () => {
-            // The default nivo tooltip rendered an empty box; the custom tooltip shows the
-            // cell label plus its usage for the selected metric. Hovering the "web" leaf
-            // surfaces a tooltip naming that leaf and a non-empty usage figure.
-            await page.goto("/cluster", { waitUntil: "networkidle" });
-            await page.locator("[data-test-id='cluster-tab-performance']").click();
-            await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
-            await page
-                .locator("[data-test-id='perf-treemap'] text")
-                .filter({ hasText: /^web$/ })
+                .filter({ hasText: /node-cp/ })
                 .first()
                 .hover({ force: true });
             const tooltip = page.locator("[data-test-id='perf-treemap-tooltip']");
             await expect(tooltip).toBeVisible();
-            await expect(tooltip).toContainText("web");
-            // CPU is the default metric, so the usage figure is a millicore/core value.
-            await expect(tooltip).toContainText(/\d/);
+            await expect(tooltip).toContainText("node-cp");
+            // The tooltip names the node's share of the cluster total.
+            await expect(tooltip).toContainText(/% of cluster/);
+        });
+    });
+
+    // ── Status page cluster resource indicator ──────────────────────────────────
+    // cluster-performance-1 added a consumed-vs-free indicator to the Status page,
+    // covering CPU and memory (the resources the Metrics API reports). With
+    // KARSE_FAKE_METRICS=1 the seeded nodes carry usage, so the indicator shows
+    // non-empty consumed percentages.
+    test.describe("Status page cluster resource indicator", () => {
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+        });
+
+        test("the Status tab shows the cluster resource indicator with CPU and memory", async () => {
+            await expect(page.locator("[data-test-id='cluster-resource-indicator']")).toBeVisible();
+            await expect(page.locator("[data-test-id='cluster-resource-cpu']")).toBeVisible();
+            await expect(page.locator("[data-test-id='cluster-resource-memory']")).toBeVisible();
+        });
+
+        test("each resource shows a consumed percentage", async () => {
+            // With fake metrics the seeded nodes carry usage, so both bars report a
+            // numeric "<n>% used" rather than the unavailable em-dash.
+            await expect(
+                page.locator("[data-test-id='cluster-resource-cpu-percent']")
+            ).toHaveText(/\d+% used/);
+            await expect(
+                page.locator("[data-test-id='cluster-resource-memory-percent']")
+            ).toHaveText(/\d+% used/);
         });
     });
 

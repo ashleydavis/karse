@@ -10,7 +10,7 @@ import { fetchEvents } from "../lib/api-client";
 
 // Maps a top-level list-page segment to its display label.
 const LIST_LABELS: Record<string, string> = {
-    cluster: "Cluster",
+    cluster: "Status",
     "all-resources": "All resources",
     contexts: "Contexts",
     nodes: "Nodes",
@@ -49,7 +49,7 @@ function buildCrumbs(
     const segments = pathname.split("/").filter((s) => s.length > 0);
     if (segments.length === 0)
     {
-        return [{ label: "Cluster" }];
+        return [{ label: "Status" }];
     }
 
     const root = segments[0];

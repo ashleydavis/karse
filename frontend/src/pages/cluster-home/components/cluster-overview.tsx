@@ -9,6 +9,7 @@ import { useShareableTo } from "../../../lib/nav-state";
 import { fetchClusterOverview } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
+import { ClusterResourceIndicator } from "./cluster-resource-indicator";
 
 type StatTileProps = {
     icon: IconProp;
@@ -190,6 +191,7 @@ export function ClusterOverview() {
                 failed={data.failedPodCount}
                 total={data.podCount}
             />
+            <ClusterResourceIndicator />
         </Box>
     );
 }

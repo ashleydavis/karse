@@ -3,16 +3,13 @@ import { Box, Paper, Typography } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import type { PerformanceMetric } from "karse-types";
 import { useKubeContext } from "../../lib/kube-context";
-import { useShareableNavigate } from "../../lib/nav-state";
 import { fetchClusterPerformance } from "../../lib/api-client";
-import { buildClusterTreemap, buildNodeHeatmap } from "../../lib/performance";
+import { buildClusterNodeTreemap } from "../../lib/performance";
 import { LoadingIndicator } from "../loading-indicator";
 import { LoadError } from "../load-error";
 import { MetricToggle } from "./metric-toggle";
 import { UsageTreemap } from "./usage-treemap";
 import { FROM_CLUSTER_PERFORMANCE } from "../../lib/breadcrumb-trail";
-import { UsageHeatmap } from "./usage-heatmap";
-import { TopConsumersTable } from "./top-consumers-table";
 import { MetricsUnavailable } from "./metrics-unavailable";
 
 // Props for the cluster Performance tab. `active` is true only when this tab is the
@@ -22,8 +19,8 @@ type ClusterPerformanceTabProps = {
     active: boolean;
 };
 
-// A titled section wrapping one of the three views (Breakdown / Hot spots / Top
-// consumers), so the cluster hub reads as a stack of labelled panels.
+// A titled section wrapping the treemap, so the cluster Performance tab reads as a
+// labelled panel.
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
     return (
         <Paper variant="outlined" sx={{ p: 2 }}>
@@ -35,14 +32,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     );
 }
 
-// The cluster Performance hub: a CPU/Memory toggle over a Breakdown treemap
-// (node → namespace → pod), a Hot spots heatmap (node × metric), and a Top consumers
-// table. Data comes from GET /cluster/performance, fetched lazily when the tab is
-// active. When the cluster has no Metrics API the MetricsUnavailable alert is shown
-// instead of the usage charts.
+// The cluster Performance tab: a CPU/Memory toggle over a Breakdown treemap of the
+// cluster's nodes, each node box sized by its usage for the selected metric and
+// labelled with its share of the cluster total. Clicking a node box opens that node's
+// detail page on its Performance tab. Data comes from GET /cluster/performance,
+// fetched lazily when the tab is active. When the cluster has no Metrics API the
+// MetricsUnavailable alert is shown instead of the treemap.
 export function ClusterPerformanceTab({ active }: ClusterPerformanceTabProps) {
     const { current } = useKubeContext();
-    const navigate = useShareableNavigate();
     const [metric, setMetric] = useState<PerformanceMetric>("cpu");
 
     const { data, error, isLoading, refetch } = useQuery({
@@ -59,8 +56,7 @@ export function ClusterPerformanceTab({ active }: ClusterPerformanceTabProps) {
         return <LoadingIndicator />;
     }
 
-    const treemap = buildClusterTreemap(data.pods, metric);
-    const heatmap = buildNodeHeatmap(data.nodes);
+    const treemap = buildClusterNodeTreemap(data.nodes, metric);
 
     return (
         <Box data-test-id="perf-cluster" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -75,22 +71,14 @@ export function ClusterPerformanceTab({ active }: ClusterPerformanceTabProps) {
             {!data.metricsAvailable && <MetricsUnavailable />}
 
             {data.metricsAvailable && (
-                <>
-                    <Section title="Breakdown">
-                        <UsageTreemap root={treemap} colorByUtilisation origin={FROM_CLUSTER_PERFORMANCE} metric={metric} />
-                    </Section>
-
-                    <Section title="Hot spots">
-                        <UsageHeatmap
-                            data={heatmap}
-                            onCellClick={(nodeName) => navigate(`/nodes/${nodeName}`, { tab: "performance" })}
-                        />
-                    </Section>
-
-                    <Section title="Top consumers">
-                        <TopConsumersTable pods={data.pods} metric={metric} />
-                    </Section>
-                </>
+                <Section title="Nodes">
+                    <UsageTreemap
+                        root={treemap}
+                        colorByUtilisation
+                        origin={FROM_CLUSTER_PERFORMANCE}
+                        metric={metric}
+                    />
+                </Section>
             )}
         </Box>
     );

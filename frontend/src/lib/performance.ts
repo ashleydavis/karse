@@ -6,9 +6,11 @@
 
 import type { NodeUsage, PodUsage, ResourceUsage, PerformanceMetric } from "karse-types";
 
-// A node in the Breakdown treemap. Interior nodes carry children; leaf nodes carry a
+// A node in a Breakdown treemap. Interior nodes carry children; leaf nodes carry a
 // numeric value (the usage for the selected metric). Leaves additionally carry the
-// pod's namespace/name so a leaf click can navigate to that pod's detail page.
+// pod's namespace/name so a leaf click can navigate to that pod's detail page, and
+// (on the cluster treemap, whose leaves are cluster nodes) the leaf's share of the
+// cluster total for the selected metric, as a whole-number percentage.
 export type TreemapNode = {
     id: string;
     value?: number;
@@ -18,13 +20,14 @@ export type TreemapNode = {
     // Navigation target carried on leaves so a click can open the pod detail page.
     podNamespace?: string;
     podName?: string;
+    // The cluster node's name, carried on cluster-treemap leaves so a leaf click can
+    // open that node's detail page.
+    nodeName?: string;
+    // The leaf's share of the cluster total for the selected metric, as a whole-number
+    // percentage (0–100). Null when the share cannot be computed (no usage, or a zero
+    // cluster total). Used on the cluster treemap's node leaves.
+    clusterShare?: number | null;
     children?: TreemapNode[];
-};
-
-// A single heatmap row: one node, with a cell per metric column (cpu% / mem%).
-export type HeatmapRow = {
-    id: string;
-    data: { x: string; y: number | null }[];
 };
 
 // Formats a CPU figure (millicores) as a human string: sub-core values keep the
@@ -84,49 +87,87 @@ export function utilisation(
     return used / cap;
 }
 
-// Builds the cluster Breakdown treemap: node → namespace → pod, where each leaf's
-// value is the pod's usage for the selected metric. Pods with no usage (null) or
-// zero usage are filtered out, so the treemap only shows pods that actually consume
-// the metric (an empty rectangle carries no information and breaks nivo's layout).
-export function buildClusterTreemap(pods: PodUsage[], metric: PerformanceMetric): TreemapNode {
-    // node name → namespace name → leaf list, preserving first-seen order at each level.
-    const byNode = new Map<string, Map<string, TreemapNode[]>>();
+// The cluster total usage for one metric: the sum of every node's usage. Nodes whose
+// usage is unknown (null, e.g. the Metrics API was unavailable) contribute nothing.
+export function clusterMetricTotal(nodes: NodeUsage[], metric: PerformanceMetric): number {
+    let total = 0;
+    for (const node of nodes) {
+        const value = metricValue(node.usage, metric);
+        if (value !== null) {
+            total += value;
+        }
+    }
+    return total;
+}
 
-    for (const pod of pods) {
-        const value = metricValue(pod.usage, metric);
+// The cluster allocatable total for one metric: the sum of every node's allocatable
+// capacity. Nodes with unknown allocatable (null) contribute nothing.
+export function clusterAllocatableTotal(nodes: NodeUsage[], metric: PerformanceMetric): number {
+    let total = 0;
+    for (const node of nodes) {
+        const value = metricValue(node.allocatable, metric);
+        if (value !== null) {
+            total += value;
+        }
+    }
+    return total;
+}
+
+// The cluster consumed-vs-free reading for one metric: the cluster usage total, the
+// allocatable total, and the consumed percentage (usage ÷ allocatable, whole number,
+// null when allocatable is zero). Drives the Status page resource indicator.
+export type ClusterResourceShare = {
+    used: number;
+    allocatable: number;
+    consumedPercent: number | null;
+};
+
+export function clusterResourceShare(
+    nodes: NodeUsage[],
+    metric: PerformanceMetric,
+): ClusterResourceShare {
+    const used = clusterMetricTotal(nodes, metric);
+    const allocatable = clusterAllocatableTotal(nodes, metric);
+    return {
+        used,
+        allocatable,
+        consumedPercent: usagePercent(used, allocatable),
+    };
+}
+
+// A node's share of the cluster total for the selected metric, as a whole-number
+// percentage (rounded). Returns null when the node's usage is unknown or the cluster
+// total is zero (so there is no meaningful share to show).
+export function nodeShareOfCluster(nodeUsed: number | null, clusterTotal: number): number | null {
+    if (nodeUsed === null || clusterTotal <= 0) {
+        return null;
+    }
+    return Math.round((nodeUsed / clusterTotal) * 100);
+}
+
+// Builds the cluster Breakdown treemap: one leaf per cluster node, sized by that
+// node's usage for the selected metric. Each leaf carries the node's share of the
+// cluster total (a whole-number percentage) for its label and tooltip, and its node
+// name so a click can open that node's detail page. Nodes with no usage (null) or
+// zero usage are filtered out, so the treemap only shows nodes that actually consume
+// the metric (an empty rectangle carries no information and breaks nivo's layout).
+export function buildClusterNodeTreemap(nodes: NodeUsage[], metric: PerformanceMetric): TreemapNode {
+    const total = clusterMetricTotal(nodes, metric);
+    const leaves: TreemapNode[] = [];
+    for (const node of nodes) {
+        const value = metricValue(node.usage, metric);
         if (value === null || value <= 0) {
             continue;
         }
-        const nodeName = pod.node === "" ? "(unscheduled)" : pod.node;
-        let byNamespace = byNode.get(nodeName);
-        if (byNamespace === undefined) {
-            byNamespace = new Map<string, TreemapNode[]>();
-            byNode.set(nodeName, byNamespace);
-        }
-        let leaves = byNamespace.get(pod.namespace);
-        if (leaves === undefined) {
-            leaves = [];
-            byNamespace.set(pod.namespace, leaves);
-        }
         leaves.push({
-            id: `${pod.namespace}/${pod.name}`,
+            id: node.name,
             value,
-            utilisation: utilisation(pod.usage, pod.limits, metric),
-            podNamespace: pod.namespace,
-            podName: pod.name,
+            utilisation: utilisation(node.usage, node.allocatable, metric),
+            nodeName: node.name,
+            clusterShare: nodeShareOfCluster(value, total),
         });
     }
-
-    const nodes: TreemapNode[] = [];
-    for (const [nodeName, byNamespace] of byNode) {
-        const namespaces: TreemapNode[] = [];
-        for (const [namespace, leaves] of byNamespace) {
-            namespaces.push({ id: `${nodeName}/${namespace}`, children: leaves });
-        }
-        nodes.push({ id: nodeName, children: namespaces });
-    }
-
-    return { id: "cluster", children: nodes };
+    return { id: "cluster", children: leaves };
 }
 
 // Builds the node Breakdown treemap: namespace → pod → container, where each leaf's
@@ -178,23 +219,10 @@ export function buildNodeTreemap(pods: PodUsage[], metric: PerformanceMetric): T
     return { id: "node", children: namespaces };
 }
 
-// Builds the Hot spots heatmap rows: one row per node, with a cell per metric column
-// (cpu% / mem%) holding the node's utilisation (usage ÷ allocatable) as a percentage.
-// A cell is null when usage or allocatable is missing, so nivo renders it blank
-// rather than as a misleading 0%.
-export function buildNodeHeatmap(nodes: NodeUsage[]): HeatmapRow[] {
-    return nodes.map((node) => ({
-        id: node.name,
-        data: [
-            { x: "cpu%", y: percentage(node.usage.cpuMillicores, node.allocatable.cpuMillicores) },
-            { x: "mem%", y: percentage(node.usage.memoryBytes, node.allocatable.memoryBytes) },
-        ],
-    }));
-}
-
 // Usage as a whole-number percentage of capacity, or null when either input is
-// missing or capacity is zero (so the heatmap leaves the cell blank).
-function percentage(used: number | null, capacity: number | null): number | null {
+// missing or capacity is zero. Used by the cluster Status indicator (cluster usage ÷
+// cluster allocatable) and the per-node utilisation reading.
+export function usagePercent(used: number | null, capacity: number | null): number | null {
     if (used === null || capacity === null || capacity === 0) {
         return null;
     }

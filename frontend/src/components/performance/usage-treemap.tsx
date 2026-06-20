@@ -29,14 +29,27 @@ function cellLabel(id: string): string {
     return slash === -1 ? id : id.slice(slash + 1);
 }
 
-// Wraps nivo's ResponsiveTreeMap to render the Breakdown view. Leaves are coloured by
-// utilisation when colorByUtilisation is set; clicking a leaf navigates to that pod's
-// detail page (its Performance tab), tagging it with `origin` (a "from" value) so the
-// pod page's breadcrumb and back button return here rather than to the Pods list.
-// Interior nodes (nodes/namespaces) are not navigable. Hovering a leaf shows a tooltip
-// with the cell label and its usage for the selected metric (replacing nivo's empty
-// default tooltip). The chart needs an explicit height because its parent is
-// flex/auto-sized.
+// True when the tree contains at least one leaf (a node with a numeric value),
+// searched depth-first so it works for both the shallow cluster treemap (leaves are
+// the root's direct children) and the deeper node treemap.
+function treeHasLeaf(node: TreemapNode): boolean {
+    const children = node.children ?? [];
+    if (children.length === 0) {
+        return node.value !== undefined;
+    }
+    return children.some((child) => treeHasLeaf(child));
+}
+
+// Wraps nivo's ResponsiveTreeMap to render a Breakdown view. Leaves are coloured by
+// utilisation when colorByUtilisation is set. A leaf that names a cluster node
+// (data.nodeName) drills to that node's detail page (its Performance tab); otherwise a
+// leaf that names a pod (data.podNamespace/podName) drills to that pod's detail page.
+// Either drill is tagged with `origin` (a "from" value) so the destination's breadcrumb
+// and back button return here rather than to the default list. Interior nodes
+// (namespaces) are not navigable. Hovering a leaf shows a tooltip with the cell label
+// and its usage for the selected metric, plus — for a cluster-node leaf — that node's
+// share of the cluster total (replacing nivo's empty default tooltip). The chart needs
+// an explicit height because its parent is flex/auto-sized.
 export function UsageTreemap({
     root,
     colorByUtilisation,
@@ -54,9 +67,11 @@ export function UsageTreemap({
     // against the panel background in both light and dark mode.
     const chartTheme = { text: { fill: muiTheme.palette.text.primary } };
 
-    const hasLeaves = (root.children ?? []).some((node) =>
-        (node.children ?? []).some((ns) => (ns.children ?? []).length > 0),
-    );
+    // True when the tree has at least one leaf (a node carrying a numeric value),
+    // regardless of nesting depth: the cluster treemap's leaves are the root's direct
+    // children (one per cluster node), while the node treemap nests namespace → pod →
+    // container.
+    const hasLeaves = treeHasLeaf(root);
 
     if (!hasLeaves) {
         return (
@@ -76,10 +91,19 @@ export function UsageTreemap({
                 theme={chartTheme}
                 identity="id"
                 value="value"
-                // Show the pod name (the segment after the last "/") on each leaf.
-                label={(node) => cellLabel(String(node.id))}
+                // Each leaf is labelled with its name (the segment after the last "/").
+                // A cluster-node leaf also shows its share of the cluster total inline
+                // (e.g. "node-cp 62%") so the percentage reads straight off the box.
+                label={(node) => {
+                    const name = cellLabel(String(node.id));
+                    const share = node.data.clusterShare;
+                    return share === null || share === undefined
+                        ? name
+                        : `${name} ${share}%`;
+                }}
                 // Replace nivo's empty default tooltip with the cell label and its usage
-                // for the selected metric (CPU in m/cores, memory in Mi/Gi).
+                // for the selected metric (CPU in m/cores, memory in Mi/Gi), plus — for a
+                // cluster-node leaf — that node's share of the cluster total.
                 tooltip={({ node }) => (
                     <Paper
                         data-test-id="perf-treemap-tooltip"
@@ -89,11 +113,16 @@ export function UsageTreemap({
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
                             {cellLabel(String(node.id))}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
                             {metric === "cpu"
                                 ? formatCpu(node.value)
                                 : formatMemory(node.value)}
                         </Typography>
+                        {node.data.clusterShare !== null && node.data.clusterShare !== undefined && (
+                            <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                                {node.data.clusterShare}% of cluster
+                            </Typography>
+                        )}
                     </Paper>
                 )}
                 labelSkipSize={16}
@@ -111,7 +140,15 @@ export function UsageTreemap({
                 nodeOpacity={0.9}
                 onClick={(node) => {
                     const data = node.data;
-                    if (data.podNamespace && data.podName) {
+                    // A cluster-node leaf drills to that node's detail page; a pod leaf
+                    // (node treemap) drills to that pod's detail page. Both open the
+                    // Performance tab and tag the origin so back/breadcrumb return here.
+                    if (data.nodeName) {
+                        navigate(`/nodes/${data.nodeName}`, {
+                            tab: "performance",
+                            from: origin,
+                        });
+                    } else if (data.podNamespace && data.podName) {
                         navigate(`/pods/${data.podNamespace}/${data.podName}`, {
                             tab: "performance",
                             from: origin,

@@ -1,6 +1,8 @@
 # cluster-overview manual tests
 
-Manual tests for the cluster home page overview tiles. See the spec: [cluster-overview](../../spec/cluster-overview/detail.md).
+Manual tests for the cluster home page (titled **Status**): its overview tiles and the cluster resource indicator. See the spec: [cluster-overview](../../spec/cluster-overview/detail.md).
+
+**Naming:** the sidebar nav item, the `/cluster` breadcrumb, and the first in-page tab all read "Status" (the tab's URL value stays `overview`).
 
 Start the app first. From the repo root run:
 
@@ -23,8 +25,10 @@ Baseline that the overview tiles render correctly with minimal data.
 `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse.
 
 ### What to check
+- **Page is titled "Status"**: the sidebar nav item, the breadcrumb, and the first tab read "Status".
 - **Overview tiles**: node count shows `2`, pod count and namespace count reflect only the system namespaces KWOK creates (typically `default`, `kube-system`, `kube-public`, `kube-node-lease`).
 - **Errors tile**: shows `0` with the sublabel "none active" on this clean cluster (no Warning events, no problem pods).
+- **Cluster resource indicator**: below the tiles and pod-status row, the "Cluster resources" card shows a consumed-vs-free bar for **CPU** and for **Memory**. On a cluster with a metrics-server each bar shows a "<n>% used" figure and the consumed/allocatable totals; on a kwok cluster with no metrics-server the card instead shows the "Metrics API not available" notice. **Disk and network are intentionally absent** — the Metrics API does not report them.
 
 Teardown:
 

@@ -109,10 +109,12 @@ retry kubectl patch node node-notready --subresource=status --type=merge -p \
   '{"status":{"conditions":[{"type":"Ready","status":"False","reason":"KubeletNotReady","message":"Simulated NotReady node","lastHeartbeatTime":"2024-01-01T00:00:00Z","lastTransitionTime":"2024-01-01T00:00:00Z"}],"nodeInfo":{"kubeletVersion":"fake"}}}'
 
 # Pods for the Performance tab. Their names/namespaces match the KARSE_FAKE_METRICS
-# pod-metrics entries (web/api in default, worker in jobs, cache in infra) so the
-# cluster Breakdown treemap and Top consumers table render with usage cells. Each
-# carries requests/limits so the provisioning fields are populated too. They are
-# spread across node-cp and node-worker so the treemap shows both node groups.
+# pod-metrics entries (web/api in default, worker in jobs, cache in infra) so the node
+# and pod Performance views render with usage cells. Each carries requests/limits so the
+# provisioning fields are populated too. They are spread across node-cp and node-worker;
+# after cluster-performance-1 the cluster Performance treemap shows one box per node
+# (node-cp, node-worker) rather than per pod, and the Status page resource indicator sums
+# their usage.
 apply_manifest "" <<'EOF'
 apiVersion: v1
 kind: Namespace

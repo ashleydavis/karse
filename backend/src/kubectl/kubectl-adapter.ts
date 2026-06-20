@@ -1140,6 +1140,14 @@ const FAKE_METRICS = {
     nodes: {
         kind: "NodeMetricsList",
         apiVersion: "metrics.k8s.io/v1beta1",
+        // fake-node-1 / fake-node-2 are the names the smoke fixture (scripts/smoke-tests.sh)
+        // seeds, so the node/cluster performance smoke checks join usage to them by name.
+        // node-cp / node-worker are the names the e2e fixture (scripts/e2e-tests.sh) seeds;
+        // they are included so the cluster Performance treemap — whose leaves are the
+        // cluster's nodes, joined to this usage by name — renders a box per node in e2e,
+        // and so the Status page's cluster resource indicator sums real, non-null usage.
+        // Unmatched entries are simply ignored by the by-name join, so listing all four is
+        // harmless for either fixture.
         items: [
             {
                 metadata: {
@@ -1154,6 +1162,24 @@ const FAKE_METRICS = {
             {
                 metadata: {
                     name: "fake-node-2",
+                },
+                usage: {
+                    cpu: "1600000000n",
+                    memory: "4194304Ki",
+                },
+            },
+            {
+                metadata: {
+                    name: "node-cp",
+                },
+                usage: {
+                    cpu: "850000u",
+                    memory: "2097152Ki",
+                },
+            },
+            {
+                metadata: {
+                    name: "node-worker",
                 },
                 usage: {
                     cpu: "1600000000n",

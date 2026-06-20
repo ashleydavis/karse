@@ -1,6 +1,6 @@
 # performance-tabs manual tests
 
-Manual tests for the Performance tabs. The cluster home page is tabbed (Overview + Performance) and its **Performance tab is now populated** (Breakdown treemap, Hot spots heatmap, Top consumers table). The node and pod detail pages each have a **populated** Performance tab too: the node tab is split into a node-scoped **Breakdown** treemap subtab and a searchable/sortable/filterable per-container **Provisioning** table subtab, and the pod tab (the leaf) shows per-container Provisioning bars with no treemap. The feature is complete.
+Manual tests for the Performance tabs. The cluster home page is tabbed (Status + Performance) and its **Performance tab is populated** with a treemap of the cluster's **nodes** — one box per node, sized by usage and labelled with each node's share of the cluster total (the Hot spots heatmap and Top consumers table were removed by cluster-performance-1). The node and pod detail pages each have a **populated** Performance tab too: the node tab is split into a node-scoped **Breakdown** treemap subtab and a searchable/sortable/filterable per-container **Provisioning** table subtab, and the pod tab (the leaf) shows per-container Provisioning bars with no treemap. The feature is complete.
 
 To see the populated cluster Performance tab against a kwok cluster (which has no metrics-server), start the app with the fake-metrics mode on: `KARSE_FAKE_METRICS=1 bun run dev`. See the [Cluster Performance tab](#cluster-performance-tab-populated) scenario below.
 
@@ -22,10 +22,10 @@ Then open the frontend at `http://127.0.0.1:5173`. The scenario fixture stands u
 
 ### Cluster home tabs
 - Navigate to `/cluster` (the Karse home page).
-- A tab bar shows two tabs: "Overview" and "Performance".
-- "Overview" is selected by default. The existing stat tiles (Server version, Nodes, Namespaces, Pods, Errors) and the Pod status row render exactly as before.
-- Click the "Performance" tab. The stat tiles disappear and the populated Performance hub appears (see the scenario below).
-- Click back to "Overview". The stat tiles reappear and the Performance hub disappears.
+- A tab bar shows two tabs: "Status" and "Performance".
+- "Status" is selected by default. The existing stat tiles (Server version, Nodes, Namespaces, Pods, Errors), the Pod status row, and the cluster resource indicator render.
+- Click the "Performance" tab. The Status content disappears and the populated Performance hub (the node treemap) appears (see the scenario below).
+- Click back to "Status". The Status content reappears and the Performance hub disappears.
 
 ### Node detail Performance tab
 - Navigate to `/nodes` and click the `fake-node-1` row to open `/nodes/fake-node-1`.
@@ -41,16 +41,26 @@ Then open the frontend at `http://127.0.0.1:5173`. The scenario fixture stands u
 
 ## Scenario: Cluster Performance tab (populated) {#cluster-performance-tab-populated}
 
-The cluster Performance tab needs usage data. kwok clusters have no metrics-server, so run the app with fake metrics on, and seed pods whose names match the fake-metrics entries (`web`/`api` in `default`, `worker` in `jobs`, `cache` in `infra`).
+The cluster Performance tab (reworked by **cluster-performance-1**) shows a treemap of the cluster's **nodes**. It needs node usage data. kwok clusters have no metrics-server, so run the app with fake metrics on; the fake-metrics node list includes the names `node-cp` and `node-worker` (the e2e fixture's nodes) and `fake-node-1`/`fake-node-2` (the smoke fixture's nodes). A node appears as a treemap box only when it is in both `kubectl get nodes` **and** the fake-metrics node list, so seed nodes with those names (or add your own node name to the `FAKE_METRICS.nodes` list while testing).
 
 ```sh
-# Seed namespaces and pods matching the fake-metrics entries.
-kubectl create namespace jobs
-kubectl create namespace infra
-kubectl run web   -n default --image=nginx
-kubectl run api   -n default --image=nginx
-kubectl run worker -n jobs   --image=nginx
-kubectl run cache -n infra   --image=nginx
+# Seed nodes whose names match the fake-metrics entries so they carry usage.
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: Node
+metadata:
+  name: node-cp
+  annotations: { kwok.x-k8s.io/node: fake }
+spec: {}
+---
+apiVersion: v1
+kind: Node
+metadata:
+  name: node-worker
+  annotations: { kwok.x-k8s.io/node: fake }
+spec: {}
+EOF
+kubectl wait --for=condition=Ready node/node-cp node/node-worker --timeout=60s
 
 # Start the app with fake metrics so usage data is returned.
 KARSE_FAKE_METRICS=1 bun run dev
@@ -59,22 +69,22 @@ KARSE_FAKE_METRICS=1 bun run dev
 Open `/cluster`, click the **Performance** tab.
 
 - A **CPU / Memory** toggle shows at the top, with **CPU** selected by default.
-- **Breakdown** (treemap): rectangles for the seeded pods, grouped by node then namespace, sized by usage. Rectangles are coloured green/amber/red by utilisation. Click a rectangle for a pod (e.g. `web`): the app navigates to `/pods/default/web?tab=performance` and the pod's Performance tab is selected. The breadcrumb trail now reads `Cluster > web` (the cluster hub is the origin), and the **back button** (left of the pod name) returns to the cluster **Performance** tab, not the Pods list.
-- Hover a rectangle: a tooltip appears showing the cell's label (e.g. `web`) and its usage for the selected metric (CPU in `m`/cores, memory in `Mi`/`Gi`). It is never an empty box.
-- **Hot spots** (heatmap): a row per node with `cpu%` and `mem%` cells. Click a cell: the app navigates to that node's detail page on its Performance tab.
-- **Top consumers** (table): the pods ranked by the selected metric's usage. Click the **Usage** header to reverse the order. Click a row: the app navigates to that pod's Performance tab.
-- Toggle to **Memory**: every view re-derives from memory usage (the Top consumers usage column switches to `Mi`/`Gi` figures, the treemap rectangles re-size).
+- **Node treemap**: one box per cluster node (e.g. `node-cp`, `node-worker`), sized by that node's usage for the selected metric and coloured green/amber/red by utilisation. Each box is labelled with the node name **and its share of the cluster total**, e.g. `node-cp 35%`. There are **no pod boxes** — the treemap shows nodes, not pods.
+- Hover a box: a tooltip shows the node name, its usage for the selected metric (CPU in `m`/cores, memory in `Mi`/`Gi`), and its `% of cluster` share. It is never an empty box.
+- Click a node box (e.g. `node-cp`): the app navigates to `/nodes/node-cp?tab=performance` and that node's Performance tab is selected. The breadcrumb origin and back button return to the cluster **Performance** tab.
+- Toggle to **Memory**: the treemap re-derives from memory usage (the boxes re-size and the share percentages recompute).
+- **No Hot spots heatmap and no Top consumers table** — both were removed in this rework. Confirm neither appears.
 
 ### Microcore (`u`) CPU usage
-- The fake metrics report several CPU usages in the microcore (`u`) form the real Metrics API can return, including the exact `398u` value from the field report (the `sidecar` container of the `web` pod). Confirm the cluster Performance tab still loads fully (treemap, heatmap, Top consumers) with **no** "Could not load data / invalid CPU quantity: 398u" error. This is the regression the microcore parse fix addresses.
+- The fake metrics report several CPU usages in the microcore (`u`) form the real Metrics API can return, including the exact `398u` value from the field report. Confirm the cluster Performance tab still loads fully (the node treemap) with **no** "Could not load data / invalid CPU quantity: 398u" error. This is the regression the microcore parse fix addresses.
 
 ### Metrics-unavailable path
 - Stop the app and restart it **without** `KARSE_FAKE_METRICS` (plain `bun run dev`).
-- Open `/cluster` → **Performance**. Because the kwok cluster has no metrics-server, the views are replaced by an information notice (the "Metrics API is not available" alert), confirming the page degrades cleanly rather than erroring.
+- Open `/cluster` → **Performance**. Because the kwok cluster has no metrics-server, the treemap is replaced by an information notice (the "Metrics API is not available" alert), confirming the page degrades cleanly rather than erroring.
 
 ### Light and dark mode (cluster Performance tab)
 - With fake metrics on and the tab populated, switch the colour mode between Light and Dark from the header settings.
-- In both modes the treemap, heatmap, toggle, and table are clearly readable with proper contrast. Capture screenshots of the populated tab and the metrics-unavailable state in both modes for review.
+- In both modes the node treemap and toggle are clearly readable with proper contrast. Capture screenshots of the populated tab and the metrics-unavailable state in both modes for review.
 
 ## Scenario: Node Performance tab (populated) {#node-performance-tab-populated}
 
@@ -196,8 +206,11 @@ bun run smoke
 The cluster Performance tab UI that consumes this endpoint shipped in `performance-tabs-6`;
 see the [Cluster Performance tab (populated)](#cluster-performance-tab-populated) scenario
 above. The e2e suite (`scripts/e2e-tests.sh`) runs the backend with `KARSE_FAKE_METRICS=1`
-and seeds the matching pods, then asserts the treemap, heatmap, and top-consumers table
-render, the metric toggle updates the view, and the drill-down navigations work.
+and seeds nodes named `node-cp`/`node-worker` (matching the fake-metrics node list), then
+asserts the node treemap renders node boxes (not pods) with per-node share percentages, that
+the Hot spots heatmap and Top consumers table are absent, the metric toggle keeps the treemap
+rendered, and clicking a node box drills to that node's Performance tab. A separate block
+asserts the Status page's cluster resource indicator shows CPU and memory consumed percentages.
 
 ### Node performance endpoint (`GET /api/nodes/:name/performance`)
 
