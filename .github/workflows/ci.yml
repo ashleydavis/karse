@@ -41,7 +41,7 @@ jobs:
         run: bash scripts/smoke-tests.sh
 
       - name: Install Playwright browser and system dependencies
-        run: bunx playwright install --with-deps chromium
+        run: cd e2e && bunx playwright install --with-deps chromium
 
       - name: E2E tests
         run: bash scripts/e2e-tests.sh
