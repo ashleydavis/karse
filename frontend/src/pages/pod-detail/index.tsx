@@ -145,9 +145,16 @@ export function PodDetailPage() {
     const effectiveTab =
         activeTab === "init-containers" && !hasInitContainers ? "containers" : activeTab;
 
+    // The Logs tab hosts the shared LogViewer, which must stretch to fill the
+    // remaining height down to the viewport bottom. So the page is a full-height
+    // flex column (height: 100% against the scrollable <main>), and the active
+    // tab panel is the flex child that grows. Other tabs keep their natural
+    // height; only the Logs panel claims the leftover space (see below).
+    const logsTabActive = effectiveTab === "logs";
+
     return (
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3, height: logsTabActive ? "100%" : undefined, minHeight: 0 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
                 <Tooltip title={`Back to ${backLabel}`}>
                     <IconButton size="small" onClick={goBack} data-test-id="pod-detail-back">
                         <FontAwesomeIcon icon={faArrowLeft} />
@@ -160,7 +167,7 @@ export function PodDetailPage() {
                 <Box sx={{ flexGrow: 1 }} />
             </Box>
 
-            <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+            <Box sx={{ borderBottom: 1, borderColor: "divider", flexShrink: 0 }}>
                 <Tabs
                     value={effectiveTab}
                     onChange={(_, value) => selectTab(value)}
@@ -271,7 +278,7 @@ export function PodDetailPage() {
             )}
 
             {effectiveTab === "logs" && (
-                <Box data-test-id="pod-panel-logs" sx={{ display: "flex", minHeight: 400 }}>
+                <Box data-test-id="pod-panel-logs" sx={{ display: "flex", flex: 1, minHeight: 0 }}>
                     <LogViewer
                         testIdPrefix="pod-logs"
                         fixedPod={{ namespace: data.namespace, podName: data.name }}

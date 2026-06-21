@@ -1819,6 +1819,23 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-logs-viewer']")).toContainText("default/nginx-abc");
         });
 
+        test("the Logs tab's log viewer stretches down to fill the remaining viewport height", async () => {
+            // Regression for logs-reusable-1: on the Pod detail Logs tab the log
+            // text area must fill the leftover space down to near the viewport
+            // bottom, the same as the Logs page, rather than the small fixed
+            // height it had before. The viewport is 800px tall.
+            await expect(page.locator("[data-test-id='pod-logs-viewer']")).toBeVisible();
+            const viewport = page.viewportSize();
+            expect(viewport).not.toBeNull();
+            const box = await page.locator("[data-test-id='pod-logs-viewer']").boundingBox();
+            expect(box).not.toBeNull();
+            const bottom = box!.y + box!.height;
+            // Within ~64px of the viewport bottom (the <main> padding is 24px each
+            // side). The old fixed 400px-min box fell well short of this.
+            expect(viewport!.height - bottom).toBeLessThan(64);
+            expect(box!.height).toBeGreaterThan(300);
+        });
+
         test("the Logs tab exposes the same options as the Logs page, with no Tail option and no Refresh button", async () => {
             await expect(page.locator("[data-test-id='pod-logs-viewer']")).toBeVisible();
             // The shared component carries none of the dropped controls: no Tail
@@ -3621,6 +3638,24 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='live-logs-tail-select']")).toHaveCount(0);
             await expect(page.locator("[data-test-id='log-refresh']")).toHaveCount(0);
             await expect(page.locator("[data-test-id='live-logs-refresh']")).toHaveCount(0);
+        });
+
+        test("the log viewer stretches down to fill the remaining viewport height", async () => {
+            // Regression for logs-reusable-1: the log text area must grow to fill
+            // the space left below the controls, down to near the viewport bottom,
+            // rather than sitting at a small fixed height. The viewport is 800px
+            // tall (set in beforeEach), so the viewer's bottom edge should land
+            // close to it once the page chrome and controls are accounted for.
+            const viewport = page.viewportSize();
+            expect(viewport).not.toBeNull();
+            const box = await page.locator("[data-test-id='live-logs-viewer']").boundingBox();
+            expect(box).not.toBeNull();
+            const bottom = box!.y + box!.height;
+            // The viewer reaches within ~64px of the viewport bottom (the <main>
+            // padding is 24px each side). A small fixed-height box would fall far
+            // short, so this both proves the stretch and guards the regression.
+            expect(viewport!.height - bottom).toBeLessThan(64);
+            expect(box!.height).toBeGreaterThan(400);
         });
 
         test("typing in the search box filters the pod checkbox list", async () => {

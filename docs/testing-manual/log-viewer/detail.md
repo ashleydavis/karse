@@ -29,6 +29,7 @@ Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stand
 - Confirm there is **no "Tail" selector** and **no Refresh button** on the Logs tab.
 - Confirm the Logs tab does **not** show the Logs page's namespace selector or pod picker (the pod is fixed here).
 - Open the Logs page from the sidebar (`/logs`). Confirm it offers the same viewer (namespace selector + searchable pod picker + Stream/Stop), and that it too has no "Tail" option and no Refresh button. The two surfaces are the same component.
+- On both surfaces confirm the dark log text area **stretches down to fill the remaining height**, with its bottom edge sitting just above the bottom of the window (only the page padding below it). It must not stop short at a small fixed height with empty space beneath. Resize the window taller and shorter and confirm the log area grows and shrinks to keep filling the space.
 
 ## Scenario B: Live (follow) pod logs
 
