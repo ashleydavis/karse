@@ -33,8 +33,9 @@ Below the stat tiles and pod-status row, the Status page shows a **consumed-vs-f
 - [x] The Errors tile shows the active-error count, updates with the cluster data, and the calculation is documented above.
 - [x] The cluster home page is titled "Status" (sidebar nav item, `/cluster` breadcrumb, and first in-page tab label).
 - [x] The Status page shows a consumed-vs-free cluster resource indicator for CPU and memory (consumed percentage + consumed/allocatable figures), driven by `GET /api/cluster/performance`.
-- [ ] Disk and network consumed-vs-free indicators. **Not feasible:** the Kubernetes Metrics API reports neither disk usage nor any network metric, so there is no live consumed figure to show without a new data source (e.g. Prometheus/cAdvisor). CPU and memory are covered; disk/network are documented as out of scope above. Flagged for human decision (see this ticket's `## Issues`).
+
+(Disk and network indicators are deliberately out of scope: the Kubernetes Metrics API reports neither, so there is no honest live figure to show without a separate metrics source. See the "Resources covered" note above.)
 
 ## Open Questions
 
-- Should disk/network consumption indicators be pursued via a separate metrics source (Prometheus/cAdvisor)? They cannot come from the Metrics API used today. Tracked as a follow-up rather than part of this change.
+- None.
