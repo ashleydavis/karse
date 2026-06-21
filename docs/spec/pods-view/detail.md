@@ -14,6 +14,7 @@ Backed by: `GET /api/pods`, `backend/src/routes/pods-route.ts`, `backend/src/kub
 - When a namespace is active, pods are scoped to it; otherwise all namespaces are shown. The Namespace column is always rendered regardless of the active namespace.
 - A Labels column renders each pod's labels as compact `key=value` chips (a muted dash when none). The column participates in the table's fuzzy search, matching on both label keys and values. To keep the row height fixed regardless of label count, only the first few chips are shown inline; when a pod has more, a `+N ...` control opens a searchable modal listing every label (the shared Labels column behaviour, see `resource-search`).
 - A stats header above the table shows Total / Healthy / Error chips for the current scope; Healthy counts `Running`/`Succeeded` pods, Error counts `Failed`/`Unknown` (see `resource-stats`).
+- **CPU and Memory columns** show each pod's resource consumption so the user can sort to find the heaviest consumers. Per-pod usage is not on the pods list response; it comes from the cluster Performance snapshot (`GET /api/cluster/performance` → `PodUsage[]`), joined to the rows by namespace/name. CPU is formatted in millicores/cores and Memory in binary units (the shared `formatCpu`/`formatMemory` helpers). Both columns sort by the raw numeric usage (millicores, bytes); a pod with no usage reading (or when the Metrics API is unavailable) shows an em-dash and sorts below every pod that has a reading. Only CPU and memory are shown: the Kubernetes Metrics API reports neither disk nor network consumption (the documented exclusion in [performance-tabs](../performance-tabs/detail.md)), so there is no disk/network figure to show or sort by.
 - Columns are sortable and the table is searchable (see `resource-search`); rows link to the pod detail page (see `clickable-resource-rows`).
 
 ## Acceptance Criteria
@@ -22,6 +23,7 @@ Backed by: `GET /api/pods`, `backend/src/routes/pods-route.ts`, `backend/src/kub
 - [x] Each pod reports phase, ready ratio, container count, summed restarts, age, and node.
 - [x] An active namespace scopes the list; no namespace shows all. The Namespace column is always rendered.
 - [x] Columns are sortable and the table is searchable.
+- [x] The table has CPU and Memory consumption columns, each sortable ascending/descending by the pod's usage. (Disk and network are excluded: the Metrics API reports neither — see [performance-tabs](../performance-tabs/detail.md).)
 - [x] A Labels column shows each pod's labels as key=value chips and is searchable.
 - [x] Rows link to the pod detail page.
 

@@ -334,6 +334,89 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Resource-consumption columns (CPU / memory sort) ───────────────────────
+
+    test.describe("pods table resource sort", () => {
+        // Three pods with deliberately mismatched CPU and memory usage so that
+        // sorting by CPU and sorting by memory yield different orders. The pods
+        // list carries no usage; usage comes from the cluster Performance snapshot,
+        // so both endpoints are mocked to keep the assertions deterministic.
+        const SORT_PODS = {
+            pods: [
+                { name: "pod-low", namespace: "default", phase: "Running", ready: "1/1", containerCount: 1, restarts: 0, node: "node-worker", createdAt: new Date().toISOString(), labels: {} },
+                { name: "pod-mid", namespace: "default", phase: "Running", ready: "1/1", containerCount: 1, restarts: 0, node: "node-worker", createdAt: new Date().toISOString(), labels: {} },
+                { name: "pod-high", namespace: "default", phase: "Running", ready: "1/1", containerCount: 1, restarts: 0, node: "node-worker", createdAt: new Date().toISOString(), labels: {} },
+            ],
+        };
+
+        // CPU ascending order is low < mid < high; memory ascending order is the
+        // OPPOSITE (high < mid < low), so a memory sort cannot accidentally pass on
+        // the CPU ordering.
+        const PERFORMANCE = {
+            metricsAvailable: true,
+            nodes: [],
+            pods: [
+                { name: "pod-low", namespace: "default", node: "node-worker", usage: { cpuMillicores: 50, memoryBytes: 300_000_000 }, requests: { cpuMillicores: null, memoryBytes: null }, limits: { cpuMillicores: null, memoryBytes: null }, containers: [] },
+                { name: "pod-mid", namespace: "default", node: "node-worker", usage: { cpuMillicores: 250, memoryBytes: 200_000_000 }, requests: { cpuMillicores: null, memoryBytes: null }, limits: { cpuMillicores: null, memoryBytes: null }, containers: [] },
+                { name: "pod-high", namespace: "default", node: "node-worker", usage: { cpuMillicores: 500, memoryBytes: 100_000_000 }, requests: { cpuMillicores: null, memoryBytes: null }, limits: { cpuMillicores: null, memoryBytes: null }, containers: [] },
+            ],
+        };
+
+        // Reads the pod-name cell of every rendered row, top to bottom.
+        async function rowNames(): Promise<string[]> {
+            return page.locator("[data-test-id='pod-row'] td:first-child").allTextContents();
+        }
+
+        // Clicks a pods-table header cell by its visible label.
+        async function clickHeader(label: string): Promise<void> {
+            await page.locator("[data-test-id='pods-table'] thead th").filter({ hasText: label }).click();
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: SORT_PODS });
+            });
+            await page.route("**/api/cluster/performance*", async (route) => {
+                await route.fulfill({ json: PERFORMANCE });
+            });
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']").first()).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+            await page.unroute("**/api/cluster/performance*");
+        });
+
+        test("CPU and Memory columns render each pod's formatted usage", async () => {
+            await expect(page.locator("[data-test-id='pods-table'] thead th").filter({ hasText: "CPU" })).toBeVisible();
+            await expect(page.locator("[data-test-id='pods-table'] thead th").filter({ hasText: "Memory" })).toBeVisible();
+            // Three rows, three CPU cells and three memory cells.
+            await expect(page.locator("[data-test-id='pod-cpu']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='pod-memory']")).toHaveCount(3);
+        });
+
+        // Numeric columns sort highest-first on the first click (TanStack's default
+        // for numeric values, and the useful default for "which pods consume most"),
+        // then ascending on the second click.
+        test("clicking CPU sorts pods by CPU, highest first then ascending", async () => {
+            await clickHeader("CPU");
+            expect(await rowNames()).toEqual(["pod-high", "pod-mid", "pod-low"]);
+            await clickHeader("CPU");
+            expect(await rowNames()).toEqual(["pod-low", "pod-mid", "pod-high"]);
+        });
+
+        test("clicking Memory sorts pods by memory, highest first then ascending", async () => {
+            await clickHeader("Memory");
+            // Memory order is the reverse of CPU order for these fixtures, proving the
+            // memory comparator sorts on memory and not on CPU.
+            expect(await rowNames()).toEqual(["pod-low", "pod-mid", "pod-high"]);
+            await clickHeader("Memory");
+            expect(await rowNames()).toEqual(["pod-high", "pod-mid", "pod-low"]);
+        });
+    });
+
     // ── Expanded search criteria (labels, node, namespace) ─────────────────────
 
     test.describe("expanded search criteria (labels, node, namespace)", () => {

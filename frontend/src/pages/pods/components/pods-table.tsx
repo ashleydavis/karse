@@ -27,7 +27,7 @@ import type { Pod, PodPhase } from "karse-types";
 import { useKubeContext } from "../../../lib/kube-context";
 import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { useShareableNavigate } from "../../../lib/nav-state";
-import { fetchPods } from "../../../lib/api-client";
+import { fetchPods, fetchClusterPerformance } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
 import { TableFilter } from "../../../components/table-filter";
@@ -41,6 +41,14 @@ import { ResourceStatsHeader } from "../../../components/resource-stats-header";
 import { computePodStats, podHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
+import { formatCpu, formatMemory } from "../../../lib/performance";
+import {
+    buildPodUsageMap,
+    podUsageFor,
+    comparePodCpu,
+    comparePodMemory,
+    type PodUsageMap,
+} from "../../../lib/pod-resource-sort";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -120,8 +128,10 @@ const PHASE_ORDER: Record<PodPhase, number> = {
 // All selectable pod phases, in display order, for the phase filter dropdown.
 const ALL_PHASES: PodPhase[] = ["Running", "Pending", "Succeeded", "Failed", "Unknown"];
 
-// Builds the column definitions for the pods table.
-function buildColumns(): ColumnDef<Pod>[] {
+// Builds the column definitions for the pods table. `usage` maps each pod
+// (namespace/name) to its CPU/memory consumption from the cluster Performance
+// snapshot, used by the resource columns and their sort comparators.
+function buildColumns(usage: PodUsageMap): ColumnDef<Pod>[] {
     const cols: ColumnDef<Pod>[] = [];
 
     cols.push(
@@ -164,6 +174,40 @@ function buildColumns(): ColumnDef<Pod>[] {
         {
             accessorKey: "node",
             header: "Node",
+        },
+        {
+            // Pod CPU consumption from the cluster Performance snapshot. Renders the
+            // formatted figure (or an em-dash when usage is unavailable) and sorts by
+            // the raw millicore value via comparePodCpu.
+            id: "cpu",
+            header: "CPU",
+            accessorFn: (row) => podUsageFor(usage, row.namespace, row.name).cpuMillicores,
+            cell: (info) => (
+                <span data-test-id="pod-cpu">{formatCpu(info.getValue<number | null>())}</span>
+            ),
+            sortingFn: (a, b) =>
+                comparePodCpu(
+                    podUsageFor(usage, a.original.namespace, a.original.name),
+                    podUsageFor(usage, b.original.namespace, b.original.name),
+                ),
+            enableGlobalFilter: false,
+        },
+        {
+            // Pod memory consumption from the cluster Performance snapshot. Renders the
+            // formatted figure (or an em-dash when usage is unavailable) and sorts by
+            // the raw byte value via comparePodMemory.
+            id: "memory",
+            header: "Memory",
+            accessorFn: (row) => podUsageFor(usage, row.namespace, row.name).memoryBytes,
+            cell: (info) => (
+                <span data-test-id="pod-memory">{formatMemory(info.getValue<number | null>())}</span>
+            ),
+            sortingFn: (a, b) =>
+                comparePodMemory(
+                    podUsageFor(usage, a.original.namespace, a.original.name),
+                    podUsageFor(usage, b.original.namespace, b.original.name),
+                ),
+            enableGlobalFilter: false,
         },
         {
             id: "age",
@@ -216,10 +260,21 @@ export function PodsTable() {
         enabled: current !== null,
     });
 
+    // Per-pod CPU/memory usage for the resource columns. Sourced from the
+    // cluster-wide Performance snapshot (the pods list response carries no usage),
+    // keyed by context only. A failed/absent metrics fetch leaves the map empty,
+    // so the columns show em-dashes rather than breaking the table.
+    const { data: performance } = useQuery({
+        queryKey: ["cluster-performance", current],
+        queryFn: () => fetchClusterPerformance(current!),
+        enabled: current !== null,
+    });
+
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
 
-    const columns = buildColumns();
+    const usageMap = buildPodUsageMap(performance?.pods ?? []);
+    const columns = buildColumns(usageMap);
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("pods", columns);
 
     // The filterable columns the shared editor offers: the Status (phase) and
