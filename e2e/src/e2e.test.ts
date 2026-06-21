@@ -349,12 +349,17 @@ test.describe("karse e2e", () => {
             ],
         };
 
-        // CPU ascending order is low < mid < high; memory ascending order is the
-        // OPPOSITE (high < mid < low), so a memory sort cannot accidentally pass on
-        // the CPU ordering.
+        // The columns show each pod's usage as a percentage of its node's allocatable.
+        // All three pods run on node-worker (allocatable: 1000m CPU, 1_000_000_000 bytes
+        // memory), so the percentage is usage ÷ allocatable. CPU ascending order is
+        // low(5%) < mid(25%) < high(50%); memory ascending order is the OPPOSITE
+        // (high(10%) < mid(20%) < low(30%)), so a memory sort cannot accidentally pass
+        // on the CPU ordering.
         const PERFORMANCE = {
             metricsAvailable: true,
-            nodes: [],
+            nodes: [
+                { name: "node-worker", usage: { cpuMillicores: 800, memoryBytes: 600_000_000 }, allocatable: { cpuMillicores: 1000, memoryBytes: 1_000_000_000 } },
+            ],
             pods: [
                 { name: "pod-low", namespace: "default", node: "node-worker", usage: { cpuMillicores: 50, memoryBytes: 300_000_000 }, requests: { cpuMillicores: null, memoryBytes: null }, limits: { cpuMillicores: null, memoryBytes: null }, containers: [] },
                 { name: "pod-mid", namespace: "default", node: "node-worker", usage: { cpuMillicores: 250, memoryBytes: 200_000_000 }, requests: { cpuMillicores: null, memoryBytes: null }, limits: { cpuMillicores: null, memoryBytes: null }, containers: [] },
@@ -389,12 +394,23 @@ test.describe("karse e2e", () => {
             await page.unroute("**/api/cluster/performance*");
         });
 
-        test("CPU and Memory columns render each pod's formatted usage", async () => {
+        test("CPU and Memory columns render each pod's usage as a percentage of its node", async () => {
             await expect(page.locator("[data-test-id='pods-table'] thead th").filter({ hasText: "CPU" })).toBeVisible();
             await expect(page.locator("[data-test-id='pods-table'] thead th").filter({ hasText: "Memory" })).toBeVisible();
             // Three rows, three CPU cells and three memory cells.
             await expect(page.locator("[data-test-id='pod-cpu']")).toHaveCount(3);
             await expect(page.locator("[data-test-id='pod-memory']")).toHaveCount(3);
+            // Each cell is a node-share percentage (e.g. "25%"), not absolute millicores/bytes.
+            for (const text of await page.locator("[data-test-id='pod-cpu']").allTextContents()) {
+                expect(text).toMatch(/^\d+%$/);
+            }
+            for (const text of await page.locator("[data-test-id='pod-memory']").allTextContents()) {
+                expect(text).toMatch(/^\d+%$/);
+            }
+            // pod-high uses 500m of node-worker's 1000m allocatable -> 50%.
+            await expect(
+                page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-high" }).locator("[data-test-id='pod-cpu']"),
+            ).toHaveText("50%");
         });
 
         // Numeric columns sort highest-first on the first click (TanStack's default

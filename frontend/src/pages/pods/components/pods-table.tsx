@@ -41,12 +41,12 @@ import { ResourceStatsHeader } from "../../../components/resource-stats-header";
 import { computePodStats, podHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
-import { formatCpu, formatMemory } from "../../../lib/performance";
 import {
     buildPodUsageMap,
     podUsageFor,
     comparePodCpu,
     comparePodMemory,
+    formatPercent,
     type PodUsageMap,
 } from "../../../lib/pod-resource-sort";
 
@@ -129,8 +129,9 @@ const PHASE_ORDER: Record<PodPhase, number> = {
 const ALL_PHASES: PodPhase[] = ["Running", "Pending", "Succeeded", "Failed", "Unknown"];
 
 // Builds the column definitions for the pods table. `usage` maps each pod
-// (namespace/name) to its CPU/memory consumption from the cluster Performance
-// snapshot, used by the resource columns and their sort comparators.
+// (namespace/name) to its CPU/memory consumption as a percentage of the node it runs
+// on (from the cluster Performance snapshot), used by the resource columns and their
+// sort comparators.
 function buildColumns(usage: PodUsageMap): ColumnDef<Pod>[] {
     const cols: ColumnDef<Pod>[] = [];
 
@@ -176,14 +177,14 @@ function buildColumns(usage: PodUsageMap): ColumnDef<Pod>[] {
             header: "Node",
         },
         {
-            // Pod CPU consumption from the cluster Performance snapshot. Renders the
-            // formatted figure (or an em-dash when usage is unavailable) and sorts by
-            // the raw millicore value via comparePodCpu.
+            // Pod CPU consumption as a percentage of its node's allocatable (from the
+            // cluster Performance snapshot). Renders the percentage (or an em-dash when
+            // usage/node is unavailable) and sorts by that percentage via comparePodCpu.
             id: "cpu",
             header: "CPU",
-            accessorFn: (row) => podUsageFor(usage, row.namespace, row.name).cpuMillicores,
+            accessorFn: (row) => podUsageFor(usage, row.namespace, row.name).cpuPercent,
             cell: (info) => (
-                <span data-test-id="pod-cpu">{formatCpu(info.getValue<number | null>())}</span>
+                <span data-test-id="pod-cpu">{formatPercent(info.getValue<number | null>())}</span>
             ),
             sortingFn: (a, b) =>
                 comparePodCpu(
@@ -193,14 +194,14 @@ function buildColumns(usage: PodUsageMap): ColumnDef<Pod>[] {
             enableGlobalFilter: false,
         },
         {
-            // Pod memory consumption from the cluster Performance snapshot. Renders the
-            // formatted figure (or an em-dash when usage is unavailable) and sorts by
-            // the raw byte value via comparePodMemory.
+            // Pod memory consumption as a percentage of its node's allocatable (from the
+            // cluster Performance snapshot). Renders the percentage (or an em-dash when
+            // usage/node is unavailable) and sorts by that percentage via comparePodMemory.
             id: "memory",
             header: "Memory",
-            accessorFn: (row) => podUsageFor(usage, row.namespace, row.name).memoryBytes,
+            accessorFn: (row) => podUsageFor(usage, row.namespace, row.name).memoryPercent,
             cell: (info) => (
-                <span data-test-id="pod-memory">{formatMemory(info.getValue<number | null>())}</span>
+                <span data-test-id="pod-memory">{formatPercent(info.getValue<number | null>())}</span>
             ),
             sortingFn: (a, b) =>
                 comparePodMemory(
@@ -260,10 +261,12 @@ export function PodsTable() {
         enabled: current !== null,
     });
 
-    // Per-pod CPU/memory usage for the resource columns. Sourced from the
+    // Per-pod CPU/memory node-share for the resource columns. Sourced from the
     // cluster-wide Performance snapshot (the pods list response carries no usage),
-    // keyed by context only. A failed/absent metrics fetch leaves the map empty,
-    // so the columns show em-dashes rather than breaking the table.
+    // which carries both per-pod usage and per-node allocatable so each pod's usage
+    // can be expressed as a percentage of its node. Keyed by context only. A
+    // failed/absent metrics fetch leaves the map empty, so the columns show em-dashes
+    // rather than breaking the table.
     const { data: performance } = useQuery({
         queryKey: ["cluster-performance", current],
         queryFn: () => fetchClusterPerformance(current!),
@@ -273,7 +276,7 @@ export function PodsTable() {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
 
-    const usageMap = buildPodUsageMap(performance?.pods ?? []);
+    const usageMap = buildPodUsageMap(performance?.pods ?? [], performance?.nodes ?? []);
     const columns = buildColumns(usageMap);
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("pods", columns);
 
