@@ -2312,8 +2312,32 @@ test.describe("karse e2e", () => {
                     phase: "Running",
                     ready: "1/1",
                     restarts: 0,
+                    containerCount: 1,
                     createdAt: new Date().toISOString(),
                     node: "node-cp",
+                    labels: {},
+                },
+                {
+                    name: "metrics-mid",
+                    namespace: "kube-system",
+                    phase: "Running",
+                    ready: "1/1",
+                    restarts: 0,
+                    containerCount: 1,
+                    createdAt: new Date().toISOString(),
+                    node: "node-cp",
+                    labels: {},
+                },
+                {
+                    name: "busy-app",
+                    namespace: "team-1",
+                    phase: "Running",
+                    ready: "1/1",
+                    restarts: 0,
+                    containerCount: 1,
+                    createdAt: new Date().toISOString(),
+                    node: "node-cp",
+                    labels: {},
                 },
             ],
             events: [
@@ -2327,10 +2351,30 @@ test.describe("karse e2e", () => {
             ],
         };
 
-        // The Status page resource indicator fetches the node performance snapshot, so the
-        // mocked node-detail describe stubs it too (a populated CPU/memory/pods reading)
-        // — registered before the broader node-detail route so it wins for the
-        // /performance path.
+        // The node Performance snapshot drives both the Status page resource indicator
+        // (node-level usage ÷ allocatable) and the Pods table's per-pod CPU/Memory
+        // columns (each pod's usage ÷ the node's allocatable). It is stubbed once for the
+        // whole node-detail describe and shared by both views.
+        //
+        // Per-pod usage for the node's Pods table. The node's allocatable is cpu 4000m /
+        // mem 8Gi, so each pod's usage reads as a whole-number percentage of the node:
+        //   coredns-abc   cpu  5%  mem 20%
+        //   metrics-mid   cpu 15%  mem 10%
+        //   busy-app      cpu 30%  mem  3%
+        // CPU ascending: coredns, metrics-mid, busy-app.
+        // Memory ascending: busy-app, metrics-mid, coredns (a distinct order, so the
+        // two column sorts cannot be confused).
+        const podUsage = (namespace: string, name: string, cpu: number, mem: number) => ({
+            name,
+            namespace,
+            node: "node-cp",
+            usage: { cpuMillicores: cpu, memoryBytes: mem },
+            requests: { cpuMillicores: cpu, memoryBytes: mem },
+            limits: { cpuMillicores: cpu, memoryBytes: mem },
+            containers: [
+                { name, usage: { cpuMillicores: cpu, memoryBytes: mem }, requests: { cpuMillicores: cpu, memoryBytes: mem }, limits: { cpuMillicores: cpu, memoryBytes: mem } },
+            ],
+        });
         const FAKE_NODE_PERFORMANCE = {
             metricsAvailable: true,
             node: {
@@ -2338,7 +2382,15 @@ test.describe("karse e2e", () => {
                 usage: { cpuMillicores: 1600, memoryBytes: 3 * 1024 * 1024 * 1024 },
                 allocatable: { cpuMillicores: 4000, memoryBytes: 8 * 1024 * 1024 * 1024 },
             },
-            pods: [],
+            // Per-pod usage against the node's allocatable (cpu 4000m / mem 8Gi):
+            //   coredns-abc:  200m  /  20% of 8Gi  → cpu  5%, mem 20%
+            //   metrics-mid:  600m  /  10% of 8Gi  → cpu 15%, mem 10%
+            //   busy-app:    1200m  /   3% of 8Gi  → cpu 30%, mem  3%
+            pods: [
+                podUsage("kube-system", "coredns-abc", 200, 1_717_986_918),
+                podUsage("kube-system", "metrics-mid", 600, 858_993_459),
+                podUsage("team-1", "busy-app", 1200, 257_698_038),
+            ],
         };
 
         test.beforeAll(async () => {
@@ -2347,10 +2399,14 @@ test.describe("karse e2e", () => {
             // registered after it so Playwright (which tries the most recently added route
             // first) matches the /performance path with the performance stub.
             await page.route("**/api/nodes/node-cp*", async (route) => {
-                await route.fulfill({
-                    json: FAKE_NODE_DETAIL,
-                });
+                await route.fulfill({ json: FAKE_NODE_DETAIL });
             });
+            // The node Performance snapshot feeds both the Status resource indicator and
+            // the Pods table's CPU/Memory columns. A separate pattern carrying the
+            // explicit /performance segment is required: the broad glob's trailing `*`
+            // does not cross the `/` into /performance, so without this route the
+            // performance request would 404. Registered after the broad route, it also
+            // wins for the /performance path (last route wins).
             await page.route("**/api/nodes/node-cp/performance*", async (route) => {
                 await route.fulfill({ json: FAKE_NODE_PERFORMANCE });
             });
@@ -2403,8 +2459,8 @@ test.describe("karse e2e", () => {
             // memory (3Gi of 8Gi = 38%) render a numeric "<n>% used" rather than an em-dash.
             await expect(page.locator("[data-test-id='node-resource-cpu-percent']")).toHaveText("40% used");
             await expect(page.locator("[data-test-id='node-resource-memory-percent']")).toHaveText("38% used");
-            // The pods row: one pod scheduled of 110 allocatable = 1%.
-            await expect(page.locator("[data-test-id='node-resource-pods-percent']")).toHaveText("1% used");
+            // The pods row: 3 pods scheduled of 110 allocatable = 3% (2.7% rounded).
+            await expect(page.locator("[data-test-id='node-resource-pods-percent']")).toHaveText("3% used");
         });
 
         test("the Capacity vs Allocatable table is gone", async () => {
@@ -2429,10 +2485,51 @@ test.describe("karse e2e", () => {
             ).toContainText("node-cp");
         });
 
-        test("shows the scheduled pod in the pods table on the Pods tab", async () => {
+        test("shows the scheduled pods in the pods table on the Pods tab", async () => {
             await page.locator("[data-test-id='node-tab-pods']").click();
             await expect(page.locator("[data-test-id='node-panel-pods']")).toBeVisible();
-            await expect(page.locator("[data-test-id='node-pod-row'] td:first-child")).toHaveText("coredns-abc");
+            await expect(page.locator("[data-test-id='node-pod-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='node-pod-row'] td:first-child").first()).toHaveText("coredns-abc");
+        });
+
+        test("the pods table shows each pod's cpu and memory as a percentage of the node", async () => {
+            // The CPU % / Memory % columns render the pod's usage ÷ the node's
+            // allocatable. With allocatable cpu 1000m / mem 1_000_000_000 bytes,
+            // coredns-abc (50m / 200_000_000) reads 5% cpu and 20% memory.
+            await page.locator("[data-test-id='node-tab-pods']").click();
+            await expect(page.locator("[data-test-id='node-panel-pods']")).toBeVisible();
+            await expect(page.getByRole("columnheader", { name: "CPU %" })).toBeVisible();
+            await expect(page.getByRole("columnheader", { name: "Memory %" })).toBeVisible();
+            const corednsRow = page
+                .locator("[data-test-id='node-pod-row']")
+                .filter({ hasText: "coredns-abc" });
+            await expect(corednsRow.locator("[data-test-id='node-pod-cpu']")).toHaveText("5%");
+            await expect(corednsRow.locator("[data-test-id='node-pod-memory']")).toHaveText("20%");
+        });
+
+        test("sorting the pods table by CPU % orders the pods by their cpu share of the node", async () => {
+            await page.locator("[data-test-id='node-tab-pods']").click();
+            await expect(page.locator("[data-test-id='node-panel-pods']")).toBeVisible();
+            const cpuHeader = page.getByRole("columnheader", { name: "CPU %" });
+            // First click: ascending. coredns 5%, metrics-mid 15%, busy-app 30%.
+            await cpuHeader.click();
+            await expect(page.locator("[data-test-id='node-pod-cpu']")).toHaveText(["5%", "15%", "30%"]);
+            // Second click: descending — the reverse order.
+            await cpuHeader.click();
+            await expect(page.locator("[data-test-id='node-pod-cpu']")).toHaveText(["30%", "15%", "5%"]);
+        });
+
+        test("sorting the pods table by Memory % orders the pods by their memory share of the node", async () => {
+            await page.locator("[data-test-id='node-tab-pods']").click();
+            await expect(page.locator("[data-test-id='node-panel-pods']")).toBeVisible();
+            const memHeader = page.getByRole("columnheader", { name: "Memory %" });
+            // Ascending: busy-app 3%, metrics-mid 10%, coredns 20% (a different order
+            // from the CPU sort, proving the column sorts on its own resource).
+            await memHeader.click();
+            await expect(page.locator("[data-test-id='node-pod-memory']")).toHaveText(["3%", "10%", "20%"]);
+            // Descending.
+            await memHeader.click();
+            await expect(page.locator("[data-test-id='node-pod-memory']")).toHaveText(["20%", "10%", "3%"]);
         });
 
         test("shows node events on the Events tab", async () => {
@@ -2460,7 +2557,8 @@ test.describe("karse e2e", () => {
                 });
             });
             await page.locator("[data-test-id='node-tab-pods']").click();
-            await page.locator("[data-test-id='node-pod-row']").click();
+            // Unsorted, coredns-abc is the first row (first in the fixture order).
+            await page.locator("[data-test-id='node-pod-row']").first().click();
             await expect(page).toHaveURL(/\/pods\/kube-system\/coredns-abc/);
             await page.unroute("**/api/pods/kube-system/coredns-abc*");
         });

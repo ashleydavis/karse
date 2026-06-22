@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import {
     Box,
@@ -16,12 +17,20 @@ import {
     Tab,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleCheck, faCircleXmark, faCircleQuestion, faTriangleExclamation, faArrowLeft } from "@fortawesome/free-solid-svg-icons";
+import { faCircleCheck, faCircleXmark, faCircleQuestion, faTriangleExclamation, faArrowLeft, faSort, faSortUp, faSortDown } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
-import type { NodeStatus, NodeCondition, KubeEvent } from "karse-types";
+import {
+    useReactTable,
+    getCoreRowModel,
+    getSortedRowModel,
+    flexRender,
+    type ColumnDef,
+    type SortingState,
+} from "@tanstack/react-table";
+import type { NodeStatus, NodeCondition, KubeEvent, Pod } from "karse-types";
 import { useKubeContext } from "../../lib/kube-context";
 import { useShareableNavigate } from "../../lib/nav-state";
-import { fetchNodeDetail } from "../../lib/api-client";
+import { fetchNodeDetail, fetchNodePerformance } from "../../lib/api-client";
 import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
 import { LabelsTab } from "../../components/labels-tab";
@@ -31,6 +40,14 @@ import { ResourceRef } from "../../components/resource-ref";
 import { NodePerformanceTab } from "../../components/performance/node-performance-tab";
 import { NodeResourceIndicator } from "../../components/performance/node-resource-indicator";
 import { tableRowSx } from "../../lib/table-row-style";
+import {
+    buildNodePodUsageMap,
+    podUsageFor,
+    comparePodCpu,
+    comparePodMemory,
+    formatPercent,
+    type PodUsageMap,
+} from "../../lib/node-pod-usage";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -80,6 +97,180 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
         );
     }
     return <Chip label="Normal" color="default" size="small" />;
+}
+
+// A node pod row: the node detail Pod joined with its CPU/memory consumption as a
+// percentage of the node (from the Performance snapshot). The percentages live on the
+// row itself so the table's accessors and sort comparators are pure functions of the
+// row data — recomputed whenever the joined rows change (i.e. once the lazy
+// Performance fetch resolves), not captured in a stale column closure.
+type NodePodRow = Pod & { cpuPercent: number | null; memoryPercent: number | null };
+
+// Column definitions for the per-node Pods table. The CPU and Memory columns are
+// sortable and read their percentage straight off the row; the others are
+// display-only, matching the previous static table's content.
+const NODE_POD_COLUMNS: ColumnDef<NodePodRow>[] = [
+    {
+        accessorKey: "name",
+        header: "Name",
+        enableSorting: false,
+        cell: (info) => (
+            <span style={{ fontFamily: "monospace" }}>{info.getValue<string>()}</span>
+        ),
+    },
+    {
+        accessorKey: "namespace",
+        header: "Namespace",
+        enableSorting: false,
+        cell: (info) => (
+            <span onClick={(e) => e.stopPropagation()}>
+                <ResourceRef kind="Namespace" name={info.getValue<string>()} testId="node-pod-namespace-link" />
+            </span>
+        ),
+    },
+    {
+        accessorKey: "phase",
+        header: "Status",
+        enableSorting: false,
+    },
+    {
+        accessorKey: "ready",
+        header: "Ready",
+        enableSorting: false,
+    },
+    {
+        accessorKey: "restarts",
+        header: "Restarts",
+        enableSorting: false,
+    },
+    {
+        // Pod CPU consumption as a percentage of this node's allocatable (from the
+        // node Performance snapshot). Renders the percentage (or an em-dash when the
+        // usage/allocatable is unavailable) and sorts by that percentage.
+        id: "cpu",
+        header: "CPU %",
+        accessorKey: "cpuPercent",
+        // Ascending on the first click (TanStack defaults numeric columns to
+        // descending-first; force a consistent low→high → high→low cycle instead).
+        sortDescFirst: false,
+        cell: (info) => (
+            <span data-test-id="node-pod-cpu">{formatPercent(info.getValue<number | null>())}</span>
+        ),
+        sortingFn: (a, b) =>
+            comparePodCpu(a.original, b.original),
+    },
+    {
+        // Pod memory consumption as a percentage of this node's allocatable (from the
+        // node Performance snapshot). Renders the percentage (or an em-dash when the
+        // usage/allocatable is unavailable) and sorts by that percentage.
+        id: "memory",
+        header: "Memory %",
+        accessorKey: "memoryPercent",
+        // Ascending on the first click (see the CPU column).
+        sortDescFirst: false,
+        cell: (info) => (
+            <span data-test-id="node-pod-memory">{formatPercent(info.getValue<number | null>())}</span>
+        ),
+        sortingFn: (a, b) =>
+            comparePodMemory(a.original, b.original),
+    },
+];
+
+// The per-node Pods table: lists the pods scheduled on the node with sortable CPU and
+// memory consumption columns, each shown as a percentage of the node (pod usage ÷ the
+// node's allocatable). Per-pod usage comes from the node Performance snapshot
+// (GET /api/nodes/:name/performance), fetched lazily — only when the Pods tab is
+// active. A failed/absent metrics fetch leaves the resource columns showing em-dashes
+// rather than breaking the table. Clicking a row opens that pod's detail page.
+function NodePodsTable({ nodeName, pods, active }: { nodeName: string; pods: Pod[]; active: boolean }) {
+    const { current } = useKubeContext();
+    const navigate = useShareableNavigate();
+    const [sorting, setSorting] = useState<SortingState>([]);
+
+    const { data: performance } = useQuery({
+        queryKey: ["node-performance", current, nodeName],
+        queryFn: () => fetchNodePerformance(current!, nodeName),
+        enabled: active && current !== null,
+    });
+
+    // Join each pod with its share-of-node percentages. Memoised on the pods and the
+    // Performance snapshot so the array's identity changes only when those change —
+    // which is what makes the table re-derive the resource cells once the lazy
+    // Performance fetch resolves (TanStack caches the row model by data identity).
+    const rows: NodePodRow[] = useMemo(() => {
+        const usage: PodUsageMap = buildNodePodUsageMap(
+            performance?.pods ?? [],
+            performance?.node.allocatable ?? null,
+        );
+        return pods.map((pod) => {
+            const u = podUsageFor(usage, pod.namespace, pod.name);
+            return { ...pod, cpuPercent: u.cpuPercent, memoryPercent: u.memoryPercent };
+        });
+    }, [pods, performance]);
+
+    const table = useReactTable({
+        data: rows,
+        columns: NODE_POD_COLUMNS,
+        state: { sorting },
+        onSortingChange: setSorting,
+        getCoreRowModel: getCoreRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+    });
+
+    function SortIcon({ columnId }: { columnId: string }) {
+        const sorted = table.getColumn(columnId)?.getIsSorted();
+        if (sorted === "asc") {
+            return <FontAwesomeIcon icon={faSortUp} />;
+        }
+        if (sorted === "desc") {
+            return <FontAwesomeIcon icon={faSortDown} />;
+        }
+        return <FontAwesomeIcon icon={faSort} />;
+    }
+
+    return (
+        <TableContainer>
+            <Table size="small">
+                <TableHead>
+                    {table.getHeaderGroups().map((hg) => (
+                        <TableRow key={hg.id}>
+                            {hg.headers.map((header) => (
+                                <TableCell
+                                    key={header.id}
+                                    onClick={header.column.getToggleSortingHandler()}
+                                    sx={{
+                                        cursor: header.column.getCanSort() ? "pointer" : "default",
+                                        userSelect: "none",
+                                    }}
+                                >
+                                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                        {flexRender(header.column.columnDef.header, header.getContext())}
+                                        {header.column.getCanSort() && <SortIcon columnId={header.id} />}
+                                    </span>
+                                </TableCell>
+                            ))}
+                        </TableRow>
+                    ))}
+                </TableHead>
+                <TableBody>
+                    {table.getRowModel().rows.map((row) => (
+                        <TableRow
+                            key={row.id}
+                            data-test-id="node-pod-row"
+                            onClick={() => navigate(`/pods/${row.original.namespace}/${row.original.name}`)}
+                            sx={tableRowSx(true)}
+                        >
+                            {row.getVisibleCells().map((cell) => (
+                                <TableCell key={cell.id}>
+                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                </TableCell>
+                            ))}
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </TableContainer>
+    );
 }
 
 // The set of tabs available on the node detail page.
@@ -246,37 +437,11 @@ export function NodeDetailPage() {
                                 <Typography color="text.secondary">No pods scheduled on this node.</Typography>
                             )
                             : (
-                                <TableContainer>
-                                    <Table size="small">
-                                        <TableHead>
-                                            <TableRow>
-                                                <TableCell>Name</TableCell>
-                                                <TableCell>Namespace</TableCell>
-                                                <TableCell>Status</TableCell>
-                                                <TableCell>Ready</TableCell>
-                                                <TableCell>Restarts</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {data.pods.map((pod) => (
-                                                <TableRow
-                                                    key={pod.namespace + "/" + pod.name}
-                                                    data-test-id="node-pod-row"
-                                                    onClick={() => navigate(`/pods/${pod.namespace}/${pod.name}`)}
-                                                    sx={tableRowSx(true)}
-                                                >
-                                                    <TableCell sx={{ fontFamily: "monospace" }}>{pod.name}</TableCell>
-                                                    <TableCell onClick={(e) => e.stopPropagation()}>
-                                                        <ResourceRef kind="Namespace" name={pod.namespace} testId="node-pod-namespace-link" />
-                                                    </TableCell>
-                                                    <TableCell>{pod.phase}</TableCell>
-                                                    <TableCell>{pod.ready}</TableCell>
-                                                    <TableCell>{pod.restarts}</TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </TableContainer>
+                                <NodePodsTable
+                                    nodeName={data.name}
+                                    pods={data.pods}
+                                    active={activeTab === "pods"}
+                                />
                             )
                         }
                     </Paper>
