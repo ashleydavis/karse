@@ -65,6 +65,7 @@ One multi-container pod plus an init container.
 - This tab is selected by default.
 - The Details card shows namespace `default`, node `fake-node-1`, pod IP, and age.
 - The Labels card shows `app=web`.
+- A **Node resources** panel shows the pod's percentage of the node for CPU and memory (no disk/network). With no metrics-server on the kwok cluster the percentages read `—` and a "Metrics API is not available" notice is shown; to see populated CPU/Memory percentages, run with `KARSE_FAKE_METRICS=1` against a node with a realistic allocatable (see the [Pod Performance tab (populated)](../performance-tabs/detail.md#pod-performance-tab-populated) scenario).
 - The Events table is shown here (if any events exist).
 - The Containers table and the Logs viewer are NOT visible on this tab.
 

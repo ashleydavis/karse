@@ -12,6 +12,7 @@ Backed by: `GET /api/pods/:namespace/:name`, `backend/src/routes/pod-detail-rout
 - The adapter runs the pod read and an events read (`get events --field-selector=involvedObject.name=<name>,involvedObject.namespace=<ns>`) in parallel; the events read is tolerant (degrades to empty on failure).
 - Each `ContainerInfo` carries `name`, `image`, `ready`, `restarts`, `state` (Running/Waiting/Terminated/Unknown), and `stateReason`.
 - The page shows pod metadata, the containers and init containers panel, the events list, and an embedded log viewer (see `log-viewer`). It offers guided commands for the pod (see `guided-commands`) and a raw-YAML view (see `yaml-viewer`).
+- The Status tab carries a **Node resources** panel: an indicator of the node resources the pod is consuming, as a **percentage of the node** for **CPU and memory only** (pod usage ÷ node allocatable, the percentage as the primary value, with the `usage / capacity` figures as small secondary text). It reuses the shared `PodNodeShare` component (see `performance-tabs`), lazy-fetched while the Status tab is active. Disk and network are not shown (the Metrics API reports no pod disk/network usage); the percentage degrades to `—` when there is no live usage or no node base.
 - The pod's own labels are shown on a Labels tab as a searchable, sortable Key / Value table (see `labels-tab`), not inline on the Status tab.
 - Each row in the Containers and Init Containers tables is clickable and drills down to that container's detail page (see `container-detail`).
 - The active tab is stored in the `tab` query param (so the view is shareable), and the breadcrumb trail's trailing crumb reflects it: `Pods > <namespace> > <name> > <tab label>`. Every tab has its own crumb label (Status, Containers, Init Containers, Labels, Performance, Logs, Commands, YAML).
@@ -24,6 +25,7 @@ Backed by: `GET /api/pods/:namespace/:name`, `backend/src/routes/pod-detail-rout
 - [x] The page embeds the log viewer for the pod's containers.
 - [x] The page offers guided commands and a raw-YAML view for the pod.
 - [x] The breadcrumb's trailing crumb reflects the active tab (its own label per tab), not a fixed "Status".
+- [x] The Status tab shows a Node resources panel: the pod's percentage of the node for CPU and memory only (no disk/network), the percentage as the primary value.
 
 ## Open Questions
 

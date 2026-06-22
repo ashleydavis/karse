@@ -2710,19 +2710,47 @@ test.describe("karse e2e", () => {
             events: [],
         };
 
+        // The pod Status tab now carries a "Node resources" panel that fetches the pod's
+        // performance snapshot, so this scaffold pod needs a valid PodPerformance response
+        // for its /performance endpoint (the broader detail mock returns a PodDetail shape).
+        const FAKE_PERF_POD_PERFORMANCE = {
+            metricsAvailable: true,
+            pod: {
+                name: "nginx-abc",
+                namespace: "default",
+                node: "node-cp",
+                usage: { cpuMillicores: 120, memoryBytes: 320 * 1024 * 1024 },
+                requests: { cpuMillicores: 0, memoryBytes: 0 },
+                limits: { cpuMillicores: 0, memoryBytes: 0 },
+                containers: [],
+            },
+            containers: [],
+            node: {
+                name: "node-cp",
+                usage: { cpuMillicores: 1000, memoryBytes: 2 * 1024 * 1024 * 1024 },
+                allocatable: { cpuMillicores: 4000, memoryBytes: 8 * 1024 * 1024 * 1024 },
+            },
+        };
+
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
             await page.route("**/api/nodes/node-cp*", async (route) => {
                 await route.fulfill({ json: FAKE_PERF_NODE_DETAIL });
             });
+            // Register the more specific /performance route last so it wins over the
+            // broader nginx-abc* detail route for the performance endpoint.
             await page.route("**/api/pods/default/nginx-abc*", async (route) => {
                 await route.fulfill({ json: FAKE_PERF_POD_DETAIL });
+            });
+            await page.route("**/api/pods/default/nginx-abc/performance*", async (route) => {
+                await route.fulfill({ json: FAKE_PERF_POD_PERFORMANCE });
             });
         });
 
         test.afterAll(async () => {
             await page.unroute("**/api/nodes/node-cp*");
             await page.unroute("**/api/pods/default/nginx-abc*");
+            await page.unroute("**/api/pods/default/nginx-abc/performance*");
         });
 
         test("cluster home shows Status and Performance tabs, defaulting to Status", async () => {
@@ -6260,51 +6288,43 @@ test.describe("karse e2e", () => {
 
     // ── Performance tabs (pod) ──────────────────────────────────────────────────
     // The backend runs with KARSE_FAKE_METRICS=1 (set in scripts/e2e-tests.sh), so the
-    // seeded `web` pod (nginx + sidecar containers in the default namespace) matches the
-    // canned per-container fake metrics by name. The pod Performance tab (the leaf)
-    // therefore renders per-container provisioning bars (usage vs request vs limit) with
-    // no treemap.
+    // seeded `web` pod (nginx + sidecar in the default namespace) matches the canned
+    // per-container fake metrics by name, and its scheduling node (node-worker) carries an
+    // explicit 4-core / 8Gi allocatable (patched in scripts/e2e-tests.sh). The pod
+    // Performance tab (the leaf) therefore shows the pod's percentage of the node for CPU
+    // and memory (pod usage ÷ node allocatable): web uses ~120m CPU (3% of 4 cores) and
+    // ~320Mi memory (4% of 8Gi). There is no treemap, no "Share of node" heading, no
+    // Provisioning section, and no disk/network rows.
     test.describe("Performance tabs (pod)", () => {
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
         });
 
-        test("renders the provisioning bars with no treemap", async () => {
+        test("shows the pod's percentage of the node for cpu and memory, no provisioning or treemap", async () => {
             await page.goto("/pods/default/web", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='pod-tab-performance']").click();
             await expect(page.locator("[data-test-id='perf-pod']")).toBeVisible();
-            // The lazy query fires once the tab is active; wait for the bars.
-            await expect(page.locator("[data-test-id='perf-provisioning']")).toBeVisible();
-            // The web pod has two containers (nginx, sidecar), each a provisioning row.
-            await expect(page.locator("[data-test-id='perf-provisioning-row']")).toHaveCount(2);
-            // The leaf has no treemap.
+            // The lazy query fires once the tab is active; wait for the indicator.
+            await expect(page.locator("[data-test-id='pod-node-share']")).toBeVisible();
+            // Exactly two rows: cpu and memory. No disk or network.
+            await expect(page.locator("[data-test-id='pod-node-share-cpu']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-node-share-memory']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-node-share-disk']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='pod-node-share-network']")).toHaveCount(0);
+            // The percentage of the node is the primary value, and it is populated and
+            // non-zero against the realistic 4-core / 8Gi node-worker (cpu 3%, memory 4%).
+            await expect(page.locator("[data-test-id='pod-node-share-cpu-percent']")).toHaveText("3%");
+            await expect(page.locator("[data-test-id='pod-node-share-memory-percent']")).toHaveText("4%");
+            // No Provisioning section, no treemap, and no "Share of node" heading.
+            await expect(page.locator("[data-test-id='perf-provisioning']")).toHaveCount(0);
             await expect(page.locator("[data-test-id='perf-treemap']")).toHaveCount(0);
-            // CPU is selected by default.
-            await expect(
-                page.locator("[data-test-id='perf-metric-cpu']")
-            ).toHaveAttribute("aria-pressed", "true");
+            await expect(page.getByText("Share of node")).toHaveCount(0);
         });
 
-        test("toggling the metric updates the provisioning bar values", async () => {
-            // Read the first row's figures under CPU, switch to Memory, and confirm the
-            // displayed text changes (CPU in m/cores, memory in Mi/Gi), proving the bars
-            // re-derive from the selected metric.
-            await page.goto("/pods/default/web", { waitUntil: "networkidle" });
-            await page.locator("[data-test-id='pod-tab-performance']").click();
-            await expect(page.locator("[data-test-id='perf-provisioning']")).toBeVisible();
-            const firstRow = page.locator("[data-test-id='perf-provisioning-row']").first();
-            const cpuText = (await firstRow.textContent())?.trim();
-            await page.locator("[data-test-id='perf-metric-memory']").click();
-            await expect(
-                page.locator("[data-test-id='perf-metric-memory']")
-            ).toHaveAttribute("aria-pressed", "true");
-            await expect(firstRow).not.toHaveText(cpuText ?? "");
-        });
-
-        test("metrics-unavailable: provisioning bars still render and the notice is shown", async () => {
-            // Force the pod performance endpoint to report no Metrics API: usage is null
-            // but requests/limits from the spec remain, so the provisioning bars still
-            // render (usage bars empty) while the unavailable notice is shown above them.
+        test("metrics-unavailable: the percentages read em-dash and the notice is shown, no disk/network", async () => {
+            // Force the pod performance endpoint to report no Metrics API: usage is null,
+            // so even with a node allocatable base the percentages cannot be computed and
+            // read "—". The unavailable notice is shown; disk/network never appear.
             await page.route("**/api/pods/default/web/performance*", async (route) => {
                 await route.fulfill({
                     json: {
@@ -6316,45 +6336,50 @@ test.describe("karse e2e", () => {
                             usage: { cpuMillicores: null, memoryBytes: null },
                             requests: { cpuMillicores: 150, memoryBytes: 201326592 },
                             limits: { cpuMillicores: 700, memoryBytes: 671088640 },
-                            containers: [
-                                {
-                                    name: "nginx",
-                                    usage: { cpuMillicores: null, memoryBytes: null },
-                                    requests: { cpuMillicores: 100, memoryBytes: 134217728 },
-                                    limits: { cpuMillicores: 500, memoryBytes: 536870912 },
-                                },
-                                {
-                                    name: "sidecar",
-                                    usage: { cpuMillicores: null, memoryBytes: null },
-                                    requests: { cpuMillicores: 50, memoryBytes: 67108864 },
-                                    limits: { cpuMillicores: 200, memoryBytes: 134217728 },
-                                },
-                            ],
+                            containers: [],
                         },
-                        containers: [
-                            {
-                                name: "nginx",
-                                usage: { cpuMillicores: null, memoryBytes: null },
-                                requests: { cpuMillicores: 100, memoryBytes: 134217728 },
-                                limits: { cpuMillicores: 500, memoryBytes: 536870912 },
-                            },
-                            {
-                                name: "sidecar",
-                                usage: { cpuMillicores: null, memoryBytes: null },
-                                requests: { cpuMillicores: 50, memoryBytes: 67108864 },
-                                limits: { cpuMillicores: 200, memoryBytes: 134217728 },
-                            },
-                        ],
+                        containers: [],
+                        node: {
+                            name: "node-worker",
+                            usage: { cpuMillicores: null, memoryBytes: null },
+                            allocatable: { cpuMillicores: 4000, memoryBytes: 8 * 1024 * 1024 * 1024 },
+                        },
                     },
                 });
             });
             await page.goto("/pods/default/web", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='pod-tab-performance']").click();
             await expect(page.locator("[data-test-id='perf-metrics-unavailable']")).toBeVisible();
-            await expect(page.locator("[data-test-id='perf-provisioning']")).toBeVisible();
-            // Both containers still render their request/limit bars from the spec.
-            await expect(page.locator("[data-test-id='perf-provisioning-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='pod-node-share']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-node-share-cpu-percent']")).toHaveText("—");
+            await expect(page.locator("[data-test-id='pod-node-share-memory-percent']")).toHaveText("—");
+            await expect(page.locator("[data-test-id='pod-node-share-disk']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='pod-node-share-network']")).toHaveCount(0);
+            // The "not reported by the Metrics API" copy must not exist anywhere.
+            await expect(page.getByText("Not reported by the Metrics API")).toHaveCount(0);
             await page.unroute("**/api/pods/default/web/performance*");
+        });
+    });
+
+    // ── Pod Status "Node resources" indicator ───────────────────────────────────
+    // The pod Status (Detail) tab carries a "Node resources" panel reusing the same
+    // percentage-of-node indicator, so the question "how much of its node is this pod
+    // using?" is answered on the default tab without opening Performance.
+    test.describe("Pod Status node resources indicator", () => {
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+        });
+
+        test("the Status tab shows the Node resources panel with cpu/memory percentages of the node", async () => {
+            await page.goto("/pods/default/web", { waitUntil: "networkidle" });
+            // Status is the default tab; the panel is present without any tab click.
+            await expect(page.locator("[data-test-id='pod-node-resources']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-node-share']").first()).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-node-share-cpu-percent']")).toHaveText("3%");
+            await expect(page.locator("[data-test-id='pod-node-share-memory-percent']")).toHaveText("4%");
+            // cpu and memory only — no disk or network rows.
+            await expect(page.locator("[data-test-id='pod-node-share-disk']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='pod-node-share-network']")).toHaveCount(0);
         });
     });
 

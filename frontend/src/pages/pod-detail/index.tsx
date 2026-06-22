@@ -31,6 +31,7 @@ import { ResourceRef } from "../../components/resource-ref";
 import { PodContainersPanel, PodInitContainersPanel } from "./components/pod-containers-panel";
 import { LogViewer } from "../../components/log-viewer";
 import { PodPerformanceTab } from "../../components/performance/pod-performance-tab";
+import { PodNodeResourcesPanel } from "../../components/performance/pod-node-share";
 import { performanceOrigin, PERFORMANCE_TAB } from "../../lib/breadcrumb-trail";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
@@ -219,6 +220,18 @@ export function PodDetailPage() {
                                 </Box>
                             ))}
                         </Box>
+                    </Paper>
+
+                    <Paper variant="outlined" sx={{ p: 2 }} data-test-id="pod-node-resources">
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Node resources</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
+                            How much of its node this pod is using, as a percentage of the node.
+                        </Typography>
+                        <PodNodeResourcesPanel
+                            namespace={data.namespace}
+                            name={data.name}
+                            active={effectiveTab === "detail"}
+                        />
                     </Paper>
 
                     {data.events.length > 0 && (

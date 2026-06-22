@@ -389,6 +389,10 @@ echo "$PERF_RESP" | jq -e 'has("pod") and (.pod | has("usage") and has("requests
 echo "$PERF_RESP" | jq -e '(.containers | type == "array") and (.containers | length == 2)' > /dev/null
 echo "$PERF_RESP" | jq -e '[.containers[].name] | sort == ["nginx", "sidecar"]' > /dev/null
 echo "$PERF_RESP" | jq -e '.containers[] | has("usage") and has("requests") and has("limits")' > /dev/null
+# The response also carries the pod's scheduling node (its usage + allocatable) so the UI
+# can show the pod's percentage of the node. smoke-pod is scheduled, so node is non-null
+# with a node name and an allocatable block.
+echo "$PERF_RESP" | jq -e '.node != null and (.node.name | type == "string") and (.node.allocatable | has("cpuMillicores") and has("memoryBytes"))' > /dev/null
 echo "OK"
 
 echo "--- GET /api/pods/:namespace/:name/performance (missing context rejected) ---"

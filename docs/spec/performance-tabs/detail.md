@@ -8,9 +8,9 @@ pages, showing point-in-time CPU and memory usage in context. This document desc
 data sources, scope, degradation behaviour, per-scope tab contents, and the test mode. The
 implementation is **Complete**: the cluster Performance tab (a node treemap), the node
 Performance tab (a single Breakdown treemap of each pod's share of the node), and the
-pod Performance tab (the leaf: per-container provisioning bars, no treemap) have all shipped,
-along with the shared chart components and the `frontend/src/lib/performance.ts`
-transform/format helpers. Time-series Trends and per-pod history remain out of scope (they
+pod Performance tab (the leaf: the pod's percentage of its node for CPU and memory, no
+treemap) have all shipped, along with the shared chart components and the
+`frontend/src/lib/performance.ts` transform/format helpers. Time-series Trends and per-pod history remain out of scope (they
 need a persistent sampler).
 
 The cluster tab was reworked by **cluster-performance-1**: its treemap now shows the
@@ -106,8 +106,23 @@ inconsistent signal.
     shared `MetricToggle` / `UsageTreemap` (with `valueKind="percent"`) / `MetricsUnavailable`
     components. The per-pod node-share calculation is unit-tested in
     `frontend/src/tests/lib/node-share.test.ts`.
-- **Pod Performance tab** (the leaf):
-  - A provisioning view of the pod's containers (usage vs request vs limit). No treemap.
+- **Pod Performance tab** (the leaf) — **reworked by pod-performance-1**:
+  - Answers "how much of its node is this pod using?": the pod's **percentage of the node**
+    it runs on for **CPU and memory** (pod usage ÷ node allocatable, a whole-number
+    percentage as the **primary value**), shown as one labelled bar per resource with the
+    `usage / capacity` figures as small secondary text. The percentage degrades to `—` when
+    there is no live usage (no Metrics API) or no node base (an unscheduled pod, or the node
+    read failed), and the MetricsUnavailable notice is shown.
+  - There is **no treemap**, **no "Share of node" heading**, and **no Provisioning section**
+    (the per-container usage/request/limit bars were removed). **Disk and network are not
+    shown at all** — the Metrics API reports no pod disk or network usage, so those rows are
+    omitted entirely (never surfaced as "not reported by the Metrics API").
+  - Built from `fetchPodPerformance`, the pure `podNodeShares` helper in
+    `frontend/src/lib/performance.ts`, and the `PodNodeShare` component
+    (`frontend/src/components/performance/pod-node-share.tsx`). The percentage-of-node
+    calculation is unit-tested in `frontend/src/tests/lib/pod-node-share.test.ts`. The same
+    `PodNodeShare` indicator is reused on the pod **Status** tab as a "Node resources" panel,
+    so the answer is also on the default tab (see `pod-detail`).
 
 Drilling a treemap leaf, a heatmap cell, or a table row navigates to that resource's detail
 page and its Performance tab, reusing the existing row-navigation pattern.
@@ -129,7 +144,10 @@ The performance types live in `packages/karse-types/src/index.ts` and are consum
 the feature: `ResourceUsage`, `ContainerUsage`, `PodUsage`, `NodeUsage`,
 `ClusterPerformance`, `NodePerformance`, `PodPerformance`, and the `PerformanceMetric`
 toggle token. A `ResourceUsage` carries `cpuMillicores` and `memoryBytes`, each `null` when
-usage is unavailable.
+usage is unavailable. `PodPerformance` also carries `node: NodeUsage | null` — the pod's
+scheduling node's usage and allocatable, the denominator the pod-Performance tab's
+percentage-of-node is computed against; it is `null` for an unscheduled pod or a failed node
+read, so the percentage degrades to `—`.
 
 ## Test mode: KARSE_FAKE_METRICS
 

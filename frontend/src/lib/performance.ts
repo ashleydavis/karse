@@ -262,3 +262,40 @@ export function usagePercent(used: number | null, capacity: number | null): numb
     }
     return Math.round((used / capacity) * 100);
 }
+
+// One resource the pod-node-share indicator reports: the pod's percentage of the node it
+// runs on for that resource, plus the raw usage and the node's allocatable base so the UI
+// can show the percentage as the primary value and the usage/capacity as small secondary
+// text. percentage is null when usage is unknown (no Metrics API) or the node base is
+// missing/zero, so the row degrades to "—" rather than a misleading 0%.
+export type PodNodeShareResource = "cpu" | "memory";
+
+export type PodNodeShareRow = {
+    resource: PodNodeShareResource;
+    percentage: number | null;
+    usage: number | null;
+    allocatable: number | null;
+};
+
+// The pod's share of its scheduling node, as one row per resource (cpu and memory only —
+// the Metrics API reports no pod disk or network usage, so those are not shown at all).
+// Each percentage is pod usage ÷ node allocatable for that resource (a whole number).
+// nodeAllocatable is null when the pod is unscheduled or the node read failed; the rows
+// then carry a null allocatable and percentage so the indicator shows "—" honestly. Pure:
+// unit-tested in frontend/src/tests/lib/pod-node-share.test.ts.
+export function podNodeShares(
+    podUsage: ResourceUsage,
+    nodeAllocatable: ResourceUsage | null,
+): PodNodeShareRow[] {
+    const resources: PodNodeShareResource[] = ["cpu", "memory"];
+    return resources.map((resource) => {
+        const usage = metricValue(podUsage, resource);
+        const allocatable = nodeAllocatable === null ? null : metricValue(nodeAllocatable, resource);
+        return {
+            resource,
+            usage,
+            allocatable,
+            percentage: usagePercent(usage, allocatable),
+        };
+    });
+}

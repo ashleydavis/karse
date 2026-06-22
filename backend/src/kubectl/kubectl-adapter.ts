@@ -1887,9 +1887,50 @@ export async function getPodPerformance(
         containers,
     };
 
+    // The pod's scheduling node, so the UI can show the pod's percentage of the node it
+    // runs on (pod usage ÷ node allocatable). allocatable comes from node status; node
+    // usage from the node metrics list (null when metrics are unavailable). An unscheduled
+    // pod (no spec.nodeName) or a failed node read yields null, so the percentage degrades
+    // to "—" rather than fabricating a denominator. READ-ONLY.
+    const nodeUsage = node !== "" ? await fetchPodSchedulingNode(context, node, metricsAvailable) : null;
+
     return {
         metricsAvailable,
         pod: podUsage,
         containers,
+        node: nodeUsage,
     };
+}
+
+// Reads the pod's scheduling node as a NodeUsage: its allocatable from node status and its
+// usage from the node metrics list (null usage when metrics are unavailable). Returns null
+// when the node object cannot be read, so a failed read degrades the pod's percentage-of-
+// node to "—" rather than throwing the whole pod-performance request. READ-ONLY.
+async function fetchPodSchedulingNode(
+    context: string,
+    name: string,
+    metricsAvailable: boolean,
+): Promise<NodeUsage | null> {
+    const ctx = ["--context", context];
+    const [nodeResult, nodeMetrics] = await Promise.all([
+        kubectl([...ctx, "get", "node", name, "-o", "json"]),
+        fetchMetrics(context, "/apis/metrics.k8s.io/v1beta1/nodes"),
+    ]);
+    if (nodeResult.exitCode !== 0) {
+        return null;
+    }
+    const nodeItem = JSON.parse(nodeResult.stdout);
+    const alloc = nodeItem.status?.allocatable ?? {};
+    const allocatable: ResourceUsage = {
+        cpuMillicores: parseCpuToMillicores(alloc.cpu ?? ""),
+        memoryBytes: parseMemoryToBytes(alloc.memory ?? ""),
+    };
+    let usage: ResourceUsage = NULL_USAGE;
+    if (metricsAvailable && nodeMetrics.available) {
+        const metricsItem = ((nodeMetrics.data?.items ?? []) as any[]).find(
+            (item) => item.metadata?.name === name,
+        );
+        usage = metricsItem ? parseUsage(metricsItem.usage) : NULL_USAGE;
+    }
+    return { name, usage, allocatable };
 }

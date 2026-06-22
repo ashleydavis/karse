@@ -398,11 +398,15 @@ export type NodePerformance = {
 };
 
 // Pod-scoped performance snapshot, returned by GET /api/pods/:namespace/:name/performance.
-// Carries the pod's usage plus its per-container usage versus requests and limits.
+// Carries the pod's usage plus its per-container usage versus requests and limits, and the
+// pod's scheduling node (its usage and allocatable) so the UI can show the pod's
+// percentage of the node it runs on. node is null when the pod is unscheduled (no
+// spec.nodeName) or the node read failed, so the percentage degrades to "—" honestly.
 export type PodPerformance = {
     metricsAvailable: boolean;
     pod: PodUsage;
     containers: ContainerUsage[];
+    node: NodeUsage | null;
 };
 
 // The shared metric-toggle token selecting which resource a Performance view shows.

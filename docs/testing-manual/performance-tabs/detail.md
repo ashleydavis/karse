@@ -1,6 +1,6 @@
 # performance-tabs manual tests
 
-Manual tests for the Performance tabs. The cluster home page is tabbed (Status + Performance) and its **Performance tab is populated** with a treemap of the cluster's **nodes** — one box per node, sized by usage and labelled with each node's share of the cluster total (the Hot spots heatmap and Top consumers table were removed by cluster-performance-1). The node and pod detail pages each have a **populated** Performance tab too: the node tab is a single **Breakdown** treemap of each pod's share of the node (the Provisioning subtab and the standalone Breakdown subtab were removed by node-performance-1), and the pod tab (the leaf) shows per-container Provisioning bars with no treemap. The feature is complete.
+Manual tests for the Performance tabs. The cluster home page is tabbed (Status + Performance) and its **Performance tab is populated** with a treemap of the cluster's **nodes** — one box per node, sized by usage and labelled with each node's share of the cluster total (the Hot spots heatmap and Top consumers table were removed by cluster-performance-1). The node and pod detail pages each have a **populated** Performance tab too: the node tab is a single **Breakdown** treemap of each pod's share of the node (the Provisioning subtab and the standalone Breakdown subtab were removed by node-performance-1), and the pod tab (the leaf) shows the pod's **percentage of its node** for CPU and memory (no treemap, no Provisioning, no "Share of node" heading, no disk/network — reworked by pod-performance-1). The feature is complete.
 
 To see the populated cluster Performance tab against a kwok cluster (which has no metrics-server), start the app with the fake-metrics mode on: `KARSE_FAKE_METRICS=1 bun run dev`. See the [Cluster Performance tab](#cluster-performance-tab-populated) scenario below.
 
@@ -37,7 +37,7 @@ Then open the frontend at `http://127.0.0.1:5173`. The scenario fixture stands u
 - Navigate to `/pods` and click the `web` pod row to open its detail page.
 - The tab bar now includes a "Performance" tab (between "Labels" and "Logs").
 - The other tabs (Status, Containers, Labels, Logs, Commands, YAML) still render and behave as before.
-- Click the "Performance" tab. The pod tab is now **populated** (per-container Provisioning bars, no treemap); see the [Pod Performance tab (populated)](#pod-performance-tab-populated) scenario below. The selected tab is reflected in the URL (`?tab=performance`), so reloading the page keeps the Performance tab open.
+- Click the "Performance" tab. The pod tab is now **populated** (the pod's percentage of its node for CPU and memory, no treemap); see the [Pod Performance tab (populated)](#pod-performance-tab-populated) scenario below. The selected tab is reflected in the URL (`?tab=performance`), so reloading the page keeps the Performance tab open.
 
 ## Scenario: Cluster Performance tab (populated) {#cluster-performance-tab-populated}
 
@@ -119,11 +119,27 @@ Open `/nodes`, click the `<node>` row, then click the **Performance** tab.
 
 ## Scenario: Pod Performance tab (populated) {#pod-performance-tab-populated}
 
-The pod Performance tab needs usage data for the pod's containers. As with the cluster and node tabs, kwok clusters have no metrics-server, so run the app with fake metrics on and open a pod whose name matches the fake-metrics entries. The `web` pod in `default` has two containers (`nginx` and `sidecar`) covered by the fake per-container metrics.
+The pod Performance tab shows the pod's **percentage of the node** it runs on for CPU and memory (pod usage ÷ node allocatable). As with the cluster and node tabs, kwok clusters have no metrics-server, so run the app with fake metrics on and open a pod whose name matches the fake-metrics entries. The `web` pod in `default` has two containers (`nginx`, `sidecar`) covered by the fake per-container metrics (summing to ~120m CPU, ~320Mi memory).
+
+The percentage is computed against the node's **allocatable**, so the node it is scheduled on must have a realistic allocatable. kwok's default fake node reports ~1k cores / 1Ti, against which the pod rounds to **0%** with empty bars. Create the node with an explicit 4-core / 8Gi allocatable **at create time** (`kubectl create` — kwok preserves a status set at creation; an `apply`/`patch` after the fact is overwritten back to the default), and pin the pod onto it.
 
 ```sh
-# Seed the web pod (two containers) matching the fake-metrics entries.
-kubectl run web -n default --image=nginx
+# Create node-worker with a realistic allocatable AT CREATE TIME (so kwok preserves it).
+kubectl create -f - <<'EOF'
+apiVersion: v1
+kind: Node
+metadata:
+  name: node-worker
+  annotations: { kwok.x-k8s.io/node: fake }
+  labels: { type: kwok }
+status:
+  allocatable: { cpu: "4", memory: "8Gi", pods: "110" }
+  capacity: { cpu: "4", memory: "8Gi", pods: "110" }
+EOF
+kubectl wait --for=condition=Ready node/node-worker --timeout=60s
+
+# Seed the web pod (two containers) matching the fake-metrics entries, pinned to node-worker.
+kubectl run web -n default --image=nginx --overrides='{"spec":{"nodeName":"node-worker"}}'
 
 # Start the app with fake metrics so usage data is returned.
 KARSE_FAKE_METRICS=1 bun run dev
@@ -131,17 +147,20 @@ KARSE_FAKE_METRICS=1 bun run dev
 
 Open `/pods`, click the `web` row, then click the **Performance** tab.
 
-- A **CPU / Memory** toggle shows at the top, with **CPU** selected by default.
-- **Provisioning** (bars): one row per container in the pod (`nginx`, `sidecar`), each showing three overlaid bars (**Usage**, **Request**, **Limit**) on a shared per-row scale, with the formatted figures alongside. There is no treemap at the pod level.
-- Toggle to **Memory**: the bars re-derive from memory usage (the figures switch to `Mi`/`Gi`).
+- The view leads with "Performance" and the line "How much of its node this pod is using, as a percentage of the node."
+- Two labelled bars, **CPU** and **Memory**, each leading with the **percentage of the node** as the primary value: **CPU 3%** (`120m / 4`) and **Memory 4%** (`320Mi / 8Gi`), with the `usage / capacity` figures as small secondary text and the bar filled to the percentage. The percentages are populated and non-zero (not 0% / empty).
+- There is **no treemap**, **no "Share of node" heading**, **no Provisioning section** (no per-container Usage/Request/Limit bars), and **no Disk or Network rows**.
+
+### Pod Status "Node resources" panel
+- Click back to the **Status** tab (the default). Below the Details card, a **Node resources** panel shows the same two bars (CPU 3%, Memory 4%) — the answer is on the default tab too, without opening Performance.
 
 ### Metrics-unavailable path (pod)
 - Stop the app and restart it **without** `KARSE_FAKE_METRICS` (plain `bun run dev`).
-- Open the pod's **Performance** tab. The "Metrics API is not available" notice is shown above the bars, but the **Provisioning** bars still render: the **Usage** bar reads `—` (empty), while **Request** and **Limit** still show their figures from the pod spec, confirming the page degrades cleanly.
+- Open the pod's **Performance** tab. The "Metrics API is not available" notice is shown, and the CPU and Memory percentages read `—` (no live usage, so the share cannot be computed), confirming the page degrades cleanly. There is still no disk/network row and no "not reported by the Metrics API" copy.
 
 ### Light and dark mode (pod Performance tab)
 - With fake metrics on and the tab populated, switch the colour mode between Light and Dark from the header settings.
-- In both modes the provisioning bars and the toggle are clearly readable with proper contrast. Capture screenshots of the populated tab and the metrics-unavailable state in both modes for review.
+- In both modes the percentage-of-node bars are clearly readable with proper contrast. Capture screenshots of the populated Performance tab and the Status "Node resources" panel in both modes for review.
 
 ## Data foundation: quantity parsers and fake-metrics mode
 
@@ -266,6 +285,9 @@ Confirm:
 - `containers` is an array, one entry per spec container, each with `usage`,
   `requests`, and `limits` blocks (CPU in millicores, memory in bytes).
 - `pod.usage`, `pod.requests`, and `pod.limits` are the per-container sums.
+- `node` is non-null for a scheduled pod, carrying the scheduling node's `name`, `usage`,
+  and `allocatable` (the denominator the pod-Performance percentage-of-node is computed
+  against). It is `null` for an unscheduled pod.
 
 Now restart **without** `KARSE_FAKE_METRICS` (plain `bun run dev`) and re-run the same
 curl: `metricsAvailable` is `false`, every `usage` field is `null`, and `requests` /

@@ -3040,6 +3040,27 @@ describe("getPodPerformance", () => {
     const METRICS_KEY =
         "--context ctx get --raw /apis/metrics.k8s.io/v1beta1/namespaces/default/pods/web";
     const POD_KEY = "--context ctx -n default get pod web -o json";
+    // The pod's scheduling node is read for its allocatable (and usage from the node
+    // metrics list) so the pod's percentage-of-node can be computed.
+    const NODE_KEY = "--context ctx get node node-1 -o json";
+    const NODE_METRICS_KEY = "--context ctx get --raw /apis/metrics.k8s.io/v1beta1/nodes";
+
+    // The scheduling node object, carrying a 4-core / 8Gi allocatable in status.
+    const NODE_OBJECT = {
+        metadata: { name: "node-1" },
+        status: { allocatable: { cpu: "4", memory: "8Gi" } },
+    };
+
+    // The node metrics list (all nodes), with node-1's live usage.
+    const NODE_METRICS = {
+        kind: "NodeMetricsList",
+        items: [
+            {
+                metadata: { name: "node-1" },
+                usage: { cpu: "1000000000n", memory: "2147483648" },
+            },
+        ],
+    };
 
     // A pod with two containers, each declaring requests and limits in its spec.
     const POD_SPEC = {
@@ -3109,6 +3130,8 @@ describe("getPodPerformance", () => {
         setRunnerHandlers({
             [METRICS_KEY]: () => ok(JSON.stringify(POD_METRICS)),
             [POD_KEY]: () => ok(JSON.stringify(POD_SPEC)),
+            [NODE_KEY]: () => ok(JSON.stringify(NODE_OBJECT)),
+            [NODE_METRICS_KEY]: () => ok(JSON.stringify(NODE_METRICS)),
         });
 
         const result = await getPodPerformance("ctx", "default", "web");
@@ -3117,6 +3140,14 @@ describe("getPodPerformance", () => {
         expect(result.pod.name).toBe("web");
         expect(result.pod.namespace).toBe("default");
         expect(result.pod.node).toBe("node-1");
+
+        // The scheduling node is read for its allocatable (4 cores / 8Gi) and live usage
+        // (1 core / 2Gi), so the UI can compute the pod's percentage of the node.
+        expect(result.node).toEqual({
+            name: "node-1",
+            usage: { cpuMillicores: 1000, memoryBytes: 2 * 1024 ** 3 },
+            allocatable: { cpuMillicores: 4000, memoryBytes: 8 * 1024 ** 3 },
+        });
 
         // Per-container join: usage from metrics (120000000n -> 120m, 262144Ki -> 256Mi
         // bytes), requests/limits from spec.
@@ -3158,6 +3189,9 @@ describe("getPodPerformance", () => {
             [METRICS_KEY]: () =>
                 fail('error: the server could not find the requested resource (get pods.metrics.k8s.io web)'),
             [POD_KEY]: () => ok(JSON.stringify(POD_SPEC)),
+            [NODE_KEY]: () => ok(JSON.stringify(NODE_OBJECT)),
+            [NODE_METRICS_KEY]: () =>
+                fail('error: the server could not find the requested resource (get nodes.metrics.k8s.io)'),
         });
 
         const result = await getPodPerformance("ctx", "default", "web");
@@ -3168,6 +3202,13 @@ describe("getPodPerformance", () => {
             expect(c.usage).toEqual({ cpuMillicores: null, memoryBytes: null });
         }
         expect(result.pod.usage).toEqual({ cpuMillicores: null, memoryBytes: null });
+        // The node's allocatable (the percentage denominator) still comes from node
+        // status, but its usage is null because the Metrics API is unavailable.
+        expect(result.node).toEqual({
+            name: "node-1",
+            usage: { cpuMillicores: null, memoryBytes: null },
+            allocatable: { cpuMillicores: 4000, memoryBytes: 8 * 1024 ** 3 },
+        });
         expect(result.pod.requests).toEqual({
             cpuMillicores: 150,
             memoryBytes: (128 + 64) * 1024 ** 2,
@@ -3193,6 +3234,8 @@ describe("getPodPerformance", () => {
                     containers: [{ name: "nginx", usage: { cpu: "0", memory: "0" } }],
                 })),
             [POD_KEY]: () => ok(JSON.stringify(podNoResources)),
+            [NODE_KEY]: () => ok(JSON.stringify(NODE_OBJECT)),
+            [NODE_METRICS_KEY]: () => ok(JSON.stringify(NODE_METRICS)),
         });
 
         const result = await getPodPerformance("ctx", "default", "web");
@@ -3209,9 +3252,11 @@ describe("getPodPerformance", () => {
 
     test("uses the canned fake metrics under KARSE_FAKE_METRICS without shelling out for metrics", async () => {
         process.env.KARSE_FAKE_METRICS = "1";
-        // Only the pod spec is fetched via kubectl; the metrics fetch is canned.
+        // Only the pod spec and the scheduling-node object are fetched via kubectl; the
+        // metrics fetches (pod and node) are canned by the fake-metrics mode.
         setRunnerHandlers({
             [POD_KEY]: () => ok(JSON.stringify(POD_SPEC)),
+            [NODE_KEY]: () => ok(JSON.stringify(NODE_OBJECT)),
         });
 
         const result = await getPodPerformance("ctx", "default", "web");
@@ -3231,5 +3276,43 @@ describe("getPodPerformance", () => {
             [POD_KEY]: () => fail("Error from server (NotFound): pods \"web\" not found"),
         });
         await expect(getPodPerformance("ctx", "default", "web")).rejects.toThrow("not found");
+    });
+
+    test("returns node:null for an unscheduled pod (no spec.nodeName), without reading any node", async () => {
+        const unscheduled = {
+            metadata: { name: "web", namespace: "default" },
+            spec: { containers: [{ name: "nginx" }] },
+        };
+        // No NODE_KEY / NODE_METRICS_KEY handlers: an unscheduled pod must not trigger a
+        // node read at all (an unmocked call would throw).
+        setRunnerHandlers({
+            [METRICS_KEY]: () =>
+                ok(JSON.stringify({
+                    metadata: { name: "web", namespace: "default" },
+                    containers: [{ name: "nginx", usage: { cpu: "0", memory: "0" } }],
+                })),
+            [POD_KEY]: () => ok(JSON.stringify(unscheduled)),
+        });
+
+        const result = await getPodPerformance("ctx", "default", "web");
+
+        expect(result.pod.node).toBe("");
+        expect(result.node).toBeNull();
+    });
+
+    test("degrades to node:null when the scheduling node read fails", async () => {
+        setRunnerHandlers({
+            [METRICS_KEY]: () => ok(JSON.stringify(POD_METRICS)),
+            [POD_KEY]: () => ok(JSON.stringify(POD_SPEC)),
+            // The node object cannot be read (e.g. deleted or RBAC); the pod-performance
+            // request still succeeds, it just has no percentage-of-node denominator.
+            [NODE_KEY]: () => fail('Error from server (NotFound): nodes "node-1" not found'),
+            [NODE_METRICS_KEY]: () => ok(JSON.stringify(NODE_METRICS)),
+        });
+
+        const result = await getPodPerformance("ctx", "default", "web");
+
+        expect(result.metricsAvailable).toBe(true);
+        expect(result.node).toBeNull();
     });
 });
