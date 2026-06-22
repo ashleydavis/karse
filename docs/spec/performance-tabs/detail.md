@@ -137,5 +137,5 @@ Because clusters without a metrics-server return no usage, a fake-metrics mode s
 deterministic data so smoke and e2e can exercise the charts. Setting `KARSE_FAKE_METRICS=1`
 makes the adapter return a canned, Metrics-API-shaped payload (a deterministic map of node
 usage and pod-container usage, large enough for several treemap and heatmap cells) instead
-of shelling out to `kubectl get --raw`. This mirrors the existing `KARSE_FAKE_LOGS` /
-`KARSE_FAKE_STERN` pattern. `metricsEnabledFake()` reports whether the mode is on.
+of shelling out to `kubectl get --raw`. This mirrors the existing `KARSE_FAKE_LOGS`
+pattern. `metricsEnabledFake()` reports whether the mode is on.

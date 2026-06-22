@@ -7,7 +7,7 @@ import type {
     WorkloadKind, WorkloadDetail, NamespaceDetail,
     PodDetail, NodeDetail, YamlResourceType, YamlResponse,
     LogStreamLine, LogStreamStarted, EventsResponse, ErrorsResponse,
-    SternStreamLine, SternStreamStarted, ClusterPerformance, NodePerformance,
+    ClusterPerformance, NodePerformance,
     PodPerformance, CacheConfigResponse, CacheClearResponse,
 } from "karse-types";
 
@@ -327,57 +327,6 @@ export function openLogStream(
     }
     const source = new EventSource(`/api/logs/stream?${params.toString()}`);
 
-    source.addEventListener("started", (e: MessageEvent) => {
-        callbacks.onStarted(JSON.parse(e.data));
-    });
-    source.addEventListener("line", (e: MessageEvent) => {
-        callbacks.onLine(JSON.parse(e.data));
-    });
-    source.addEventListener("error", (e: MessageEvent) => {
-        const data = e.data;
-        if (typeof data === "string" && data !== "") {
-            const parsed = JSON.parse(data);
-            callbacks.onError(parsed.message ?? "stream error");
-        }
-    });
-
-    return () => {
-        source.close();
-    };
-}
-
-// Callbacks for the stern live log stream consumed via Server-Sent Events.
-// onUnavailable fires when the backend reports that `stern` is not installed, so
-// the page can show install instructions instead of treating it as an error.
-export type SternStreamCallbacks = {
-    onStarted: (started: SternStreamStarted) => void;
-    onLine: (line: SternStreamLine) => void;
-    onUnavailable: () => void;
-    onError: (message: string) => void;
-};
-
-// Opens a Server-Sent Events connection to GET /api/stern/stream and dispatches
-// each event to the callbacks. Streams live logs from every pod matching the
-// query (substring/wildcard/regex) in the given context and namespace scope,
-// using the backend's real `stern` process. Returns a function that closes the
-// stream (terminating the backend stern process via the request-close handler).
-export function openSternStream(
-    context: string,
-    namespace: string | undefined,
-    query: string,
-    tail: number,
-    callbacks: SternStreamCallbacks,
-): () => void {
-    const params = new URLSearchParams({ context, query, tail: String(tail) });
-    if (namespace) {
-        params.set("namespace", namespace);
-    }
-    const source = new EventSource(`/api/stern/stream?${params.toString()}`);
-
-    source.addEventListener("unavailable", () => {
-        callbacks.onUnavailable();
-        source.close();
-    });
     source.addEventListener("started", (e: MessageEvent) => {
         callbacks.onStarted(JSON.parse(e.data));
     });

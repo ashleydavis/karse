@@ -18,7 +18,6 @@ import { ContainerDetailPage } from "./pages/container-detail";
 import { NodeDetailPage } from "./pages/node-detail";
 import { WorkloadDetailPage } from "./pages/workload-detail";
 import { LiveLogsPage } from "./pages/live-logs";
-import { SternPage } from "./pages/stern";
 import { AllResourcesPage } from "./pages/all-resources";
 import { AboutPage } from "./pages/about";
 import { ConfigPage } from "./pages/config";
@@ -55,7 +54,6 @@ export function App() {
                 <Route path="logs" element={<LiveLogsPage />} />
                 <Route path="errors" element={<ErrorsPage />} />
                 <Route path="errors/:index" element={<ErrorDetailPage />} />
-                <Route path="stern" element={<SternPage />} />
                 <Route path="about" element={<AboutPage />} />
                 <Route path="config" element={<ConfigPage />} />
             </Route>

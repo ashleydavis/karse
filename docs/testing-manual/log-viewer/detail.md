@@ -2,7 +2,7 @@
 
 Manual tests for the pod log viewer embedded on the pod detail page (the Logs tab). See the spec: [log-viewer](../../spec/log-viewer/detail.md).
 
-The Logs tab uses the **same shared component** as the dedicated Logs page (`/logs`), so both surfaces expose the same options; on the Logs tab the pod is fixed, so its namespace/pod picker is hidden. Neither surface has a "Tail" option or a Refresh button. Multi-pod streaming on the Logs page is covered by [stern-live-logs](../stern-live-logs/detail.md).
+The Logs tab uses the **same shared component** as the dedicated Logs page (`/logs`), so both surfaces expose the same options; on the Logs tab the pod is fixed, so its namespace/pod picker is hidden. Neither surface has a "Tail" option or a Refresh button. Multi-pod streaming on the Logs page is covered by [live-logs](../live-logs/detail.md).
 
 The single-container log panel on the container detail page is a separate surface (it keeps its own container/tail/refresh controls) and is not covered here.
 

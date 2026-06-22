@@ -11,7 +11,7 @@ export const logsStreamRouter = Router();
 // Converts a wildcard/substring filter into a predicate over pod names.
 // An empty filter matches everything. A filter containing `*` is treated as a
 // glob anchored to the whole name (`*` matches any run of characters); otherwise
-// it is a case-insensitive substring match, mirroring stern's default behaviour.
+// it is a case-insensitive substring match.
 function buildPodMatcher(filter: string): (name: string) => boolean {
     const trimmed = filter.trim();
     if (trimmed === "") {

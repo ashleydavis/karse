@@ -47,7 +47,7 @@ To tear down every test cluster at once (after running several fixtures, or to c
 | [22-breadcrumbs](22-breadcrumbs/) | One node, one pod | cross-cutting |
 | [23-shareable-url-state](23-shareable-url-state/) | Two clusters, namespaced pods | cross-cutting |
 | [24-navbar-dropdown-pickers](24-navbar-dropdown-pickers/) | Two clusters, extra namespaces | quick-find |
-| [25-live-logs](25-live-logs/) | One node, three pods | stern-live-logs |
+| [25-live-logs](25-live-logs/) | One node, three pods | live-logs |
 | [26-table-row-hover](26-table-row-hover/) | One node, one multi-container pod | clickable-resource-rows |
 | [27-live-pod-logs](27-live-pod-logs/) | One node, one multi-container pod | log-viewer |
 | [28-events-view](28-events-view/) | Seeded events across two namespaces | events-feed |

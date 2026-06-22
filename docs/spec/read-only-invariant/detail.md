@@ -13,7 +13,7 @@ Karse is a viewer, not a management tool. The kubectl adapter (`backend/src/kube
 - No mutating cluster subcommand (`apply`, `create`, `delete`, `edit`, `patch`, `replace`, `scale`, `rollout`, `expose`, `label`, `annotate`, etc.) is ever invoked by the adapter.
 - The only user-supplied value that reaches kubectl as a write argument is the context name on `POST /api/contexts/current`. It is validated to be a non-empty string, rejected if it begins with `-`, and passed as a positional argument (not interpolated into a shell), so shell injection is not possible.
 - The guided-commands feature (see `guided-commands`) generates mutating kubectl strings as text for the user to copy, but Karse itself never executes them.
-- The stern integration (see `stern-live-logs`) runs the external `stern` binary in read/tail mode only.
+- The multi-pod Logs page (see `live-logs`) follows pod logs with `kubectl logs -f`, a read/tail-only command.
 - The on-disk cache (see `cluster-cache`) stores cluster read output only: a cache hit returns a previously-read result without running kubectl, and only successful cluster reads are cached. Every `kubectl config …` command (the writes `use-context` / `set-context` / `unset`, and the local reads `config view` / `current-context`) bypasses the cache entirely, so caching never causes a write nor serves one, and a kubeconfig change is always reflected live.
 
 ## Acceptance Criteria

@@ -20,7 +20,6 @@ const LIST_LABELS: Record<string, string> = {
     statefulsets: "StatefulSets",
     daemonsets: "DaemonSets",
     logs: "Logs",
-    stern: "Stern",
     events: "Events",
     errors: "Errors",
     about: "About",

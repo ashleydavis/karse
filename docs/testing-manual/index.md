@@ -39,7 +39,7 @@ Single-test-cluster discipline (per `readme.md`): there is only ever ONE test cl
 | [workload-detail](./workload-detail/index.md) | Deployment / stateful set / daemon set detail pages. |
 | [clickable-resource-rows](./clickable-resource-rows/index.md) | Rows link to detail pages; consistent row hover. |
 | [log-viewer](./log-viewer/index.md) | Pod/container log viewer and live follow. |
-| [stern-live-logs](./stern-live-logs/index.md) | Multi-pod live log streaming. |
+| [live-logs](./live-logs/index.md) | Multi-pod live log streaming on the Logs page (`/logs`). |
 | [events-feed](./events-feed/index.md) | Recent cluster events view. |
 | [event-detail](./event-detail/index.md) | Event detail page and the row-click drill-down. |
 | [errors-feed](./errors-feed/index.md) | Warning events and problem pods. |

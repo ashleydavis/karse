@@ -26,7 +26,7 @@ import { shouldFollow, bottomScrollTop, thumbMetrics, scrollTopForThumbTop, type
 // A rendered log line tagged with a stable key for React reconciliation.
 type RenderedLine = LogStreamLine & { key: number };
 
-// Palette used to color pod-name prefixes, cycling like stern does.
+// Palette used to color pod-name prefixes, cycling through the colours per pod.
 const PREFIX_COLORS = ["#4fc3f7", "#81c784", "#ffb74d", "#ba68c8", "#e57373", "#4db6ac", "#f06292", "#9575cd"];
 
 // Maximum number of streaming-pod chips shown before the list is collapsed

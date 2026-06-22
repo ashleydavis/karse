@@ -191,7 +191,7 @@ its containers. With no metrics-server, `metricsAvailable` is `false` and every 
 is `null` while allocatable/requests/limits stay populated from node status and pod specs.
 
 The smoke suite (`scripts/smoke-tests.sh`) launches the backend with `KARSE_FAKE_METRICS=1`
-(alongside `KARSE_FAKE_LOGS=1` and `KARSE_FAKE_STERN=1`) and asserts this endpoint returns
+(alongside `KARSE_FAKE_LOGS=1`) and asserts this endpoint returns
 `200` with `metricsAvailable: true`, non-empty `nodes` and `pods`, the `fake-node-1` node
 usage joined (non-null), and every pod carrying its join and resource fields. Run it with:
 

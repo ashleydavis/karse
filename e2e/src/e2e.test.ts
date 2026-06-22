@@ -3681,7 +3681,7 @@ test.describe("karse e2e", () => {
         });
     });
 
-    // ── Live logs page (stern-style multi-pod streaming) ──────────────────────
+    // ── Live logs page (multi-pod streaming) ──────────────────────────────────
 
     test.describe("live logs page", () => {
         // Two fake pods used to populate the pod dropdown and drive the stream.
@@ -4115,120 +4115,6 @@ test.describe("karse e2e", () => {
             await page.locator("[data-test-id='live-logs-matched-collapse']").click();
             await expect(page.locator("[data-test-id='live-logs-matched-pod']")).toHaveCount(8);
             await expect(page.locator("[data-test-id='live-logs-matched-expand']")).toBeVisible();
-        });
-    });
-
-    // ── Stern page (stern-powered live logs) ──────────────────────────────────
-
-    test.describe("stern page", () => {
-        // Builds a Server-Sent Events body that announces the stream then emits one
-        // stern-style "namespace pod message" line per pod, mirroring the backend.
-        function buildSternSseBody(query: string): string {
-            const started = `event: started\ndata: ${JSON.stringify({ query, namespace: "default" })}\n\n`;
-            const pods = ["nginx-abc", "redis-xyz"].filter(
-                (n) => query === "" || query === ".*" || n.toLowerCase().includes(query.toLowerCase())
-            );
-            const lines = pods
-                .map((n) => `event: line\ndata: ${JSON.stringify({ line: `default ${n} log line from ${n}` })}\n\n`)
-                .join("");
-            return started + lines;
-        }
-
-        // Intercepts the stern SSE stream, returning canned output for the request's
-        // query, or an "unavailable" event when forceUnavailable is set.
-        async function interceptSternStream(forceUnavailable: boolean): Promise<void> {
-            await page.route("**/api/stern/stream*", async (route) => {
-                if (forceUnavailable) {
-                    await route.fulfill({
-                        headers: { "Content-Type": "text/event-stream" },
-                        body: `event: unavailable\ndata: ${JSON.stringify({ binary: "stern" })}\n\n`,
-                    });
-                    return;
-                }
-                const query = new URL(route.request().url()).searchParams.get("query") ?? "";
-                await route.fulfill({
-                    headers: { "Content-Type": "text/event-stream" },
-                    body: buildSternSseBody(query),
-                });
-            });
-        }
-
-        test.beforeAll(async () => {
-            setContext(CLUSTER_1);
-            await interceptSternStream(false);
-            await page.goto("/stern", { waitUntil: "networkidle" });
-        });
-
-        test.afterAll(async () => {
-            await page.unroute("**/api/stern/stream*");
-            setContext(CLUSTER_1);
-        });
-
-        test("shows page title Stern", async () => {
-            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Stern");
-        });
-
-        test("renders namespace and query controls", async () => {
-            await expect(page.locator("[data-test-id='stern-namespace-select']")).toBeVisible();
-            await expect(page.locator("[data-test-id='stern-query']")).toBeVisible();
-        });
-
-        test("streaming shows a stern-prefixed line per pod", async () => {
-            await page.locator("[data-test-id='stern-start']").click();
-            await expect(page.locator("[data-test-id='stern-line']")).toHaveCount(2);
-            await expect(page.locator("[data-test-id='stern-viewer']")).toContainText("default nginx-abc");
-            await expect(page.locator("[data-test-id='stern-viewer']")).toContainText("default redis-xyz");
-        });
-
-        test("Stop button replaces Stream while streaming", async () => {
-            await expect(page.locator("[data-test-id='stern-stop']")).toBeVisible();
-            await page.locator("[data-test-id='stern-stop']").click();
-            await expect(page.locator("[data-test-id='stern-start']")).toBeVisible();
-        });
-
-        test("query sends the query param and restricts the streamed pods", async () => {
-            await page.locator("[data-test-id='stern-query'] input").fill("nginx");
-            const requestPromise = page.waitForRequest((req) => req.url().includes("/api/stern/stream") && req.url().includes("query=nginx"));
-            await page.locator("[data-test-id='stern-start']").click();
-            await requestPromise;
-            await expect(page.locator("[data-test-id='stern-line']")).toHaveCount(1);
-            await expect(page.locator("[data-test-id='stern-viewer']")).toContainText("default nginx-abc");
-            await expect(page.locator("[data-test-id='stern-viewer']")).not.toContainText("redis-xyz");
-        });
-
-        test("while streaming with no lines yet shows the progress indicator, not loading text", async () => {
-            // Delay the stream body so the pre-line streaming state is observable.
-            await page.unroute("**/api/stern/stream*");
-            await page.route("**/api/stern/stream*", async (route) => {
-                const query = new URL(route.request().url()).searchParams.get("query") ?? "";
-                await new Promise((resolve) => setTimeout(resolve, 1500));
-                await route.fulfill({
-                    headers: { "Content-Type": "text/event-stream" },
-                    body: buildSternSseBody(query),
-                });
-            });
-            await page.goto("/stern", { waitUntil: "networkidle" });
-            // Clear any leftover query from earlier tests so both pods stream.
-            await page.locator("[data-test-id='stern-query'] input").fill("");
-            await page.locator("[data-test-id='stern-start']").click();
-            // The spinner stands in for the loading state; no "Waiting for log lines..." text.
-            await expect(page.locator("[data-test-id='stern-viewer'] [data-test-id='loading-indicator']")).toBeVisible();
-            await expect(page.locator("[data-test-id='stern-viewer']")).not.toContainText("Waiting for log lines");
-            // Once lines arrive, the indicator is gone and the lines are shown.
-            await expect(page.locator("[data-test-id='stern-line']")).toHaveCount(2);
-            await expect(page.locator("[data-test-id='stern-viewer'] [data-test-id='loading-indicator']")).toHaveCount(0);
-            // Restore the immediate stream for the remaining test.
-            await page.unroute("**/api/stern/stream*");
-            await interceptSternStream(false);
-        });
-
-        test("shows install instructions when stern is not installed", async () => {
-            await page.unroute("**/api/stern/stream*");
-            await interceptSternStream(true);
-            await page.goto("/stern", { waitUntil: "networkidle" });
-            await page.locator("[data-test-id='stern-start']").click();
-            await expect(page.locator("[data-test-id='stern-not-installed']")).toBeVisible();
-            await expect(page.locator("[data-test-id='stern-not-installed']")).toContainText("brew install stern");
         });
     });
 
@@ -5302,6 +5188,13 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Errors");
             await expect(page.locator("[data-test-id='no-errors-empty']")).toBeVisible();
             await page.unroute("**/api/errors*");
+        });
+
+        // The Stern feature was removed; the sidebar must not link to it.
+        test("has no Stern nav entry", async () => {
+            const nav = page.locator("[data-test-id='sidebar-nav']");
+            await expect(nav.locator("[aria-label='stern']")).toHaveCount(0);
+            await expect(nav.getByRole("link", { name: "Stern" })).toHaveCount(0);
         });
     });
 

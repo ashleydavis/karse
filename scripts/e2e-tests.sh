@@ -270,7 +270,7 @@ kubectl config use-context "kwok-$KWOK_CLUSTER_1"
 # KARSE_PORT=0 asks the OS for a free port; the backend writes it to KARSE_PORT_FILE.
 echo "--- Starting backend (OS-assigned free port) ---"
 : > "$PORT_FILE"
-(cd backend && KARSE_FAKE_LOGS=1 KARSE_FAKE_STERN=1 KARSE_FAKE_METRICS=1 KARSE_PORT=0 KARSE_PORT_FILE="$PORT_FILE" bun src/index.ts) 2>/dev/null &
+(cd backend && KARSE_FAKE_LOGS=1 KARSE_FAKE_METRICS=1 KARSE_PORT=0 KARSE_PORT_FILE="$PORT_FILE" bun src/index.ts) 2>/dev/null &
 BACKEND_PID=$!
 
 for _ in $(seq 1 100); do

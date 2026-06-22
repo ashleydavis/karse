@@ -1,36 +1,20 @@
-# stern-live-logs
+# live-logs
 
 ## Overview
 
-Unlike the kubectl-based pod log viewer (`log-viewer`), which follows one container, the Stern page streams logs from every pod matching a query across a namespace (or all namespaces). It shells out to the real `stern` binary on the backend, which natively tails and aggregates multi-pod logs.
+The Logs page (`/logs`) streams live, aggregated logs from one or more pods using `kubectl logs -f` (read-only follow) on the backend, merged and pushed to the browser over Server-Sent Events. Unlike the kubectl-based single-container pod log viewer (`log-viewer`), which follows one container, this page lets the user pick several pods (or every pod matching a substring/wildcard) and streams them together.
 
-Backed by: `GET /api/stern/stream`, `backend/src/routes/stern-stream-route.ts`, `backend/src/kubectl/stern-adapter.ts`, `frontend/src/pages/stern/`.
+Backed by: `GET /api/logs/stream`, `backend/src/routes/logs-stream-route.ts`, `frontend/src/pages/live-logs/`, and the shared `frontend/src/components/log-viewer.tsx`.
 
 ## Behaviour
 
-- The page has a namespace selector (including "All namespaces"), a pod-query field (wildcard/regex, e.g. `nginx-*` or `.*`), and a Stream/Stop button.
-- Pressing Stream opens an SSE stream to `GET /api/stern/stream`. Each `line` event carries a `SternStreamLine` whose `line` already includes stern's own `namespace pod message` prefix, displayed verbatim. A `started` event carries the resolved query and namespace.
-- The viewer auto-scrolls to the newest line and caps its in-memory buffer (5000 lines) so a long-running stream cannot exhaust memory.
-- The "Streaming N pod(s)" row of pod-name chips above the logs is capped: at most 8 chips are shown. When more pods are streaming, a "... +M more" chip appears after them; clicking it expands the row to show every streaming pod, and a "Show fewer" chip then collapses it back to the cap. This keeps a large multi-pod stream from consuming the page's vertical space.
-- If `stern` is not found on the server's PATH, the stream reports an "unavailable" signal and the page shows install instructions (Homebrew, Krew, manual download) instead of erroring.
-- The stream is torn down on Stop and on page unmount.
-
-### Firehose bounding (CPU/memory safety)
-
-A whole-cluster `.*` all-namespaces stream is the worst case: stern fans out to one log watch per matching pod and merges them into a single stdout firehose that the backend ingests on its single event-loop thread. Left unbounded this pegs a CPU core and can OOM the backend. Two source-level bounds keep it safe:
-
-- **Fan-out cap at the source.** The backend passes an explicit `--max-log-requests` to stern (default `10`, overridable via `KARSE_STERN_MAX_LOG_REQUESTS`), instead of stern's own default of `50`. This caps the number of concurrent per-pod watches stern opens, bounding the merged firehose volume before it reaches the backend.
-- **Bounded drop-oldest backpressure.** Incoming lines are accumulated in a bounded ring buffer (`STERN_BUFFER_MAX_LINES = 5000`) and flushed to the SSE client on a timer (every `100ms`) rather than written synchronously per line. When the buffer is full the oldest line is dropped (tail logs: newest matter most) and a `dropped` SSE event reports the count so the gap is visible. The buffer never grows without bound, so a runaway producer cannot OOM the backend or starve the event loop with synchronous per-line writes.
-
-Both bounds preserve the read-only invariant: stern is still tail-only and no mutating verb is ever issued.
-
 ### Logs page (`/logs`) pod picker and scoping before streaming
 
-The kubectl-based multi-pod Logs page (`/logs`, `frontend/src/pages/live-logs/`) streams `kubectl logs -f` from every chosen pod. Once a stream is open the logs are live and update automatically (no manual refresh): each `kubectl logs -f` follow pushes new lines to the backend, which forwards them over SSE to the viewer as they arrive.
+The kubectl-based multi-pod Logs page (`/logs`, `frontend/src/pages/live-logs/`) streams `kubectl logs -f` from every chosen pod. Once a stream is open the logs are live and update automatically (no manual refresh): each `kubectl logs -f` follow pushes new lines to the backend, which forwards them over SSE to the viewer as they arrive. The page passes the checked pods (or, with nothing checked, a wildcard/substring filter) to `GET /api/logs/stream`; the backend opens one follow per matching pod and merges their output into a single `line` event stream (each `LogStreamLine` carries the source `namespace` and `pod`). A `started` event reports the set of pods the stream attached to.
 
 The Logs page and the Pod detail Logs tab render a single shared component, `frontend/src/components/log-viewer.tsx` (`LogViewer`), so both surfaces expose the same options. The Logs page uses its full picker mode (namespace selector + pod picker + Stream/Stop); the Pod detail Logs tab passes a `fixedPod` so the component hides the picker and auto-streams that one pod. Neither surface has a "Tail" option or a Refresh button (see [log-viewer](../log-viewer/detail.md)).
 
-The page replaces the old single-select pod dropdown with a **searchable, multi-select pod picker dropdown** so it stays usable when there are many pods. The picker is a trigger button (labelled "Search pods...", or summarising the current selection/search) that, when clicked, drops an overlay panel DOWN below it. The pod list is collapsed until the trigger is used, rather than always expanded inline on the page. The dropdown panel holds, top to bottom:
+The page uses a **searchable, multi-select pod picker dropdown** so it stays usable when there are many pods. The picker is a trigger button (labelled "Search pods...", or summarising the current selection/search) that, when clicked, drops an overlay panel DOWN below it. The pod list is collapsed until the trigger is used, rather than always expanded inline on the page. The dropdown panel holds, top to bottom:
 
 - A visible **"Search pods..."** input that filters the pod list by case-insensitive substring (the pure `filterPods` helper in `frontend/src/lib/filter-pods.ts`).
 - A scrollable **checkbox list**, one checkbox per pod, so the user can pick several pods to stream at once.
@@ -43,6 +27,10 @@ Streaming every pod in a context at once is not feasible, so the page requires t
 - The user scopes either by checking one or more pods, or by typing a substring into the search box (with nothing checked) so every matching pod is streamed. An explicit checkbox selection takes precedence: while pods are checked the search box is disabled, and the checked pod names are sent verbatim to the backend in `pods` query parameters. With nothing checked, the search text is sent as the wildcard/substring `filter` instead.
 - Pressing Stream with no pod checked and an empty search does **not** open a stream. Instead the page shows an info message ("Pick which pods to stream first") explaining that the user must check pods or type a substring, then press Stream again.
 - The message clears as soon as the user checks a pod or types into the search box. Once a pod or search is given, pressing Stream opens the stream as normal.
+
+The "Streaming N pod(s)" row of pod-name chips above the logs is capped: at most 8 chips are shown. When more pods are streaming, a "... +M more" chip appears after them; clicking it expands the row to show every streaming pod, and a "Show fewer" chip then collapses it back to the cap. This keeps a large multi-pod stream from consuming the page's vertical space.
+
+The viewer auto-scrolls to the newest line and caps its in-memory buffer (5000 lines) so a long-running stream cannot exhaust memory. The stream is torn down on Stop and on page unmount (closing the SSE connection, which the backend uses to terminate the `kubectl logs -f` processes).
 
 #### Auto-follow and the visible scrollbar
 
@@ -63,15 +51,10 @@ Next to the Stream/Stop button the Logs page shows a small caption telling the u
 
 ## Acceptance Criteria
 
-- [x] The page streams multi-pod logs via the external `stern` binary over SSE.
-- [x] A namespace selector and a wildcard/regex pod-query field scope the stream.
-- [x] Stern's own line prefix is displayed verbatim.
-- [x] The viewer auto-scrolls and caps its buffer to bound memory.
+- [x] The kubectl-based Logs page (`/logs`) streams multi-pod `kubectl logs -f` output over SSE, merged into one viewer.
+- [x] A namespace selector and a searchable, multi-select pod picker scope the stream; with nothing checked the search text is the substring/wildcard filter.
 - [x] The streaming-pod label row is capped at 8 chips with a "... +M more" expander that reveals the full list (and a "Show fewer" control to collapse it), so a large stream does not eat vertical space.
-- [x] When `stern` is missing from PATH, the page shows install instructions instead of an error.
-- [x] The stream is torn down on Stop and on unmount.
-- [x] The whole-cluster firehose is bounded: stern fan-out is capped via an explicit `--max-log-requests`, so an all-namespaces `.*` stream no longer pegs a CPU core.
-- [x] Backend backpressure is bounded: lines are buffered in a fixed-size drop-oldest ring and flushed on a timer, so a runaway producer cannot OOM the backend (a `dropped` event reports shed lines).
+- [x] The viewer auto-scrolls and caps its buffer to bound memory; the stream is torn down on Stop and on unmount.
 - [x] The kubectl-based Logs page (`/logs`) does not stream all pods at once: with no pod selected and an empty filter, pressing Stream shows guidance ("Pick which pods to stream first") instead of streaming, and streaming proceeds once a pod or wildcard is given.
 - [x] The Logs page (`/logs`) auto-follows the newest line only while the view is at the bottom; once the user scrolls up, new lines do not force-scroll them back down, and the viewer keeps a clearly visible, usable scrollbar so the streamed history stays reachable.
 - [x] The Logs page shows an "Updated ..." indicator next to the Stream/Stop button: "No logs yet" until the first line, then "Updated just now" / "Updated Ns/Nm/Nh ago" tracking the most recent appended log line, ticking once a second and resetting when a new stream starts.
@@ -80,3 +63,4 @@ Next to the Stream/Stop button the Logs page shows a small caption telling the u
 ## Open Questions
 
 None.
+</content>

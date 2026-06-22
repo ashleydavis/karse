@@ -1,6 +1,6 @@
 # Karse spec
 
-This is the top-level index of Karse's features. Karse is a local-only, read-only Kubernetes dashboard that shells out to the locally-installed `kubectl` (and optionally `stern`) for every cluster query. See `README.md` for the layout and ID rules, and `docs/architecture.md` for how it is built.
+This is the top-level index of Karse's features. Karse is a local-only, read-only Kubernetes dashboard that shells out to the locally-installed `kubectl` for every cluster query. See `README.md` for the layout and ID rules, and `docs/architecture.md` for how it is built.
 
 The spec is reverse-engineered from the shipped code and the prose docs (`docs/architecture.md`, `docs/api.md`, `docs/user-guide.md`, `docs/security.md`, `docs/audit-log.md`) as of bootstrap. Every statement is backed by existing code or docs.
 
@@ -25,7 +25,7 @@ The spec is reverse-engineered from the shipped code and the prose docs (`docs/a
 | [workload-detail](./workload-detail/index.md) | Settled | Complete | Shared detail page for a deployment, stateful set, or daemon set. |
 | [clickable-resource-rows](./clickable-resource-rows/index.md) | Settled | Complete | Every resource table row links to that resource's detail page. |
 | [log-viewer](./log-viewer/index.md) | Settled | Complete | Read-only pod/container log viewer with container + tail selectors and a live follow. |
-| [stern-live-logs](./stern-live-logs/index.md) | Settled | Complete | Multi-pod live log streaming via the `stern` binary. |
+| [live-logs](./live-logs/index.md) | Settled | Complete | Multi-pod live log streaming on the Logs page (`/logs`) via `kubectl logs -f`. |
 | [events-feed](./events-feed/index.md) | Settled | Complete | Recent cluster events view, sorted newest-first. |
 | [event-detail](./event-detail/index.md) | Settled | Complete | `/events/:uid` page: every event field, the full message, first/last seen, and a link to the involved object. |
 | [errors-feed](./errors-feed/index.md) | Settled | Complete | Unified view of Warning events and problem pods. |

@@ -125,7 +125,7 @@ This addresses roadmap items 7-11 and the point-in-time half of item 15. The dri
 ## Smoke Tests
 
 In `scripts/smoke-tests.sh`:
-- Add `KARSE_FAKE_METRICS=1` to the backend launch env (alongside the existing `KARSE_FAKE_LOGS=1 KARSE_FAKE_STERN=1`).
+- Add `KARSE_FAKE_METRICS=1` to the backend launch env (alongside the existing `KARSE_FAKE_LOGS=1`).
 - Add `curl` checks asserting the three new endpoints return 200 with the expected shape against the fake metrics:
   - `/api/cluster/performance?context=...` → `metricsAvailable: true`, non-empty `nodes` and `pods`.
   - `/api/nodes/<name>/performance?context=...` → scoped `node` and `pods`.

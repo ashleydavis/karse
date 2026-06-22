@@ -48,7 +48,6 @@ Karse currently ships the cluster home page, namespace scoping, the core workloa
 - **Resource search**: in-table search and column sorting across the resource tables.
 - **All resources page**: a single "All resources" page (`/all-resources`) listing every resource across all kinds (pods, nodes, namespaces, deployments, stateful sets, daemon sets) in one combined, searchable, sortable, filterable table, with a Kind filter and clickable rows. See `docs/spec/all-resources/detail.md`.
 - **Light/dark theming**: a color-mode setting (light, dark, or system) applied across the app.
-- **Stern firehose bounding (hardening)**: a whole-cluster `.*` all-namespaces stern stream no longer pegs a CPU core. Stern fan-out is capped at the source via an explicit `--max-log-requests` (default 10, overridable via `KARSE_STERN_MAX_LOG_REQUESTS`), and the backend buffers incoming lines in a bounded drop-oldest ring flushed on a timer so a runaway producer cannot OOM the backend. See `docs/spec/stern-live-logs/detail.md`.
 
 ## New items
 

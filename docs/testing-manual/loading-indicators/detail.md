@@ -29,7 +29,7 @@ Open the browser dev tools, go to the Network tab, and set throttling to "Slow 3
 ### Streaming and YAML panels (progress indicator only, never loading text)
 The same spinner stands in for every loading state in the app, never plain text like "Loading" or "Waiting for logs":
 - Open a pod detail page and the Logs tab. While the stream is connecting and before the first line arrives, confirm the spinner is shown in the log panel, not "(waiting for logs...)" or any loading text. Once lines arrive they replace it; an idle (non-streaming) panel shows "(no logs)".
-- On the Logs page (`/logs`) and the Stern page (`/stern`), press Stream. Before the first line arrives, confirm the spinner is shown in the viewer, not "Waiting for log lines...". The idle (pre-stream) viewer still shows the "Pick a scope and press Stream." prompt, which is guidance, not a loading state.
+- On the Logs page (`/logs`), press Stream. Before the first line arrives, confirm the spinner is shown in the viewer, not "Waiting for log lines...". The idle (pre-stream) viewer still shows the "Pick a scope and press Stream." prompt, which is guidance, not a loading state.
 - On a detail page, open the YAML sub-tab. While the YAML is loading, confirm the spinner is shown, not "Loading...". An empty result still shows "(no yaml)".
 
 ### Removal and error state

@@ -32,7 +32,7 @@ Then open the frontend at `http://127.0.0.1:5173`. Each check then runs the refe
 
 **Fixture:** [_fixtures-kwok/25-live-logs](../_fixtures-kwok/25-live-logs/)
 
-- Run the [stern-live-logs scenario](../stern-live-logs/detail.md). Stream logs from multiple pods.
+- Run the [live-logs scenario](../live-logs/detail.md). Stream logs from multiple pods.
 - Tail `logs/audit-*.log` while streaming and confirm only `logs -f` and `get` kubectl commands are recorded. No mutating verbs ever appear.
 
 ## Check D: The only write is the context switch
