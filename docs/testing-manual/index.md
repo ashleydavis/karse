@@ -60,6 +60,15 @@ Single-test-cluster discipline (per `readme.md`): there is only ever ONE test cl
 
 Some KWOK scenarios exercise behaviour that has no single dedicated spec feature. They are kept under [`cross-cutting/`](./cross-cutting/index.md): long resource names, breadcrumb navigation, and shareable URL state.
 
+## Tooling scenarios
+
+Some scenarios exercise Karse against a workload deployed into a cluster you
+already have running.
+
+| Scenario | Manual test guide |
+|---|---|
+| [logs-test-cluster](./logs-test-cluster/index.md) | Deploy varied log-emitting pods into an existing cluster, then verify their logs in `kubectl`/`stern` and in Karse's Logs and Stern pages. |
+
 ## Keeping it in sync
 
 The testing manual mirrors the spec. When the spec structure changes (a feature added, renamed, or removed), make the matching change here. A feature in `docs/spec/<id>/` must have a corresponding `docs/testing-manual/<id>/`.
