@@ -26,7 +26,7 @@ import { faCircleCheck, faCircleQuestion, faCircleXmark, faMagnifyingGlass, faSo
 import { useQuery } from "@tanstack/react-query";
 import type { Node, NodeStatus } from "karse-types";
 import { useKubeContext } from "../../../lib/kube-context";
-import { fetchNodes } from "../../../lib/api-client";
+import { fetchNodes, fetchClusterPerformance } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
 import { TableFilter } from "../../../components/table-filter";
@@ -40,6 +40,14 @@ import { ResourceStatsHeader } from "../../../components/resource-stats-header";
 import { computeNodeStats, nodeHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
+import {
+    buildNodeUsageMap,
+    nodeUsageFor,
+    compareNodeCpu,
+    compareNodeMemory,
+    formatPercent,
+    type NodeUsageMap,
+} from "../../../lib/node-usage-sort";
 
 function formatAge(createdAt: string): string {
     const ms = Date.now() - new Date(createdAt).getTime();
@@ -86,7 +94,12 @@ const STATUS_ORDER: Record<NodeStatus, number> = { Ready: 0, NotReady: 1, Unknow
 // All selectable node statuses, in display order, for the status filter dropdown.
 const ALL_STATUSES: NodeStatus[] = ["Ready", "NotReady", "Unknown"];
 
-const columns: ColumnDef<Node>[] = [
+// Builds the column definitions for the nodes table. `usage` maps each node (by name)
+// to its CPU/memory consumption as a percentage of its own allocatable (from the
+// cluster Performance snapshot), used by the resource columns and their sort
+// comparators.
+function buildColumns(usage: NodeUsageMap): ColumnDef<Node>[] {
+    return [
     {
         accessorKey: "name",
         header: "Name",
@@ -117,6 +130,34 @@ const columns: ColumnDef<Node>[] = [
     {
         accessorKey: "version",
         header: "Version",
+    },
+    {
+        // Node CPU consumption as a percentage of its own allocatable (from the cluster
+        // Performance snapshot). Renders the percentage (or an em-dash when usage is
+        // unavailable, e.g. a NotReady node) and sorts by that percentage via compareNodeCpu.
+        id: "cpu",
+        header: "CPU",
+        accessorFn: (row) => nodeUsageFor(usage, row.name).cpuPercent,
+        cell: (info) => (
+            <span data-test-id="node-cpu">{formatPercent(info.getValue<number | null>())}</span>
+        ),
+        sortingFn: (a, b) =>
+            compareNodeCpu(nodeUsageFor(usage, a.original.name), nodeUsageFor(usage, b.original.name)),
+        enableGlobalFilter: false,
+    },
+    {
+        // Node memory consumption as a percentage of its own allocatable (from the cluster
+        // Performance snapshot). Renders the percentage (or an em-dash when usage is
+        // unavailable) and sorts by that percentage via compareNodeMemory.
+        id: "memory",
+        header: "Memory",
+        accessorFn: (row) => nodeUsageFor(usage, row.name).memoryPercent,
+        cell: (info) => (
+            <span data-test-id="node-memory">{formatPercent(info.getValue<number | null>())}</span>
+        ),
+        sortingFn: (a, b) =>
+            compareNodeMemory(nodeUsageFor(usage, a.original.name), nodeUsageFor(usage, b.original.name)),
+        enableGlobalFilter: false,
     },
     {
         id: "age",
@@ -150,7 +191,8 @@ const columns: ColumnDef<Node>[] = [
         // Excluded from the column-config modal: it is an always-hidden filter helper, never shown.
         enableHiding: false,
     },
-];
+    ];
+}
 
 export function NodesTable() {
     const { current } = useKubeContext();
@@ -161,8 +203,22 @@ export function NodesTable() {
         enabled: current !== null,
     });
 
+    // Per-node CPU/memory consumption for the resource columns. Sourced from the
+    // cluster-wide Performance snapshot (the nodes list response carries no usage),
+    // which carries each node's usage and its allocatable so usage can be expressed as
+    // a percentage of the node. Keyed by context. A failed/absent metrics fetch leaves
+    // the map empty, so the columns show em-dashes rather than breaking the table.
+    const { data: performance } = useQuery({
+        queryKey: ["cluster-performance", current],
+        queryFn: () => fetchClusterPerformance(current!),
+        enabled: current !== null,
+    });
+
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
+
+    const usageMap = buildNodeUsageMap(performance?.nodes ?? []);
+    const columns = buildColumns(usageMap);
 
     // The filterable columns the shared editor offers: the Status and Health value
     // columns plus one column per label key present on the loaded nodes.

@@ -154,7 +154,7 @@ test.describe("karse e2e", () => {
         test("shows the default column headers with Roles hidden by default", async () => {
             const table = page.locator("[data-test-id='nodes-table']");
             // Roles is hidden by default (usually "<none>" on real clusters), so it is not shown.
-            for (const name of ["Name", "Status", "Version", "Age"]) {
+            for (const name of ["Name", "Status", "Version", "CPU", "Memory", "Age"]) {
                 await expect(table.getByRole("columnheader", { name, exact: true })).toBeVisible();
             }
             await expect(table.getByRole("columnheader", { name: "Roles", exact: true })).toHaveCount(0);
@@ -224,6 +224,106 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='nodes-stats-total']")).toHaveText("Total: 3");
             await expect(page.locator("[data-test-id='nodes-stats-healthy']")).toHaveText("Healthy: 2");
             await expect(page.locator("[data-test-id='nodes-stats-error']")).toHaveText("Error: 1");
+        });
+    });
+
+    // ── Resource consumption sort (CPU / Memory percentage-of-node columns) ─────
+
+    test.describe("nodes table resource consumption sort", () => {
+        // Three nodes whose CPU and memory consumption (as a percentage of each node's
+        // OWN allocatable) deliberately disagree, so a CPU sort and a memory sort give
+        // different orders and neither can accidentally pass on the other's ordering.
+        // The nodes list carries no usage; usage comes from the cluster Performance
+        // snapshot, so both endpoints are mocked to keep the assertions deterministic.
+        const SORT_NODES = {
+            nodes: [
+                { name: "node-cool", status: "Ready", roles: [], version: "v1.30.0", createdAt: new Date().toISOString(), labels: {} },
+                { name: "node-hot", status: "Ready", roles: [], version: "v1.30.0", createdAt: new Date().toISOString(), labels: {} },
+                { name: "node-notready", status: "NotReady", roles: [], version: "v1.30.0", createdAt: new Date().toISOString(), labels: {} },
+            ],
+        };
+
+        // Each node's percentage is its usage ÷ its OWN allocatable, so differently-sized
+        // nodes are comparable. node-cool has the bigger allocatable but lower CPU share;
+        // node-hot has the smaller allocatable but higher CPU share. CPU ascending order is
+        // node-cool(30%) < node-hot(60%); memory ascending is the OPPOSITE,
+        // node-hot(25%) < node-cool(50%). node-notready has no usage sample, so its
+        // percentages are an em-dash and it sorts to the bottom ascending.
+        const PERFORMANCE = {
+            metricsAvailable: true,
+            nodes: [
+                { name: "node-cool", usage: { cpuMillicores: 300, memoryBytes: 3_000_000_000 }, allocatable: { cpuMillicores: 1000, memoryBytes: 6_000_000_000 } },
+                { name: "node-hot", usage: { cpuMillicores: 1200, memoryBytes: 1_000_000_000 }, allocatable: { cpuMillicores: 2000, memoryBytes: 4_000_000_000 } },
+                { name: "node-notready", usage: { cpuMillicores: null, memoryBytes: null }, allocatable: { cpuMillicores: 1000, memoryBytes: 4_000_000_000 } },
+            ],
+            pods: [],
+        };
+
+        // Reads the name cell of every rendered node row, top to bottom.
+        async function rowNames(): Promise<string[]> {
+            return page.locator("[data-test-id='node-row'] td:first-child").allTextContents();
+        }
+
+        // Clicks a nodes-table header cell by its visible label.
+        async function clickHeader(label: string): Promise<void> {
+            await page.locator("[data-test-id='nodes-table'] thead th").filter({ hasText: label }).click();
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/cluster/nodes*", async (route) => {
+                await route.fulfill({ json: SORT_NODES });
+            });
+            await page.route("**/api/cluster/performance*", async (route) => {
+                await route.fulfill({ json: PERFORMANCE });
+            });
+            await page.goto("/nodes", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='node-row']").first()).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/cluster/nodes*");
+            await page.unroute("**/api/cluster/performance*");
+        });
+
+        test("CPU and Memory columns render each node's usage as a percentage of the node", async () => {
+            await expect(page.locator("[data-test-id='nodes-table'] thead th").filter({ hasText: "CPU" })).toBeVisible();
+            await expect(page.locator("[data-test-id='nodes-table'] thead th").filter({ hasText: "Memory" })).toBeVisible();
+            // Three rows, three CPU cells and three memory cells.
+            await expect(page.locator("[data-test-id='node-cpu']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='node-memory']")).toHaveCount(3);
+            // node-cool uses 300m of its own 1000m allocatable -> 30%, and 3GB of 6GB -> 50%.
+            const coolRow = page.locator("[data-test-id='node-row']").filter({ hasText: "node-cool" });
+            await expect(coolRow.locator("[data-test-id='node-cpu']")).toHaveText("30%");
+            await expect(coolRow.locator("[data-test-id='node-memory']")).toHaveText("50%");
+            // node-hot: 1200m of 2000m -> 60% CPU, 1GB of 4GB -> 25% memory.
+            const hotRow = page.locator("[data-test-id='node-row']").filter({ hasText: "node-hot" });
+            await expect(hotRow.locator("[data-test-id='node-cpu']")).toHaveText("60%");
+            await expect(hotRow.locator("[data-test-id='node-memory']")).toHaveText("25%");
+            // node-notready has no usage sample, so both columns show an em-dash.
+            const notReadyRow = page.locator("[data-test-id='node-row']").filter({ hasText: "node-notready" });
+            await expect(notReadyRow.locator("[data-test-id='node-cpu']")).toHaveText("—");
+            await expect(notReadyRow.locator("[data-test-id='node-memory']")).toHaveText("—");
+        });
+
+        // Numeric columns sort highest-first on the first click (TanStack's default for
+        // numeric values, and the useful default for "which node is most loaded"), then
+        // ascending on the second click. A node with no reading sorts to the bottom
+        // ascending (and so to the top descending, after the real values).
+        test("clicking CPU sorts nodes by CPU percentage, highest first then ascending", async () => {
+            await clickHeader("CPU");
+            expect(await rowNames()).toEqual(["node-hot", "node-cool", "node-notready"]);
+            await clickHeader("CPU");
+            expect(await rowNames()).toEqual(["node-notready", "node-cool", "node-hot"]);
+        });
+
+        test("clicking Memory sorts nodes by memory percentage, highest first then ascending", async () => {
+            await clickHeader("Memory");
+            // Memory order of the metered nodes is the reverse of CPU order for these
+            // fixtures, proving the memory comparator sorts on memory and not on CPU.
+            expect(await rowNames()).toEqual(["node-cool", "node-hot", "node-notready"]);
+            await clickHeader("Memory");
+            expect(await rowNames()).toEqual(["node-notready", "node-hot", "node-cool"]);
         });
     });
 
@@ -4919,8 +5019,8 @@ test.describe("karse e2e", () => {
         }
         const startX = sourceBox.x + sourceBox.width / 2;
         const startY = sourceBox.y + sourceBox.height / 2;
-        const endX = targetBox.x + targetBox.width / 2;
-        const endY = targetBox.y + targetBox.height / 2;
+        let endX = targetBox.x + targetBox.width / 2;
+        let endY = targetBox.y + targetBox.height / 2;
         await page.mouse.move(startX, startY);
         await page.mouse.down();
         // Step the pointer towards the target so dnd-kit starts and tracks the drag.
@@ -4929,6 +5029,23 @@ test.describe("karse e2e", () => {
             const x = startX + ((endX - startX) * step) / steps;
             const y = startY + ((endY - startY) * step) / steps;
             await page.mouse.move(x, y);
+        }
+        // Re-aim at the target's LIVE position before releasing. When the target is a column row,
+        // dnd-kit parks the dragged column at the cursor's insertion point during the drag, which
+        // reflows the list and moves the row from where its box was captured at the start (more so
+        // with more columns present). Reading the live box and re-aiming a few times converges the
+        // cursor onto the row's settled centre, so the drop lands ON the row's slot — exactly what a
+        // real user's cursor would do — rather than in the bare area below it (which would append to
+        // the end). For a section droppable target there is no row to reflow, so this is a harmless
+        // no-op re-read.
+        for (let i = 0; i < 3; i++) {
+            const live = await target.boundingBox();
+            if (live !== null) {
+                endX = live.x + live.width / 2;
+                endY = live.y + live.height / 2;
+            }
+            await page.mouse.move(endX, endY);
+            await page.waitForTimeout(60);
         }
         // A final settle move on the target, then release to drop.
         await page.mouse.move(endX, endY);
@@ -4958,10 +5075,10 @@ test.describe("karse e2e", () => {
         }
         const startX = sourceBox.x + sourceBox.width / 2;
         const startY = sourceBox.y + sourceBox.height / 2;
-        const endX = sectionBox.x + sectionBox.width / 2;
+        let endX = sectionBox.x + sectionBox.width / 2;
         // Aim a little below the last row (still inside the section's padded box) so the cursor sits
         // in the bare area beneath every row; if the section is empty, aim at its centre.
-        const endY = lastRowBox === null
+        let endY = lastRowBox === null
             ? sectionBox.y + sectionBox.height / 2
             : Math.min(lastRowBox.y + lastRowBox.height + 10, sectionBox.y + sectionBox.height - 4);
         await page.mouse.move(startX, startY);
@@ -4971,6 +5088,21 @@ test.describe("karse e2e", () => {
             const x = startX + ((endX - startX) * step) / steps;
             const y = startY + ((endY - startY) * step) / steps;
             await page.mouse.move(x, y);
+        }
+        // Re-aim at the section's LIVE bare area before releasing. Parking the dragged column in the
+        // destination during the drag grows the section and reflows its rows, so the end landing spot
+        // captured before the drag is stale (more so with more columns present). Aim at the live
+        // section's bottom edge (just inside its padding, past every row) so the drop lands in the
+        // bare area — the END — rather than on a row; reading the live box a few times lets the layout
+        // settle under the cursor, as a real user's cursor would track it.
+        for (let i = 0; i < 3; i++) {
+            const liveSection = await section.boundingBox();
+            if (liveSection !== null) {
+                endX = liveSection.x + liveSection.width / 2;
+                endY = liveSection.y + liveSection.height - 4;
+            }
+            await page.mouse.move(endX, endY);
+            await page.waitForTimeout(60);
         }
         await page.mouse.move(endX, endY);
         await page.mouse.up();

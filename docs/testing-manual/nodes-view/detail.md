@@ -47,6 +47,7 @@ Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stand
 ### What to check
 - **Overview tiles**: node count shows `20`.
 - **Sort**: click each column header and confirm rows reorder; click again to reverse.
+- **CPU / Memory columns**: the table has **CPU** and **Memory** columns. On a metrics-less cluster (plain kwok, as this fixture is) every node shows an em-dash (`—`) in both, since there is no usage to take a percentage of. To see real percentages and sorting, use Scenario H below.
 - **Search**: type a partial node name (e.g. `07`) and confirm only matching rows appear. Type a string that matches nothing and confirm the "no nodes match" empty state appears (distinct from the "No nodes." zero-data state).
 - **Refresh**: click the header refresh button and confirm all 20 rows reload.
 
@@ -132,6 +133,27 @@ Reuses the mixed-statuses fixture: a Ready node, a NotReady node, and a cordoned
 - **Check only Healthy**: untick `Error`, then tick `Healthy`. Only the two Ready nodes (`fake-node-ready`, `fake-node-cordoned`) remain and the button reads `Filter: 1 selected`.
 - **Deselect all**: open the editor and click **Deselect all**: the selection clears, all three rows return, and the button reads `Filter: All`.
 - The Health values combine with the search box and the Status values: a row must pass all active filters to show.
+
+## Scenario H: CPU / Memory consumption columns (percentage of node) and sort
+
+The **CPU** and **Memory** columns show each node's consumption **as a percentage of that node** (node usage ÷ that node's allocatable, e.g. `8%`), and each sorts by that percentage. A real metrics-server is required for non-em-dash values; this scenario uses `KARSE_FAKE_METRICS=1` so the backend serves canned per-node usage (matching `fake-node-1`/`fake-node-2`) without one, against a plain kwok cluster.
+
+This scenario starts the app itself (do not use the `bun run dev` at the top of this doc). Stand up the two-node fixture, then start Karse with fake metrics:
+
+**Fixture:** [_fixtures-kwok/01-empty-cluster-two-nodes](../_fixtures-kwok/01-empty-cluster-two-nodes/)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/01-empty-cluster-two-nodes/setup.sh
+KARSE_FAKE_METRICS=1 bun run dev
+```
+
+Then open `http://127.0.0.1:5173`, select the `kwok-karse-test` context, and go to the **Nodes** page (`/nodes`).
+
+### What to check
+- **Columns**: the table has a **CPU** column and a **Memory** column, each showing a percentage (e.g. `42%`) for `fake-node-1` and `fake-node-2` — a percentage of that node, not absolute millicores/bytes.
+- **CPU sort**: click the **CPU** header. Rows reorder by CPU percentage, highest first; click again to reverse to ascending.
+- **Memory sort**: click the **Memory** header. Rows reorder by memory percentage; confirm the order reflects memory, independent of the CPU order.
+- **Em-dash**: stop the app and restart it **without** `KARSE_FAKE_METRICS=1` (plain `bun run dev`). With no metrics-server on this kwok cluster, both columns show an em-dash (`—`) for every node, since there is no usage to take a percentage of. Such nodes sort to the bottom of the ascending order.
 
 Teardown each cluster you stood up while testing this doc:
 
