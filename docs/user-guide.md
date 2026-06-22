@@ -121,17 +121,9 @@ Click a column header to sort; type in the search box to filter rows. Use the **
 
 ### Node detail Performance tab
 
-A node's detail page has a **Performance** tab showing the node's point-in-time CPU and memory usage, scoped to that one node. A **CPU / Memory** toggle at the top selects which metric the views show (CPU by default). The tab is split into two **subtabs** (Breakdown is shown first):
+A node's detail page has a **Performance** tab showing the node's point-in-time CPU and memory usage, scoped to that one node. A **CPU / Memory** toggle at the top selects which metric the view shows (CPU by default). The tab is a single **Breakdown** treemap: the node's usage drilled namespace → pod, with each pod box sized by the pod's share of the node (pod usage ÷ node allocatable) for the selected metric and coloured green→amber→red by how close it is to its limit. Hover a box to see a tooltip with its label and figure; click a box to open the owning pod's detail page on its Performance tab. The view is read-only.
 
-- **Breakdown** (treemap): the node's usage broken down namespace → pod → container, each rectangle sized by the container's usage for the selected metric and coloured green→amber→red by how close it is to its limit. Hover a rectangle to see a tooltip with its label and its usage for the selected metric (CPU in m/cores, memory in Mi/Gi); click a rectangle to open the owning pod's detail page on its Performance tab.
-- **Provisioning** (table): one row per container on the node, each with overlaid **Usage**, **Request**, and **Limit** bars (on a shared per-row scale) and the formatted figures alongside, so over- and under-provisioning is easy to spot. The table is:
-  - **Searchable:** a **Search containers...** box narrows the rows by namespace / pod / container name.
-  - **Sortable:** click a column header to sort by it.
-  - **Filterable:** a **pod picker** (the same searchable Pod filter used on the Logs page) narrows the rows to the pods you tick; with nothing ticked, its own search box acts as a pod-name filter.
-
-  The view is read-only.
-
-If the cluster has no Metrics API, the Breakdown subtab shows a short note pointing you at the Provisioning subtab, and on Provisioning the Usage bars read em-dash with empty bars while the Request and Limit bars still render from the pod specs.
+If the cluster has no Metrics API, the Breakdown treemap needs live usage it cannot get, so the tab shows a short note in place of the treemap explaining the share of the node cannot be computed.
 
 ### Pod detail Performance tab
 

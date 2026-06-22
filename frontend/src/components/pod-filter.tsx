@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
     Box,
     Button,
+    Divider,
     TextField,
     Typography,
     Checkbox,
@@ -10,7 +11,7 @@ import {
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMagnifyingGlass, faChevronDown } from "@fortawesome/free-solid-svg-icons";
-import { filterPods } from "../lib/filter-pods";
+import { filterPods, orderPods } from "../lib/filter-pods";
 import type { Pod } from "karse-types";
 
 // Props for the shared Pod filter. `pods` are the pods to choose from; `search`
@@ -31,13 +32,16 @@ type PodFilterProps = {
     testIdPrefix: string;
 };
 
-// The shared, searchable pod picker used by the Logs page and the node
-// Provisioning subtab. Clicking the trigger drops a search box and a filterable
-// checkbox list of pods below it as an overlay; ticking pods narrows whatever the
-// consumer scopes by them, and the search box filters the list (and, with nothing
-// ticked, doubles as a free-text pod-name filter the consumer can read). This is
-// the single component both call sites use, so the picker behaves identically in
-// both places.
+// The single, shared, searchable pod picker used everywhere pods can be selected
+// (currently the Logs page). Clicking the trigger drops, top to bottom: the search
+// box, a header row with the "N selected" count and a Clear button, then a
+// scrollable checkbox list of pods, all as an overlay. The count and Clear sit in
+// the header above the list (not a footer) so they stay visible however long the
+// list grows. Ticking pods narrows whatever the consumer scopes by them, and the
+// search box filters the list (and, with nothing ticked, doubles as a free-text
+// pod-name filter the consumer can read). The list is ordered selected-first then
+// unselected, each group alphanumerical, with a divider between the two groups (drawn
+// only when both are non-empty), so the current selection is easy to find at the top.
 export function PodFilter({
     pods,
     search,
@@ -54,7 +58,17 @@ export function PodFilter({
 
     // The list is narrowed to pods matching the search box. When pods are
     // explicitly ticked the search box is disabled, so the full list shows.
-    const visiblePods = selectedPods.length > 0 ? pods : filterPods(pods, search);
+    // The result is ordered selected-first then unselected, each group sorted
+    // alphanumerically, so the current selection is easy to see at the top.
+    const filteredPods = selectedPods.length > 0 ? pods : filterPods(pods, search);
+    const visiblePods = orderPods(filteredPods, selectedPods);
+
+    // How many of the visible pods are ticked: the selected group occupies the
+    // first `selectedVisibleCount` rows, the unselected group the rest.
+    const selectedVisibleCount = visiblePods.filter((pod) => selectedPods.includes(pod.name)).length;
+    // Draw the group divider only when both groups are non-empty (no stray line
+    // when nothing is ticked, or when every visible pod is ticked).
+    const showDivider = selectedVisibleCount > 0 && selectedVisibleCount < visiblePods.length;
 
     return (
         <Box data-test-id={`${testIdPrefix}-pod-picker`}>
@@ -100,33 +114,6 @@ export function PodFilter({
                     }}
                 />
 
-                <Box
-                    data-test-id={`${testIdPrefix}-pod-list`}
-                    sx={{ maxHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column" }}
-                >
-                    {visiblePods.length === 0 ? (
-                        <Typography variant="caption" color="text.secondary" sx={{ p: 0.5 }}>
-                            No pods match.
-                        </Typography>
-                    ) : (
-                        visiblePods.map((pod) => (
-                            <FormControlLabel
-                                key={`${pod.namespace}/${pod.name}`}
-                                data-test-id={`${testIdPrefix}-pod-option`}
-                                control={
-                                    <Checkbox
-                                        size="small"
-                                        checked={selectedPods.includes(pod.name)}
-                                        onChange={() => onTogglePod(pod.name)}
-                                        data-test-id={`${testIdPrefix}-pod-checkbox`}
-                                    />
-                                }
-                                label={<Typography variant="body2">{pod.name}</Typography>}
-                            />
-                        ))
-                    )}
-                </Box>
-
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <Typography variant="caption" color="text.secondary" data-test-id={`${testIdPrefix}-selected-count`}>
                         {selectedPods.length} selected
@@ -139,6 +126,37 @@ export function PodFilter({
                     >
                         Clear
                     </Button>
+                </Box>
+
+                <Box
+                    data-test-id={`${testIdPrefix}-pod-list`}
+                    sx={{ maxHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column" }}
+                >
+                    {visiblePods.length === 0 ? (
+                        <Typography variant="caption" color="text.secondary" sx={{ p: 0.5 }}>
+                            No pods match.
+                        </Typography>
+                    ) : (
+                        visiblePods.map((pod, index) => (
+                            <Box key={`${pod.namespace}/${pod.name}`}>
+                                {showDivider && index === selectedVisibleCount && (
+                                    <Divider data-test-id={`${testIdPrefix}-pod-group-divider`} sx={{ my: 0.5 }} />
+                                )}
+                                <FormControlLabel
+                                    data-test-id={`${testIdPrefix}-pod-option`}
+                                    control={
+                                        <Checkbox
+                                            size="small"
+                                            checked={selectedPods.includes(pod.name)}
+                                            onChange={() => onTogglePod(pod.name)}
+                                            data-test-id={`${testIdPrefix}-pod-checkbox`}
+                                        />
+                                    }
+                                    label={<Typography variant="body2">{pod.name}</Typography>}
+                                />
+                            </Box>
+                        ))
+                    )}
                 </Box>
             </Popover>
         </Box>

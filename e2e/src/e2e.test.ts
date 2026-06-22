@@ -4036,6 +4036,55 @@ test.describe("karse e2e", () => {
             await closePicker();
         });
 
+        test("checked pods move to the top of the list, with a divider before the rest", async () => {
+            // The two fake pods sort nginx-abc, redis-xyz alphabetically. With
+            // nothing checked there is a single ordered group and no divider.
+            await openPicker();
+            let options = page.locator("[data-test-id='live-logs-pod-option']");
+            await expect(options.nth(0)).toContainText("nginx-abc");
+            await expect(options.nth(1)).toContainText("redis-xyz");
+            await expect(page.locator("[data-test-id='live-logs-pod-group-divider']")).toHaveCount(0);
+
+            // Check the alphabetically-later pod: it jumps to the top group and a
+            // divider appears between it and the remaining unselected pod.
+            await page.locator("[data-test-id='live-logs-pod-list'] [data-test-id='live-logs-pod-option']", { hasText: "redis-xyz" })
+                .locator("input").check();
+            options = page.locator("[data-test-id='live-logs-pod-option']");
+            await expect(options.nth(0)).toContainText("redis-xyz");
+            await expect(options.nth(1)).toContainText("nginx-abc");
+            await expect(page.locator("[data-test-id='live-logs-pod-group-divider']")).toHaveCount(1);
+
+            // The divider sits between the selected pod and the first unselected pod.
+            const dividerBox = await page.locator("[data-test-id='live-logs-pod-group-divider']").boundingBox();
+            const selectedBox = await options.nth(0).boundingBox();
+            const unselectedBox = await options.nth(1).boundingBox();
+            expect(dividerBox!.y).toBeGreaterThan(selectedBox!.y);
+            expect(dividerBox!.y).toBeLessThan(unselectedBox!.y);
+
+            // Checking the other pod too: every visible pod is selected, so the
+            // divider disappears (no stray line when one group is empty).
+            await page.locator("[data-test-id='live-logs-pod-list'] [data-test-id='live-logs-pod-option']", { hasText: "nginx-abc" })
+                .locator("input").check();
+            await expect(page.locator("[data-test-id='live-logs-pod-group-divider']")).toHaveCount(0);
+
+            await page.locator("[data-test-id='live-logs-clear']").click();
+            await expect(page.locator("[data-test-id='live-logs-selected-count']")).toHaveText("0 selected");
+            await closePicker();
+        });
+
+        test("the selected count and Clear sit above the pod list, not below it", async () => {
+            // Regression: with many pods the old footer count/Clear were pushed off
+            // the bottom of the list. They now sit in a header row above the list,
+            // so they stay visible however long the list grows.
+            await openPicker();
+            const countBox = await page.locator("[data-test-id='live-logs-selected-count']").boundingBox();
+            const clearBox = await page.locator("[data-test-id='live-logs-clear']").boundingBox();
+            const listBox = await page.locator("[data-test-id='live-logs-pod-list']").boundingBox();
+            expect(countBox!.y).toBeLessThan(listBox!.y);
+            expect(clearBox!.y).toBeLessThan(listBox!.y);
+            await closePicker();
+        });
+
         test("checking a pod sends it as an explicit pods selection", async () => {
             await openPicker();
             await page.locator("[data-test-id='live-logs-pod-list'] [data-test-id='live-logs-pod-option']", { hasText: "redis-xyz" })

@@ -1,5 +1,5 @@
 import type { Pod } from "karse-types";
-import { filterPods } from "../../lib/filter-pods";
+import { filterPods, orderPods } from "../../lib/filter-pods";
 
 // Builds a Pod fixture with the given name; other fields are realistic but
 // irrelevant to the name-based filter under test.
@@ -57,5 +57,53 @@ describe("filterPods", () => {
     test("an empty pod list stays empty regardless of query", () => {
         expect(filterPods([], "nginx")).toEqual([]);
         expect(filterPods([], "")).toEqual([]);
+    });
+});
+
+describe("orderPods", () => {
+    const names = (pods: Pod[]) => pods.map((p) => p.name);
+
+    test("puts selected pods first, then unselected", () => {
+        const pods = [makePod("alpha"), makePod("beta"), makePod("gamma")];
+        expect(names(orderPods(pods, ["gamma"]))).toEqual(["gamma", "alpha", "beta"]);
+    });
+
+    test("sorts each group alphanumerically and independently", () => {
+        const pods = [makePod("redis"), makePod("alpha"), makePod("nginx"), makePod("beta")];
+        // alpha + nginx selected -> they sort within their own group, then the
+        // unselected beta + redis sort within theirs.
+        expect(names(orderPods(pods, ["nginx", "alpha"]))).toEqual(["alpha", "nginx", "beta", "redis"]);
+    });
+
+    test("orders number-aware so pod-2 precedes pod-10", () => {
+        const pods = [makePod("pod-10"), makePod("pod-2"), makePod("pod-1")];
+        expect(names(orderPods(pods, []))).toEqual(["pod-1", "pod-2", "pod-10"]);
+    });
+
+    test("sorts case-insensitively", () => {
+        const pods = [makePod("Zeta"), makePod("alpha"), makePod("Beta")];
+        expect(names(orderPods(pods, []))).toEqual(["alpha", "Beta", "Zeta"]);
+    });
+
+    test("with nothing selected, returns one alphanumerical group", () => {
+        const pods = [makePod("redis"), makePod("nginx"), makePod("api")];
+        expect(names(orderPods(pods, []))).toEqual(["api", "nginx", "redis"]);
+    });
+
+    test("with everything selected, returns one alphanumerical group", () => {
+        const pods = [makePod("redis"), makePod("nginx"), makePod("api")];
+        expect(names(orderPods(pods, ["redis", "nginx", "api"]))).toEqual(["api", "nginx", "redis"]);
+    });
+
+    test("does not mutate the input array", () => {
+        const pods = [makePod("redis"), makePod("alpha")];
+        const before = names(pods);
+        orderPods(pods, ["redis"]);
+        expect(names(pods)).toEqual(before);
+    });
+
+    test("an empty pod list stays empty", () => {
+        expect(orderPods([], [])).toEqual([]);
+        expect(orderPods([], ["ghost"])).toEqual([]);
     });
 });

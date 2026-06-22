@@ -33,11 +33,19 @@ One node, three pods (`nginx-one`, `nginx-two`, `redis-main`).
 - A pod picker: a "Search pods..." button (the dropdown trigger). The pod list is not shown until you open it.
 
 ### The pod picker is a searchable, multi-select dropdown
+- This is the single shared pod picker (`PodFilter`) used everywhere pods can be selected; there is no separate per-page selector.
 - Initially the picker is collapsed: only the "Search pods..." trigger button is shown, with no pod list expanded on the page.
-- Click the trigger. A dropdown drops DOWN below it as an overlay, holding (top to bottom): a "Search pods..." input, a checkbox list of `nginx-one`, `nginx-two`, and `redis-main`, and a "N selected" count next to a "Clear" button.
+- Click the trigger. A dropdown drops DOWN below it as an overlay, holding (top to bottom): a "Search pods..." input, an "N selected" count next to a "Clear" button, and a checkbox list of `nginx-one`, `nginx-two`, and `redis-main`.
+- The "N selected" count and the "Clear" button sit in a header row directly above the checkbox list (not below it). Only the pod list scrolls, so the count and Clear stay visible however long the list is.
 - Type `nginx` into the "Search pods..." input. The checkbox list narrows to `nginx-one` and `nginx-two`; `redis-main` disappears. Clear the input and all three return.
 - The "N selected" count and the "Clear" button sit inside the same dropdown as the search input and checkbox list, not floating on the page.
 - Click outside the dropdown (or press Escape). It collapses again, leaving only the trigger. When pods are checked the trigger reads "N pod(s) selected"; with a search typed it reads "Search: <text>".
+
+### Selected pods sort to the top, with a divider
+- Open the picker with nothing checked. The three pods are listed in one alphanumerical group (`nginx-one`, `nginx-two`, `redis-main`), with no divider line.
+- Check `redis-main`. It immediately jumps to the top of the list (the selected group), above the unchecked `nginx-one` and `nginx-two`, and a divider line appears between it and the unchecked pods.
+- Check `nginx-two` as well. Both checked pods sit at the top in alphanumerical order (`nginx-two`, `redis-main`), then the divider, then the remaining unchecked `nginx-one`.
+- Check the last pod so every pod is selected. The divider disappears (one group again). Press "Clear": all pods return to one alphanumerical group with no divider.
 
 ### Streaming requires picking pods first
 - Streaming every pod at once is not supported, so the page makes you scope the stream first.
