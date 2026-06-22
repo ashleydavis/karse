@@ -18,22 +18,6 @@
 import type { NodeUsage, PodUsage } from "karse-types";
 import { type PodUsageMap, podUsageKey, usagePercent } from "./pod-resource-sort";
 
-// Re-export the shared lookup/comparator/format helpers so the node detail page can
-// import everything it needs for the resource columns from one module, and so the
-// node table and the main pods table provably share the same calculation, sort
-// order, and rendering.
-export {
-    type PodResourceUsage,
-    type PodUsageMap,
-    podUsageKey,
-    podUsageFor,
-    usagePercent,
-    compareUsageValue,
-    comparePodCpu,
-    comparePodMemory,
-    formatPercent,
-} from "./pod-resource-sort";
-
 // Builds the namespace/name -> node-share lookup for one node's pods. Each pod's CPU
 // and memory usage (from the node Performance snapshot) is divided by the node's
 // allocatable to give its share of the node; a missing usage sample or a missing

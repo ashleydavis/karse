@@ -1,11 +1,11 @@
 import type { NodeUsage, PodUsage } from "karse-types";
+import { buildNodePodUsageMap } from "../../lib/node-pod-usage";
 import {
-    buildNodePodUsageMap,
     podUsageFor,
     comparePodCpu,
     comparePodMemory,
     formatPercent,
-} from "../../lib/node-pod-usage";
+} from "../../lib/pod-resource-sort";
 
 // Builds a PodUsage fixture carrying only the fields the node usage map reads
 // (namespace, name, usage), plus the structurally required node/requests/limits/

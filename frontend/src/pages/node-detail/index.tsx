@@ -40,14 +40,14 @@ import { ResourceRef } from "../../components/resource-ref";
 import { NodePerformanceTab } from "../../components/performance/node-performance-tab";
 import { NodeResourceIndicator } from "../../components/performance/node-resource-indicator";
 import { tableRowSx } from "../../lib/table-row-style";
+import { buildNodePodUsageMap } from "../../lib/node-pod-usage";
 import {
-    buildNodePodUsageMap,
     podUsageFor,
     comparePodCpu,
     comparePodMemory,
     formatPercent,
     type PodUsageMap,
-} from "../../lib/node-pod-usage";
+} from "../../lib/pod-resource-sort";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
