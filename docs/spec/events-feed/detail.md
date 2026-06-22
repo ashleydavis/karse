@@ -12,7 +12,7 @@ Backed by: `GET /api/events`, `backend/src/routes/events-route.ts`, `backend/src
 - Each `ClusterEvent` has `uid` (metadata.uid; the stable identifier the detail route uses), `type` (Normal/Warning), `reason`, `message`, `count`, `source` (the reporting component, e.g. `kubelet`, from `source.component` falling back to `reportingComponent`; `""` when unknown), `firstSeen` (ISO; first occurrence, `""` when unknown), `lastSeen` (ISO; the UI computes age), `namespace`, `objectKind` (involvedObject.kind), and `objectName`. The richer `objectKind`/`objectName`/`namespace` fields let events from many resources be shown in one table.
 - Events are sorted newest-first by `lastSeen`.
 - The table is sortable and searchable (see `resource-search`).
-- The table declares its `type` column filterable in the shared column-filter editor (see `resource-search`), so the single "Filter" dropdown beside the search box offers a **Type** group listing the event types (`Warning`, `Normal`). It shows every event by default (nothing checked); checking one or more types narrows the table to just those types. A "Deselect all" control clears the selection, restoring the show-all default. The button reads "Filter: All" / "Filter: N selected". The filter is a frontend-only concern (a TanStack column filter); `GET /api/events` is unchanged. Backed by `frontend/src/components/table-filter.tsx` and `frontend/src/lib/table-filter-state.ts`.
+- The table declares its `type` column filterable in the shared column-filter editor (see `resource-search`), so the single "Filter" dropdown beside the search box offers a **Type** group listing the event types (`Warning`, `Normal`). It shows every event by default (nothing checked); checking one or more types narrows the table to just those types. A "Clear" control clears the selection, restoring the show-all default. The button reads "Filter: All" / "Filter: N selected". The filter is a frontend-only concern (a TanStack column filter); `GET /api/events` is unchanged. Backed by `frontend/src/components/table-filter.tsx` and `frontend/src/lib/table-filter-state.ts`.
 - Each row is clickable (the standard `clickable-resource-rows` affordance) and navigates to the event detail page `/events/:uid`. See `event-detail`.
 
 ## Acceptance Criteria
@@ -21,7 +21,7 @@ Backed by: `GET /api/events`, `backend/src/routes/events-route.ts`, `backend/src
 - [x] Each event reports type, reason, message, count, last-seen, and the involved object (kind, name, namespace).
 - [x] Events are sorted newest-first by last-seen.
 - [x] The table is sortable and searchable.
-- [x] The table has a type-filter dropdown listing the event types; nothing checked shows all events, and checking types narrows to just those. A "Deselect all" control clears the selection back to showing all.
+- [x] The table has a type-filter dropdown listing the event types; nothing checked shows all events, and checking types narrows to just those. A "Clear" control clears the selection back to showing all.
 
 ## Open Questions
 

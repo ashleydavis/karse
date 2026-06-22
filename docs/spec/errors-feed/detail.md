@@ -13,7 +13,7 @@ Backed by: `GET /api/errors`, `backend/src/routes/errors-route.ts`, `backend/src
 - Each `ClusterError` has `source` (`Event` | `Pod`), `namespace`, `objectKind`, `objectName`, `reason`, `message`, `count`, `firstSeen`, and `lastSeen`. `firstSeen` is the event's `firstTimestamp` (or the pod's `creationTimestamp`); `lastSeen` is the event's `lastTimestamp` (or the pod's start time).
 - Warning events become `source: "Event"` rows. Pods are flagged as `source: "Pod"` when a container is in a known problem state (CrashLoopBackOff, ImagePullBackOff, ErrImagePull, CreateContainerConfigError, CreateContainerError, InvalidImageName, RunContainerError, Error, ContainerCannotRun, OOMKilled, ...) or the pod phase is Failed/Unknown.
 - Rows are sorted newest-first by `lastSeen`. The table is sortable and searchable (see `resource-search`).
-- The table declares its `reason` column filterable in the shared column-filter editor (see `resource-search`), so the single "Filter" dropdown beside the search box offers a **Reason** group listing the distinct error types present, one checkbox each, in alphabetical order. Include semantics: with nothing checked (the default) every error shows; checking one or more reasons narrows the table to errors of those reasons. A "Deselect all" control clears the selection. The button reads "Filter: All" when nothing is checked and "Filter: N selected" otherwise. The filter composes with the search box and column sorting.
+- The table declares its `reason` column filterable in the shared column-filter editor (see `resource-search`), so the single "Filter" dropdown beside the search box offers a **Reason** group listing the distinct error types present, one checkbox each, in alphabetical order. Include semantics: with nothing checked (the default) every error shows; checking one or more reasons narrows the table to errors of those reasons. A "Clear" control clears the selection. The button reads "Filter: All" when nothing is checked and "Filter: N selected" otherwise. The filter composes with the search box and column sorting.
 
 ### Error detail page
 
@@ -32,7 +32,7 @@ Backed by: `GET /api/errors`, `backend/src/routes/errors-route.ts`, `backend/src
 - [x] The table is sortable and searchable.
 - [x] A type-filter dropdown lists the error types present, one checkbox each.
 - [x] Checking one or more types narrows the table to those types; the default (nothing checked) shows all errors.
-- [x] A "Deselect all" control clears the selection, restoring the show-all default.
+- [x] A "Clear" control clears the selection, restoring the show-all default.
 - [x] Each error row is clickable and navigates to a per-error detail page (`/errors/:index`).
 - [x] The detail page shows every table field (source, object, reason, namespace, count, age) plus the full untruncated message.
 - [x] The detail page shows the first-seen and last-seen times.

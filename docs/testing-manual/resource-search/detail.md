@@ -69,11 +69,23 @@ Every resource table has one shared filter editor (the same `table-filter.tsx` c
 Behaviour:
 - Nothing ticked = filter off, every row shows; the button reads **Filter: All**. The filter activates on the first tick, and the button then reads **Filter: N selected** (N = total ticked across all columns).
 - Within one column the ticked values are OR'd; across columns they are AND'd. A selection that matches no rows shows the table's no-match message.
-- A **Deselect all** control at the top clears every selection at once (back to showing everything); it is greyed out when nothing is selected.
+- A **Clear** control at the top clears every selection at once (back to showing everything); it is greyed out when nothing is selected.
 - A **search input** filters the shown options: a query matching a column name keeps that whole column, otherwise only the matching values survive (columns with no match drop out); a query matching nothing shows "No matching filters".
+- **Multi-column layout**: the value checkboxes fill the editor's width. Within each group the options flow in horizontal rows that wrap into multiple columns, so a group with many values fans out sideways, the whitespace beside small groups is used, and every checkbox and label stays visible without scrolling offscreen. When the groups and options together exceed the editor's capped height, the body scrolls and shows a scrollbar.
 - It composes with the search box: a row must satisfy all active filters and the search.
 
 See the dedicated scenarios: pods status/health in [pods-view](../pods-view/detail.md) (Scenario E), nodes status/health in [nodes-view](../nodes-view/detail.md) (Scenario G).
+
+#### Multi-column layout (many values)
+
+Use a table/column with many distinct values, e.g. the Pods page with a namespace that has many pods carrying distinct `app` label values, or the **Namespace** group on a cluster with many namespaces. Open the **Filter** editor and look at a group with many values:
+
+- The value checkboxes are arranged across **multiple columns** that **fill the editor's width**, not one long single column. The options flow in horizontal rows that wrap, so small groups (Status, Health) no longer leave a wide empty margin on the right.
+- All checkboxes and their labels are **visible at once without scrolling offscreen** (the options fan out sideways and wrap into further columns; the menu stays within the screen width).
+- When there are enough groups/values to exceed the editor's height, a **scrollbar is visible** on the editor body, and scrolling reveals the rest.
+- Ticking an option in any column toggles its value exactly as before, and **Clear**, the option search, and the OR-within / AND-across behaviour are unchanged.
+
+Check this in both **light and dark mode**.
 
 Teardown the fuzzy-search fixture, then stand up the labels fixture below:
 
@@ -93,12 +105,12 @@ Teardown the fuzzy-search fixture, then stand up the labels fixture below:
 Open the **Pods page** (default namespace). Two pods are present: `web-pod` (labels `app=web`, `tier=frontend`) and `db-pod` (label `app=db`).
 
 - **Default**: both pods show; the **Filter** button reads `Filter: All`.
-- **Lists keys**: click the **Filter** button. Below the search input and Deselect all, the editor lists the `app` and `tier` label groups, each with its values as checkboxes (alongside the Status and Health groups).
+- **Lists keys**: click the **Filter** button. Below the search input and Clear, the editor lists the `app` and `tier` label groups, each with its values as checkboxes (alongside the Status and Health groups).
 - **Filter by value**: tick `app` → `web`. Only `web-pod` remains; the button reads `Filter: 1 selected`.
 - **OR within a key**: also tick `app` → `db`. Both pods reappear (the table shows any pod whose `app` is `web` or `db`); the button reads `Filter: 2 selected`.
 - **AND across keys**: with `app` still on `web` and `db`, tick `tier` → `frontend`. Only `web-pod` remains (it is the only pod that is both in the app set and `tier=frontend`).
 - **Search the options**: type `tier` in the editor's search input; only the `tier` group remains. Type a value like `web`; only matching options remain. Clear the search to restore the full list.
-- **Deselect all**: click "Deselect all" at the top of the editor. Every selection clears, both pods show again, and the button reads `Filter: All`.
+- **Clear**: click "Clear" at the top of the editor. Every selection clears, both pods show again, and the button reads `Filter: All`.
 
 Repeat a value filter on the **Deployments page** (or another workload table) to confirm the same editor works on the other resource kinds.
 

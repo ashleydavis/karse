@@ -3484,7 +3484,9 @@ test.describe("karse e2e", () => {
 
         test("deselect all clears the selection and restores every pod", async () => {
             await page.locator("[data-test-id='pods-filter-button']").click();
-            // Make a selection first so Deselect all is enabled, then clear it.
+            // The control is labelled "Clear" (the app-wide standard wording for this action).
+            await expect(page.locator("[data-test-id='pods-filter-deselect-all']")).toHaveText("Clear");
+            // Make a selection first so the Clear control is enabled, then clear it.
             await page.locator("[data-test-id='pods-filter-item-phase-Running']").click();
             await page.locator("[data-test-id='pods-filter-deselect-all']").click();
             await page.keyboard.press("Escape");
@@ -5756,6 +5758,125 @@ test.describe("karse e2e", () => {
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(3);
             await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: All");
+        });
+    });
+
+    // ── Pods page: filter editor multi-column layout ────────────────────────────
+
+    test.describe("pods page filter editor multi-column layout", () => {
+        // Many pods, each carrying a distinct `app` label value, so the editor's
+        // `app` group has far more options than fit in a single column. This is the
+        // many-values case that used to run the checkboxes off the bottom of the
+        // screen; they must now fan out across multiple columns.
+        const APP_VALUES = [
+            "alpha", "bravo", "charlie", "delta", "echo", "foxtrot",
+            "golf", "hotel", "india", "juliet", "kilo", "lima",
+            "mike", "november", "oscar", "papa",
+        ];
+        const MANY_VALUE_PODS = {
+            pods: APP_VALUES.map((app) => ({
+                name: `${app}-pod`,
+                namespace: "default",
+                phase: "Running",
+                ready: "1/1",
+                containerCount: 1,
+                restarts: 0,
+                node: "node-worker",
+                createdAt: new Date().toISOString(),
+                labels: { app },
+            })),
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: MANY_VALUE_PODS });
+            });
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']").first()).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+            setContext(CLUSTER_1);
+        });
+
+        test("a group with many values lays its options out across multiple columns, filling the width", async () => {
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            const grid = page.locator("[data-test-id='pods-filter-options-label:app']");
+            await expect(grid).toBeVisible();
+
+            // Every one of the many label values has a rendered, visible option.
+            const items = grid.locator("[data-test-id^='pods-filter-item-label:app-']");
+            await expect(items).toHaveCount(APP_VALUES.length);
+            for (let i = 0; i < APP_VALUES.length; i++) {
+                await expect(items.nth(i)).toBeVisible();
+            }
+
+            // Read each option's top-left corner so the layout can be inspected.
+            const corners = await items.evaluateAll((els) =>
+                els.map((el) => {
+                    const r = el.getBoundingClientRect();
+                    return { left: Math.round(r.left), top: Math.round(r.top) };
+                }),
+            );
+
+            // The options span more than one column: distinct left edges mean
+            // distinct columns. A single-column layout would yield exactly one.
+            const distinctLefts = new Set(corners.map((c) => c.left));
+            expect(distinctLefts.size).toBeGreaterThan(1);
+
+            // The row-flow fills the width: with several columns the group's height
+            // is far shorter than 16 single-column rows would be, so the checkboxes
+            // do not run down and off the screen the way the old single-column
+            // layout did.
+            const distinctTops = new Set(corners.map((c) => c.top));
+            const distinctColumns = distinctLefts.size;
+            const expectedRows = Math.ceil(APP_VALUES.length / distinctColumns);
+            expect(distinctTops.size).toBeLessThanOrEqual(expectedRows);
+            expect(distinctTops.size).toBeLessThan(APP_VALUES.length);
+
+            // The grid uses the editor's width, not a narrow single column: it is
+            // wider than one option cell. The columns consume the horizontal space
+            // beside the group rather than leaving a wide empty margin.
+            const gridBox = await grid.boundingBox();
+            expect(gridBox).not.toBeNull();
+            const oneItemBox = await items.first().boundingBox();
+            expect(oneItemBox).not.toBeNull();
+            expect(gridBox!.width).toBeGreaterThan(oneItemBox!.width * 1.5);
+            await page.keyboard.press("Escape");
+        });
+
+        test("the editor body shows a scrollbar when its content overflows", async () => {
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            const body = page.locator("[data-test-id='pods-filter-body']");
+            await expect(body).toBeVisible();
+            // The many-value fixture produces enough groups/options that the body's
+            // content exceeds its capped height, so it scrolls: the scrollHeight
+            // exceeds the visible clientHeight and the element is a scroll
+            // container (overflow-y resolves to auto/scroll).
+            const overflow = await body.evaluate((el) => ({
+                scrollable: el.scrollHeight > el.clientHeight,
+                overflowY: getComputedStyle(el).overflowY,
+            }));
+            expect(overflow.scrollable).toBe(true);
+            expect(["auto", "scroll"]).toContain(overflow.overflowY);
+            await page.keyboard.press("Escape");
+        });
+
+        test("the multi-column options still toggle the filter normally", async () => {
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            // An option in what is necessarily a later column still toggles its value.
+            await page.locator("[data-test-id='pods-filter-item-label:app-papa']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("papa-pod");
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: 1 selected");
+            // Clear so the suite leaves the editor as it found it.
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            await page.locator("[data-test-id='pods-filter-deselect-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(APP_VALUES.length);
         });
     });
 

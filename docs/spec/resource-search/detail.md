@@ -30,8 +30,9 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/errors-search.t
   - **One group per label key** present on the loaded rows. Under each key are its distinct values. Keys and values are sorted for a stable order.
 - Selecting values narrows the rows: within one column the ticked values are OR'd; across columns the per-column results are AND'd (a row must satisfy every column that has any value ticked).
 - An empty selection means the filter is off and every row shows; the button reads "Filter: All". The filter activates on the first tick; with any values ticked the button reads "Filter: N selected", where N is the total ticked across all columns.
-- A "Deselect all" control at the top clears every selection at once, returning to showing everything. It is greyed out (and inert) when nothing is selected.
+- A "Clear" control at the top clears every selection at once, returning to showing everything. It is greyed out (and inert) when nothing is selected.
 - The editor has a search input that filters the shown options: a query that is a substring of a column name keeps that whole column; otherwise only the values containing the query survive, and columns with no surviving value are dropped. An empty query shows everything; a query that matches nothing shows a "No matching filters" message.
+- The value checkboxes fill the editor's width rather than stacking in one narrow column. Within each group the options flow in horizontal rows (left-to-right) that wrap into as many columns as the width allows, so a group with many distinct values fans out sideways and the horizontal whitespace beside small groups (e.g. Status, Health) is used instead of left empty. All checkboxes and their labels stay visible without running offscreen, and the menu width is capped to the viewport so the columns never overflow the screen. The editor body has a capped height and scrolls when its groups and options together run past it; the scrollbar is shown on overflow so the user can tell there is more and scroll to it.
 - When a selection matches no rows, the table shows its existing no-match message.
 - The editor drives one TanStack Table column filter per ticked value column (a plain value column keeps a row when its value is among the ticked ones; the label groups collapse onto a single `labels` column filter holding a key→values map). An empty selection leaves no column filters, so the filter and the search box compose (a row must satisfy all active filters and the search). The editor and its column-filter wiring are shared (`table-filter.tsx`, `table-filter-state.ts`, `use-table-filter.ts`) so behaviour is identical across tables, with no per-table duplicate.
 
@@ -63,14 +64,14 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/errors-search.t
 - [x] Every table whose kind has a status field has a status-filter dropdown with one checkbox per status value; all selected by default.
 - [x] Unchecking a status hides rows with that status; unchecking all shows the no-match message.
 - [x] The status-filter dropdown and its column-filter wiring are shared across tables, with no per-table duplicate.
-- [x] The status-filter dropdown has "Select all" and "Deselect all" controls that tick or untick every status at once, shared across the pods status filter and the nodes status filter.
+- [x] The status-filter dropdown has a "Clear" control that unticks every status at once (formerly a "Select all"/"Deselect all" pair), shared across the pods status filter and the nodes status filter.
 - [x] The app standardizes on "Status" as the single user-facing name (phase and status are the same concept here); no "Phase" label remains in the UI, while the data field keeps the Kubernetes name `phase`.
 - [x] Every table with a Healthy/Error stats header (pods, nodes, deployments, stateful sets, daemon sets) has a Healthy/Error health-filter dropdown; both checked by default (shows all).
-- [x] Checking only "Error" shows just error rows; checking only "Healthy" shows just healthy rows; "Deselect all" hides all rows.
+- [x] Checking only "Error" shows just error rows; checking only "Healthy" shows just healthy rows; "Clear" empties the selection so every row shows again.
 - [x] The health filter reuses the shared dropdown and column-filter wiring (no per-table duplicate) and uses the same derived health as the stats header.
 - [x] Every table whose kind carries labels (nodes, pods, deployments, stateful sets, daemon sets, namespaces) has a label-filter dropdown listing the label keys present on the loaded resources.
 - [x] Selecting a label key's value(s) narrows the table to matching resources (OR within a key, AND across keys); the default empty selection shows everything.
-- [x] A "Deselect all" control clears every label selection and returns to showing everything.
+- [x] A "Clear" control clears every label selection and returns to showing everything.
 - [x] The label-filter dropdown and its column-filter wiring are shared across tables, with no per-table duplicate, and compose with the search box and the status filter.
 - [x] The shared Labels column keeps the row height fixed (only the first few chips inline) and exposes the rest behind a `+N ...` control that opens a searchable modal listing every label, while the table's fuzzy search still matches on all labels.
 

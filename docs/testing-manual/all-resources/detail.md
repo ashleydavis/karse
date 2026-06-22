@@ -30,8 +30,8 @@ Then open the frontend at `http://127.0.0.1:5173`. The fixture stands up a KWOK 
 - **Kind filter**: click the **Filter: All** button. The dropdown lists a **Kind** group (Pod, Node, Namespace, Deployment, StatefulSet, DaemonSet, HorizontalPodAutoscaler as present), a **Health** group, and any label-key groups.
   - Tick **Node** under Kind: only Node rows remain, and the button reads "Filter: 1 selected".
   - Tick **Namespace** as well: Node and Namespace rows both show (OR within the Kind column).
-  - Click **Deselect all**, then tick **HorizontalPodAutoscaler**: only the HPA row (`nginx`) remains, confirming HPAs are selectable in the filter.
-  - Click **Deselect all**: every row returns and the button reads "Filter: All".
+  - Click **Clear**, then tick **HorizontalPodAutoscaler**: only the HPA row (`nginx`) remains, confirming HPAs are selectable in the filter.
+  - Click **Clear**: every row returns and the button reads "Filter: All".
 - **Row navigation**: click the Deployment (`nginx`) row. It navigates to that deployment's detail page (`/deployments/default/nginx`). Click the Node (`fake-node-1`) row and confirm it opens that node's detail page. (Every kind in this fixture has a detail page, so no row degrades to plain text here.)
 - **Breadcrumb origin**: after clicking the Deployment (`nginx`) row, the page URL carries `from=all-resources` and the breadcrumb reads "All resources > nginx" (the originating page, then just the resource name, no kind prefix), not the deployment's own list trail. Click the "All resources" crumb and confirm it returns to `/all-resources`. (Reaching the same detail page directly, e.g. via the Deployments page, shows its normal trail without the All resources origin.)
 - **Nav origin**: on that same drilled-down detail page (reached from the All resources row), the left nav keeps "All resources" highlighted, not "Deployments". Reaching the deployment directly (via the Deployments page) instead highlights "Deployments".

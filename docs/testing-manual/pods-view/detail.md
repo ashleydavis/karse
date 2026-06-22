@@ -87,7 +87,7 @@ Five pods in `default`, one each in Running, Pending, Succeeded, Failed, Unknown
 - Click the **Filter** button to open the editor. Under the **Status** heading the five statuses are listed, none checked (the filter is off).
 - **Check one status** (for example `Running`): only `pod-running` is listed and the button reads `Filter: 1 selected`.
 - **Check a second status** (for example `Pending`): both matching pods show (OR within the Status column) and the button reads `Filter: 2 selected`.
-- **Deselect all**: open the editor and click **Deselect all** (top of the editor): the selection clears, all five rows return, and the button reads `Filter: All`. With nothing selected, **Deselect all** is greyed out.
+- **Clear**: open the editor and click **Clear** (top of the editor): the selection clears, all five rows return, and the button reads `Filter: All`. With nothing selected, **Clear** is greyed out.
 - The filter combines with the search box: searching while a subset of statuses is checked narrows results further.
 - If KWOK overrides a patched terminal phase back to `Running`, re-run the patch commands from the setup script and reload.
 
@@ -106,7 +106,7 @@ Reuses the phase-filter fixture: five pods in `default`, one per phase. By healt
 - Click the **Filter** button. Under the **Health** heading two values are listed, **Healthy** and **Error**, none checked.
 - **Check only Error**: tick `Error`. Only `pod-failed` and `pod-unknown` remain (two rows) and the button reads `Filter: 1 selected`. (The Pending pod is hidden too: it is neither healthy nor error.)
 - **Check only Healthy**: untick `Error`, then tick `Healthy`. Only `pod-running` and `pod-succeeded` remain and the button reads `Filter: 1 selected`.
-- **Deselect all**: open the editor and click **Deselect all**: the selection clears, all five rows return, and the button reads `Filter: All`.
+- **Clear**: open the editor and click **Clear**: the selection clears, all five rows return, and the button reads `Filter: All`.
 - The Health values combine with the search box and the Status values: a row must pass all active filters to show.
 
 ## Scenario F: Labels column

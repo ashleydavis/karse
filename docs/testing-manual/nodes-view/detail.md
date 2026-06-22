@@ -113,7 +113,7 @@ A Ready node, a NotReady node, and a cordoned (Ready) node, so at least two dist
 - Click the **Filter** button to open the editor. Under the **Status** heading `Ready`, `NotReady`, and `Unknown` are listed, none checked (the filter is off).
 - **Check `Ready`**: only the Ready nodes (`fake-node-ready`, `fake-node-cordoned`) are listed and the button reads `Filter: 1 selected`.
 - **Check a second status** (for example `NotReady`): the `fake-node-notready` row joins them (OR within Status) and the button reads `Filter: 2 selected`.
-- **Deselect all**: open the editor and click **Deselect all** (top of the editor): the selection clears, all three rows return, and the button reads `Filter: All`. With nothing selected, **Deselect all** is greyed out.
+- **Clear**: open the editor and click **Clear** (top of the editor): the selection clears, all three rows return, and the button reads `Filter: All`. With nothing selected, **Clear** is greyed out.
 - The filter combines with the search box: searching while a subset of statuses is checked narrows results further.
 
 ## Scenario G.2: Node health filter
@@ -131,7 +131,7 @@ Reuses the mixed-statuses fixture: a Ready node, a NotReady node, and a cordoned
 - Click the **Filter** button. Under the **Health** heading two values are listed, **Healthy** and **Error**, none checked.
 - **Check only Error**: tick `Error`. Only the `fake-node-notready` row remains and the button reads `Filter: 1 selected`.
 - **Check only Healthy**: untick `Error`, then tick `Healthy`. Only the two Ready nodes (`fake-node-ready`, `fake-node-cordoned`) remain and the button reads `Filter: 1 selected`.
-- **Deselect all**: open the editor and click **Deselect all**: the selection clears, all three rows return, and the button reads `Filter: All`.
+- **Clear**: open the editor and click **Clear**: the selection clears, all three rows return, and the button reads `Filter: All`.
 - The Health values combine with the search box and the Status values: a row must pass all active filters to show.
 
 ## Scenario H: CPU / Memory consumption columns (percentage of node) and sort

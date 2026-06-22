@@ -172,7 +172,7 @@ Every resource table has one shared **Filter** dropdown (filter icon) beside its
 - Across different columns, the table shows only rows that match every column you have ticked a value in.
 - Nothing is ticked by default, so the filter is off, all rows show, and the button reads "Filter: All". Once you pick values it reads "Filter: N selected".
 - The editor has a search input at the top that filters the shown options by column name or value text, so you can quickly find a column or value to filter on.
-- "Deselect all" at the top clears every selection and returns to showing everything.
+- "Clear" at the top clears every selection and returns to showing everything.
 - The filter works together with the search box: a row must satisfy the filter and the search.
 
 ### Labels tab on detail pages

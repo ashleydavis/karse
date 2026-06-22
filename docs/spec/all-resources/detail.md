@@ -53,7 +53,7 @@ Other common types (ReplicaSet, Job, CronJob, Service, Ingress, ConfigMap, Secre
   - A **Kind** filter whose options are the kinds actually present, so the user can restrict the table to one or more kinds (OR within the column).
   - A **Health** filter (Healthy / Error), as on the other tables.
   - One filter per label key present across the loaded resources.
-- Selections across columns are AND'd; within a column they are OR'd. An empty selection means the filter is off and every row shows. "Deselect all" clears every selection.
+- Selections across columns are AND'd; within a column they are OR'd. An empty selection means the filter is off and every row shows. "Clear" clears every selection.
 
 ### Row navigation
 

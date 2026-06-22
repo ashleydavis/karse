@@ -69,7 +69,7 @@ describe("buildColumnFilters + filter functions", () => {
     test("deselect-all (empty selection) resets to all rows", () => {
         const selection = toggleSelection({}, "status", "NotReady");
         expect(applyFilters(rows, [statusCol, healthCol], selection)).toHaveLength(1);
-        // Clearing the selection is what the editor's Deselect all does.
+        // Clearing the selection is what the editor's Clear control does.
         expect(applyFilters(rows, [statusCol, healthCol], {})).toHaveLength(rows.length);
     });
 });
