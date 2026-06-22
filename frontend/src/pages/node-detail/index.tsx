@@ -29,6 +29,7 @@ import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { ResourceRef } from "../../components/resource-ref";
 import { NodePerformanceTab } from "../../components/performance/node-performance-tab";
+import { NodeResourceIndicator } from "../../components/performance/node-resource-indicator";
 import { tableRowSx } from "../../lib/table-row-style";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
@@ -190,28 +191,13 @@ export function NodeDetailPage() {
                         </Paper>
                     )}
 
-                    <Paper variant="outlined" sx={{ p: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Capacity vs Allocatable</Typography>
-                        <TableContainer>
-                            <Table size="small">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Resource</TableCell>
-                                        <TableCell>Capacity</TableCell>
-                                        <TableCell>Allocatable</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {(["cpu", "memory", "pods"] as const).map((r) => (
-                                        <TableRow key={r} sx={tableRowSx(false)}>
-                                            <TableCell>{r}</TableCell>
-                                            <TableCell sx={{ fontFamily: "monospace" }}>{data.capacity[r]}</TableCell>
-                                            <TableCell sx={{ fontFamily: "monospace" }}>{data.allocatable[r]}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
+                    <Paper variant="outlined" sx={{ p: 2 }} data-test-id="node-resource-usage">
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Resource usage (consumed vs free)</Typography>
+                        <NodeResourceIndicator
+                            nodeName={data.name}
+                            podCount={data.pods.length}
+                            podsAllocatable={data.allocatable.pods}
+                        />
                     </Paper>
 
                     <Paper variant="outlined" sx={{ p: 2 }}>

@@ -1,6 +1,6 @@
 # performance-tabs manual tests
 
-Manual tests for the Performance tabs. The cluster home page is tabbed (Status + Performance) and its **Performance tab is populated** with a treemap of the cluster's **nodes** — one box per node, sized by usage and labelled with each node's share of the cluster total (the Hot spots heatmap and Top consumers table were removed by cluster-performance-1). The node and pod detail pages each have a **populated** Performance tab too: the node tab is split into a node-scoped **Breakdown** treemap subtab and a searchable/sortable/filterable per-container **Provisioning** table subtab, and the pod tab (the leaf) shows per-container Provisioning bars with no treemap. The feature is complete.
+Manual tests for the Performance tabs. The cluster home page is tabbed (Status + Performance) and its **Performance tab is populated** with a treemap of the cluster's **nodes** — one box per node, sized by usage and labelled with each node's share of the cluster total (the Hot spots heatmap and Top consumers table were removed by cluster-performance-1). The node and pod detail pages each have a **populated** Performance tab too: the node tab is a single **Breakdown** treemap of each pod's share of the node (the Provisioning subtab and the standalone Breakdown subtab were removed by node-performance-1), and the pod tab (the leaf) shows per-container Provisioning bars with no treemap. The feature is complete.
 
 To see the populated cluster Performance tab against a kwok cluster (which has no metrics-server), start the app with the fake-metrics mode on: `KARSE_FAKE_METRICS=1 bun run dev`. See the [Cluster Performance tab](#cluster-performance-tab-populated) scenario below.
 
@@ -31,7 +31,7 @@ Then open the frontend at `http://127.0.0.1:5173`. The scenario fixture stands u
 - Navigate to `/nodes` and click the `fake-node-1` row to open `/nodes/fake-node-1`.
 - The tab bar now includes a "Performance" tab (between "Labels" and "Commands").
 - The other tabs (Status, Pods, Events, Labels, Commands, YAML) still render and behave as before.
-- Click the "Performance" tab. The Status cards are not visible on this tab. The node tab is now **populated** with two subtabs (a **Breakdown** treemap and a searchable/sortable/filterable **Provisioning** table); see the [Node Performance tab (populated)](#node-performance-tab-populated) scenario below.
+- Click the "Performance" tab. The Status cards are not visible on this tab. The node tab is now **populated** with a single **Breakdown** treemap of each pod's share of the node (no subtabs); see the [Node Performance tab (populated)](#node-performance-tab-populated) scenario below.
 
 ### Pod detail Performance tab
 - Navigate to `/pods` and click the `web` pod row to open its detail page.
@@ -104,22 +104,18 @@ KARSE_FAKE_METRICS=1 bun run dev
 Open `/nodes`, click the `<node>` row, then click the **Performance** tab.
 
 - A **CPU / Memory** toggle shows at the top, with **CPU** selected by default.
-- The tab is split into two **subtabs**: **Breakdown** (shown first) and **Provisioning**.
-- **Breakdown subtab** (treemap): rectangles for the node's containers, grouped by namespace then pod, sized by the container's usage and coloured green/amber/red by utilisation. Click a rectangle: the app navigates to that pod's detail page on its Performance tab. The breadcrumb trail reads `<node> > <pod>` (the node is the origin), and the **back button** (left of the pod name) returns to **this node's Performance tab**, not the Pods list. (Regression check for performance-back-nav-1: before the fix the back button always returned to the Pods page.) A pod opened the normal way from the Pods list still backs to the Pods list.
-- Hover a rectangle: a tooltip appears showing the cell's label (e.g. `worker`) and its usage for the selected metric (CPU in `m`/cores, memory in `Mi`/`Gi`). It is never an empty box.
-- Click the **Provisioning** subtab. It shows a **table**, one row per container scheduled on the node, each row showing three overlaid bars (**Usage**, **Request**, **Limit**) on a shared per-row scale with the formatted figures alongside. Confirm:
-  - **Search:** type part of a container/pod name into the **Search containers...** box. Only the matching rows remain; clear it and all rows return.
-  - **Sort:** click a column header (e.g. **Usage**). The rows reorder by that column; click again to reverse.
-  - **Filter:** open the **pod picker** (the same searchable Pod filter as the Logs page), tick one pod, and confirm only that pod's container rows remain. Click **Clear** to restore all rows.
-- Toggle to **Memory**: both subtabs re-derive from memory usage (the provisioning figures switch to `Mi`/`Gi`, the treemap rectangles re-size).
+- The tab is a **single Breakdown treemap** — there are no subtabs (the Provisioning subtab and the standalone Breakdown subtab were removed by node-performance-1).
+- **Breakdown treemap**: one rectangle per pod scheduled on the node, grouped by namespace, sized by — and labelled with — the pod's **share of the node** (pod usage ÷ node allocatable for the selected metric, e.g. `worker 25%`) and coloured green/amber/red by utilisation. To see meaningful (non-zero) percentages, give the node a small explicit allocatable (kwok's default node is ~1k cores / 1Ti, against which a pod rounds to 0%); e.g. `kubectl patch node <node> --subresource=status --type=merge -p '{"status":{"capacity":{"cpu":"4","memory":"8Gi","pods":"110"},"allocatable":{"cpu":"4","memory":"8Gi","pods":"110"}}}'`. Click a rectangle: the app navigates to that pod's detail page on its Performance tab. The breadcrumb trail reads `<node> > <pod>` (the node is the origin), and the **back button** (left of the pod name) returns to **this node's Performance tab**, not the Pods list. (Regression check for performance-back-nav-1: before the fix the back button always returned to the Pods page.) A pod opened the normal way from the Pods list still backs to the Pods list.
+- Hover a rectangle: a tooltip appears showing the pod's label (e.g. `cache`) and its `% of node` share. It is never an empty box.
+- Toggle to **Memory**: the treemap re-derives from memory usage (the rectangles re-size and the share percentages recompute).
 
 ### Metrics-unavailable path (node)
 - Stop the app and restart it **without** `KARSE_FAKE_METRICS` (plain `bun run dev`).
-- Open the node's **Performance** tab. On the **Breakdown** subtab the treemap is replaced by a short note pointing to the Provisioning subtab. Switch to the **Provisioning** subtab: the rows still render, the **Usage** bar reads `—` (empty), while **Request** and **Limit** still show their figures from the pod specs, confirming the page degrades cleanly.
+- Open the node's **Performance** tab. With no live usage there is nothing to size the boxes by, so the "Metrics API is not available" notice is shown and a short note replaces the treemap, confirming the page degrades cleanly.
 
 ### Light and dark mode (node Performance tab)
 - With fake metrics on and the tab populated, switch the colour mode between Light and Dark from the header settings.
-- In both modes the treemap, the Provisioning table (default, searched, and pod-filtered states), and the toggle are clearly readable with proper contrast. Capture screenshots of the Breakdown subtab, the Provisioning subtab (default, searched, filtered), and the metrics-unavailable state in both modes for review.
+- In both modes the node-share treemap and the toggle are clearly readable with proper contrast. Capture screenshots of the populated Breakdown treemap and the metrics-unavailable state in both modes for review.
 
 ## Scenario: Pod Performance tab (populated) {#pod-performance-tab-populated}
 

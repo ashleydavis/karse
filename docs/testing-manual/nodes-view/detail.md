@@ -21,7 +21,7 @@ Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stand
 ```
 
 ### What to check
-- **Nodes table**: two rows, `fake-node-1` and `fake-node-2`, both with a green Ready chip. Reveal the Roles column (see the note above) and confirm both show role `worker`. Click either row to navigate to the node detail page; confirm the node name, Ready chip, capacity vs allocatable table, and conditions are shown.
+- **Nodes table**: two rows, `fake-node-1` and `fake-node-2`, both with a green Ready chip. Reveal the Roles column (see the note above) and confirm both show role `worker`. Click either row to navigate to the node detail page; confirm the node name, Ready chip, the consumed-vs-free resource usage indicator (cpu, memory, pods), and conditions are shown.
 
 ## Scenario B: No nodes (empty state)
 

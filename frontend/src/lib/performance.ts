@@ -1,8 +1,8 @@
-// Pure transform and format helpers for the Performance tabs. These are frontend
-// modules and, per project policy, are not unit-tested directly; they are exercised
-// by the Playwright e2e suite (and the smoke endpoint checks for the data they shape).
-// Keeping them pure (no React, no I/O) makes the charts deterministic and the e2e
-// assertions stable.
+// Pure transform and format helpers for the Performance tabs. Most are exercised by the
+// Playwright e2e suite (and the smoke endpoint checks for the data they shape); the
+// per-pod node-share calculation (buildNodeShares / buildNodeShareTreemap) is also unit-
+// tested directly in frontend/src/tests/lib/node-share.test.ts. Keeping them pure (no
+// React, no I/O) makes the charts deterministic and the assertions stable.
 
 import type { NodeUsage, PodUsage, ResourceUsage, PerformanceMetric } from "karse-types";
 
@@ -28,6 +28,9 @@ export type TreemapNode = {
     // cluster total). Used on the cluster treemap's node leaves.
     clusterShare?: number | null;
     children?: TreemapNode[];
+    // Note: on the node-share treemap the leaf `value` is itself a whole-number
+    // percentage of the node (see buildNodeShareTreemap), so UsageTreemap formats it as a
+    // percent (valueKind="percent") rather than as a cpu/memory figure.
 };
 
 // Formats a CPU figure (millicores) as a human string: sub-core values keep the
@@ -170,50 +173,81 @@ export function buildClusterNodeTreemap(nodes: NodeUsage[], metric: PerformanceM
     return { id: "cluster", children: leaves };
 }
 
-// Builds the node Breakdown treemap: namespace → pod → container, where each leaf's
-// value is the container's usage for the selected metric. The node's own name is not a
-// level (the view is already scoped to one node), so the top split is by namespace.
-// Containers with no usage (null) or zero usage are filtered out, so the treemap only
-// shows containers that actually consume the metric (an empty rectangle carries no
-// information and breaks nivo's layout). A leaf still navigates to its owning pod's
-// detail page on click, reusing the cluster treemap's leaf navigation fields.
-export function buildNodeTreemap(pods: PodUsage[], metric: PerformanceMetric): TreemapNode {
-    // namespace name → pod name → container leaf list, preserving first-seen order.
-    const byNamespace = new Map<string, Map<string, TreemapNode[]>>();
+// One pod's share of a node for the selected metric, as a whole-number percentage of the
+// node's allocatable capacity. Carries the pod's usage and the resolved percentage (null
+// when usage or the node base is unknown), plus the pod's namespace/name for navigation.
+export type NodeShareRow = {
+    namespace: string;
+    pod: string;
+    usage: number | null;
+    // Percentage (whole number, not capped) of the node's allocatable that the pod
+    // consumes for the selected metric. Null when usage is unknown or the node base is
+    // missing/zero.
+    percentage: number | null;
+};
+
+// Each pod's percentage of the node it runs on for the selected metric. The base is the
+// node's allocatable for that metric; percentage = round(pod usage ÷ node allocatable ×
+// 100). Pods with no usage reading (Metrics API unavailable) keep a null percentage so
+// the caller can show them honestly rather than as a misleading 0%. Sorted by percentage
+// descending (nulls last) so the heaviest consumers read first. Pure: exercised by unit
+// tests (see frontend/src/tests/lib/node-share.test.ts).
+export function buildNodeShares(
+    pods: PodUsage[],
+    nodeAllocatable: ResourceUsage,
+    metric: PerformanceMetric,
+): NodeShareRow[] {
+    const base = metricValue(nodeAllocatable, metric);
+    const rows: NodeShareRow[] = pods.map((pod) => {
+        const usage = metricValue(pod.usage, metric);
+        return {
+            namespace: pod.namespace,
+            pod: pod.name,
+            usage,
+            percentage: usagePercent(usage, base),
+        };
+    });
+    return rows.sort((a, b) => (b.percentage ?? -1) - (a.percentage ?? -1));
+}
+
+// Builds the node Breakdown treemap sized by each pod's percentage of the node, so the
+// box areas read as "share of the node" rather than raw usage. The tree is namespace →
+// pod, with each pod leaf valued by its node-percentage for the selected metric. Pods
+// with no usage (null) or a zero share are dropped (an empty box carries no information
+// and breaks nivo's layout). A leaf still navigates to its owning pod's detail page on
+// click. The base is the node's allocatable for the metric; when it is missing or zero
+// the percentages are null and the treemap renders empty (its empty-state shows).
+export function buildNodeShareTreemap(
+    pods: PodUsage[],
+    nodeAllocatable: ResourceUsage,
+    metric: PerformanceMetric,
+): TreemapNode {
+    const base = metricValue(nodeAllocatable, metric);
+    // namespace name → pod leaf list, preserving first-seen order.
+    const byNamespace = new Map<string, TreemapNode[]>();
 
     for (const pod of pods) {
-        for (const container of pod.containers) {
-            const value = metricValue(container.usage, metric);
-            if (value === null || value <= 0) {
-                continue;
-            }
-            let byPod = byNamespace.get(pod.namespace);
-            if (byPod === undefined) {
-                byPod = new Map<string, TreemapNode[]>();
-                byNamespace.set(pod.namespace, byPod);
-            }
-            let leaves = byPod.get(pod.name);
-            if (leaves === undefined) {
-                leaves = [];
-                byPod.set(pod.name, leaves);
-            }
-            leaves.push({
-                id: `${pod.namespace}/${pod.name}/${container.name}`,
-                value,
-                utilisation: utilisation(container.usage, container.limits, metric),
-                podNamespace: pod.namespace,
-                podName: pod.name,
-            });
+        const pct = usagePercent(metricValue(pod.usage, metric), base);
+        if (pct === null || pct <= 0) {
+            continue;
         }
+        let leaves = byNamespace.get(pod.namespace);
+        if (leaves === undefined) {
+            leaves = [];
+            byNamespace.set(pod.namespace, leaves);
+        }
+        leaves.push({
+            id: `${pod.namespace}/${pod.name}`,
+            value: pct,
+            utilisation: utilisation(pod.usage, pod.limits, metric),
+            podNamespace: pod.namespace,
+            podName: pod.name,
+        });
     }
 
     const namespaces: TreemapNode[] = [];
-    for (const [namespace, byPod] of byNamespace) {
-        const podNodes: TreemapNode[] = [];
-        for (const [podName, leaves] of byPod) {
-            podNodes.push({ id: `${namespace}/${podName}`, children: leaves });
-        }
-        namespaces.push({ id: namespace, children: podNodes });
+    for (const [namespace, leaves] of byNamespace) {
+        namespaces.push({ id: namespace, children: leaves });
     }
 
     return { id: "node", children: namespaces };

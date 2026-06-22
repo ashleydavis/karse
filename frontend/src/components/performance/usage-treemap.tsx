@@ -55,11 +55,17 @@ export function UsageTreemap({
     colorByUtilisation,
     origin,
     metric,
+    valueKind = "usage",
 }: {
     root: TreemapNode;
     colorByUtilisation: boolean;
     origin: string;
     metric: PerformanceMetric;
+    // How to read a leaf's `value`: "usage" (a cpu/memory figure, formatted in m/cores or
+    // Mi/Gi — the cluster and default views) or "percent" (a whole-number percentage of
+    // the node — the node-share treemap, where the box area is the pod's share of the
+    // node). Drives the label and tooltip formatting.
+    valueKind?: "usage" | "percent";
 }) {
     const navigate = useShareableNavigate();
     const muiTheme = useTheme();
@@ -93,17 +99,23 @@ export function UsageTreemap({
                 value="value"
                 // Each leaf is labelled with its name (the segment after the last "/").
                 // A cluster-node leaf also shows its share of the cluster total inline
-                // (e.g. "node-cp 62%") so the percentage reads straight off the box.
+                // (e.g. "node-cp 62%"); a node-share leaf (valueKind="percent") shows its
+                // share of the node (e.g. "worker 25%"), so the percentage reads straight
+                // off the box.
                 label={(node) => {
                     const name = cellLabel(String(node.id));
+                    if (valueKind === "percent") {
+                        return `${name} ${node.value}%`;
+                    }
                     const share = node.data.clusterShare;
                     return share === null || share === undefined
                         ? name
                         : `${name} ${share}%`;
                 }}
-                // Replace nivo's empty default tooltip with the cell label and its usage
-                // for the selected metric (CPU in m/cores, memory in Mi/Gi), plus — for a
-                // cluster-node leaf — that node's share of the cluster total.
+                // Replace nivo's empty default tooltip with the cell label and its value:
+                // a usage figure for the selected metric (CPU in m/cores, memory in Mi/Gi)
+                // on usage treemaps, or the pod's percentage of the node on the node-share
+                // treemap; plus — for a cluster-node leaf — that node's share of the cluster.
                 tooltip={({ node }) => (
                     <Paper
                         data-test-id="perf-treemap-tooltip"
@@ -114,9 +126,11 @@ export function UsageTreemap({
                             {cellLabel(String(node.id))}
                         </Typography>
                         <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
-                            {metric === "cpu"
-                                ? formatCpu(node.value)
-                                : formatMemory(node.value)}
+                            {valueKind === "percent"
+                                ? `${node.value}% of node`
+                                : metric === "cpu"
+                                    ? formatCpu(node.value)
+                                    : formatMemory(node.value)}
                         </Typography>
                         {node.data.clusterShare !== null && node.data.clusterShare !== undefined && (
                             <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>

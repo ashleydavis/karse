@@ -7,7 +7,7 @@ The Performance feature adds a per-scope "Performance" tab to the cluster, node,
 pages, showing point-in-time CPU and memory usage in context. This document describes the
 data sources, scope, degradation behaviour, per-scope tab contents, and the test mode. The
 implementation is **Complete**: the cluster Performance tab (a node treemap), the node
-Performance tab (node-scoped Breakdown treemap plus per-container provisioning bars), and the
+Performance tab (a single Breakdown treemap of each pod's share of the node), and the
 pod Performance tab (the leaf: per-container provisioning bars, no treemap) have all shipped,
 along with the shared chart components and the `frontend/src/lib/performance.ts`
 transform/format helpers. Time-series Trends and per-pod history remain out of scope (they
@@ -66,9 +66,9 @@ requested resource"`, `"metrics.k8s.io"`, or `"Metrics API not available"` — a
 - Usage fields (`cpuMillicores`, `memoryBytes`) are `null`.
 - Requests and limits are still populated from the pod specs.
 
-So the page never breaks: the Provisioning view (usage vs request vs limit) still shows the
+So the page never breaks: the pod Provisioning bars (usage vs request vs limit) still show the
 requests/limits, and the UI shows a "Metrics API not available" notice in place of the
-usage-driven charts.
+usage-driven charts (the cluster and node treemaps, which have no usage to size their boxes by).
 
 ## Per-scope tab contents
 
@@ -89,28 +89,23 @@ inconsistent signal.
     `MetricsUnavailable` components in `frontend/src/components/performance/`, and the pure
     helpers in `frontend/src/lib/performance.ts` (`formatCpu`, `formatMemory`, `metricValue`,
     `utilisation`, `clusterMetricTotal`, `nodeShareOfCluster`, `buildClusterNodeTreemap`).
-- **Node Performance tab** — **implemented**:
-  - The node Performance tab is split into two **subtabs**, **Breakdown** and
-    **Provisioning**, under a shared CPU/Memory toggle. Breakdown is shown first.
-  - **Breakdown subtab:** a node-scoped treemap drilling namespace → pod → container, sized
-    by the container's usage for the selected metric, reusing the shared `UsageTreemap`.
-    Leaves are coloured green→amber→red by utilisation and a leaf click opens the owning
-    pod's detail page on its Performance tab. The treemap needs live usage, so when the
-    Metrics API is unavailable the subtab shows a short note pointing the user at the
-    Provisioning subtab instead.
-  - **Provisioning subtab:** the node's pods as a **searchable, sortable, filterable table**,
-    one row per container, each row carrying overlaid usage / request / limit bars on a
-    shared per-row scale with the formatted figures alongside. A free-text search box
-    (the shared fuzzy filter) narrows the rows by namespace/pod/container text; the columns
-    sort; and the **shared Logs Pod filter** (the same `PodFilter` component the Logs page
-    uses) narrows the rows to the ticked pods (or, with none ticked, its search box acts as
-    a pod-name substring filter). The bars render even with no Metrics API (requests/limits
-    come from specs; the usage bar is then empty), so the view degrades cleanly. The view is
-    read-only.
-  - Built from `fetchNodePerformance`, `buildNodeTreemap`, the shared `MetricToggle` /
-    `UsageTreemap` / `MetricsUnavailable` / `PodFilter`, the shared `fuzzyGlobalFilter`, and
-    the `ProvisioningTable` component. (The pod Performance leaf still uses the simpler
-    `ProvisioningBars` list.)
+- **Node Performance tab** — **implemented** (reworked by node-performance-1):
+  - The node Performance tab is a **single Breakdown treemap** under a shared CPU/Memory
+    toggle. The Provisioning subtab and the standalone Breakdown subtab were **removed**
+    (node-performance-1): Breakdown is now the Performance tab itself.
+  - **Breakdown treemap:** a node-scoped treemap drilling namespace → pod, with each pod box
+    sized by — and labelled with — the pod's **percentage of the node** it runs on (pod usage
+    ÷ node allocatable for the selected metric, a whole-number percentage, e.g. "worker 25%"),
+    so the boxes read as "share of the node". Leaves are coloured green→amber→red by
+    utilisation (usage ÷ limit) and a leaf click opens the owning pod's detail page on its
+    Performance tab. Hovering a box shows a tooltip with the pod name and its "% of node"
+    share. The treemap needs live usage, so when the Metrics API is unavailable the tab shows
+    the MetricsUnavailable notice and a short note in place of the treemap (there is no usage
+    to size the boxes by).
+  - Built from `fetchNodePerformance`, `buildNodeShareTreemap` / `buildNodeShares`, and the
+    shared `MetricToggle` / `UsageTreemap` (with `valueKind="percent"`) / `MetricsUnavailable`
+    components. The per-pod node-share calculation is unit-tested in
+    `frontend/src/tests/lib/node-share.test.ts`.
 - **Pod Performance tab** (the leaf):
   - A provisioning view of the pod's containers (usage vs request vs limit). No treemap.
 

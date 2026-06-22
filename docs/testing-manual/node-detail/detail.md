@@ -22,7 +22,7 @@ Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stand
 - Navigate to `/nodes`. Click the `fake-node-1` row. Confirm the browser navigates to `/nodes/fake-node-1` and the page title shows "Node".
 - The node name and a green Ready chip appear at the top.
 - The Details card shows roles, version, and age.
-- The Capacity vs Allocatable table shows rows for cpu, memory, and pods.
+- The "Resource usage (consumed vs free)" indicator shows a consumed-vs-free bar for cpu, memory, and pods only (no disk or network rows, and no Capacity vs Allocatable table). With metrics available, the cpu and memory bars show a real "<n>% used" percentage rather than an em-dash.
 - The Conditions table shows at least the Ready condition with a True status.
 - The Pods section header shows a count and the table lists only the pods scheduled on this node (the `web` pod), with Name, Namespace, Status, Ready, and Restarts columns. Pods on other nodes must not appear. Click the pod row and confirm navigation to the pod detail page.
 - The back arrow navigates back to `/nodes`.
@@ -46,7 +46,7 @@ A node with two pods scheduled on it and a couple of node-scoped events.
 - This tab is selected by default.
 - The Details card shows roles `control-plane`, version, and age.
 - The Addresses card lists the node's addresses (if any).
-- The Capacity vs Allocatable table shows `cpu`, `memory`, and `pods` rows.
+- The "Resource usage (consumed vs free)" indicator shows a consumed-vs-free bar for `cpu`, `memory`, and `pods` only (no disk/network rows, no Capacity vs Allocatable table).
 - The Conditions table shows the node conditions, including `Ready`.
 - The Labels card shows the node labels.
 - The Pods table and the Events table are NOT visible on this tab.

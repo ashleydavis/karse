@@ -33,7 +33,7 @@ All data tables apply the same row styling through the shared helper `frontend/s
 - Rows that are clickable additionally show a pointer cursor.
 - Rows that are static (no navigation) keep the default cursor but still get the same hover highlight.
 
-Tables covered: nodes, pods, deployments, stateful sets, daemon sets, contexts, namespaces, and the detail-page sub-tables (pod containers / init containers / events, node capacity / conditions / scheduled pods).
+Tables covered: nodes, pods, deployments, stateful sets, daemon sets, contexts, namespaces, and the detail-page sub-tables (pod containers / init containers / events, node conditions / scheduled pods).
 
 **Fixture:** [_fixtures-kwok/26-table-row-hover](../_fixtures-kwok/26-table-row-hover/) (one node, one multi-container pod)
 
@@ -58,7 +58,7 @@ For each of these pages, hover a data row and confirm the row background lighten
 
 ### Detail page sub-tables
 - Open the `web` pod detail page (`/pods/default/web`). Open the Containers tab, hover a container row, and confirm it highlights AND shows a pointer cursor (those rows now navigate to the container detail page; see `container-detail`).
-- Open the `fake-node-1` node detail page (`/nodes/fake-node-1`). Hover rows in the Capacity vs Allocatable and Conditions tables and confirm they highlight with the default cursor. Hover a row in the Pods section and confirm it highlights AND shows a pointer cursor (those rows navigate to the pod).
+- Open the `fake-node-1` node detail page (`/nodes/fake-node-1`). Hover rows in the Conditions table and confirm they highlight with the default cursor. (The node Status tab now shows a consumed-vs-free resource usage indicator instead of a Capacity vs Allocatable table.) Hover a row in the Pods section and confirm it highlights AND shows a pointer cursor (those rows navigate to the pod).
 
 ### Consistency check
 Confirm the highlight colour looks identical across all of the above tables. They all use the same `action.hover` background, so a clickable node row and a static context row should highlight to the same shade.

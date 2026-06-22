@@ -108,6 +108,17 @@ EOF
 
 kubectl wait --for=condition=Ready node/node-cp node/node-worker --timeout=120s
 
+# Give node-cp and node-worker a small, explicit allocatable/capacity (4 cores / 8Gi /
+# 110 pods). kwok's default fake node reports ~1k cores / 1Ti allocatable, against which
+# the seeded pod usage and the node usage from KARSE_FAKE_METRICS round to ~0%. With a
+# realistic 4-core/8Gi node the node Status resource indicator (usage ÷ allocatable) and
+# the node Performance treemap (each pod's share of the node) render meaningful, non-zero
+# percentages — what node-performance-1 needs the populated state to show.
+for node in node-cp node-worker; do
+  retry kubectl patch node "$node" --subresource=status --type=merge -p \
+    '{"status":{"capacity":{"cpu":"4","memory":"8Gi","pods":"110"},"allocatable":{"cpu":"4","memory":"8Gi","pods":"110"}}}'
+done
+
 # node-notready has no kwok annotation, so kwok does not manage it. Patch a
 # Ready=False condition that will stick, making the node genuinely NotReady.
 retry kubectl patch node node-notready --subresource=status --type=merge -p \
