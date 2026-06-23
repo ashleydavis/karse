@@ -6561,34 +6561,46 @@ test.describe("karse e2e", () => {
     // seeded `web` pod (nginx + sidecar in the default namespace) matches the canned
     // per-container fake metrics by name, and its scheduling node (node-worker) carries an
     // explicit 4-core / 8Gi allocatable (patched in scripts/e2e-tests.sh). The pod
-    // Performance tab (the leaf) therefore shows the pod's percentage of the node for CPU
-    // and memory (pod usage ÷ node allocatable): web uses ~120m CPU (3% of 4 cores) and
-    // ~320Mi memory (4% of 8Gi). There is no treemap, no "Share of node" heading, no
-    // Provisioning section, and no disk/network rows.
+    // Performance tab (the leaf) therefore shows two resource sections (CPU and Memory),
+    // each with Requested / Limit / Usage-now tiles and a combined usage-vs-request-vs-limit
+    // bar (the PodResourcePanel, resource-utilization-11). Below that, the "Share of node"
+    // subsection keeps the pod's percentage of its scheduling node for CPU and memory (pod
+    // usage ÷ node allocatable): web uses ~120m CPU (3% of 4 cores) and ~320Mi memory (4% of
+    // 8Gi). There is no treemap, no Provisioning section, and no disk/network rows.
     test.describe("Performance tabs (pod)", () => {
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
         });
 
-        test("shows the pod's percentage of the node for cpu and memory, no provisioning or treemap", async () => {
+        test("shows the CPU/Memory resource panel and the share-of-node subsection, no provisioning or treemap", async () => {
             await page.goto("/pods/default/web", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='pod-tab-performance']").click();
             await expect(page.locator("[data-test-id='perf-pod']")).toBeVisible();
-            // The lazy query fires once the tab is active; wait for the indicator.
+            // The lazy query fires once the tab is active; wait for the resource panel.
+            await expect(page.locator("[data-test-id='pod-resource-panel']")).toBeVisible();
+            // Two resource sections: CPU and Memory, each with the three tiles and a bar.
+            await expect(page.locator("[data-test-id='pod-resource-cpu']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-resource-memory']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-resource-cpu-requested-value']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-resource-cpu-limit-value']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-resource-cpu-usage-value']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-resource-cpu-bar']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-resource-memory-bar']")).toBeVisible();
+            // The share-of-node subsection is kept below the panel as a labelled section.
+            await expect(page.getByText("Share of node")).toBeVisible();
             await expect(page.locator("[data-test-id='pod-node-share']")).toBeVisible();
-            // Exactly two rows: cpu and memory. No disk or network.
+            // Exactly two share rows: cpu and memory. No disk or network.
             await expect(page.locator("[data-test-id='pod-node-share-cpu']")).toBeVisible();
             await expect(page.locator("[data-test-id='pod-node-share-memory']")).toBeVisible();
             await expect(page.locator("[data-test-id='pod-node-share-disk']")).toHaveCount(0);
             await expect(page.locator("[data-test-id='pod-node-share-network']")).toHaveCount(0);
-            // The percentage of the node is the primary value, and it is populated and
-            // non-zero against the realistic 4-core / 8Gi node-worker (cpu 3%, memory 4%).
+            // The percentage of the node is populated and non-zero against the realistic
+            // 4-core / 8Gi node-worker (cpu 3%, memory 4%).
             await expect(page.locator("[data-test-id='pod-node-share-cpu-percent']")).toHaveText("3%");
             await expect(page.locator("[data-test-id='pod-node-share-memory-percent']")).toHaveText("4%");
-            // No Provisioning section, no treemap, and no "Share of node" heading.
+            // No Provisioning section and no treemap.
             await expect(page.locator("[data-test-id='perf-provisioning']")).toHaveCount(0);
             await expect(page.locator("[data-test-id='perf-treemap']")).toHaveCount(0);
-            await expect(page.getByText("Share of node")).toHaveCount(0);
         });
 
         test("metrics-unavailable: the percentages read em-dash and the notice is shown, no disk/network", async () => {
@@ -6620,6 +6632,12 @@ test.describe("karse e2e", () => {
             await page.goto("/pods/default/web", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='pod-tab-performance']").click();
             await expect(page.locator("[data-test-id='perf-metrics-unavailable']")).toBeVisible();
+            // The resource panel still renders: requests/limits come from the spec, so they
+            // stay populated while the live usage figure degrades to the em-dash.
+            await expect(page.locator("[data-test-id='pod-resource-panel']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-resource-cpu-requested-value']")).toHaveText("150m");
+            await expect(page.locator("[data-test-id='pod-resource-cpu-limit-value']")).toHaveText("700m");
+            await expect(page.locator("[data-test-id='pod-resource-cpu-usage-value']")).toHaveText("—");
             await expect(page.locator("[data-test-id='pod-node-share']")).toBeVisible();
             await expect(page.locator("[data-test-id='pod-node-share-cpu-percent']")).toHaveText("—");
             await expect(page.locator("[data-test-id='pod-node-share-memory-percent']")).toHaveText("—");

@@ -277,6 +277,69 @@ export type PodNodeShareRow = {
     allocatable: number | null;
 };
 
+// One resource section of the pod Performance panel (CPU or Memory): the pod's requested,
+// limit, and live usage figures for that resource, plus the positions (as whole-number
+// percentages of a common scale) of usage, request, and limit on the combined bar so the
+// UI can draw all three against one axis. usage/request/limit are the raw values (null when
+// unknown — no Metrics API for usage, or unset request/limit in the spec). usagePercent is
+// the usage as a percentage of the scale (the bar's filled width); requestMark and limitMark
+// are where the request and limit sit on the same scale (vertical markers). All marks are
+// null when the value is unknown or the scale is zero.
+export type PodResourceRow = {
+    resource: PodNodeShareResource;
+    usage: number | null;
+    request: number | null;
+    limit: number | null;
+    usagePercent: number | null;
+    requestMark: number | null;
+    limitMark: number | null;
+};
+
+// The scale a pod resource bar is drawn against: the largest of the pod's usage, request,
+// and limit for that resource (ignoring nulls). The bar then plots all three as percentages
+// of this scale, so the longest of the three reaches 100% and the others read in proportion.
+// Returns 0 when none of the three is known (the bar renders empty).
+function podResourceScale(usage: number | null, request: number | null, limit: number | null): number {
+    return Math.max(0, usage ?? 0, request ?? 0, limit ?? 0);
+}
+
+// A value's position on the resource bar as a whole-number percentage of the scale, or null
+// when the value is unknown or the scale is zero (so the UI omits the marker rather than
+// drawing it at 0).
+function markOnScale(value: number | null, scale: number): number | null {
+    if (value === null || scale <= 0) {
+        return null;
+    }
+    return Math.round((value / scale) * 100);
+}
+
+// Builds the two resource rows (cpu, then memory) for the pod Performance panel from the
+// pod's summed usage, requests, and limits. Each row carries the raw figures and their marks
+// on a per-resource bar scaled to the largest of the three values. Pure: exercised by the
+// resource-utilization e2e (resource-utilization-13).
+export function podResourceRows(
+    usage: ResourceUsage,
+    requests: ResourceUsage,
+    limits: ResourceUsage,
+): PodResourceRow[] {
+    const resources: PodNodeShareResource[] = ["cpu", "memory"];
+    return resources.map((resource) => {
+        const used = metricValue(usage, resource);
+        const request = metricValue(requests, resource);
+        const limit = metricValue(limits, resource);
+        const scale = podResourceScale(used, request, limit);
+        return {
+            resource,
+            usage: used,
+            request,
+            limit,
+            usagePercent: markOnScale(used, scale),
+            requestMark: markOnScale(request, scale),
+            limitMark: markOnScale(limit, scale),
+        };
+    });
+}
+
 // The pod's share of its scheduling node, as one row per resource (cpu and memory only —
 // the Metrics API reports no pod disk or network usage, so those are not shown at all).
 // Each percentage is pod usage ÷ node allocatable for that resource (a whole number).
