@@ -134,9 +134,7 @@ export function UsageTreemap({
                         sx={{ px: 1.5, py: 1 }}
                     >
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {node.data.nodeName
-                                ? truncateMiddle(cellLabel(String(node.id)), NODE_LABEL_MAX)
-                                : cellLabel(String(node.id))}
+                            {cellLabel(String(node.id))}
                         </Typography>
                         <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
                             {valueKind === "percent"

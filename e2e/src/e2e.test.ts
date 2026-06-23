@@ -6340,6 +6340,7 @@ test.describe("karse e2e", () => {
     // ── Cluster treemap long node-name middle-truncation ────────────────────────
     // A long node name overflows a treemap box, so its leaf label is middle-truncated
     // (truncateMiddle to ~14 chars) before the cluster share — resource-utilization-5.
+    // The hover tooltip is not truncated: it shows the full node name.
     // The cluster Performance treemap is built from the /api/cluster/performance node
     // list, so this block mocks that endpoint with a long-named node to inject the long
     // leaf, without seeding a real long-named node (which other tests' node counts assert).
@@ -6381,7 +6382,7 @@ test.describe("karse e2e", () => {
             expect(joined).not.toContain(LONG_NODE);
         });
 
-        test("the tooltip title shows the same middle-truncated name", async () => {
+        test("the tooltip title shows the full untruncated node name", async () => {
             await page
                 .locator("[data-test-id='perf-treemap'] text")
                 .filter({ hasText: /node-wi\.\.\.rker-01/ })
@@ -6389,8 +6390,9 @@ test.describe("karse e2e", () => {
                 .hover({ force: true });
             const tooltip = page.locator("[data-test-id='perf-treemap-tooltip']");
             await expect(tooltip).toBeVisible();
-            await expect(tooltip).toContainText("node-wi...rker-01");
-            await expect(tooltip).not.toContainText(LONG_NODE);
+            // The box label is truncated, but the hover tooltip shows the full name.
+            await expect(tooltip).toContainText(LONG_NODE);
+            await expect(tooltip).not.toContainText("node-wi...rker-01");
         });
     });
 
