@@ -1610,75 +1610,86 @@ export async function getClusterPerformance(context: string): Promise<ClusterPer
         }
     }
 
-    // Build per-node usage joined with allocatable from node status.
-    const nodes: NodeUsage[] = ((nodesResult.stdout ? JSON.parse(nodesResult.stdout).items : []) as any[])
-        .map((item) => {
-            const name: string = item.metadata?.name ?? "";
-            const alloc = item.status?.allocatable ?? {};
-            return {
-                name,
-                usage: metricsAvailable ? (nodeUsageByName.get(name) ?? NULL_USAGE) : NULL_USAGE,
-                // Pod-request sums per node are computed by resource-utilization-2; until
-                // then requests are null (not yet derived) rather than a fabricated zero.
-                requests: NULL_USAGE,
-                allocatable: toResourceUsage(alloc.cpu, alloc.memory),
-            };
-        });
+    // The raw node and pod items, parsed once so they can drive both the typed
+    // NodeUsage/PodUsage lists and the health/workload aggregations below.
+    const nodeItems: any[] = (nodesResult.stdout ? JSON.parse(nodesResult.stdout).items : []) as any[];
+    const podItems: any[] = (podsResult.stdout ? JSON.parse(podsResult.stdout).items : []) as any[];
 
     // Build per-pod usage joined with requests/limits summed from the spec containers.
-    const pods: PodUsage[] = ((podsResult.stdout ? JSON.parse(podsResult.stdout).items : []) as any[])
-        .map((item) => {
-            const name: string = item.metadata?.name ?? "";
-            const namespace: string = item.metadata?.namespace ?? "";
-            const node: string = item.spec?.nodeName ?? "";
-            const containerUsage = podUsageByKey.get(`${namespace}/${name}`) ?? new Map<string, ResourceUsage>();
+    // Built before nodes so each node can sum the requests of the pods scheduled on it.
+    const pods: PodUsage[] = podItems.map((item) => {
+        const name: string = item.metadata?.name ?? "";
+        const namespace: string = item.metadata?.namespace ?? "";
+        const node: string = item.spec?.nodeName ?? "";
+        const containerUsage = podUsageByKey.get(`${namespace}/${name}`) ?? new Map<string, ResourceUsage>();
 
-            const containers = ((item.spec?.containers ?? []) as any[]).map((c) => {
-                const resources = c.resources ?? {};
-                const requests = resources.requests ?? {};
-                const limits = resources.limits ?? {};
-                const usage = metricsAvailable
-                    ? (containerUsage.get(c.name) ?? NULL_USAGE)
-                    : NULL_USAGE;
-                return {
-                    name: c.name,
-                    usage,
-                    requests: toResourceUsage(requests.cpu, requests.memory),
-                    limits: toResourceUsage(limits.cpu, limits.memory),
-                };
-            });
-
-            const podUsage: ResourceUsage = metricsAvailable
-                ? sumUsage(containers.map((c) => c.usage))
+        const containers = ((item.spec?.containers ?? []) as any[]).map((c) => {
+            const resources = c.resources ?? {};
+            const requests = resources.requests ?? {};
+            const limits = resources.limits ?? {};
+            const usage = metricsAvailable
+                ? (containerUsage.get(c.name) ?? NULL_USAGE)
                 : NULL_USAGE;
-
             return {
-                name,
-                namespace,
-                node,
-                usage: podUsage,
-                requests: sumUsage(containers.map((c) => c.requests)),
-                limits: sumUsage(containers.map((c) => c.limits)),
-                containers,
+                name: c.name,
+                usage,
+                requests: toResourceUsage(requests.cpu, requests.memory),
+                limits: toResourceUsage(limits.cpu, limits.memory),
             };
         });
 
-    // totals, health, and workloads are computed by resource-utilization-2. This ticket
-    // only lands the shape, so they are returned empty (zero counts, null usage, no
-    // workloads) until that ticket fills them in.
+        const podUsage: ResourceUsage = metricsAvailable
+            ? sumUsage(containers.map((c) => c.usage))
+            : NULL_USAGE;
+
+        return {
+            name,
+            namespace,
+            node,
+            usage: podUsage,
+            requests: sumUsage(containers.map((c) => c.requests)),
+            limits: sumUsage(containers.map((c) => c.limits)),
+            containers,
+        };
+    });
+
+    // Sum each node's reserved requests from the pods scheduled on it (pod.node === name),
+    // reusing the per-pod request sums computed above. A node with no scheduled pods sums
+    // to zero (empty sumUsage), which is a true figure, not an unknown.
+    const requestsByNode = new Map<string, ResourceUsage>();
+    for (const pod of pods) {
+        if (pod.node === "") {
+            continue;
+        }
+        const existing = requestsByNode.get(pod.node);
+        requestsByNode.set(pod.node, existing ? addUsage(existing, pod.requests) : pod.requests);
+    }
+
+    // Build per-node usage joined with allocatable from node status and the summed
+    // requests of the pods scheduled on it.
+    const nodes: NodeUsage[] = nodeItems.map((item) => {
+        const name: string = item.metadata?.name ?? "";
+        const alloc = item.status?.allocatable ?? {};
+        return {
+            name,
+            usage: metricsAvailable ? (nodeUsageByName.get(name) ?? NULL_USAGE) : NULL_USAGE,
+            requests: requestsByNode.get(name) ?? { cpuMillicores: 0, memoryBytes: 0 },
+            allocatable: toResourceUsage(alloc.cpu, alloc.memory),
+        };
+    });
+
+    // Cluster-wide totals: sum node usage, node requests, and node allocatable across
+    // every node. Usage stays null when metrics are unavailable (null propagates via
+    // sumUsage? — sumUsage treats null as 0, so use addUsage here to keep usage null
+    // when any node's usage is null). Requests/allocatable always sum to a number.
     const totals: ClusterResourceTotals = {
-        usage: NULL_USAGE,
-        requests: NULL_USAGE,
-        allocatable: NULL_USAGE,
+        usage: sumNodeField(nodes, "usage", metricsAvailable),
+        requests: sumNodeField(nodes, "requests", true),
+        allocatable: sumNodeField(nodes, "allocatable", true),
     };
-    const health: ClusterHealthSignals = {
-        pendingPods: 0,
-        oomKillCount: 0,
-        nodeCount: nodes.length,
-        nodePressure: { memoryPressure: 0, diskPressure: 0, pidPressure: 0 },
-        cpuThrottlingAvailable: false,
-    };
-    const workloads: WorkloadUsage[] = [];
+
+    const workloads = aggregateWorkloads(podItems, pods, metricsAvailable);
+    const health = computeHealth(nodeItems, podItems, nodes.length);
 
     return {
         metricsAvailable,
@@ -1687,6 +1698,125 @@ export async function getClusterPerformance(context: string): Promise<ClusterPer
         totals,
         health,
         workloads,
+    };
+}
+
+// Sums one ResourceUsage field across every node. When populated is false the field is
+// returned null (used for usage when the Metrics API is unavailable); otherwise the
+// fields are summed with addUsage so a null on any node keeps the total null.
+function sumNodeField(
+    nodes: NodeUsage[],
+    field: "usage" | "requests" | "allocatable",
+    populated: boolean,
+): ResourceUsage {
+    if (!populated) {
+        return NULL_USAGE;
+    }
+    let total: ResourceUsage = { cpuMillicores: 0, memoryBytes: 0 };
+    for (const node of nodes) {
+        total = addUsage(total, node[field]);
+    }
+    return total;
+}
+
+// Resolves the top-level controller a pod belongs to from its first ownerReference.
+// A ReplicaSet owner is rewritten to its parent Deployment by stripping the trailing
+// "-<hash>" the ReplicaSet name carries (best-effort, no extra API call). A bare pod
+// (no ownerReferences) is its own row with kind "Pod". Returns the grouping key parts.
+function resolveWorkloadOwner(podItem: any): { kind: string; name: string; namespace: string } {
+    const namespace: string = podItem.metadata?.namespace ?? "";
+    const owners: any[] = podItem.metadata?.ownerReferences ?? [];
+    const owner = owners[0];
+    if (owner === undefined) {
+        return { kind: "Pod", name: podItem.metadata?.name ?? "", namespace };
+    }
+    if (owner.kind === "ReplicaSet") {
+        // ReplicaSet names are "<deployment>-<hash>"; drop the last "-<hash>" segment to
+        // recover the Deployment name. If there is no hash segment, fall back to the RS.
+        const match = /^(.*)-[^-]+$/.exec(owner.name ?? "");
+        if (match !== null) {
+            return { kind: "Deployment", name: match[1]!, namespace };
+        }
+    }
+    return { kind: owner.kind ?? "", name: owner.name ?? "", namespace };
+}
+
+// Groups pods by their top-level controller owner, summing usage and requests per group.
+// Rows are sorted by CPU usage descending (nulls last) and capped at 20. podItems and
+// the typed pods list are aligned by index (both come from the same kubectl pod list).
+function aggregateWorkloads(podItems: any[], pods: PodUsage[], metricsAvailable: boolean): WorkloadUsage[] {
+    const groups = new Map<string, WorkloadUsage>();
+    for (let i = 0; i < pods.length; i++) {
+        const pod = pods[i]!;
+        const owner = resolveWorkloadOwner(podItems[i]);
+        const key = `${owner.namespace}/${owner.kind}/${owner.name}`;
+        const existing = groups.get(key);
+        if (existing === undefined) {
+            groups.set(key, {
+                name: owner.name,
+                namespace: owner.namespace,
+                kind: owner.kind,
+                usage: metricsAvailable ? pod.usage : NULL_USAGE,
+                requests: pod.requests,
+            });
+        }
+        else {
+            existing.usage = metricsAvailable ? addUsage(existing.usage, pod.usage) : NULL_USAGE;
+            existing.requests = addUsage(existing.requests, pod.requests);
+        }
+    }
+    const rows = [...groups.values()];
+    rows.sort((a, b) => (b.usage.cpuMillicores ?? -1) - (a.usage.cpuMillicores ?? -1));
+    return rows.slice(0, 20);
+}
+
+// Computes the cluster health-signal counters from the raw node and pod items.
+// pendingPods: pods in the Pending phase. oomKillCount: pods with any container whose
+// lastState.terminated.reason is "OOMKilled" (point-in-time). nodePressure: nodes whose
+// MemoryPressure/DiskPressure/PIDPressure condition is "True". cpuThrottlingAvailable is
+// always false (kubectl cannot expose CPU throttling).
+function computeHealth(nodeItems: any[], podItems: any[], nodeCount: number): ClusterHealthSignals {
+    let pendingPods = 0;
+    let oomKillCount = 0;
+    for (const pod of podItems) {
+        if (pod.status?.phase === "Pending") {
+            pendingPods++;
+        }
+        const statuses: any[] = [
+            ...(pod.status?.containerStatuses ?? []),
+            ...(pod.status?.initContainerStatuses ?? []),
+        ];
+        if (statuses.some((cs) => cs.lastState?.terminated?.reason === "OOMKilled")) {
+            oomKillCount++;
+        }
+    }
+
+    let memoryPressure = 0;
+    let diskPressure = 0;
+    let pidPressure = 0;
+    for (const node of nodeItems) {
+        for (const condition of (node.status?.conditions ?? []) as any[]) {
+            if (condition.status !== "True") {
+                continue;
+            }
+            if (condition.type === "MemoryPressure") {
+                memoryPressure++;
+            }
+            else if (condition.type === "DiskPressure") {
+                diskPressure++;
+            }
+            else if (condition.type === "PIDPressure") {
+                pidPressure++;
+            }
+        }
+    }
+
+    return {
+        pendingPods,
+        oomKillCount,
+        nodeCount,
+        nodePressure: { memoryPressure, diskPressure, pidPressure },
+        cpuThrottlingAvailable: false,
     };
 }
 
@@ -1841,6 +1971,11 @@ export async function getNodePerformance(context: string, name: string): Promise
     const pods: PodUsage[] = ((JSON.parse(podsResult.stdout).items ?? []) as any[]).map((item) =>
         buildPodUsage(item, metricsAvailable, containerUsageByPod),
     );
+
+    // The node's reserved requests are the sum of the requests of the pods scheduled on
+    // it (the field selector already scoped the pods to this node). A node with no pods
+    // sums to zero, a true figure rather than an unknown.
+    node.requests = sumUsage(pods.map((p) => p.requests));
 
     return {
         metricsAvailable,

@@ -243,6 +243,19 @@ echo "$PERF_RESP" | jq -e '.nodes[] | select(.name == "fake-node-1") | .usage.cp
 # Every pod carries the join fields (namespace, node) and the resource shapes,
 # whether or not its usage matched a fake-metrics entry.
 echo "$PERF_RESP" | jq -e '.pods | all(has("namespace") and has("node") and (.requests | has("cpuMillicores")) and (.limits | has("cpuMillicores")) and (.usage | has("cpuMillicores")) and (.containers | type == "array"))' > /dev/null
+# Every node carries its summed pod-request reservation alongside usage/allocatable.
+echo "$PERF_RESP" | jq -e '.nodes | all((.requests | has("cpuMillicores")))' > /dev/null
+# totals carries cluster-wide usage/requests/allocatable. allocatable always sums to a
+# number; requests too. Usage stays null when any node lacks a metrics entry (the smoke
+# fixture's fake-node-notready has none), since an unknown node makes the cluster total
+# unknown — so only its shape is asserted, not non-nullness.
+echo "$PERF_RESP" | jq -e '.totals | (.usage | has("cpuMillicores")) and (.requests | has("cpuMillicores")) and (.allocatable | has("cpuMillicores"))' > /dev/null
+echo "$PERF_RESP" | jq -e '.totals.allocatable.cpuMillicores != null and .totals.requests.cpuMillicores != null' > /dev/null
+# health carries the signal counters; nodeCount matches the node list length.
+echo "$PERF_RESP" | jq -e '.health | has("pendingPods") and has("oomKillCount") and has("nodeCount") and (.nodePressure | has("memoryPressure") and has("diskPressure") and has("pidPressure")) and .cpuThrottlingAvailable == false' > /dev/null
+echo "$PERF_RESP" | jq -e '.health.nodeCount == (.nodes | length)' > /dev/null
+# workloads is an array of per-controller rows, each with kind/usage/requests.
+echo "$PERF_RESP" | jq -e '(.workloads | type == "array") and (.workloads | all(has("kind") and has("name") and has("namespace") and (.usage | has("cpuMillicores")) and (.requests | has("cpuMillicores"))))' > /dev/null
 echo "OK"
 
 echo "--- GET /api/namespaces ---"

@@ -97,7 +97,7 @@ curl -fsS http://127.0.0.1:5172/api/cluster/overview
 Returns the nodes in the current context, shaped for the nodes table.
 
 - **Request**: no body.
-- **Response 200**: `{ "nodes": Node[] }`.
+- **Response 200**: `{ "nodes": Node[] }`. Each `Node` carries `instanceType`, read from the node's `node.kubernetes.io/instance-type` label (falling back to the legacy `beta.kubernetes.io/instance-type`), or `null` when the cluster does not set it (e.g. kwok).
 - **Response 500**: `{ "error": "<kubectl stderr>" }` when listing nodes fails.
 
 ```sh
@@ -112,7 +112,8 @@ curl -fsS http://127.0.0.1:5172/api/cluster/nodes
       "status": "Ready",
       "roles": ["control-plane"],
       "version": "v1.30.0",
-      "createdAt": "2024-01-01T00:00:00Z"
+      "createdAt": "2024-01-01T00:00:00Z",
+      "instanceType": "m5.large"
     }
   ]
 }
@@ -120,13 +121,18 @@ curl -fsS http://127.0.0.1:5172/api/cluster/nodes
 
 ## GET /api/cluster/performance
 
-Returns the cluster-scoped performance snapshot for the given context: per-node usage versus allocatable capacity, and per-pod usage versus the pod's summed requests and limits. Backs the cluster Performance tab.
+Returns the cluster-scoped performance snapshot for the given context: per-node usage versus allocatable capacity and reserved requests, per-pod usage versus the pod's summed requests and limits, cluster-wide totals, health-signal counters, and per-controller workload usage rows. Backs the cluster Performance tab.
 
 Usage is read from the Kubernetes Metrics API (`/apis/metrics.k8s.io/v1beta1/nodes` and `.../pods`, via `kubectl get --raw`). Allocatable comes from node status; requests and limits come from the pod specs. CPU is normalised to millicores, memory to bytes. The read is a single point-in-time sample (no history).
 
 - **Request query**: `context` (required) — the kubeconfig context name.
-- **Response 200**: `ClusterPerformance` — `{ "metricsAvailable": boolean, "nodes": NodeUsage[], "pods": PodUsage[] }`. Each `NodeUsage` is `{ name, usage, allocatable }`; each `PodUsage` is `{ name, namespace, node, usage, requests, limits, containers[] }`. A `ResourceUsage` is `{ "cpuMillicores": number | null, "memoryBytes": number | null }`.
-- **`metricsAvailable: false`**: on a cluster with no metrics-server, the Metrics API read degrades rather than failing. `metricsAvailable` is then `false`, every `usage` field (node, pod, and container) is `null`, and `allocatable`, `requests`, and `limits` are still populated from node status and pod specs so the provisioning view renders.
+- **Response 200**: `ClusterPerformance` — `{ "metricsAvailable": boolean, "nodes": NodeUsage[], "pods": PodUsage[], "totals": ClusterResourceTotals, "health": ClusterHealthSignals, "workloads": WorkloadUsage[] }`. A `ResourceUsage` is `{ "cpuMillicores": number | null, "memoryBytes": number | null }`.
+  - Each `NodeUsage` is `{ name, usage, requests, allocatable }`, where `requests` is the sum of the requests of the pods scheduled on that node.
+  - Each `PodUsage` is `{ name, namespace, node, usage, requests, limits, containers[] }`.
+  - `totals` is `{ usage, requests, allocatable }`, each a cluster-wide sum across all nodes (node usage, node requests, node allocatable).
+  - `health` is `{ pendingPods, oomKillCount, nodeCount, nodePressure: { memoryPressure, diskPressure, pidPressure }, cpuThrottlingAvailable }`. `pendingPods` counts pods in the `Pending` phase; `oomKillCount` counts pods with a container whose `lastState.terminated.reason` is `"OOMKilled"` (point-in-time, not a 24h history); `nodePressure` counts nodes whose matching condition is `"True"`; `cpuThrottlingAvailable` is always `false` (kubectl cannot expose CPU throttling).
+  - `workloads` is up to 20 rows, one per top-level controller, each `{ name, namespace, kind, usage, requests }`. Pods are grouped by their first `ownerReference`; a `ReplicaSet` owner is folded into its parent Deployment (by stripping the ReplicaSet name's trailing hash, best-effort); a bare pod with no owner is its own row with kind `"Pod"`. Rows are sorted by CPU usage descending.
+- **`metricsAvailable: false`**: on a cluster with no metrics-server, the Metrics API read degrades rather than failing. `metricsAvailable` is then `false`, every `usage` field (node, pod, container, totals, and workloads) is `null`, and `allocatable`, `requests` (node, pod, totals, workloads), and pod `limits` are still populated from node status and pod specs so the provisioning view renders.
 - **Response 400**: `{ "error": "context query parameter is required" }` when `context` is missing or blank.
 - **Response 500**: `{ "error": "<kubectl stderr>" }` when the node or pod spec read fails.
 
@@ -141,6 +147,7 @@ curl -fsS 'http://127.0.0.1:5172/api/cluster/performance?context=my-ctx'
     {
       "name": "node-a",
       "usage": { "cpuMillicores": 850, "memoryBytes": 2147483648 },
+      "requests": { "cpuMillicores": 150, "memoryBytes": 201326592 },
       "allocatable": { "cpuMillicores": 4000, "memoryBytes": 8589934592 }
     }
   ],
@@ -160,6 +167,27 @@ curl -fsS 'http://127.0.0.1:5172/api/cluster/performance?context=my-ctx'
           "limits": { "cpuMillicores": 500, "memoryBytes": 268435456 }
         }
       ]
+    }
+  ],
+  "totals": {
+    "usage": { "cpuMillicores": 850, "memoryBytes": 2147483648 },
+    "requests": { "cpuMillicores": 150, "memoryBytes": 201326592 },
+    "allocatable": { "cpuMillicores": 4000, "memoryBytes": 8589934592 }
+  },
+  "health": {
+    "pendingPods": 0,
+    "oomKillCount": 0,
+    "nodeCount": 1,
+    "nodePressure": { "memoryPressure": 0, "diskPressure": 0, "pidPressure": 0 },
+    "cpuThrottlingAvailable": false
+  },
+  "workloads": [
+    {
+      "name": "web",
+      "namespace": "default",
+      "kind": "Deployment",
+      "usage": { "cpuMillicores": 150, "memoryBytes": 335544320 },
+      "requests": { "cpuMillicores": 150, "memoryBytes": 201326592 }
     }
   ]
 }
@@ -276,7 +304,7 @@ curl -fsS 'http://127.0.0.1:5172/api/pods?context=my-ctx&namespace=default'
 Returns a point-in-time performance snapshot scoped to a single node: the node's CPU/memory usage joined with its allocatable capacity, plus the pods scheduled on it with per-container usage. Backs the node Performance tab.
 
 - **Request query**: `context` (required) — the kubeconfig context name.
-- **Response 200**: `NodePerformance` — `{ "metricsAvailable": boolean, "node": NodeUsage, "pods": PodUsage[] }`. Each `NodeUsage` is `{ name, usage, allocatable }` and each `PodUsage` is `{ name, namespace, node, usage, requests, limits, containers[] }`, where `containers[]` is `ContainerUsage` (`{ name, usage, requests, limits }`). Every `usage`/`requests`/`limits` is a `ResourceUsage` (`{ cpuMillicores, memoryBytes }`). CPU is reported in millicores and memory in bytes (parsed from the Metrics API's nanocore/`Ki` quantities and the pod-spec quantities).
+- **Response 200**: `NodePerformance` — `{ "metricsAvailable": boolean, "node": NodeUsage, "pods": PodUsage[] }`. Each `NodeUsage` is `{ name, usage, requests, allocatable }`, where `requests` is the sum of the requests of the pods scheduled on the node. Each `PodUsage` is `{ name, namespace, node, usage, requests, limits, containers[] }`, where `containers[]` is `ContainerUsage` (`{ name, usage, requests, limits }`). Every `usage`/`requests`/`limits` is a `ResourceUsage` (`{ cpuMillicores, memoryBytes }`). CPU is reported in millicores and memory in bytes (parsed from the Metrics API's nanocore/`Ki` quantities and the pod-spec quantities).
 - **Metrics-unavailable degradation**: on a cluster with no metrics-server, `metricsAvailable` is `false`, every `usage` field (`cpuMillicores`, `memoryBytes`) is `null`, and `requests`/`limits` (and node `allocatable`) are still populated from the pod specs and node status, so the provisioning view keeps working. The adapter treats a metrics read whose stderr names the Metrics API being unavailable as `metricsAvailable: false` rather than failing the request.
 - **Response 400**: `{ "error": "context query parameter is required" }` when `context` is missing or blank.
 - **Response 500**: `{ "error": "<kubectl stderr>" }` when the node read or the scoped pod read fails.
@@ -293,6 +321,7 @@ curl -fsS 'http://127.0.0.1:5172/api/nodes/ctrl-0/performance?context=my-ctx'
   "node": {
     "name": "ctrl-0",
     "usage": { "cpuMillicores": 850, "memoryBytes": 2147483648 },
+    "requests": { "cpuMillicores": 150, "memoryBytes": 201326592 },
     "allocatable": { "cpuMillicores": 4000, "memoryBytes": 8589934592 }
   },
   "pods": [

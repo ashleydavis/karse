@@ -2783,14 +2783,16 @@ describe("getClusterPerformance", () => {
             {
                 name: "node-a",
                 usage: { cpuMillicores: 850, memoryBytes: 2097152 * 1024 },
-                // requests are null until resource-utilization-2 sums per-node pod requests.
-                requests: { cpuMillicores: null, memoryBytes: null },
+                // node-a's requests = the web pod's summed requests (nginx 100m/128Mi +
+                // sidecar 50m/64Mi), the only pod scheduled on it.
+                requests: { cpuMillicores: 150, memoryBytes: 192 * 1024 ** 2 },
                 allocatable: { cpuMillicores: 4000, memoryBytes: 8 * 1024 ** 3 },
             },
             {
                 name: "node-b",
                 usage: { cpuMillicores: 1600, memoryBytes: 4194304 * 1024 },
-                requests: { cpuMillicores: null, memoryBytes: null },
+                // node-b's requests = the api pod's requests (200m/256Mi).
+                requests: { cpuMillicores: 200, memoryBytes: 256 * 1024 ** 2 },
                 allocatable: { cpuMillicores: 8000, memoryBytes: 16 * 1024 ** 3 },
             },
         ]);
@@ -2825,6 +2827,183 @@ describe("getClusterPerformance", () => {
         expect(api.usage).toEqual({ cpuMillicores: 300, memoryBytes: 524288 * 1024 });
         expect(api.requests).toEqual({ cpuMillicores: 200, memoryBytes: 256 * 1024 ** 2 });
         expect(api.limits).toEqual({ cpuMillicores: 1000, memoryBytes: 512 * 1024 ** 2 });
+
+        // totals: cluster-wide sums across the two nodes.
+        expect(result.totals).toEqual({
+            usage: { cpuMillicores: 850 + 1600, memoryBytes: (2097152 + 4194304) * 1024 },
+            requests: { cpuMillicores: 150 + 200, memoryBytes: (192 + 256) * 1024 ** 2 },
+            allocatable: { cpuMillicores: 4000 + 8000, memoryBytes: (8 + 16) * 1024 ** 3 },
+        });
+    });
+
+    test("totals arithmetic sums usage, requests, and allocatable across two nodes", async () => {
+        setRunnerHandlers({
+            "--context ctx get --raw /apis/metrics.k8s.io/v1beta1/nodes": () => ok(JSON.stringify(nodeMetricsFixture)),
+            "--context ctx get --raw /apis/metrics.k8s.io/v1beta1/pods": () => ok(JSON.stringify(podMetricsFixture)),
+            "--context ctx get nodes -o json": () => ok(JSON.stringify(nodesFixture)),
+            "--context ctx get pods -A -o json": () => ok(JSON.stringify(podsFixture)),
+        });
+
+        const { totals } = await getClusterPerformance("ctx");
+
+        // node-a usage 850m + node-b 1600m; memory 2097152Ki + 4194304Ki.
+        expect(totals.usage).toEqual({ cpuMillicores: 2450, memoryBytes: (2097152 + 4194304) * 1024 });
+        // requests: web (150m/192Mi) on node-a + api (200m/256Mi) on node-b.
+        expect(totals.requests).toEqual({ cpuMillicores: 350, memoryBytes: (192 + 256) * 1024 ** 2 });
+        // allocatable: 4 + 8 cores; 8 + 16 GiB.
+        expect(totals.allocatable).toEqual({ cpuMillicores: 12000, memoryBytes: 24 * 1024 ** 3 });
+    });
+
+    test("workload grouping merges two pods under one Deployment", async () => {
+        // Two pods owned by ReplicaSets of the same Deployment ("web"), plus a bare pod.
+        const ownedPods = {
+            items: [
+                {
+                    metadata: {
+                        name: "web-abc123-aaaaa",
+                        namespace: "default",
+                        ownerReferences: [{ kind: "ReplicaSet", name: "web-abc123" }],
+                    },
+                    spec: {
+                        nodeName: "node-a",
+                        containers: [
+                            { name: "c", resources: { requests: { cpu: "100m", memory: "128Mi" } } },
+                        ],
+                    },
+                },
+                {
+                    metadata: {
+                        name: "web-abc123-bbbbb",
+                        namespace: "default",
+                        ownerReferences: [{ kind: "ReplicaSet", name: "web-abc123" }],
+                    },
+                    spec: {
+                        nodeName: "node-b",
+                        containers: [
+                            { name: "c", resources: { requests: { cpu: "100m", memory: "128Mi" } } },
+                        ],
+                    },
+                },
+                {
+                    metadata: { name: "loner", namespace: "default" },
+                    spec: {
+                        nodeName: "node-a",
+                        containers: [
+                            { name: "c", resources: { requests: { cpu: "20m", memory: "16Mi" } } },
+                        ],
+                    },
+                },
+            ],
+        };
+        // Pod metrics for both web pods so the merged usage is checkable.
+        const podMetrics = {
+            kind: "PodMetricsList",
+            items: [
+                {
+                    metadata: { name: "web-abc123-aaaaa", namespace: "default" },
+                    containers: [{ name: "c", usage: { cpu: "50000000n", memory: "100Ki" } }],
+                },
+                {
+                    metadata: { name: "web-abc123-bbbbb", namespace: "default" },
+                    containers: [{ name: "c", usage: { cpu: "70000000n", memory: "200Ki" } }],
+                },
+                {
+                    metadata: { name: "loner", namespace: "default" },
+                    containers: [{ name: "c", usage: { cpu: "10000000n", memory: "50Ki" } }],
+                },
+            ],
+        };
+        setRunnerHandlers({
+            "--context ctx get --raw /apis/metrics.k8s.io/v1beta1/nodes": () => ok(JSON.stringify(nodeMetricsFixture)),
+            "--context ctx get --raw /apis/metrics.k8s.io/v1beta1/pods": () => ok(JSON.stringify(podMetrics)),
+            "--context ctx get nodes -o json": () => ok(JSON.stringify(nodesFixture)),
+            "--context ctx get pods -A -o json": () => ok(JSON.stringify(ownedPods)),
+        });
+
+        const { workloads } = await getClusterPerformance("ctx");
+
+        // The two ReplicaSet pods collapse into a single "web" Deployment row; the bare
+        // pod is its own "Pod" row. Two rows total.
+        expect(workloads).toHaveLength(2);
+        const web = workloads.find((w) => w.kind === "Deployment" && w.name === "web")!;
+        expect(web.namespace).toBe("default");
+        // usage merged: 50m + 70m; memory 100Ki + 200Ki.
+        expect(web.usage).toEqual({ cpuMillicores: 120, memoryBytes: 300 * 1024 });
+        // requests merged: 100m + 100m; 128Mi + 128Mi.
+        expect(web.requests).toEqual({ cpuMillicores: 200, memoryBytes: 256 * 1024 ** 2 });
+        const loner = workloads.find((w) => w.kind === "Pod")!;
+        expect(loner.name).toBe("loner");
+        // Sorted by CPU usage descending: the 120m Deployment row before the 10m Pod row.
+        expect(workloads[0]!.kind).toBe("Deployment");
+    });
+
+    test("health counts oomKillCount and nodePressure from fixture conditions and lastState", async () => {
+        const pressuredNodes = {
+            items: [
+                {
+                    metadata: { name: "node-a" },
+                    status: {
+                        allocatable: { cpu: "4", memory: "8Gi" },
+                        conditions: [
+                            { type: "MemoryPressure", status: "True" },
+                            { type: "DiskPressure", status: "False" },
+                            { type: "PIDPressure", status: "True" },
+                        ],
+                    },
+                },
+                {
+                    metadata: { name: "node-b" },
+                    status: {
+                        allocatable: { cpu: "8", memory: "16Gi" },
+                        conditions: [
+                            { type: "MemoryPressure", status: "False" },
+                            { type: "DiskPressure", status: "True" },
+                        ],
+                    },
+                },
+            ],
+        };
+        const healthPods = {
+            items: [
+                {
+                    metadata: { name: "pending-pod", namespace: "default" },
+                    status: { phase: "Pending" },
+                    spec: { nodeName: "", containers: [] },
+                },
+                {
+                    metadata: { name: "oom-pod", namespace: "default" },
+                    status: {
+                        phase: "Running",
+                        containerStatuses: [
+                            { name: "c", lastState: { terminated: { reason: "OOMKilled" } } },
+                        ],
+                    },
+                    spec: { nodeName: "node-a", containers: [{ name: "c" }] },
+                },
+                {
+                    metadata: { name: "healthy-pod", namespace: "default" },
+                    status: { phase: "Running" },
+                    spec: { nodeName: "node-b", containers: [{ name: "c" }] },
+                },
+            ],
+        };
+        setRunnerHandlers({
+            "--context ctx get --raw /apis/metrics.k8s.io/v1beta1/nodes": () =>
+                fail("error: the server could not find the requested resource"),
+            "--context ctx get --raw /apis/metrics.k8s.io/v1beta1/pods": () =>
+                fail("error: the server could not find the requested resource"),
+            "--context ctx get nodes -o json": () => ok(JSON.stringify(pressuredNodes)),
+            "--context ctx get pods -A -o json": () => ok(JSON.stringify(healthPods)),
+        });
+
+        const { health } = await getClusterPerformance("ctx");
+
+        expect(health.nodeCount).toBe(2);
+        expect(health.pendingPods).toBe(1);
+        expect(health.oomKillCount).toBe(1);
+        // node-a is under MemoryPressure + PIDPressure; node-b under DiskPressure.
+        expect(health.nodePressure).toEqual({ memoryPressure: 1, diskPressure: 1, pidPressure: 1 });
+        expect(health.cpuThrottlingAvailable).toBe(false);
     });
 
     test("metrics-API-unavailable -> metricsAvailable false, usage null, requests/limits populated", async () => {
@@ -2975,8 +3154,9 @@ describe("getNodePerformance", () => {
         expect(result.node).toEqual({
             name: "node-1",
             usage: { cpuMillicores: 850, memoryBytes: 2097152 * 1024 },
-            // requests are null until resource-utilization-2 sums per-node pod requests.
-            requests: { cpuMillicores: null, memoryBytes: null },
+            // requests = the web pod's summed requests (nginx 100m/128Mi + sidecar 50m/64Mi),
+            // the only pod scheduled on node-1.
+            requests: { cpuMillicores: 150, memoryBytes: 192 * 1024 ** 2 },
             allocatable: { cpuMillicores: 4000, memoryBytes: 8 * 1024 ** 3 },
         });
 
@@ -3203,7 +3383,8 @@ describe("getPodPerformance", () => {
         expect(result.node).toEqual({
             name: "node-1",
             usage: { cpuMillicores: 1000, memoryBytes: 2 * 1024 ** 3 },
-            // requests are null until resource-utilization-2 sums per-node pod requests.
+            // The scheduling-node helper reads only allocatable and usage, not the node's
+            // pods, so its requests stay null (the pod page does not need the node's requests).
             requests: { cpuMillicores: null, memoryBytes: null },
             allocatable: { cpuMillicores: 4000, memoryBytes: 8 * 1024 ** 3 },
         });
@@ -3266,7 +3447,8 @@ describe("getPodPerformance", () => {
         expect(result.node).toEqual({
             name: "node-1",
             usage: { cpuMillicores: null, memoryBytes: null },
-            // requests are null until resource-utilization-2 sums per-node pod requests.
+            // The scheduling-node helper reads only allocatable and usage, not the node's
+            // pods, so its requests stay null (the pod page does not need the node's requests).
             requests: { cpuMillicores: null, memoryBytes: null },
             allocatable: { cpuMillicores: 4000, memoryBytes: 8 * 1024 ** 3 },
         });
