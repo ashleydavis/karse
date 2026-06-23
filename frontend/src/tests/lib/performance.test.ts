@@ -17,6 +17,7 @@ function makeNode(
     return {
         name,
         usage: { cpuMillicores: usage[0], memoryBytes: usage[1] },
+        requests: { cpuMillicores: null, memoryBytes: null },
         allocatable: { cpuMillicores: allocatable[0], memoryBytes: allocatable[1] },
     };
 }

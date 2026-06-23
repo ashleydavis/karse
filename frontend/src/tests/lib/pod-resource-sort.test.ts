@@ -37,6 +37,7 @@ function makeNodeUsage(name: string, cpu: number | null, memory: number | null):
     return {
         name,
         usage: { cpuMillicores: null, memoryBytes: null },
+        requests: { cpuMillicores: null, memoryBytes: null },
         allocatable: { cpuMillicores: cpu, memoryBytes: memory },
     };
 }

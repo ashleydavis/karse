@@ -78,6 +78,7 @@ describe("GET /api/cluster/nodes", () => {
         version: "v1.30.0",
         createdAt: "2024-01-01T00:00:00Z",
         labels: { "node-role.kubernetes.io/control-plane": "" },
+        instanceType: null,
     };
 
     test("with ?context forwards it to adapter", async () => {
@@ -123,6 +124,7 @@ describe("GET /api/cluster/performance", () => {
             {
                 name: "ctrl-0",
                 usage: { cpuMillicores: 850, memoryBytes: 2147483648 },
+                requests: { cpuMillicores: 100, memoryBytes: 134217728 },
                 allocatable: { cpuMillicores: 4000, memoryBytes: 8589934592 },
             },
         ],
@@ -142,6 +144,27 @@ describe("GET /api/cluster/performance", () => {
                         limits: { cpuMillicores: 500, memoryBytes: 536870912 },
                     },
                 ],
+            },
+        ],
+        totals: {
+            usage: { cpuMillicores: 850, memoryBytes: 2147483648 },
+            requests: { cpuMillicores: 100, memoryBytes: 134217728 },
+            allocatable: { cpuMillicores: 4000, memoryBytes: 8589934592 },
+        },
+        health: {
+            pendingPods: 0,
+            oomKillCount: 0,
+            nodeCount: 1,
+            nodePressure: { memoryPressure: 0, diskPressure: 0, pidPressure: 0 },
+            cpuThrottlingAvailable: false,
+        },
+        workloads: [
+            {
+                name: "web",
+                namespace: "default",
+                kind: "Deployment",
+                usage: { cpuMillicores: 120, memoryBytes: 268435456 },
+                requests: { cpuMillicores: 100, memoryBytes: 134217728 },
             },
         ],
     };

@@ -40,6 +40,7 @@ The spec is reverse-engineered from the shipped code and the prose docs (`docs/a
 | [audit-log](./audit-log/index.md) | Settled | Complete | Every kubectl call is appended to a rolling on-disk audit log. |
 | [about-page](./about-page/index.md) | Settled | Complete | Static About page: what Karse is, how it works, who made it, and a GitHub link. |
 | [cluster-cache](./cluster-cache/index.md) | Settled | Complete | On-disk, date-stamped cache of read-only cluster data, with a UI-configurable staleness threshold and a refresh that empties it. |
+| [resource-utilization](./resource-utilization/index.md) | Draft | None | Richer CPU/memory utilisation surfaces: cluster Usage-vs-Requests cards with %/Absolute toggles, health-signal tiles, bar columns on the nodes/pods tables, a per-controller workloads table, and node/pod utilisation panels. |
 
 ## Not yet shipped
 

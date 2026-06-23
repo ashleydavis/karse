@@ -37,6 +37,7 @@ function makeNode(name: string, status: Node["status"]): Node {
         version: "v1.29.0",
         createdAt: "2024-01-01T00:00:00Z",
         labels: {},
+        instanceType: null,
     };
 }
 

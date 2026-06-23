@@ -23,6 +23,7 @@ function makeNode(name: string, status: Node["status"]): Node {
         version: "v1.29.0",
         createdAt: "2024-02-01T00:00:00Z",
         labels: { "kubernetes.io/hostname": name },
+        instanceType: null,
     };
 }
 

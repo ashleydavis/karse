@@ -13,6 +13,7 @@ import type {
     NamespaceDetail, NamespaceResource, NamespaceQuota, NamespaceLimit,
     ClusterPerformance, NodeUsage, PodUsage, ResourceUsage,
     ContainerUsage, NodePerformance, PodPerformance,
+    ClusterResourceTotals, ClusterHealthSignals, WorkloadUsage,
 } from "karse-types";
 
 // Base directory for the rolling audit log; overridable via KARSE_LOGS_DIR.
@@ -188,13 +189,19 @@ export async function listNodes(context: string): Promise<Node[]> {
             }
         }
         roles.sort();
+        const labels: Record<string, string> = item.metadata.labels ?? {};
+        const instanceType =
+            labels["node.kubernetes.io/instance-type"] ??
+            labels["beta.kubernetes.io/instance-type"] ??
+            null;
         return {
             name: item.metadata.name,
             status,
             roles,
             version: item.status.nodeInfo.kubeletVersion,
             createdAt: item.metadata.creationTimestamp,
-            labels: item.metadata.labels ?? {},
+            labels,
+            instanceType,
         };
     });
 }
@@ -1611,6 +1618,9 @@ export async function getClusterPerformance(context: string): Promise<ClusterPer
             return {
                 name,
                 usage: metricsAvailable ? (nodeUsageByName.get(name) ?? NULL_USAGE) : NULL_USAGE,
+                // Pod-request sums per node are computed by resource-utilization-2; until
+                // then requests are null (not yet derived) rather than a fabricated zero.
+                requests: NULL_USAGE,
                 allocatable: toResourceUsage(alloc.cpu, alloc.memory),
             };
         });
@@ -1653,10 +1663,30 @@ export async function getClusterPerformance(context: string): Promise<ClusterPer
             };
         });
 
+    // totals, health, and workloads are computed by resource-utilization-2. This ticket
+    // only lands the shape, so they are returned empty (zero counts, null usage, no
+    // workloads) until that ticket fills them in.
+    const totals: ClusterResourceTotals = {
+        usage: NULL_USAGE,
+        requests: NULL_USAGE,
+        allocatable: NULL_USAGE,
+    };
+    const health: ClusterHealthSignals = {
+        pendingPods: 0,
+        oomKillCount: 0,
+        nodeCount: nodes.length,
+        nodePressure: { memoryPressure: 0, diskPressure: 0, pidPressure: 0 },
+        cpuThrottlingAvailable: false,
+    };
+    const workloads: WorkloadUsage[] = [];
+
     return {
         metricsAvailable,
         nodes,
         pods,
+        totals,
+        health,
+        workloads,
     };
 }
 
@@ -1800,6 +1830,8 @@ export async function getNodePerformance(context: string, name: string): Promise
     const node: NodeUsage = {
         name,
         usage: nodeUsage,
+        // Pod-request sum for the node is computed by resource-utilization-2; null until then.
+        requests: NULL_USAGE,
         allocatable,
     };
 
@@ -1932,5 +1964,5 @@ async function fetchPodSchedulingNode(
         );
         usage = metricsItem ? parseUsage(metricsItem.usage) : NULL_USAGE;
     }
-    return { name, usage, allocatable };
+    return { name, usage, requests: NULL_USAGE, allocatable };
 }

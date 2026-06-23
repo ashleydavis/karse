@@ -19,6 +19,9 @@ export type Node = {
     version: string;           // kubeletVersion
     createdAt: string;         // ISO timestamp; UI computes age
     labels: Record<string, string>;  // metadata.labels; empty object when none
+    // The node's cloud instance type, from label node.kubernetes.io/instance-type
+    // (falling back to beta.kubernetes.io/instance-type); null when neither label is set.
+    instanceType: string | null;
 };
 
 export type ClusterOverview = {
@@ -373,20 +376,67 @@ export type PodUsage = {
 };
 
 // A single node's usage joined with its allocatable capacity, used to compute the
-// node-utilisation heatmap (usage / allocatable).
+// node-utilisation heatmap (usage / allocatable). requests is the CPU/memory reserved
+// by the pods scheduled on the node, summed from those pods' specs, so requests-mode
+// utilisation (requests / allocatable) can be shown even when usage is unavailable.
 export type NodeUsage = {
     name: string;
     usage: ResourceUsage;
+    requests: ResourceUsage;
     allocatable: ResourceUsage;
+};
+
+// Cluster-wide CPU/memory totals, summed across all nodes: live usage, the requests
+// reserved by scheduled pods, and the allocatable capacity. The denominators for the
+// cluster Overview cards' percentage bases.
+export type ClusterResourceTotals = {
+    usage: ResourceUsage;
+    requests: ResourceUsage;
+    allocatable: ResourceUsage;
+};
+
+// Cluster-wide health counters shown as health-signal tiles on the cluster Overview tab.
+// pendingPods counts pods in the Pending phase; oomKillCount counts pods whose containers
+// currently expose lastState.terminated.reason === "OOMKilled" (point-in-time, not a 24h
+// history); nodeCount is the number of nodes; nodePressure counts nodes whose matching
+// condition is "True". cpuThrottlingAvailable is always false: kubectl cannot expose CPU
+// throttling (it needs container_cpu_cfs_throttled_periods_total from Prometheus), so the
+// tile is permanently "not available".
+export type ClusterHealthSignals = {
+    pendingPods: number;
+    oomKillCount: number;
+    nodeCount: number;
+    nodePressure: {
+        memoryPressure: number;
+        diskPressure: number;
+        pidPressure: number;
+    };
+    cpuThrottlingAvailable: false;
+};
+
+// One row of the cluster Overview workloads table: a top-level controller's summed usage
+// and requests. One row per top-level controller (Deployment, StatefulSet, DaemonSet, …);
+// a bare pod with no controller owner appears as its own row with kind "Pod".
+export type WorkloadUsage = {
+    name: string;
+    namespace: string;
+    kind: string;
+    usage: ResourceUsage;
+    requests: ResourceUsage;
 };
 
 // Cluster-scoped performance snapshot, returned by GET /api/cluster/performance.
 // metricsAvailable is false when the Metrics API is absent; usage fields are then
-// null while requests/limits remain populated from specs.
+// null while requests/limits remain populated from specs. totals carries the
+// cluster-wide usage/requests/allocatable sums, health the health-signal counters,
+// and workloads the per-controller usage rows for the Overview workloads table.
 export type ClusterPerformance = {
     metricsAvailable: boolean;
     nodes: NodeUsage[];
     pods: PodUsage[];
+    totals: ClusterResourceTotals;
+    health: ClusterHealthSignals;
+    workloads: WorkloadUsage[];
 };
 
 // Node-scoped performance snapshot, returned by GET /api/nodes/:name/performance.

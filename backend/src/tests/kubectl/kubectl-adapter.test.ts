@@ -269,6 +269,7 @@ describe("listNodes", () => {
             labels: {
                 "node-role.kubernetes.io/control-plane": "",
             },
+            instanceType: null,
         });
         expect(result[1]!).toEqual({
             name: "worker-0",
@@ -277,7 +278,58 @@ describe("listNodes", () => {
             version: "v1.30.0",
             createdAt: "2024-06-01T00:00:00Z",
             labels: {},
+            instanceType: null,
         });
+    });
+
+    test("reads instanceType from the instance-type label, preferring the GA key", async () => {
+        const fixture = {
+            items: [
+                {
+                    metadata: {
+                        name: "ga-node",
+                        creationTimestamp: "2024-01-01T00:00:00Z",
+                        labels: {
+                            "node.kubernetes.io/instance-type": "m5.large",
+                            "beta.kubernetes.io/instance-type": "m4.large",
+                        },
+                    },
+                    status: {
+                        conditions: [{ type: "Ready", status: "True" }],
+                        nodeInfo: { kubeletVersion: "v1.30.0" },
+                    },
+                },
+                {
+                    metadata: {
+                        name: "beta-node",
+                        creationTimestamp: "2024-01-01T00:00:00Z",
+                        labels: { "beta.kubernetes.io/instance-type": "t2.micro" },
+                    },
+                    status: {
+                        conditions: [{ type: "Ready", status: "True" }],
+                        nodeInfo: { kubeletVersion: "v1.30.0" },
+                    },
+                },
+                {
+                    metadata: {
+                        name: "no-label-node",
+                        creationTimestamp: "2024-01-01T00:00:00Z",
+                        labels: {},
+                    },
+                    status: {
+                        conditions: [{ type: "Ready", status: "True" }],
+                        nodeInfo: { kubeletVersion: "v1.30.0" },
+                    },
+                },
+            ],
+        };
+        setRunnerHandlers({
+            "--context test-ctx get nodes -o json": () => ok(JSON.stringify(fixture)),
+        });
+        const result = await listNodes("test-ctx");
+        expect(result[0]!.instanceType).toBe("m5.large");
+        expect(result[1]!.instanceType).toBe("t2.micro");
+        expect(result[2]!.instanceType).toBeNull();
     });
 
     test("derives statuses from realistic kwok-style mixed conditions", async () => {
@@ -2731,11 +2783,14 @@ describe("getClusterPerformance", () => {
             {
                 name: "node-a",
                 usage: { cpuMillicores: 850, memoryBytes: 2097152 * 1024 },
+                // requests are null until resource-utilization-2 sums per-node pod requests.
+                requests: { cpuMillicores: null, memoryBytes: null },
                 allocatable: { cpuMillicores: 4000, memoryBytes: 8 * 1024 ** 3 },
             },
             {
                 name: "node-b",
                 usage: { cpuMillicores: 1600, memoryBytes: 4194304 * 1024 },
+                requests: { cpuMillicores: null, memoryBytes: null },
                 allocatable: { cpuMillicores: 8000, memoryBytes: 16 * 1024 ** 3 },
             },
         ]);
@@ -2920,6 +2975,8 @@ describe("getNodePerformance", () => {
         expect(result.node).toEqual({
             name: "node-1",
             usage: { cpuMillicores: 850, memoryBytes: 2097152 * 1024 },
+            // requests are null until resource-utilization-2 sums per-node pod requests.
+            requests: { cpuMillicores: null, memoryBytes: null },
             allocatable: { cpuMillicores: 4000, memoryBytes: 8 * 1024 ** 3 },
         });
 
@@ -3146,6 +3203,8 @@ describe("getPodPerformance", () => {
         expect(result.node).toEqual({
             name: "node-1",
             usage: { cpuMillicores: 1000, memoryBytes: 2 * 1024 ** 3 },
+            // requests are null until resource-utilization-2 sums per-node pod requests.
+            requests: { cpuMillicores: null, memoryBytes: null },
             allocatable: { cpuMillicores: 4000, memoryBytes: 8 * 1024 ** 3 },
         });
 
@@ -3207,6 +3266,8 @@ describe("getPodPerformance", () => {
         expect(result.node).toEqual({
             name: "node-1",
             usage: { cpuMillicores: null, memoryBytes: null },
+            // requests are null until resource-utilization-2 sums per-node pod requests.
+            requests: { cpuMillicores: null, memoryBytes: null },
             allocatable: { cpuMillicores: 4000, memoryBytes: 8 * 1024 ** 3 },
         });
         expect(result.pod.requests).toEqual({
