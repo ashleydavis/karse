@@ -4,6 +4,12 @@ import type { PerformanceMetric } from "karse-types";
 import { useShareableNavigate } from "../../lib/nav-state";
 import { formatCpu, formatMemory } from "../../lib/performance";
 import type { TreemapNode } from "../../lib/performance";
+import { truncateMiddle } from "../../lib/resource-utilization";
+
+// Cluster-node leaf labels can carry a long node name into a small box, so they are
+// middle-truncated to ~14 chars before the share percent is appended. Pod/container and
+// percent-mode leaves are left untouched.
+const NODE_LABEL_MAX = 14;
 
 // Colours a leaf green→amber→red by its utilisation (usage ÷ limit). A leaf with no
 // known limit (utilisation null) gets a neutral blue so it is still visible without
@@ -107,10 +113,15 @@ export function UsageTreemap({
                     if (valueKind === "percent") {
                         return `${name} ${node.value}%`;
                     }
+                    // A cluster-node leaf can carry a long node name into a small box, so
+                    // its name is middle-truncated before the cluster share is appended.
+                    const label = node.data.nodeName
+                        ? truncateMiddle(name, NODE_LABEL_MAX)
+                        : name;
                     const share = node.data.clusterShare;
                     return share === null || share === undefined
-                        ? name
-                        : `${name} ${share}%`;
+                        ? label
+                        : `${label} ${share}%`;
                 }}
                 // Replace nivo's empty default tooltip with the cell label and its value:
                 // a usage figure for the selected metric (CPU in m/cores, memory in Mi/Gi)
@@ -123,7 +134,9 @@ export function UsageTreemap({
                         sx={{ px: 1.5, py: 1 }}
                     >
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {cellLabel(String(node.id))}
+                            {node.data.nodeName
+                                ? truncateMiddle(cellLabel(String(node.id)), NODE_LABEL_MAX)
+                                : cellLabel(String(node.id))}
                         </Typography>
                         <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
                             {valueKind === "percent"

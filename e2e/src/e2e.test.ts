@@ -6337,6 +6337,63 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Cluster treemap long node-name middle-truncation ────────────────────────
+    // A long node name overflows a treemap box, so its leaf label is middle-truncated
+    // (truncateMiddle to ~14 chars) before the cluster share — resource-utilization-5.
+    // The cluster Performance treemap is built from the /api/cluster/performance node
+    // list, so this block mocks that endpoint with a long-named node to inject the long
+    // leaf, without seeding a real long-named node (which other tests' node counts assert).
+    // It is its own top-level block with self-contained route setup/teardown so it never
+    // disturbs the shared page state the "Performance tabs (cluster)" block relies on.
+    test.describe("cluster treemap long node-name truncation", () => {
+        const LONG_NODE = "node-with-a-very-long-hostname-worker-01";
+        const PERFORMANCE = {
+            metricsAvailable: true,
+            nodes: [
+                { name: LONG_NODE, usage: { cpuMillicores: 1200, memoryBytes: 3_000_000_000 }, allocatable: { cpuMillicores: 4000, memoryBytes: 8_000_000_000 } },
+                { name: "node-worker", usage: { cpuMillicores: 800, memoryBytes: 2_000_000_000 }, allocatable: { cpuMillicores: 4000, memoryBytes: 8_000_000_000 } },
+            ],
+            pods: [],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/cluster/performance*", async (route) => {
+                await route.fulfill({ json: PERFORMANCE });
+            });
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='cluster-tab-performance']").click();
+            await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/cluster/performance*");
+        });
+
+        test("the long node leaf label is middle-truncated with an ellipsis", async () => {
+            const labels = await page
+                .locator("[data-test-id='perf-treemap'] text")
+                .allTextContents();
+            const joined = labels.join(" ");
+            // truncateMiddle(LONG_NODE, 14) keeps 7 start + "..." + 7 end chars.
+            expect(joined).toContain("node-wi...rker-01");
+            // The full untruncated name must not appear in any box label.
+            expect(joined).not.toContain(LONG_NODE);
+        });
+
+        test("the tooltip title shows the same middle-truncated name", async () => {
+            await page
+                .locator("[data-test-id='perf-treemap'] text")
+                .filter({ hasText: /node-wi\.\.\.rker-01/ })
+                .first()
+                .hover({ force: true });
+            const tooltip = page.locator("[data-test-id='perf-treemap-tooltip']");
+            await expect(tooltip).toBeVisible();
+            await expect(tooltip).toContainText("node-wi...rker-01");
+            await expect(tooltip).not.toContainText(LONG_NODE);
+        });
+    });
+
     // ── Performance tabs (node) ─────────────────────────────────────────────────
     // The backend runs with KARSE_FAKE_METRICS=1 (set in scripts/e2e-tests.sh), so the
     // pods scheduled on node-cp (worker in jobs, cache in infra) match the canned
