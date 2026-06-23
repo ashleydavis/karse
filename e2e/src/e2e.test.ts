@@ -5498,13 +5498,6 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='no-errors-empty']")).toBeVisible();
             await page.unroute("**/api/errors*");
         });
-
-        // The Stern feature was removed; the sidebar must not link to it.
-        test("has no Stern nav entry", async () => {
-            const nav = page.locator("[data-test-id='sidebar-nav']");
-            await expect(nav.locator("[aria-label='stern']")).toHaveCount(0);
-            await expect(nav.getByRole("link", { name: "Stern" })).toHaveCount(0);
-        });
     });
 
     // ── Loading indicator ──────────────────────────────────────────────────────

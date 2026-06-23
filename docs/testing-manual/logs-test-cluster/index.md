@@ -6,9 +6,8 @@ log-emitting pods (varied names, namespaces, and labels) into an existing,
 reachable cluster, verifies their logs are observable, and removes only those
 workloads afterwards.
 
-This scenario tests the Logs page ([log-viewer](../log-viewer/index.md)) and the
-Stern page ([stern-live-logs](../stern-live-logs/index.md)) against real,
-continuously-changing logs.
+This scenario tests the Logs page ([log-viewer](../log-viewer/index.md)) against
+real, continuously-changing logs.
 
 ## Prerequisites
 
@@ -17,8 +16,6 @@ continuously-changing logs.
   scenario does **not** create, prepare, or delete a cluster.
 - `kubectl` on `PATH`, with its current context (or a context you name) pointed
   at that cluster.
-- Optionally `stern` on `PATH` to exercise the Stern page and the script's stern
-  probe. The Stern page shows install help when `stern` is absent.
 
 ## Tooling
 

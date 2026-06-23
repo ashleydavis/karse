@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Deploy a variety of log-emitting workloads into an EXISTING, already-running
-# Kubernetes cluster, so Karse's log features (the kubectl-based Logs page and the
-# stern-based Stern page) can be exercised against a realistic workload.
+# Kubernetes cluster, so Karse's log features (the kubectl-based Logs page) can be
+# exercised against a realistic workload.
 #
 # This script does NOT create, prepare, or delete a cluster. It targets the
 # cluster the developer already has running, reached via the current kubectl
@@ -170,8 +170,8 @@ EOF
 
 # Emit the full manifest: the three namespaces, then six deployments (ten pods)
 # with varied names, labels, and replica counts. The shape deliberately gives
-# multiple pods per app (multi-replica) so multi-pod aggregation, the stern
-# fan-out, and the Logs page multi-select are all exercisable.
+# multiple pods per app (multi-replica) so multi-pod aggregation and the Logs
+# page multi-select are all exercisable.
 full_manifest() {
     local ns
     for ns in "${NAMESPACES[@]}"; do
@@ -213,14 +213,14 @@ cmd_deploy() {
     echo "Pods now running (with their labels):"
     kc get pods -A -l "$MANAGED_LABEL" -L app,tier,env
     echo
-    echo "Done. Open Karse's Logs and Stern pages to view these logs;"
+    echo "Done. Open Karse's Logs page to view these logs;"
     echo "see docs/testing-manual/logs-test-cluster/detail.md for the walkthrough."
 }
 
 # Verify the logs are observable at the cluster level: two reads of one pod show
 # new lines with different random numbers (continuous output), -f follows, and
-# logs aggregate across multiple pods of one app. Probes the real stern binary if
-# it is on PATH. Proves the workloads emit real, changing logs.
+# logs aggregate across multiple pods of one app. Proves the workloads emit real,
+# changing logs.
 cmd_verify() {
     require_cluster
     echo "Verifying cluster-level log observability..."
@@ -268,26 +268,8 @@ cmd_verify() {
     echo "$agg" | sed 's/^/   /'
     echo
 
-    echo "4) stern (optional): aggregates the same workloads if installed."
-    if command -v stern >/dev/null 2>&1; then
-        local ctx_arg=()
-        if [[ -n "$CONTEXT" ]]; then
-            ctx_arg=(--context "$CONTEXT")
-        fi
-        local sout
-        sout="$(stern "${ctx_arg[@]}" -n payments --max-log-requests 10 'checkout-worker' --tail 1 & spid=$!; sleep 5; kill "$spid" 2>/dev/null || true; wait "$spid" 2>/dev/null || true)"
-        if [[ -n "$sout" ]]; then
-            echo "   OK: stern streamed lines."
-            echo "$sout" | head -5 | sed 's/^/   /'
-        else
-            echo "   stern is installed but produced no output in the sample window."
-        fi
-    else
-        echo "   stern not on PATH; skipping (the Stern page shows install help when stern is absent)."
-    fi
-    echo
     echo "Cluster-level verification passed. Now confirm the same logs in Karse's"
-    echo "Logs and Stern pages per docs/testing-manual/logs-test-cluster/detail.md."
+    echo "Logs page per docs/testing-manual/logs-test-cluster/detail.md."
 }
 
 # Remove ONLY the workloads this script created, never the cluster. Deletes each

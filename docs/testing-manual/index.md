@@ -67,7 +67,7 @@ already have running.
 
 | Scenario | Manual test guide |
 |---|---|
-| [logs-test-cluster](./logs-test-cluster/index.md) | Deploy varied log-emitting pods into an existing cluster, then verify their logs in `kubectl`/`stern` and in Karse's Logs and Stern pages. |
+| [logs-test-cluster](./logs-test-cluster/index.md) | Deploy varied log-emitting pods into an existing cluster, then verify their logs in `kubectl` and in Karse's Logs page. |
 
 ## Keeping it in sync
 

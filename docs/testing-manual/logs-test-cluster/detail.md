@@ -20,8 +20,6 @@ in Karse, then remove only those workloads.
   kubectl cluster-info
   ```
 
-- Optionally `stern` on `PATH` for the Stern page walkthrough below.
-
 ## What the script deploys
 
 [`logs-test-workloads.sh`](./logs-test-workloads.sh) (it sits in this directory)
@@ -42,9 +40,9 @@ different numbers.
 | `infra` | `log-shipper` | 1 | `log-shipper` | `backend` | `staging` |
 
 The multi-replica deployments (`api-gateway`, `checkout-worker`, `redis-cache`)
-give multiple pods per app so multi-pod aggregation, the stern fan-out, and the
-Logs page multi-select are all exercised. The varied namespaces and labels
-exercise the pod-picker search and the "All namespaces" mode.
+give multiple pods per app so multi-pod aggregation and the Logs page
+multi-select are all exercised. The varied namespaces and labels exercise the
+pod-picker search and the "All namespaces" mode.
 
 > The script's manifests use the standard Kubernetes `kind:` field (e.g.
 > `kind: Deployment`). That is a manifest field, not a cluster tool — nothing in
@@ -111,12 +109,6 @@ Aggregate across all pods of one app:
 kubectl -n payments logs -l app=checkout-worker --prefix --tail=3
 ```
 
-With `stern` installed, aggregate across pods with a query:
-
-```sh
-stern -n payments checkout-worker --tail 2
-```
-
 The script automates all of the above:
 
 ```sh
@@ -124,7 +116,7 @@ docs/testing-manual/logs-test-cluster/logs-test-workloads.sh verify
 ```
 
 It asserts the two reads differ, that follow streams lines, and that logs
-aggregate across the `checkout-worker` pods, and probes `stern` if it is present.
+aggregate across the `checkout-worker` pods.
 
 ### 4. Confirm the logs in Karse
 
@@ -144,15 +136,6 @@ Then open the frontend at `http://127.0.0.1:5173`.
    (try "All namespaces"). Confirm lines stream and the random numbers keep
    changing.
 3. Pick a single pod and confirm its container log auto-loads and live-follows.
-
-**Stern page:**
-
-1. Open the Stern page (requires `stern` on `PATH`; if it is absent the page
-   shows install help).
-2. Set the namespace to `payments` and enter a query/regex such as
-   `checkout-worker` (or `.*` with "All namespaces") and confirm multi-pod
-   streaming. With many pods you will hit the pod-chip cap and the fan-out bound
-   (`--max-log-requests`, configurable via `KARSE_STERN_MAX_LOG_REQUESTS`).
 
 ### 5. Clean up (workloads only)
 
@@ -184,5 +167,5 @@ This should report no resources.
 - **Re-running is safe.** `deploy` re-applies the same manifest (idempotent);
   `cleanup` only removes its own marker-labelled namespaces.
 - **Real logs.** Because the workloads run on your real cluster's container
-  runtime, the pod logs and `stern` output are genuinely real — no fake-logs mode
-  is needed, so start Karse with `bun run dev` (not `dev:test`).
+  runtime, the pod logs are genuinely real, so start Karse with `bun run dev`
+  (not `dev:test`).
