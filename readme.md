@@ -4,6 +4,24 @@ Karse is a local-only Kubernetes dashboard that wraps your locally-installed `ku
 
 For the full list of what Karse can do, see the spec at [`docs/spec/index.md`](docs/spec/index.md).
 
+## Screenshots
+
+The cluster performance screen, breaking each node's CPU and memory usage down as a treemap:
+
+![Cluster performance](docs/images/cluster-performance.png)
+
+The pods table, with live CPU and memory usage per pod:
+
+![Pods table](docs/images/pods-table.png)
+
+The nodes table (shown in dark mode), with CPU and memory usage per node:
+
+![Nodes table](docs/images/nodes-table-dark.png)
+
+Streaming pod logs, multiplexed across pods and colour-coded by source:
+
+![Pod logs](docs/images/pod-logs.png)
+
 ## Requirements
 
 - `kubectl` available on your `PATH`, already configured against at least one kubeconfig context. If you use [mise](https://mise.jdx.dev), `mise trust && mise install` at the repo root installs the pinned version.
