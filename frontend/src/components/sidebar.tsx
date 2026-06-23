@@ -11,7 +11,7 @@ import { TOP_BAR_HEIGHT } from "../lib/layout";
 const NAV_ITEMS = [
     { to: "/errors",       icon: faCircleExclamation, label: "Errors"   },
     { to: "/contexts",     icon: faLink,          label: "Contexts"     },
-    { to: "/cluster",      icon: faDharmachakra,  label: "Status"       },
+    { to: "/cluster",      icon: faDharmachakra,  label: "Cluster"      },
     { to: "/all-resources", icon: faList,         label: "All resources" },
     { to: "/nodes",        icon: faServer,        label: "Nodes"        },
     { to: "/namespaces",   icon: faLayerGroup,    label: "Namespaces"   },

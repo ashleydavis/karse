@@ -71,8 +71,8 @@ test.describe("karse e2e", () => {
         });
 
         test("shows page title for cluster home", async () => {
-            // The cluster home page is titled "Status" (cluster-performance-1).
-            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Status");
+            // The cluster home page is titled "Cluster" (resource-utilization-6).
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Cluster");
         });
 
         test("updates page title when navigating to nodes", async () => {
@@ -2753,13 +2753,13 @@ test.describe("karse e2e", () => {
             await page.unroute("**/api/pods/default/nginx-abc/performance*");
         });
 
-        test("cluster home shows Status and Performance tabs, defaulting to Status", async () => {
+        test("cluster home shows Overview and Resource utilization tabs, defaulting to Overview", async () => {
             await page.goto("/cluster", { waitUntil: "networkidle" });
-            // The first tab is labelled "Status" (cluster-performance-1) but keeps its
+            // The first tab is labelled "Overview" (resource-utilization-6) but keeps its
             // "overview" URL value / test-id so existing shareable links still work.
-            await expect(page.locator("[data-test-id='cluster-tab-overview']")).toHaveText("Status");
-            await expect(page.locator("[data-test-id='cluster-tab-performance']")).toBeVisible();
-            // Status is the default panel and still renders the stat tiles unchanged.
+            await expect(page.locator("[data-test-id='cluster-tab-overview']")).toHaveText("Overview");
+            await expect(page.locator("[data-test-id='cluster-tab-performance']")).toHaveText("Resource utilization");
+            // Overview is the default panel and still renders the stat tiles unchanged.
             await expect(page.locator("[data-test-id='cluster-panel-overview']")).toBeVisible();
             await expect(page.locator("[data-test-id='stat-server-version']")).toBeVisible();
             await expect(page.locator("[data-test-id='cluster-panel-performance']")).toHaveCount(0);
@@ -2767,17 +2767,17 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='perf-cluster-stub']")).toHaveCount(0);
         });
 
-        test("selecting the cluster Performance tab mounts the Performance panel", async () => {
-            // The cluster Performance tab is now populated (a node treemap); its detailed
-            // content is asserted in the "Performance tabs (cluster)" block. Here we only
-            // confirm the tab switch mounts the Performance panel and unmounts the Status
-            // panel, the scaffold behaviour this block covers.
+        test("selecting the cluster Resource utilization tab mounts the Performance panel", async () => {
+            // The cluster Resource utilization tab is now populated (a node treemap); its
+            // detailed content is asserted in the "Performance tabs (cluster)" block. Here we
+            // only confirm the tab switch mounts the Performance panel and unmounts the
+            // Overview panel, the scaffold behaviour this block covers.
             await page.goto("/cluster", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='cluster-tab-performance']").click();
             await expect(page.locator("[data-test-id='cluster-panel-performance']")).toBeVisible();
             // The old stub placeholder is gone.
             await expect(page.locator("[data-test-id='perf-cluster-stub']")).toHaveCount(0);
-            // The Status panel is no longer mounted once Performance is selected.
+            // The Overview panel is no longer mounted once Resource utilization is selected.
             await expect(page.locator("[data-test-id='cluster-panel-overview']")).toHaveCount(0);
         });
 
@@ -6251,18 +6251,18 @@ test.describe("karse e2e", () => {
         });
     });
 
-    // ── Status page cluster resource indicator ──────────────────────────────────
-    // cluster-performance-1 added a consumed-vs-free indicator to the Status page,
-    // covering CPU and memory (the resources the Metrics API reports). With
+    // ── Cluster Overview tab resource indicator ─────────────────────────────────
+    // cluster-performance-1 added a consumed-vs-free indicator to the Cluster Overview
+    // tab, covering CPU and memory (the resources the Metrics API reports). With
     // KARSE_FAKE_METRICS=1 the seeded nodes carry usage, so the indicator shows
     // non-empty consumed percentages.
-    test.describe("Status page cluster resource indicator", () => {
+    test.describe("Cluster Overview tab resource indicator", () => {
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
             await page.goto("/cluster", { waitUntil: "networkidle" });
         });
 
-        test("the Status tab shows the cluster resource indicator with CPU and memory", async () => {
+        test("the Overview tab shows the cluster resource indicator with CPU and memory", async () => {
             await expect(page.locator("[data-test-id='cluster-resource-indicator']")).toBeVisible();
             await expect(page.locator("[data-test-id='cluster-resource-cpu']")).toBeVisible();
             await expect(page.locator("[data-test-id='cluster-resource-memory']")).toBeVisible();

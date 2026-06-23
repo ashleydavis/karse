@@ -4,12 +4,12 @@ import { ClusterOverview } from "./components/cluster-overview";
 import { ClusterPerformanceTab } from "../../components/performance/cluster-performance-tab";
 
 // The set of tabs available on the cluster home page. The first tab's URL value stays
-// "overview" (so existing shareable links keep working) while its label reads "Status".
+// "overview" (so existing shareable links keep working) and its label reads "Overview".
 type ClusterHomeTab = "overview" | "performance";
 
-// Reads the active tab from the URL, falling back to the Status tab for any
+// Reads the active tab from the URL, falling back to the Overview tab for any
 // missing or unrecognized value. The tab lives in the URL so returning to this page
-// from a drill-down (e.g. a Performance treemap back-nav) can reopen the right tab.
+// from a drill-down (e.g. a treemap back-nav) can reopen the right tab.
 function parseTab(value: string | null): ClusterHomeTab {
     if (value === "performance") {
         return value;
@@ -41,8 +41,8 @@ export function ClusterHomePage() {
                     onChange={(_, value) => setActiveTab(value)}
                     data-test-id="cluster-tabs"
                 >
-                    <Tab label="Status" value="overview" data-test-id="cluster-tab-overview" />
-                    <Tab label="Performance" value="performance" data-test-id="cluster-tab-performance" />
+                    <Tab label="Overview" value="overview" data-test-id="cluster-tab-overview" />
+                    <Tab label="Resource utilization" value="performance" data-test-id="cluster-tab-performance" />
                 </Tabs>
             </Box>
 

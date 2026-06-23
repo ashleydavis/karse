@@ -2,13 +2,13 @@
 
 ## Overview
 
-The cluster home page is the landing view, titled **Status**. The bare root `/` redirects to `/cluster` while preserving the context/namespace query string. The page shows five stat tiles, a pod-status row, and a cluster resource indicator for the active context. The sidebar nav item, the breadcrumb for `/cluster`, and the first in-page tab all read "Status" (the tab keeps its `overview` URL value so existing shareable links still work).
+The cluster home page is the landing view, titled **Cluster**. The bare root `/` redirects to `/cluster` while preserving the context/namespace query string. The page shows five stat tiles, a pod-status row, and a cluster resource indicator for the active context. The sidebar nav item and the breadcrumb for `/cluster` both read "Cluster"; the first in-page tab is labelled "Overview" (it keeps its `overview` URL value so existing shareable links still work) and the second tab is labelled "Resource utilization".
 
 Backed by: `GET /api/cluster/overview`, `GET /api/cluster/performance`, `backend/src/routes/cluster-route.ts`, `backend/src/kubectl/kubectl-adapter.ts` (`getClusterOverview`, `getClusterPerformance`), `frontend/src/pages/cluster-home/`.
 
 ### Cluster resource indicator
 
-Below the stat tiles and pod-status row, the Status page shows a **consumed-vs-free indicator** for the cluster's resources. It is driven by `GET /api/cluster/performance` (the same per-node usage-vs-allocatable snapshot the Performance tab uses): for each metric it sums every node's usage and every node's allocatable, and shows the consumed percentage (`usage ÷ allocatable`, whole number), the consumed/allocatable figures, and the free remainder, as a labelled bar per resource. The pure helpers live in `frontend/src/lib/performance.ts` (`clusterMetricTotal`, `clusterAllocatableTotal`, `clusterResourceShare`, `usagePercent`).
+Below the stat tiles and pod-status row, the Cluster Overview tab shows a **consumed-vs-free indicator** for the cluster's resources. It is driven by `GET /api/cluster/performance` (the same per-node usage-vs-allocatable snapshot the Performance tab uses): for each metric it sums every node's usage and every node's allocatable, and shows the consumed percentage (`usage ÷ allocatable`, whole number), the consumed/allocatable figures, and the free remainder, as a labelled bar per resource. The pure helpers live in `frontend/src/lib/performance.ts` (`clusterMetricTotal`, `clusterAllocatableTotal`, `clusterResourceShare`, `usagePercent`).
 
 **Resources covered: CPU and memory only.** These are the resources the Kubernetes Metrics API reports. **Disk and network are not shown**: the Metrics API (`kubectl top` / `metrics.k8s.io`) does not report disk usage or any network metric, so there is no live consumed figure to indicate without adding a separate metrics source (e.g. Prometheus/cAdvisor), which is out of scope here. This matches the existing Performance-tabs decision to exclude disk (see [performance-tabs](../performance-tabs/detail.md)). When the cluster has no Metrics API the indicator shows the "Metrics API not available" notice instead of the bars.
 
@@ -31,8 +31,8 @@ Below the stat tiles and pod-status row, the Status page shows a **consumed-vs-f
 - [x] The server-version tile shows `-` when the cluster is unreachable.
 - [x] `GET /api/cluster/overview` returns an `errorCount`: the count of active error conditions (Warning events + problem pods), with the Warning-events source tolerant of failure.
 - [x] The Errors tile shows the active-error count, updates with the cluster data, and the calculation is documented above.
-- [x] The cluster home page is titled "Status" (sidebar nav item, `/cluster` breadcrumb, and first in-page tab label).
-- [x] The Status page shows a consumed-vs-free cluster resource indicator for CPU and memory (consumed percentage + consumed/allocatable figures), driven by `GET /api/cluster/performance`.
+- [x] The cluster home page is titled "Cluster" (sidebar nav item and `/cluster` breadcrumb); the first in-page tab is labelled "Overview" and the second "Resource utilization".
+- [x] The Cluster Overview tab shows a consumed-vs-free cluster resource indicator for CPU and memory (consumed percentage + consumed/allocatable figures), driven by `GET /api/cluster/performance`.
 
 (Disk and network indicators are deliberately out of scope: the Kubernetes Metrics API reports neither, so there is no honest live figure to show without a separate metrics source. See the "Resources covered" note above.)
 
