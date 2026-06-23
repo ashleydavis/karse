@@ -1,6 +1,6 @@
 # cluster-overview manual tests
 
-Manual tests for the cluster home page (titled **Cluster**): its overview tiles and the cluster resource indicator. See the spec: [cluster-overview](../../spec/cluster-overview/detail.md).
+Manual tests for the cluster home page (titled **Cluster**): its overview tiles and the cluster-utilisation sections (resource cards, health signals, workloads table). See the spec: [cluster-overview](../../spec/cluster-overview/detail.md). The toggles, percentage bases, and health signals have their own deeper manual under [resource-utilization](../resource-utilization/detail.md).
 
 **Naming:** the sidebar nav item and the `/cluster` breadcrumb both read "Cluster"; the first in-page tab is labelled "Overview" (its URL value stays `overview`) and the second tab is labelled "Resource utilization".
 
@@ -28,7 +28,7 @@ Baseline that the overview tiles render correctly with minimal data.
 - **Page is titled "Cluster"**: the sidebar nav item and the breadcrumb read "Cluster"; the first tab reads "Overview" and the second "Resource utilization".
 - **Overview tiles**: node count shows `2`, pod count and namespace count reflect only the system namespaces KWOK creates (typically `default`, `kube-system`, `kube-public`, `kube-node-lease`).
 - **Errors tile**: shows `0` with the sublabel "none active" on this clean cluster (no Warning events, no problem pods).
-- **Cluster resource indicator**: below the tiles and pod-status row, the "Cluster resources" card shows a consumed-vs-free bar for **CPU** and for **Memory**. On a cluster with a metrics-server each bar shows a "<n>% used" figure and the consumed/allocatable totals; on a kwok cluster with no metrics-server the card instead shows the "Metrics API not available" notice. **Disk and network are intentionally absent** — the Metrics API does not report them.
+- **Cluster-utilisation sections**: below the tiles and pod-status row are three sections. **Cluster-wide resources** shows a CPU and a Memory card with the Usage/Requests and %/Absolute toggles (base = cluster allocatable); **Health signals** shows five tiles (Pending pods, OOMKills, a permanent CPU-throttling "—" / "N/A" with the caption "Not available from kubectl", Node count, Node pressure); **Workloads** shows a searchable/sortable table of the per-controller rows with CPU/Memory bar cells and a Status badge that react to the toggles. On a kwok cluster with no metrics-server the resource cards show the "Metrics API not available" notice and the usage cards/bars read an em-dash, while the requests cards and the workloads requests still populate. **Disk and network are intentionally absent** — the Metrics API does not report them. (See the resource-utilization manual for the toggle behaviour.)
 
 Teardown:
 

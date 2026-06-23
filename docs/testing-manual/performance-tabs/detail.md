@@ -23,7 +23,7 @@ Then open the frontend at `http://127.0.0.1:5173`. The scenario fixture stands u
 ### Cluster home tabs
 - Navigate to `/cluster` (the Karse home page).
 - A tab bar shows two tabs: "Overview" and "Resource utilization".
-- "Overview" is selected by default. The existing stat tiles (Server version, Nodes, Namespaces, Pods, Errors), the Pod status row, and the cluster resource indicator render.
+- "Overview" is selected by default. The existing stat tiles (Server version, Nodes, Namespaces, Pods, Errors), the Pod status row, and the cluster-utilisation sections (resource cards, health signals, workloads table) render.
 - Click the "Resource utilization" tab. The Overview content disappears and the populated Performance hub (the node treemap) appears (see the scenario below).
 - Click back to "Overview". The Overview content reappears and the Performance hub disappears.
 
@@ -225,8 +225,9 @@ above. The e2e suite (`scripts/e2e-tests.sh`) runs the backend with `KARSE_FAKE_
 and seeds nodes named `node-cp`/`node-worker` (matching the fake-metrics node list), then
 asserts the node treemap renders node boxes (not pods) with per-node share percentages, that
 the Hot spots heatmap and Top consumers table are absent, the metric toggle keeps the treemap
-rendered, and clicking a node box drills to that node's Performance tab. A separate block
-asserts the Status page's cluster resource indicator shows CPU and memory consumed percentages.
+rendered, and clicking a node box drills to that node's Performance tab. The Cluster Overview
+tab's utilisation sections (resource cards, health signals, workloads table) are covered by the
+resource-utilization e2e block.
 
 ### Node performance endpoint (`GET /api/nodes/:name/performance`)
 

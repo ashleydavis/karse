@@ -6315,35 +6315,6 @@ test.describe("karse e2e", () => {
         });
     });
 
-    // ── Cluster Overview tab resource indicator ─────────────────────────────────
-    // cluster-performance-1 added a consumed-vs-free indicator to the Cluster Overview
-    // tab, covering CPU and memory (the resources the Metrics API reports). With
-    // KARSE_FAKE_METRICS=1 the seeded nodes carry usage, so the indicator shows
-    // non-empty consumed percentages.
-    test.describe("Cluster Overview tab resource indicator", () => {
-        test.beforeAll(async () => {
-            setContext(CLUSTER_1);
-            await page.goto("/cluster", { waitUntil: "networkidle" });
-        });
-
-        test("the Overview tab shows the cluster resource indicator with CPU and memory", async () => {
-            await expect(page.locator("[data-test-id='cluster-resource-indicator']")).toBeVisible();
-            await expect(page.locator("[data-test-id='cluster-resource-cpu']")).toBeVisible();
-            await expect(page.locator("[data-test-id='cluster-resource-memory']")).toBeVisible();
-        });
-
-        test("each resource shows a consumed percentage", async () => {
-            // With fake metrics the seeded nodes carry usage, so both bars report a
-            // numeric "<n>% used" rather than the unavailable em-dash.
-            await expect(
-                page.locator("[data-test-id='cluster-resource-cpu-percent']")
-            ).toHaveText(/\d+% used/);
-            await expect(
-                page.locator("[data-test-id='cluster-resource-memory-percent']")
-            ).toHaveText(/\d+% used/);
-        });
-    });
-
     // ── Performance tabs (node) ─────────────────────────────────────────────────
     // The backend runs with KARSE_FAKE_METRICS=1 (set in scripts/e2e-tests.sh), so the
     // pods scheduled on node-cp (worker in jobs, cache in infra) match the canned

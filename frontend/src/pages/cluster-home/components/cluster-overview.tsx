@@ -6,10 +6,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useKubeContext } from "../../../lib/kube-context";
 import { useShareableTo } from "../../../lib/nav-state";
-import { fetchClusterOverview } from "../../../lib/api-client";
+import { fetchClusterOverview, fetchClusterPerformance } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
-import { ClusterResourceIndicator } from "./cluster-resource-indicator";
+import { ClusterUtilizationPanel } from "./cluster-utilization-panel";
+import { ClusterHealthSignalsSection } from "./cluster-health-signals";
+import { ClusterWorkloadsTable } from "./cluster-workloads-table";
 
 type StatTileProps = {
     icon: IconProp;
@@ -112,6 +114,14 @@ export function ClusterOverview() {
         queryFn: () => fetchClusterOverview(current!),
         enabled: current !== null,
     });
+    // The cluster performance snapshot drives the health-signals row and the workloads
+    // table below. The utilisation panel issues its own query against the same
+    // ["cluster-performance", current] key, so TanStack Query dedupes to a single fetch.
+    const performance = useQuery({
+        queryKey: ["cluster-performance", current],
+        queryFn: () => fetchClusterPerformance(current!),
+        enabled: current !== null,
+    });
 
     if (error) {
         return <LoadError message={(error as Error).message} onRetry={() => refetch()} />;
@@ -191,7 +201,19 @@ export function ClusterOverview() {
                 failed={data.failedPodCount}
                 total={data.podCount}
             />
-            <ClusterResourceIndicator />
+            <ClusterUtilizationPanel />
+            {performance.data && (
+                <>
+                    <ClusterHealthSignalsSection
+                        health={performance.data.health}
+                        metricsAvailable={performance.data.metricsAvailable}
+                    />
+                    <ClusterWorkloadsTable
+                        workloads={performance.data.workloads}
+                        totals={performance.data.totals}
+                    />
+                </>
+            )}
         </Box>
     );
 }
