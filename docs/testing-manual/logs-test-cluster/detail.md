@@ -24,7 +24,7 @@ in Karse, then remove only those workloads.
 
 ## What the script deploys
 
-[`scripts/logs-test-workloads.sh`](../../../scripts/logs-test-workloads.sh)
+[`logs-test-workloads.sh`](./logs-test-workloads.sh) (it sits in this directory)
 deploys **3 namespaces, 6 deployments, and 10 pods** with varied names and
 `app` / `tier` / `env` labels. Every pod runs a small `busybox` loop that prints
 one structured log line per second, each carrying randomised numbers
@@ -67,11 +67,12 @@ kubectl config use-context <your-context>
 From the repo root:
 
 ```sh
-scripts/logs-test-workloads.sh deploy
+docs/testing-manual/logs-test-cluster/logs-test-workloads.sh deploy
 ```
 
 Pass `--context <ctx>` to target a specific context without switching your
-current one, e.g. `scripts/logs-test-workloads.sh deploy --context my-cluster`.
+current one, e.g.
+`docs/testing-manual/logs-test-cluster/logs-test-workloads.sh deploy --context my-cluster`.
 
 The command applies the manifests, waits for the deployments to become available,
 and prints the running pods with their labels. If no cluster is reachable it
@@ -119,7 +120,7 @@ stern -n payments checkout-worker --tail 2
 The script automates all of the above:
 
 ```sh
-scripts/logs-test-workloads.sh verify
+docs/testing-manual/logs-test-cluster/logs-test-workloads.sh verify
 ```
 
 It asserts the two reads differ, that follow streams lines, and that logs
@@ -159,7 +160,7 @@ Remove just the workloads this script created. The cluster is left intact — no
 cluster is created or deleted at any point:
 
 ```sh
-scripts/logs-test-workloads.sh cleanup
+docs/testing-manual/logs-test-cluster/logs-test-workloads.sh cleanup
 ```
 
 Cleanup deletes only namespaces that carry the script's

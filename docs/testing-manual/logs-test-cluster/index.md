@@ -22,7 +22,7 @@ continuously-changing logs.
 
 ## Tooling
 
-- Script: [`scripts/logs-test-workloads.sh`](../../../scripts/logs-test-workloads.sh)
+- Script: [`logs-test-workloads.sh`](./logs-test-workloads.sh) (in this directory)
   with `deploy`, `verify`, `cleanup`, and `all` subcommands.
 
 ## Full guide

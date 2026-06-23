@@ -11,14 +11,15 @@ set -euo pipefail
 # workloads, verify their logs are observable, and (on cleanup) remove only the
 # workloads it created.
 #
-# The doc for this scenario:
+# The doc for this scenario sits beside this script:
 #   docs/testing-manual/logs-test-cluster/detail.md
 #
-# Usage (run from anywhere; kubectl must be on PATH and pointed at a cluster):
-#   scripts/logs-test-workloads.sh deploy   [--context CTX]   # apply the workloads
-#   scripts/logs-test-workloads.sh verify   [--context CTX]   # check logs are observable
-#   scripts/logs-test-workloads.sh cleanup  [--context CTX]   # remove only the workloads
-#   scripts/logs-test-workloads.sh all      [--context CTX]   # deploy, then verify
+# Usage (run from anywhere; kubectl must be on PATH and pointed at a cluster).
+# Paths below are from the repo root:
+#   docs/testing-manual/logs-test-cluster/logs-test-workloads.sh deploy   [--context CTX]   # apply the workloads
+#   docs/testing-manual/logs-test-cluster/logs-test-workloads.sh verify   [--context CTX]   # check logs are observable
+#   docs/testing-manual/logs-test-cluster/logs-test-workloads.sh cleanup  [--context CTX]   # remove only the workloads
+#   docs/testing-manual/logs-test-cluster/logs-test-workloads.sh all      [--context CTX]   # deploy, then verify
 #
 # With no --context the current kubectl context is used. cleanup removes only the
 # namespaces this script created (guarded by a managed-by marker label), so a
