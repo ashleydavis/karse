@@ -133,7 +133,14 @@ export function UsageTreemap({
                         elevation={3}
                         sx={{ px: 1.5, py: 1 }}
                     >
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        <Typography
+                            data-test-id="perf-treemap-tooltip-title"
+                            variant="body2"
+                            // Keep the (possibly long) node name on a single line so the
+                            // tooltip grows wide enough to show it in full rather than
+                            // wrapping it onto many lines in a narrow box.
+                            sx={{ fontWeight: 600, whiteSpace: "nowrap" }}
+                        >
                             {cellLabel(String(node.id))}
                         </Typography>
                         <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>

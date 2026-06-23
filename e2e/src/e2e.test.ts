@@ -6393,6 +6393,10 @@ test.describe("karse e2e", () => {
             // The box label is truncated, but the hover tooltip shows the full name.
             await expect(tooltip).toContainText(LONG_NODE);
             await expect(tooltip).not.toContainText("node-wi...rker-01");
+            // The title sits on a single line (white-space: nowrap) so the tooltip
+            // widens to fit the full name rather than wrapping it onto many lines.
+            const title = tooltip.locator("[data-test-id='perf-treemap-tooltip-title']");
+            await expect(title).toHaveCSS("white-space", "nowrap");
         });
     });
 
