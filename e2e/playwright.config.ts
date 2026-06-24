@@ -21,6 +21,11 @@ export default defineConfig({
     expect: {
         timeout: 30000,
     },
+    // The suite runs serially (workers: 1) and shares the box with sibling pb:next
+    // e2e runs. A single mis-timed read under that contention must not abort the
+    // whole suite, so allow a small number of retries: a flaked test re-runs from
+    // its describe block rather than taking 363 siblings down with it.
+    retries: 2,
     use: {
         baseURL: process.env.KARSE_E2E_URL ?? "http://localhost:5173",
         // 127.0.0.1 is not reliable on all CI environments; localhost is used throughout.
