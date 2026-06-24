@@ -501,12 +501,12 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-cpu']")).toHaveCount(3);
             await expect(page.locator("[data-test-id='pod-memory']")).toHaveCount(3);
             // Each cell is a node-share percentage (e.g. "25%"), not absolute millicores/bytes.
-            for (const text of await page.locator("[data-test-id='pod-cpu']").allTextContents()) {
-                expect(text).toMatch(/^\d+%$/);
-            }
-            for (const text of await page.locator("[data-test-id='pod-memory']").allTextContents()) {
-                expect(text).toMatch(/^\d+%$/);
-            }
+            // toHaveText auto-retries until every cell matches, so it waits for the separate
+            // cluster-performance query to populate the column. allTextContents() + toMatch
+            // was a one-shot snapshot that read the pre-load "—" if the query had not yet
+            // applied (a render-vs-assertion race that lost under parallel CPU load).
+            await expect(page.locator("[data-test-id='pod-cpu']")).toHaveText([/^\d+%$/, /^\d+%$/, /^\d+%$/]);
+            await expect(page.locator("[data-test-id='pod-memory']")).toHaveText([/^\d+%$/, /^\d+%$/, /^\d+%$/]);
             // pod-high uses 500m of node-worker's 1000m allocatable -> 50%.
             await expect(
                 page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-high" }).locator("[data-test-id='pod-cpu']"),
