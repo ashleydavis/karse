@@ -11,6 +11,9 @@ import { MetricToggle } from "./metric-toggle";
 import { UsageTreemap } from "./usage-treemap";
 import { FROM_NODE_PERFORMANCE } from "../../lib/breadcrumb-trail";
 import { MetricsUnavailable } from "./metrics-unavailable";
+import { ResourceUtilizationProvider } from "../../lib/resource-utilization-context";
+import { ViewToggles } from "../resource-utilization/view-toggles";
+import { NodeUtilizationCards } from "../resource-utilization/node-utilization-cards";
 
 // Props for the node Performance tab. `active` is true only when this tab is the
 // selected one, so the data fetch is lazy (matching the cluster tab and YamlTabPanel):
@@ -65,15 +68,31 @@ export function NodePerformanceTab({ nodeName, active }: NodePerformanceTabProps
 
     return (
         <Box data-test-id="perf-node" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                Performance
+            </Typography>
+
+            {!data.metricsAvailable && <MetricsUnavailable />}
+
+            {/* Utilization cards: their own View-mode / Value-format toggles, separate from
+                the treemap's metric toggle below. The provider scopes the toggle state to
+                these cards (the pods table on the Pods tab has its own provider). */}
+            <ResourceUtilizationProvider>
+                <Box data-test-id="perf-node-utilization" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                        <ViewToggles />
+                    </Box>
+                    <NodeUtilizationCards node={data.node} active={active} />
+                </Box>
+            </ResourceUtilizationProvider>
+
             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    Performance
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                    Breakdown
                 </Typography>
                 <Box sx={{ flexGrow: 1 }} />
                 <MetricToggle value={metric} onChange={setMetric} />
             </Box>
-
-            {!data.metricsAvailable && <MetricsUnavailable />}
 
             <Box data-test-id="perf-node-panel-breakdown">
                 {data.metricsAvailable ? (

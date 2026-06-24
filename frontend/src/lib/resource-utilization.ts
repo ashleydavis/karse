@@ -9,7 +9,7 @@
 // nodes.html scripts and documented in each classifier's comment.
 
 import { formatCpu, formatMemory } from "./performance";
-import type { NodeUsage } from "karse-types";
+import type { NodeUsage, PerformanceMetric, ResourceUsage } from "karse-types";
 
 // Which figure the shared View-mode toggle selects: live consumption from the Metrics
 // API ("usage") or the CPU/memory reserved by pod specs ("requests"). Default is "usage".
@@ -237,4 +237,68 @@ export function buildNodeUtilizationSummary(nodes: NodeUsage[]): {
         }
     }
     return { over, healthy, under };
+}
+
+// The display figure for a node-scope bar or card: the fill percentage of the node's
+// allocatable, the text to show (a "%" or a "used / total" absolute string per the
+// Value-format toggle), and the threshold level. Shared by the node-detail utilization
+// cards and the node-detail pods-table bars so both read the same way. null percent /
+// empty base render as an em-dash via the consuming component.
+export type NodeFigure = {
+    percent: number | null;
+    valueText: string;
+    level: ThresholdLevel;
+};
+
+// Selects the used reading (the numerator) for a node-scope figure: live usage in
+// "usage" mode, reserved requests in "requests" mode, for the chosen metric.
+function nodeUsedValue(usage: ResourceUsage, requests: ResourceUsage, mode: ViewMode, metric: PerformanceMetric): number | null {
+    const source = mode === "usage" ? usage : requests;
+    return metricFieldOrNull(source, metric);
+}
+
+// The allocatable base (the denominator) for a node-scope figure, for the chosen metric.
+function nodeBaseValue(allocatable: ResourceUsage, metric: PerformanceMetric): number | null {
+    return metricFieldOrNull(allocatable, metric);
+}
+
+// Reads the CPU or memory field of a usage reading, tolerating a missing reading (null /
+// undefined) by yielding null — so a node-scope figure degrades to an em-dash rather than
+// throwing when, e.g., a snapshot omits a usage/requests block.
+function metricFieldOrNull(reading: ResourceUsage | null | undefined, metric: PerformanceMetric): number | null {
+    if (reading === null || reading === undefined) {
+        return null;
+    }
+    return metric === "cpu" ? reading.cpuMillicores : reading.memoryBytes;
+}
+
+// Formats a used/total pair for the Absolute value-format, picking the CPU or memory
+// formatter for the chosen metric.
+function formatAbsolute(used: number | null, total: number | null, metric: PerformanceMetric): string {
+    return metric === "cpu" ? formatAbsoluteCpu(used, total) : formatAbsoluteMemory(used, total);
+}
+
+// Builds the display figure for one node metric (CPU or Memory) against the node's
+// allocatable, honouring the shared View-mode (usage/requests) and Value-format
+// (percent/absolute) toggles. The percentage always drives the bar fill; the text is the
+// rounded "%" in percent format or the "used / total" string in absolute format. The
+// level grades the percentage with the nodes-table classifier (over ≥ 85, under ≤ 35,
+// else healthy), so the cards and bars carry a level for the colours plan. A null
+// numerator or a zero/null base yields a null percent (em-dash).
+export function nodeMetricFigure(
+    used: ResourceUsage,
+    requests: ResourceUsage,
+    allocatable: ResourceUsage,
+    metric: PerformanceMetric,
+    mode: ViewMode,
+    format: ValueFormat,
+): NodeFigure {
+    const usedValue = nodeUsedValue(used, requests, mode, metric);
+    const base = nodeBaseValue(allocatable, metric);
+    const percent = nodePercent(usedValue, base);
+    const level = classifyNodeRow(percent).level;
+    const valueText = format === "percent"
+        ? (percent === null ? "—" : `${percent}%`)
+        : formatAbsolute(usedValue, base, metric);
+    return { percent, valueText, level };
 }

@@ -24,7 +24,7 @@ Then open the frontend at `http://127.0.0.1:5173`. Each scenario's fixture stand
 - The Details card shows roles, version, and age.
 - The "Resource usage (consumed vs free)" indicator shows a consumed-vs-free bar for cpu, memory, and pods only (no disk or network rows, and no Capacity vs Allocatable table). With metrics available, the cpu and memory bars show a real "<n>% used" percentage rather than an em-dash.
 - The Conditions table shows at least the Ready condition with a True status.
-- The Pods section header shows a count and the table lists only the pods scheduled on this node (the `web` pod), with Name, Namespace, Status, Ready, Restarts, and the sortable **CPU %** and **Memory %** columns. Pods on other nodes must not appear. Click the pod row and confirm navigation to the pod detail page.
+- The Pods section header shows a count and the table lists only the pods scheduled on this node (the `web` pod), with Name, Namespace, Status, Ready, Restarts, and the sortable **CPU** and **Memory** bar columns (with the shared View-mode / Value-format toggles in the header). Pods on other nodes must not appear. Click the pod row and confirm navigation to the pod detail page.
 - The back arrow navigates back to `/nodes`.
 
 ## Scenario B: Node detail tabs (Status, Pods, Events)
@@ -54,7 +54,10 @@ A node with two pods scheduled on it and a couple of node-scoped events.
 ### Pods tab
 - Click the "Pods" tab.
 - The Pods table lists both `web` and `api` in namespace `default`.
-- The table has **CPU %** and **Memory %** columns. Each shows the pod's consumption as a percentage of the node (pod usage ÷ the node's allocatable), e.g. `12%`. A pod with no usage sample (or when the cluster has no Metrics API) shows an em-dash in those columns.
+- A **View** toggle (Usage | Requests) and a **Value format** toggle (% | Absolute) sit in the Pods header.
+- The table has **CPU** and **Memory** bar columns. With the default Usage + % toggles, each cell shows a bar plus the pod's consumption as a percentage of the node (pod usage ÷ the node's allocatable), e.g. `12%`, and the headers read "CPU %"/"Memory %". A pod with no usage sample (or when the cluster has no Metrics API) shows an em-dash in those columns.
+- Click **Requests**: each bar switches to the pod's requests ÷ the node's allocatable (the figure changes for pods whose usage and requests differ).
+- Click **Absolute**: each cell switches to a "used / total" string (e.g. `250m / 4 vCPU`, `512Mi / 8 GB`) and the headers drop the "%".
 - Click the **CPU %** header: the rows reorder ascending by cpu share; click again for descending. Confirm the pod using the most cpu sits at the bottom (ascending) / top (descending).
 - Click the **Memory %** header and confirm the rows reorder by memory share (a potentially different order from the cpu sort).
 - The Details, Conditions, and other status cards are NOT visible on this tab.

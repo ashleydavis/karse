@@ -2510,6 +2510,7 @@ test.describe("karse e2e", () => {
             node: {
                 name: "node-cp",
                 usage: { cpuMillicores: 1600, memoryBytes: 3 * 1024 * 1024 * 1024 },
+                requests: { cpuMillicores: 2000, memoryBytes: 4 * 1024 * 1024 * 1024 },
                 allocatable: { cpuMillicores: 4000, memoryBytes: 8 * 1024 * 1024 * 1024 },
             },
             // Per-pod usage against the node's allocatable (cpu 4000m / mem 8Gi):
@@ -2622,10 +2623,11 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='node-pod-row'] td:first-child").first()).toHaveText("coredns-abc");
         });
 
-        test("the pods table shows each pod's cpu and memory as a percentage of the node", async () => {
-            // The CPU % / Memory % columns render the pod's usage ÷ the node's
-            // allocatable. With allocatable cpu 1000m / mem 1_000_000_000 bytes,
-            // coredns-abc (50m / 200_000_000) reads 5% cpu and 20% memory.
+        test("the pods table shows each pod's cpu and memory as a node-share bar percentage", async () => {
+            // The CPU % / Memory % bar columns render the pod's usage ÷ the node's
+            // allocatable (cpu 4000m / mem 8Gi) for the default Usage + % toggles. The
+            // percentage shows in each bar cell's value span. coredns-abc reads 5% cpu and
+            // 20% memory.
             await page.locator("[data-test-id='node-tab-pods']").click();
             await expect(page.locator("[data-test-id='node-panel-pods']")).toBeVisible();
             await expect(page.getByRole("columnheader", { name: "CPU %" })).toBeVisible();
@@ -2633,8 +2635,8 @@ test.describe("karse e2e", () => {
             const corednsRow = page
                 .locator("[data-test-id='node-pod-row']")
                 .filter({ hasText: "coredns-abc" });
-            await expect(corednsRow.locator("[data-test-id='node-pod-cpu']")).toHaveText("5%");
-            await expect(corednsRow.locator("[data-test-id='node-pod-memory']")).toHaveText("20%");
+            await expect(corednsRow.locator("[data-test-id='node-pod-cpu-value']")).toHaveText("5%");
+            await expect(corednsRow.locator("[data-test-id='node-pod-memory-value']")).toHaveText("20%");
         });
 
         test("sorting the pods table by CPU % orders the pods by their cpu share of the node", async () => {
@@ -2643,10 +2645,10 @@ test.describe("karse e2e", () => {
             const cpuHeader = page.getByRole("columnheader", { name: "CPU %" });
             // First click: ascending. coredns 5%, metrics-mid 15%, busy-app 30%.
             await cpuHeader.click();
-            await expect(page.locator("[data-test-id='node-pod-cpu']")).toHaveText(["5%", "15%", "30%"]);
+            await expect(page.locator("[data-test-id='node-pod-cpu-value']")).toHaveText(["5%", "15%", "30%"]);
             // Second click: descending — the reverse order.
             await cpuHeader.click();
-            await expect(page.locator("[data-test-id='node-pod-cpu']")).toHaveText(["30%", "15%", "5%"]);
+            await expect(page.locator("[data-test-id='node-pod-cpu-value']")).toHaveText(["30%", "15%", "5%"]);
         });
 
         test("sorting the pods table by Memory % orders the pods by their memory share of the node", async () => {
@@ -2656,10 +2658,10 @@ test.describe("karse e2e", () => {
             // Ascending: busy-app 3%, metrics-mid 10%, coredns 20% (a different order
             // from the CPU sort, proving the column sorts on its own resource).
             await memHeader.click();
-            await expect(page.locator("[data-test-id='node-pod-memory']")).toHaveText(["3%", "10%", "20%"]);
+            await expect(page.locator("[data-test-id='node-pod-memory-value']")).toHaveText(["3%", "10%", "20%"]);
             // Descending.
             await memHeader.click();
-            await expect(page.locator("[data-test-id='node-pod-memory']")).toHaveText(["20%", "10%", "3%"]);
+            await expect(page.locator("[data-test-id='node-pod-memory-value']")).toHaveText(["20%", "10%", "3%"]);
         });
 
         test("shows node events on the Events tab", async () => {
@@ -6402,6 +6404,55 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='node-panel-performance']")).toBeVisible();
         });
 
+        test("renders CPU and Memory utilization cards above the treemap, separate from the treemap metric toggle", async () => {
+            // resource-utilization-9: the Performance tab carries utilization cards driven
+            // by the shared View-mode / Value-format toggles, above the Breakdown treemap
+            // which keeps its own CPU/Memory metric toggle. The two toggle concerns are
+            // independent.
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='node-tab-performance']").click();
+            await expect(page.locator("[data-test-id='node-utilization-cards']")).toBeVisible();
+            await expect(page.locator("[data-test-id='node-util-card-cpu']")).toBeVisible();
+            await expect(page.locator("[data-test-id='node-util-card-memory']")).toBeVisible();
+            // The cards' View-mode / Value-format toggles and the treemap's metric toggle
+            // both render, on the same tab.
+            await expect(page.locator("[data-test-id='util-view-mode']")).toBeVisible();
+            await expect(page.locator("[data-test-id='util-value-format']")).toBeVisible();
+            await expect(page.locator("[data-test-id='perf-metric-cpu']")).toBeVisible();
+        });
+
+        test("the utilization-card toggles update the cards and are independent of the treemap metric toggle", async () => {
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='node-tab-performance']").click();
+            const cpuCard = page.locator("[data-test-id='node-util-card-cpu']");
+            await expect(cpuCard).toBeVisible();
+            // Default Usage + % shows a percentage value.
+            const percentValue = (await cpuCard.textContent()) ?? "";
+            expect(percentValue).toMatch(/%/);
+            // Switch the Value format to Absolute: the card now reads "used / total vCPU"
+            // (no bare percentage), proving the toggle drives the card.
+            await page.locator("[data-test-id='util-value-format-absolute']").click();
+            await expect(cpuCard).toContainText("vCPU");
+            // The treemap metric toggle is unaffected: CPU is still the selected treemap
+            // metric (the two toggle concerns are independent).
+            await expect(page.locator("[data-test-id='perf-metric-cpu']")).toHaveAttribute("aria-pressed", "true");
+            // Switch back to % so later tests start from the default.
+            await page.locator("[data-test-id='util-value-format-percent']").click();
+            await expect(cpuCard).toContainText("%");
+        });
+
+        test("the pods table bars respond to the View-mode / Value-format toggles", async () => {
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='node-tab-pods']").click();
+            await expect(page.locator("[data-test-id='node-panel-pods']")).toBeVisible();
+            const firstCpu = page.locator("[data-test-id='node-pod-cpu-value']").first();
+            // Default Usage + % shows a percentage.
+            await expect(firstCpu).toContainText("%");
+            // Absolute format switches every bar to a "used / total vCPU" string.
+            await page.locator("[data-test-id='util-value-format-absolute']").click();
+            await expect(firstCpu).toContainText("vCPU");
+        });
+
         test("metrics-unavailable: the treemap is replaced by a note", async () => {
             // Force the node performance endpoint to report no Metrics API: with no live
             // usage there is nothing to size the boxes by, so the Performance tab shows the
@@ -6413,6 +6464,7 @@ test.describe("karse e2e", () => {
                         node: {
                             name: "node-cp",
                             usage: { cpuMillicores: null, memoryBytes: null },
+                            requests: { cpuMillicores: 100, memoryBytes: 134217728 },
                             allocatable: { cpuMillicores: 4000, memoryBytes: 8589934592 },
                         },
                         pods: [

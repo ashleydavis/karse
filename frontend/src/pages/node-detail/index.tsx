@@ -40,14 +40,15 @@ import { ResourceRef } from "../../components/resource-ref";
 import { NodePerformanceTab } from "../../components/performance/node-performance-tab";
 import { NodeResourceIndicator } from "../../components/performance/node-resource-indicator";
 import { tableRowSx } from "../../lib/table-row-style";
-import { buildNodePodUsageMap } from "../../lib/node-pod-usage";
+import { buildNodePodResourceMap, podResourceFor, type PodResourceMap } from "../../lib/node-pod-usage";
+import { compareUsageValue } from "../../lib/pod-resource-sort";
+import { nodeMetricFigure, type NodeFigure, type ValueFormat } from "../../lib/resource-utilization";
 import {
-    podUsageFor,
-    comparePodCpu,
-    comparePodMemory,
-    formatPercent,
-    type PodUsageMap,
-} from "../../lib/pod-resource-sort";
+    ResourceUtilizationProvider,
+    useResourceUtilization,
+} from "../../lib/resource-utilization-context";
+import { ViewToggles } from "../../components/resource-utilization/view-toggles";
+import { ResourceBarCell } from "../../components/resource-utilization/resource-bar-cell";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -99,92 +100,110 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
     return <Chip label="Normal" color="default" size="small" />;
 }
 
-// A node pod row: the node detail Pod joined with its CPU/memory consumption as a
-// percentage of the node (from the Performance snapshot). The percentages live on the
-// row itself so the table's accessors and sort comparators are pure functions of the
-// row data — recomputed whenever the joined rows change (i.e. once the lazy
-// Performance fetch resolves), not captured in a stale column closure.
-type NodePodRow = Pod & { cpuPercent: number | null; memoryPercent: number | null };
+// A node pod row: the node detail Pod joined with its CPU and Memory display figures
+// against the node (from the Performance snapshot), already resolved for the active
+// View-mode / Value-format toggle state. Each figure carries the bar percentage, the
+// display text (% or used/total), and the threshold level. The figures live on the row so
+// the table's accessors and sort comparators are pure functions of the row data —
+// recomputed whenever the joined rows or the toggle state change, not captured in a stale
+// column closure.
+type NodePodRow = Pod & { cpu: NodeFigure; memory: NodeFigure };
 
-// Column definitions for the per-node Pods table. The CPU and Memory columns are
-// sortable and read their percentage straight off the row; the others are
-// display-only, matching the previous static table's content.
-const NODE_POD_COLUMNS: ColumnDef<NodePodRow>[] = [
-    {
-        accessorKey: "name",
-        header: "Name",
-        enableSorting: false,
-        cell: (info) => (
-            <span style={{ fontFamily: "monospace" }}>{info.getValue<string>()}</span>
-        ),
-    },
-    {
-        accessorKey: "namespace",
-        header: "Namespace",
-        enableSorting: false,
-        cell: (info) => (
-            <span onClick={(e) => e.stopPropagation()}>
-                <ResourceRef kind="Namespace" name={info.getValue<string>()} testId="node-pod-namespace-link" />
-            </span>
-        ),
-    },
-    {
-        accessorKey: "phase",
-        header: "Status",
-        enableSorting: false,
-    },
-    {
-        accessorKey: "ready",
-        header: "Ready",
-        enableSorting: false,
-    },
-    {
-        accessorKey: "restarts",
-        header: "Restarts",
-        enableSorting: false,
-    },
-    {
-        // Pod CPU consumption as a percentage of this node's allocatable (from the
-        // node Performance snapshot). Renders the percentage (or an em-dash when the
-        // usage/allocatable is unavailable) and sorts by that percentage.
-        id: "cpu",
-        header: "CPU %",
-        accessorKey: "cpuPercent",
-        // Ascending on the first click (TanStack defaults numeric columns to
-        // descending-first; force a consistent low→high → high→low cycle instead).
-        sortDescFirst: false,
-        cell: (info) => (
-            <span data-test-id="node-pod-cpu">{formatPercent(info.getValue<number | null>())}</span>
-        ),
-        sortingFn: (a, b) =>
-            comparePodCpu(a.original, b.original),
-    },
-    {
-        // Pod memory consumption as a percentage of this node's allocatable (from the
-        // node Performance snapshot). Renders the percentage (or an em-dash when the
-        // usage/allocatable is unavailable) and sorts by that percentage.
-        id: "memory",
-        header: "Memory %",
-        accessorKey: "memoryPercent",
-        // Ascending on the first click (see the CPU column).
-        sortDescFirst: false,
-        cell: (info) => (
-            <span data-test-id="node-pod-memory">{formatPercent(info.getValue<number | null>())}</span>
-        ),
-        sortingFn: (a, b) =>
-            comparePodMemory(a.original, b.original),
-    },
-];
+// Column definitions for the per-node Pods table, parameterised by the active value-format
+// so the CPU/Memory column headers read "CPU %"/"CPU" etc. The CPU and Memory columns
+// render a ResourceBarCell from the row's resolved figure and sort by the figure's bar
+// percentage (a null reading sorts below every real value via compareUsageValue); the
+// others are display-only.
+function nodePodColumns(format: ValueFormat): ColumnDef<NodePodRow>[] {
+    const suffix = format === "percent" ? " %" : "";
+    return [
+        {
+            accessorKey: "name",
+            header: "Name",
+            enableSorting: false,
+            cell: (info) => (
+                <span style={{ fontFamily: "monospace" }}>{info.getValue<string>()}</span>
+            ),
+        },
+        {
+            accessorKey: "namespace",
+            header: "Namespace",
+            enableSorting: false,
+            cell: (info) => (
+                <span onClick={(e) => e.stopPropagation()}>
+                    <ResourceRef kind="Namespace" name={info.getValue<string>()} testId="node-pod-namespace-link" />
+                </span>
+            ),
+        },
+        {
+            accessorKey: "phase",
+            header: "Status",
+            enableSorting: false,
+        },
+        {
+            accessorKey: "ready",
+            header: "Ready",
+            enableSorting: false,
+        },
+        {
+            accessorKey: "restarts",
+            header: "Restarts",
+            enableSorting: false,
+        },
+        {
+            // Pod CPU consumption as a share of this node's allocatable, in the active
+            // mode/format. Renders a bar (or an em-dash when the figure is null) and sorts
+            // by the bar percentage.
+            id: "cpu",
+            header: `CPU${suffix}`,
+            // Sort by the resolved bar percentage. The accessor returns the percent so
+            // TanStack's sort state machine (asc → desc → off) behaves like a numeric
+            // column; the custom sortingFn keeps null readings ordered below real values.
+            accessorFn: (row) => row.cpu.percent,
+            // Ascending on the first click (TanStack defaults numeric columns to
+            // descending-first; force a consistent low→high → high→low cycle instead).
+            sortDescFirst: false,
+            cell: ({ row }) => (
+                <ResourceBarCell
+                    percent={row.original.cpu.percent}
+                    displayText={row.original.cpu.valueText}
+                    level={row.original.cpu.level}
+                    testId="node-pod-cpu"
+                />
+            ),
+            sortingFn: (a, b) => compareUsageValue(a.original.cpu.percent, b.original.cpu.percent),
+        },
+        {
+            // Pod memory consumption as a share of this node's allocatable, in the active
+            // mode/format.
+            id: "memory",
+            header: `Memory${suffix}`,
+            accessorFn: (row) => row.memory.percent,
+            sortDescFirst: false,
+            cell: ({ row }) => (
+                <ResourceBarCell
+                    percent={row.original.memory.percent}
+                    displayText={row.original.memory.valueText}
+                    level={row.original.memory.level}
+                    testId="node-pod-memory"
+                />
+            ),
+            sortingFn: (a, b) => compareUsageValue(a.original.memory.percent, b.original.memory.percent),
+        },
+    ];
+}
 
 // The per-node Pods table: lists the pods scheduled on the node with sortable CPU and
-// memory consumption columns, each shown as a percentage of the node (pod usage ÷ the
-// node's allocatable). Per-pod usage comes from the node Performance snapshot
-// (GET /api/nodes/:name/performance), fetched lazily — only when the Pods tab is
-// active. A failed/absent metrics fetch leaves the resource columns showing em-dashes
-// rather than breaking the table. Clicking a row opens that pod's detail page.
+// memory bar columns, each showing the pod's share of the node (pod usage-or-requests ÷
+// the node's allocatable) for the shared View-mode / Value-format toggles. Per-pod usage
+// and requests come from the node Performance snapshot (GET /api/nodes/:name/performance),
+// fetched lazily — only when the Pods tab is active. A failed/absent metrics fetch leaves
+// the usage-mode bars showing em-dashes rather than breaking the table. Clicking a row
+// opens that pod's detail page.
 function NodePodsTable({ nodeName, pods, active }: { nodeName: string; pods: Pod[]; active: boolean }) {
     const { current } = useKubeContext();
     const navigate = useShareableNavigate();
+    const { mode, format } = useResourceUtilization();
     const [sorting, setSorting] = useState<SortingState>([]);
 
     const { data: performance } = useQuery({
@@ -193,24 +212,29 @@ function NodePodsTable({ nodeName, pods, active }: { nodeName: string; pods: Pod
         enabled: active && current !== null,
     });
 
-    // Join each pod with its share-of-node percentages. Memoised on the pods and the
-    // Performance snapshot so the array's identity changes only when those change —
-    // which is what makes the table re-derive the resource cells once the lazy
-    // Performance fetch resolves (TanStack caches the row model by data identity).
+    // Join each pod with its resolved CPU/Memory figures for the active mode/format.
+    // Memoised on the pods, the Performance snapshot, and the toggle state so the array's
+    // identity changes only when those change — which is what makes the table re-derive the
+    // resource cells once the lazy Performance fetch resolves or a toggle flips (TanStack
+    // caches the row model by data identity).
     const rows: NodePodRow[] = useMemo(() => {
-        const usage: PodUsageMap = buildNodePodUsageMap(
-            performance?.pods ?? [],
-            performance?.node.allocatable ?? null,
-        );
+        const resources: PodResourceMap = buildNodePodResourceMap(performance?.pods ?? []);
+        const allocatable = performance?.node.allocatable ?? { cpuMillicores: null, memoryBytes: null };
         return pods.map((pod) => {
-            const u = podUsageFor(usage, pod.namespace, pod.name);
-            return { ...pod, cpuPercent: u.cpuPercent, memoryPercent: u.memoryPercent };
+            const r = podResourceFor(resources, pod.namespace, pod.name);
+            return {
+                ...pod,
+                cpu: nodeMetricFigure(r.usage, r.requests, allocatable, "cpu", mode, format),
+                memory: nodeMetricFigure(r.usage, r.requests, allocatable, "memory", mode, format),
+            };
         });
-    }, [pods, performance]);
+    }, [pods, performance, mode, format]);
+
+    const columns = useMemo(() => nodePodColumns(format), [format]);
 
     const table = useReactTable({
         data: rows,
-        columns: NODE_POD_COLUMNS,
+        columns,
         state: { sorting },
         onSortingChange: setSorting,
         getCoreRowModel: getCoreRowModel(),
@@ -427,11 +451,16 @@ export function NodeDetailPage() {
             )}
 
             {activeTab === "pods" && (
-                <Box data-test-id="node-panel-pods">
+                <ResourceUtilizationProvider>
+                    <Box data-test-id="node-panel-pods">
                     <Paper variant="outlined" sx={{ p: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                            Pods ({data.pods.length})
-                        </Typography>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1, flexWrap: "wrap" }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                Pods ({data.pods.length})
+                            </Typography>
+                            <Box sx={{ flexGrow: 1 }} />
+                            {data.pods.length > 0 && <ViewToggles />}
+                        </Box>
                         {data.pods.length === 0
                             ? (
                                 <Typography color="text.secondary">No pods scheduled on this node.</Typography>
@@ -445,7 +474,8 @@ export function NodeDetailPage() {
                             )
                         }
                     </Paper>
-                </Box>
+                    </Box>
+                </ResourceUtilizationProvider>
             )}
 
             {activeTab === "events" && (
