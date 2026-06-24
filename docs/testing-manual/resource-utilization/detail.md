@@ -57,16 +57,26 @@ absent — kwok reports `null`):
 curl -fsS 'http://127.0.0.1:5172/api/cluster/nodes?context=<ctx>' | jq '.nodes[] | {name, instanceType}'
 ```
 
+## Cluster overview node-utilization summary (UI)
+
+The Cluster page Overview tab (`/`, Overview tab) shows a **node-utilization summary strip**
+below the stat tiles with three cards — Over-utilized (CPU requests ≥ 85% of allocatable),
+Healthy (40–85%), Under-utilized (< 40%). Start the stack with `KARSE_FAKE_METRICS=1` and open
+the Cluster page, then confirm:
+
+- The three counts sum to the number of nodes whose CPU requests and allocatable are both
+  readable, and each count equals the number of nodes that fall in that band (the strip is
+  computed from the per-node CPU-requests share of the Performance snapshot).
+- The same counts match the bands of the rows on the Nodes page (the strip and the table read
+  the same per-node CPU-requests share).
+- The strip is omitted entirely (not shown as all zeros) when metrics are unavailable or no
+  node's CPU requests/allocatable are readable.
+
 ## Nodes list utilization (UI)
 
 The Nodes page table (`/nodes`) shows the bar-column + toggle utilization model. Start the
 stack with `KARSE_FAKE_METRICS=1` and open Nodes, then confirm:
 
-- A **summary strip** sits above the toolbar with three cards — Over-utilized (CPU requests ≥
-  85% of allocatable), Healthy (40–85%), Under-utilized (< 40%). The three counts sum to the
-  number of nodes whose CPU requests and allocatable are both readable, and each count equals
-  the number of rows that fall in that band (the strip is computed from the same per-node CPU
-  requests share, independent of the View toggle).
 - The toolbar carries the **View toggle** (Usage | Requests) and **Value-format toggle** (% |
   Absolute). They drive the whole table together.
 - The **CPU** and **Memory** columns are inline bars with a right-aligned monospace value. In

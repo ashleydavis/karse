@@ -52,7 +52,6 @@ import {
     type UtilizationFigure,
 } from "../../../lib/node-utilization";
 import {
-    buildNodeUtilizationSummary,
     classifyNodeRow,
     formatAbsoluteCpu,
     formatAbsoluteMemory,
@@ -65,7 +64,6 @@ import {
 import { ResourceBarCell } from "../../../components/resource-utilization/resource-bar-cell";
 import { ViewToggles } from "../../../components/resource-utilization/view-toggles";
 import { StatusBadge } from "../../../components/resource-utilization/status-badge";
-import { NodeSummaryStrip } from "../../../components/resource-utilization/node-summary-strip";
 import type { ViewMode } from "../../../lib/resource-utilization";
 
 function formatAge(createdAt: string): string {
@@ -326,9 +324,6 @@ function NodesTableInner() {
 
     const utilizationMap = buildNodeUtilizationMap(performance?.nodes ?? []);
     const columns = buildColumns(utilizationMap, mode, format);
-    // Summary-strip band counts, computed from the per-node CPU-requests share of
-    // allocatable (independent of the View toggle, which only changes the bar bases).
-    const summary = buildNodeUtilizationSummary(performance?.nodes ?? []);
 
     // The filterable columns the shared editor offers: the Status and Health value
     // columns plus one column per label key present on the loaded nodes.
@@ -384,7 +379,6 @@ function NodesTableInner() {
     return (
         <div className="flex flex-col gap-2">
             <ResourceStatsHeader stats={stats} testIdPrefix="nodes" />
-            <NodeSummaryStrip summary={summary} />
             <div className="flex flex-row gap-2 items-center">
                 <ViewToggles />
                 <TextField

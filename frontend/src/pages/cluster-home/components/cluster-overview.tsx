@@ -12,6 +12,8 @@ import { LoadError } from "../../../components/load-error";
 import { ClusterUtilizationPanel } from "./cluster-utilization-panel";
 import { ClusterHealthSignalsSection } from "./cluster-health-signals";
 import { ClusterWorkloadsTable } from "./cluster-workloads-table";
+import { NodeSummaryStrip } from "../../../components/resource-utilization/node-summary-strip";
+import { buildNodeUtilizationSummary } from "../../../lib/resource-utilization";
 
 type StatTileProps = {
     icon: IconProp;
@@ -114,9 +116,10 @@ export function ClusterOverview() {
         queryFn: () => fetchClusterOverview(current!),
         enabled: current !== null,
     });
-    // The cluster performance snapshot drives the health-signals row and the workloads
-    // table below. The utilisation panel issues its own query against the same
-    // ["cluster-performance", current] key, so TanStack Query dedupes to a single fetch.
+    // The cluster performance snapshot drives the health-signals row, the workloads
+    // table, and the node-utilization summary strip below. The utilisation panel issues
+    // its own query against the same ["cluster-performance", current] key, so TanStack
+    // Query dedupes to a single fetch.
     const performance = useQuery({
         queryKey: ["cluster-performance", current],
         queryFn: () => fetchClusterPerformance(current!),
@@ -134,6 +137,15 @@ export function ClusterOverview() {
     const allNodesReady = data.readyNodeCount === data.nodeCount;
     const nodeSubLabel = `${data.readyNodeCount} of ${data.nodeCount} ready`;
     const nodeSubColor = allNodesReady ? "success.main" : "warning.main";
+
+    // Node-utilization band counts (over/healthy/under by CPU-requests share of
+    // allocatable), from the Performance snapshot. Shown only when the snapshot has nodes
+    // and at least one falls in a band, so the strip is omitted (rather than shown as all
+    // zeros) when metrics are unavailable or no node's requests/allocatable are readable.
+    const performanceNodes = performance.data?.nodes ?? [];
+    const nodeSummary = buildNodeUtilizationSummary(performanceNodes);
+    const showNodeSummary =
+        nodeSummary.over + nodeSummary.healthy + nodeSummary.under > 0;
 
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -195,6 +207,7 @@ export function ClusterOverview() {
                     />
                 </Grid>
             </Grid>
+            {showNodeSummary && <NodeSummaryStrip summary={nodeSummary} />}
             <PodPhaseRow
                 running={data.runningPodCount}
                 pending={data.pendingPodCount}
