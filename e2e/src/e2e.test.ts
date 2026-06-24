@@ -279,6 +279,14 @@ test.describe("karse e2e", () => {
             });
             await page.goto("/nodes", { waitUntil: "networkidle" });
             await expect(page.locator("[data-test-id='node-row']").first()).toBeVisible();
+            // The CPU/Memory columns are fed by a separate cluster-performance query that
+            // settles independently of the nodes list (and of `networkidle`), so the rows
+            // can appear before usage has loaded — the cell then shows an em-dash. Block
+            // until node-cool's CPU cell carries its real share (300m of 1000m = 30%) so
+            // every test below reads percentages, not a transient em-dash.
+            await expect(
+                page.locator("[data-test-id='node-row']").filter({ hasText: "node-cool" }).locator("[data-test-id='node-cpu']"),
+            ).toHaveText("30%");
         });
 
         test.afterAll(async () => {
@@ -488,6 +496,14 @@ test.describe("karse e2e", () => {
             });
             await page.goto("/pods", { waitUntil: "networkidle" });
             await expect(page.locator("[data-test-id='pod-row']").first()).toBeVisible();
+            // The resource columns are fed by a separate cluster-performance query that
+            // settles independently of the pods list (and of `networkidle`), so the rows
+            // can appear before usage has loaded — the cell then shows an em-dash. Block
+            // until pod-high's CPU cell carries its real node-share (500m of 1000m = 50%)
+            // so every test below reads percentages, not a transient em-dash.
+            await expect(
+                page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-high" }).locator("[data-test-id='pod-cpu']"),
+            ).toHaveText("50%");
         });
 
         test.afterAll(async () => {
