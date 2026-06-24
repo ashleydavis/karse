@@ -42,13 +42,18 @@ import { computePodStats, podHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
 import {
-    buildPodUsageMap,
-    podUsageFor,
-    comparePodCpu,
-    comparePodMemory,
-    formatPercent,
-    type PodUsageMap,
-} from "../../../lib/pod-resource-sort";
+    buildPodFiguresMap,
+    podFiguresFor,
+    podCpuCell,
+    podMemoryCell,
+    comparePodCells,
+    type PodFiguresMap,
+} from "../../../lib/pod-utilization";
+import { ResourceUtilizationProvider, useResourceUtilization } from "../../../lib/resource-utilization-context";
+import { ViewToggles } from "../../../components/resource-utilization/view-toggles";
+import { ResourceBarCell } from "../../../components/resource-utilization/resource-bar-cell";
+import { StatusBadge } from "../../../components/resource-utilization/status-badge";
+import type { ViewMode, ValueFormat } from "../../../lib/resource-utilization";
 
 // Formats a Kubernetes creationTimestamp into a human-readable age string.
 function formatAge(createdAt: string): string {
@@ -128,11 +133,14 @@ const PHASE_ORDER: Record<PodPhase, number> = {
 // All selectable pod phases, in display order, for the phase filter dropdown.
 const ALL_PHASES: PodPhase[] = ["Running", "Pending", "Succeeded", "Failed", "Unknown"];
 
-// Builds the column definitions for the pods table. `usage` maps each pod
-// (namespace/name) to its CPU/memory consumption as a percentage of the node it runs
-// on (from the cluster Performance snapshot), used by the resource columns and their
-// sort comparators.
-function buildColumns(usage: PodUsageMap): ColumnDef<Pod>[] {
+// Builds the column definitions for the pods table. `figures` maps each pod
+// (namespace/name) to its raw CPU/memory usage and request figures (from the cluster
+// Performance snapshot); `mode`/`format` are the shared view-mode and value-format toggle
+// state. The CPU and Memory columns render an inline ResourceBarCell whose percentage base
+// is the pod's own request (usage mode) or the request itself (requests mode), and a Status
+// column shows a StatusBadge grading the usage ratio. All three read mode/format so a toggle
+// re-derives every cell.
+function buildColumns(figures: PodFiguresMap, mode: ViewMode, format: ValueFormat): ColumnDef<Pod>[] {
     const cols: ColumnDef<Pod>[] = [];
 
     cols.push(
@@ -177,36 +185,63 @@ function buildColumns(usage: PodUsageMap): ColumnDef<Pod>[] {
             header: "Node",
         },
         {
-            // Pod CPU consumption as a percentage of its node's allocatable (from the
-            // cluster Performance snapshot). Renders the percentage (or an em-dash when
-            // usage/node is unavailable) and sorts by that percentage via comparePodCpu.
+            // Pod CPU utilisation as an inline bar. The percentage base is the pod's own
+            // request (usage mode: usage ÷ request; requests mode: the request as a full
+            // bar), from the cluster Performance snapshot. Sorts by that percentage via
+            // comparePodCells in whichever mode is active.
             id: "cpu",
             header: "CPU",
-            accessorFn: (row) => podUsageFor(usage, row.namespace, row.name).cpuPercent,
-            cell: (info) => (
-                <span data-test-id="pod-cpu">{formatPercent(info.getValue<number | null>())}</span>
-            ),
+            accessorFn: (row) => podCpuCell(podFiguresFor(figures, row.namespace, row.name), mode, format).sortValue,
+            cell: (info) => {
+                const cell = podCpuCell(podFiguresFor(figures, info.row.original.namespace, info.row.original.name), mode, format);
+                return <ResourceBarCell percent={cell.percent} displayText={cell.displayText} level={cell.level} testId="pod-cpu" />;
+            },
             sortingFn: (a, b) =>
-                comparePodCpu(
-                    podUsageFor(usage, a.original.namespace, a.original.name),
-                    podUsageFor(usage, b.original.namespace, b.original.name),
+                comparePodCells(
+                    podCpuCell(podFiguresFor(figures, a.original.namespace, a.original.name), mode, format),
+                    podCpuCell(podFiguresFor(figures, b.original.namespace, b.original.name), mode, format),
                 ),
             enableGlobalFilter: false,
         },
         {
-            // Pod memory consumption as a percentage of its node's allocatable (from the
-            // cluster Performance snapshot). Renders the percentage (or an em-dash when
-            // usage/node is unavailable) and sorts by that percentage via comparePodMemory.
+            // Pod memory utilisation as an inline bar, base the pod's own request (as CPU
+            // above). Sorts by that percentage via comparePodCells in the active mode.
             id: "memory",
             header: "Memory",
-            accessorFn: (row) => podUsageFor(usage, row.namespace, row.name).memoryPercent,
-            cell: (info) => (
-                <span data-test-id="pod-memory">{formatPercent(info.getValue<number | null>())}</span>
-            ),
+            accessorFn: (row) => podMemoryCell(podFiguresFor(figures, row.namespace, row.name), mode, format).sortValue,
+            cell: (info) => {
+                const cell = podMemoryCell(podFiguresFor(figures, info.row.original.namespace, info.row.original.name), mode, format);
+                return <ResourceBarCell percent={cell.percent} displayText={cell.displayText} level={cell.level} testId="pod-memory" />;
+            },
             sortingFn: (a, b) =>
-                comparePodMemory(
-                    podUsageFor(usage, a.original.namespace, a.original.name),
-                    podUsageFor(usage, b.original.namespace, b.original.name),
+                comparePodCells(
+                    podMemoryCell(podFiguresFor(figures, a.original.namespace, a.original.name), mode, format),
+                    podMemoryCell(podFiguresFor(figures, b.original.namespace, b.original.name), mode, format),
+                ),
+            enableGlobalFilter: false,
+        },
+        {
+            // CPU utilisation status badge, grading the pod's CPU usage ÷ request ratio
+            // (over-reserving / under-provisioned / OK) via classifyPodUsageRow inside
+            // podCpuCell. Shown only in usage mode — requests mode has no ratio to grade, so
+            // the cell is empty there. Sorts by the same percentage as the CPU bar.
+            id: "utilization",
+            header: "Utilization",
+            accessorFn: (row) => podCpuCell(podFiguresFor(figures, row.namespace, row.name), mode, format).sortValue,
+            cell: (info) => {
+                if (mode === "requests") {
+                    return null;
+                }
+                const cell = podCpuCell(podFiguresFor(figures, info.row.original.namespace, info.row.original.name), mode, format);
+                if (cell.level === "info") {
+                    return <span data-test-id="pod-status-badge-empty">—</span>;
+                }
+                return <StatusBadge label={cell.statusLabel} level={cell.level} />;
+            },
+            sortingFn: (a, b) =>
+                comparePodCells(
+                    podCpuCell(podFiguresFor(figures, a.original.namespace, a.original.name), mode, format),
+                    podCpuCell(podFiguresFor(figures, b.original.namespace, b.original.name), mode, format),
                 ),
             enableGlobalFilter: false,
         },
@@ -250,10 +285,21 @@ function buildColumns(usage: PodUsageMap): ColumnDef<Pod>[] {
 // Sortable, filterable table of Kubernetes pods for the active context.
 // When a namespace is selected it scopes the query; otherwise shows all namespaces.
 // The Namespace column is always rendered regardless of the active namespace.
+// Wraps the table in a ResourceUtilizationProvider so its View-mode / Value-format toggles
+// drive the CPU/Memory bar columns; the inner component consumes that shared state.
 export function PodsTable() {
+    return (
+        <ResourceUtilizationProvider>
+            <PodsTableInner />
+        </ResourceUtilizationProvider>
+    );
+}
+
+function PodsTableInner() {
     const { current } = useKubeContext();
     const { namespace } = useKubeNamespace();
     const navigate = useShareableNavigate();
+    const { mode, format } = useResourceUtilization();
 
     const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["pods", current, namespace],
@@ -261,12 +307,12 @@ export function PodsTable() {
         enabled: current !== null,
     });
 
-    // Per-pod CPU/memory node-share for the resource columns. Sourced from the
-    // cluster-wide Performance snapshot (the pods list response carries no usage),
-    // which carries both per-pod usage and per-node allocatable so each pod's usage
-    // can be expressed as a percentage of its node. Keyed by context only. A
-    // failed/absent metrics fetch leaves the map empty, so the columns show em-dashes
-    // rather than breaking the table.
+    // Per-pod CPU/memory usage and request figures for the resource bar columns. Sourced
+    // from the cluster-wide Performance snapshot (the pods list response carries no usage),
+    // which carries each pod's usage and its summed requests so the bar can express usage as
+    // a percentage of the pod's own request (usage mode) or show the request itself
+    // (requests mode). Keyed by context only. A failed/absent metrics fetch leaves the map
+    // empty, so the columns show em-dashes rather than breaking the table.
     const { data: performance } = useQuery({
         queryKey: ["cluster-performance", current],
         queryFn: () => fetchClusterPerformance(current!),
@@ -276,8 +322,8 @@ export function PodsTable() {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
 
-    const usageMap = buildPodUsageMap(performance?.pods ?? [], performance?.nodes ?? []);
-    const columns = buildColumns(usageMap);
+    const figuresMap = buildPodFiguresMap(performance?.pods ?? []);
+    const columns = buildColumns(figuresMap, mode, format);
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("pods", columns);
 
     // The filterable columns the shared editor offers: the Status (phase) and
@@ -358,6 +404,7 @@ export function PodsTable() {
                     testIdPrefix="pods-filter"
                 />
                 <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
+                <ViewToggles />
             </div>
             <TableContainer component={Paper} data-test-id="pods-table">
                 <Table size="small">

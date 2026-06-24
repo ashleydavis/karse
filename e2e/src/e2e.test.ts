@@ -436,11 +436,11 @@ test.describe("karse e2e", () => {
 
     // ── Resource-consumption columns (CPU / memory sort) ───────────────────────
 
-    test.describe("pods table resource sort", () => {
-        // Three pods with deliberately mismatched CPU and memory usage so that
-        // sorting by CPU and sorting by memory yield different orders. The pods
-        // list carries no usage; usage comes from the cluster Performance snapshot,
-        // so both endpoints are mocked to keep the assertions deterministic.
+    test.describe("pods table resource utilization", () => {
+        // Three pods with deliberately mismatched CPU and memory so that sorting by CPU
+        // and by memory yield different orders. The pods list carries no usage; usage and
+        // requests come from the cluster Performance snapshot, so both endpoints are mocked
+        // to keep the assertions deterministic.
         const SORT_PODS = {
             pods: [
                 { name: "pod-low", namespace: "default", phase: "Running", ready: "1/1", containerCount: 1, restarts: 0, node: "node-worker", createdAt: new Date().toISOString(), labels: {} },
@@ -449,21 +449,22 @@ test.describe("karse e2e", () => {
             ],
         };
 
-        // The columns show each pod's usage as a percentage of its node's allocatable.
-        // All three pods run on node-worker (allocatable: 1000m CPU, 1_000_000_000 bytes
-        // memory), so the percentage is usage ÷ allocatable. CPU ascending order is
-        // low(5%) < mid(25%) < high(50%); memory ascending order is the OPPOSITE
-        // (high(10%) < mid(20%) < low(30%)), so a memory sort cannot accidentally pass
-        // on the CPU ordering.
+        // The pods table's usage-mode percentage base is the pod's OWN REQUEST (not its
+        // node share). Each pod here requests 1000m CPU / 1_000_000_000 bytes memory, so
+        // the percentage is usage ÷ request. CPU ascending is low(5%) < mid(25%) < high(50%);
+        // memory ascending is the OPPOSITE (high(10%) < mid(20%) < low(30%)), so a memory
+        // sort cannot accidentally pass on the CPU ordering. pod-low's 5% CPU lands in the
+        // "over-reserving" band (≤ 35%), the others in "OK", proving the status badge grades
+        // the usage ÷ request ratio.
         const PERFORMANCE = {
             metricsAvailable: true,
             nodes: [
-                { name: "node-worker", usage: { cpuMillicores: 800, memoryBytes: 600_000_000 }, allocatable: { cpuMillicores: 1000, memoryBytes: 1_000_000_000 } },
+                { name: "node-worker", usage: { cpuMillicores: 800, memoryBytes: 600_000_000 }, requests: { cpuMillicores: 3000, memoryBytes: 3_000_000_000 }, allocatable: { cpuMillicores: 4000, memoryBytes: 8_000_000_000 } },
             ],
             pods: [
-                { name: "pod-low", namespace: "default", node: "node-worker", usage: { cpuMillicores: 50, memoryBytes: 300_000_000 }, requests: { cpuMillicores: null, memoryBytes: null }, limits: { cpuMillicores: null, memoryBytes: null }, containers: [] },
-                { name: "pod-mid", namespace: "default", node: "node-worker", usage: { cpuMillicores: 250, memoryBytes: 200_000_000 }, requests: { cpuMillicores: null, memoryBytes: null }, limits: { cpuMillicores: null, memoryBytes: null }, containers: [] },
-                { name: "pod-high", namespace: "default", node: "node-worker", usage: { cpuMillicores: 500, memoryBytes: 100_000_000 }, requests: { cpuMillicores: null, memoryBytes: null }, limits: { cpuMillicores: null, memoryBytes: null }, containers: [] },
+                { name: "pod-low", namespace: "default", node: "node-worker", usage: { cpuMillicores: 50, memoryBytes: 300_000_000 }, requests: { cpuMillicores: 1000, memoryBytes: 1_000_000_000 }, limits: { cpuMillicores: null, memoryBytes: null }, containers: [] },
+                { name: "pod-mid", namespace: "default", node: "node-worker", usage: { cpuMillicores: 250, memoryBytes: 200_000_000 }, requests: { cpuMillicores: 1000, memoryBytes: 1_000_000_000 }, limits: { cpuMillicores: null, memoryBytes: null }, containers: [] },
+                { name: "pod-high", namespace: "default", node: "node-worker", usage: { cpuMillicores: 500, memoryBytes: 100_000_000 }, requests: { cpuMillicores: 1000, memoryBytes: 1_000_000_000 }, limits: { cpuMillicores: null, memoryBytes: null }, containers: [] },
             ],
         };
 
@@ -494,23 +495,52 @@ test.describe("karse e2e", () => {
             await page.unroute("**/api/cluster/performance*");
         });
 
-        test("CPU and Memory columns render each pod's usage as a percentage of its node", async () => {
+        test("CPU and Memory bar columns render each pod's usage as a percentage of its OWN REQUEST", async () => {
             await expect(page.locator("[data-test-id='pods-table'] thead th").filter({ hasText: "CPU" })).toBeVisible();
             await expect(page.locator("[data-test-id='pods-table'] thead th").filter({ hasText: "Memory" })).toBeVisible();
-            // Three rows, three CPU cells and three memory cells.
-            await expect(page.locator("[data-test-id='pod-cpu']")).toHaveCount(3);
-            await expect(page.locator("[data-test-id='pod-memory']")).toHaveCount(3);
-            // Each cell is a node-share percentage (e.g. "25%"), not absolute millicores/bytes.
+            // Three rows, three CPU bar cells and three memory bar cells, each with a bar.
+            await expect(page.locator("[data-test-id='pod-cpu-bar']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='pod-memory-bar']")).toHaveCount(3);
+            // Each value is a percentage of the pod's request (e.g. "25%"), not millicores.
             // toHaveText auto-retries until every cell matches, so it waits for the separate
             // cluster-performance query to populate the column. allTextContents() + toMatch
             // was a one-shot snapshot that read the pre-load "—" if the query had not yet
             // applied (a render-vs-assertion race that lost under parallel CPU load).
-            await expect(page.locator("[data-test-id='pod-cpu']")).toHaveText([/^\d+%$/, /^\d+%$/, /^\d+%$/]);
-            await expect(page.locator("[data-test-id='pod-memory']")).toHaveText([/^\d+%$/, /^\d+%$/, /^\d+%$/]);
-            // pod-high uses 500m of node-worker's 1000m allocatable -> 50%.
+            await expect(page.locator("[data-test-id='pod-cpu-value']")).toHaveText([/^\d+%$/, /^\d+%$/, /^\d+%$/]);
+            await expect(page.locator("[data-test-id='pod-memory-value']")).toHaveText([/^\d+%$/, /^\d+%$/, /^\d+%$/]);
+            // pod-high uses 500m of its 1000m request -> 50% (its node-share would be ~13%,
+            // proving the base is the request, not the node allocatable).
             await expect(
-                page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-high" }).locator("[data-test-id='pod-cpu']"),
+                page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-high" }).locator("[data-test-id='pod-cpu-value']"),
             ).toHaveText("50%");
+        });
+
+        test("the Utilization status badge grades the usage ÷ request ratio", async () => {
+            // pod-low: 5% CPU -> over-reserving (≤ 35%). pod-high: 50% CPU -> OK.
+            await expect(
+                page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-low" }).locator("[data-test-id='util-status-badge']"),
+            ).toHaveText("Over-reserving");
+            await expect(
+                page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-high" }).locator("[data-test-id='util-status-badge']"),
+            ).toHaveText("OK");
+        });
+
+        test("toggling to Requests then Absolute switches the bar value to the request quantity", async () => {
+            await page.locator("[data-test-id='util-view-mode-requests']").click();
+            // In requests mode the request is the base, shown as a full 100% bar.
+            await expect(
+                page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-high" }).locator("[data-test-id='pod-cpu-value']"),
+            ).toHaveText("100%");
+            // Requests mode has no usage ratio to grade, so the badge is absent.
+            await expect(page.locator("[data-test-id='util-status-badge']")).toHaveCount(0);
+            // Absolute format shows the request quantity (1000m -> "1" core).
+            await page.locator("[data-test-id='util-value-format-absolute']").click();
+            await expect(
+                page.locator("[data-test-id='pod-row']").filter({ hasText: "pod-high" }).locator("[data-test-id='pod-cpu-value']"),
+            ).toHaveText("1");
+            // Restore the defaults for the sort tests below.
+            await page.locator("[data-test-id='util-view-mode-usage']").click();
+            await page.locator("[data-test-id='util-value-format-percent']").click();
         });
 
         // Numeric columns sort highest-first on the first click (TanStack's default
