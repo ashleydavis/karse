@@ -40,14 +40,33 @@ import { ResourceStatsHeader } from "../../../components/resource-stats-header";
 import { computeNodeStats, nodeHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
+import { formatPercent, compareUsageValue } from "../../../lib/node-usage-sort";
 import {
-    buildNodeUsageMap,
-    nodeUsageFor,
-    compareNodeCpu,
-    compareNodeMemory,
-    formatPercent,
-    type NodeUsageMap,
-} from "../../../lib/node-usage-sort";
+    buildNodeUtilizationMap,
+    nodeUtilizationFor,
+    cpuFigureFor,
+    memoryFigureFor,
+    compareNodeCpuMode,
+    compareNodeMemoryMode,
+    type NodeUtilizationMap,
+    type UtilizationFigure,
+} from "../../../lib/node-utilization";
+import {
+    buildNodeUtilizationSummary,
+    classifyNodeRow,
+    formatAbsoluteCpu,
+    formatAbsoluteMemory,
+    type ValueFormat,
+} from "../../../lib/resource-utilization";
+import {
+    ResourceUtilizationProvider,
+    useResourceUtilization,
+} from "../../../lib/resource-utilization-context";
+import { ResourceBarCell } from "../../../components/resource-utilization/resource-bar-cell";
+import { ViewToggles } from "../../../components/resource-utilization/view-toggles";
+import { StatusBadge } from "../../../components/resource-utilization/status-badge";
+import { NodeSummaryStrip } from "../../../components/resource-utilization/node-summary-strip";
+import type { ViewMode } from "../../../lib/resource-utilization";
 
 function formatAge(createdAt: string): string {
     const ms = Date.now() - new Date(createdAt).getTime();
@@ -94,11 +113,27 @@ const STATUS_ORDER: Record<NodeStatus, number> = { Ready: 0, NotReady: 1, Unknow
 // All selectable node statuses, in display order, for the status filter dropdown.
 const ALL_STATUSES: NodeStatus[] = ["Ready", "NotReady", "Unknown"];
 
-// Builds the column definitions for the nodes table. `usage` maps each node (by name)
-// to its CPU/memory consumption as a percentage of its own allocatable (from the
-// cluster Performance snapshot), used by the resource columns and their sort
-// comparators.
-function buildColumns(usage: NodeUsageMap): ColumnDef<Node>[] {
+// The display text for a CPU bar cell: a percent of allocatable in percent format, or a
+// "used / total vCPU" pair in absolute format. The bar always fills to the percent.
+function cpuDisplayText(figure: UtilizationFigure, format: ValueFormat): string {
+    return format === "absolute"
+        ? formatAbsoluteCpu(figure.used, figure.total)
+        : formatPercent(figure.percent);
+}
+
+// The display text for a memory bar cell: a percent of allocatable, or a "used / total GB"
+// pair in absolute format.
+function memoryDisplayText(figure: UtilizationFigure, format: ValueFormat): string {
+    return format === "absolute"
+        ? formatAbsoluteMemory(figure.used, figure.total)
+        : formatPercent(figure.percent);
+}
+
+// Builds the column definitions for the nodes table. `util` maps each node (by name) to its
+// CPU/memory utilisation in both View modes; `mode` and `format` come from the shared
+// resource-utilization toggle and pick which base (usage vs requests) and which display
+// (percent vs absolute) the CPU/Memory bar columns and the Status badge use.
+function buildColumns(util: NodeUtilizationMap, mode: ViewMode, format: ValueFormat): ColumnDef<Node>[] {
     return [
     {
         accessorKey: "name",
@@ -132,31 +167,98 @@ function buildColumns(usage: NodeUsageMap): ColumnDef<Node>[] {
         header: "Version",
     },
     {
-        // Node CPU consumption as a percentage of its own allocatable (from the cluster
-        // Performance snapshot). Renders the percentage (or an em-dash when usage is
-        // unavailable, e.g. a NotReady node) and sorts by that percentage via compareNodeCpu.
-        id: "cpu",
-        header: "CPU",
-        accessorFn: (row) => nodeUsageFor(usage, row.name).cpuPercent,
-        cell: (info) => (
-            <span data-test-id="node-cpu">{formatPercent(info.getValue<number | null>())}</span>
-        ),
+        // Node-level status badge: classifies the node by its active-mode CPU figure (usage
+        // ÷ allocatable, or requests ÷ allocatable) via the shared classifier, so the badge
+        // tracks the same base as the bars. Sorts by that percent; an em-dash node sorts low.
+        id: "node-status-badge",
+        header: "Utilization",
+        accessorFn: (row) => cpuFigureFor(nodeUtilizationFor(util, row.name), mode).percent,
+        // Re-derive from the live util map in the cell (rather than info.getValue(), whose
+        // accessor result TanStack memoises per row) so the badge updates when the Performance
+        // snapshot arrives or the View mode changes, matching the bar cells below.
+        cell: (info) => {
+            const percent = cpuFigureFor(nodeUtilizationFor(util, info.row.original.name), mode).percent;
+            const result = classifyNodeRow(percent);
+            return <StatusBadge label={result.label} level={result.level} />;
+        },
         sortingFn: (a, b) =>
-            compareNodeCpu(nodeUsageFor(usage, a.original.name), nodeUsageFor(usage, b.original.name)),
+            compareUsageValue(
+                cpuFigureFor(nodeUtilizationFor(util, a.original.name), mode).percent,
+                cpuFigureFor(nodeUtilizationFor(util, b.original.name), mode).percent,
+            ),
         enableGlobalFilter: false,
     },
     {
-        // Node memory consumption as a percentage of its own allocatable (from the cluster
-        // Performance snapshot). Renders the percentage (or an em-dash when usage is
-        // unavailable) and sorts by that percentage via compareNodeMemory.
+        // Node CPU as a bar of its own allocatable, in the active View mode (usage or
+        // requests) and Value format (percent or absolute "used / total vCPU"). The bar fills
+        // to the percent; an em-dash node renders an empty bar. Sorts by the mode's percent.
+        id: "cpu",
+        header: "CPU",
+        accessorFn: (row) => cpuFigureFor(nodeUtilizationFor(util, row.name), mode).percent,
+        cell: (info) => {
+            const figure = cpuFigureFor(nodeUtilizationFor(util, info.row.original.name), mode);
+            return (
+                <ResourceBarCell
+                    percent={figure.percent}
+                    displayText={cpuDisplayText(figure, format)}
+                    level={classifyNodeRow(figure.percent).level}
+                    testId="node-cpu"
+                />
+            );
+        },
+        sortingFn: (a, b) =>
+            compareNodeCpuMode(
+                nodeUtilizationFor(util, a.original.name),
+                nodeUtilizationFor(util, b.original.name),
+                mode,
+            ),
+        enableGlobalFilter: false,
+    },
+    {
+        // Node memory as a bar of its own allocatable, in the active View mode and Value
+        // format ("used / total GB" when absolute). Sorts by the mode's memory percent.
         id: "memory",
         header: "Memory",
-        accessorFn: (row) => nodeUsageFor(usage, row.name).memoryPercent,
-        cell: (info) => (
-            <span data-test-id="node-memory">{formatPercent(info.getValue<number | null>())}</span>
-        ),
+        accessorFn: (row) => memoryFigureFor(nodeUtilizationFor(util, row.name), mode).percent,
+        cell: (info) => {
+            const figure = memoryFigureFor(nodeUtilizationFor(util, info.row.original.name), mode);
+            return (
+                <ResourceBarCell
+                    percent={figure.percent}
+                    displayText={memoryDisplayText(figure, format)}
+                    level={classifyNodeRow(figure.percent).level}
+                    testId="node-memory"
+                />
+            );
+        },
         sortingFn: (a, b) =>
-            compareNodeMemory(nodeUsageFor(usage, a.original.name), nodeUsageFor(usage, b.original.name)),
+            compareNodeMemoryMode(
+                nodeUtilizationFor(util, a.original.name),
+                nodeUtilizationFor(util, b.original.name),
+                mode,
+            ),
+        enableGlobalFilter: false,
+    },
+    {
+        // The node's cloud instance type (from a node label), as a monospace caption. Nodes
+        // without the label (e.g. kwok, docker-desktop) carry null, shown as an em-dash.
+        id: "instanceType",
+        header: "Instance Type",
+        accessorFn: (row) => row.instanceType,
+        cell: (info) => {
+            const value = info.getValue<string | null>();
+            return (
+                <Typography
+                    variant="caption"
+                    data-test-id="node-instance-type"
+                    sx={{ fontFamily: "monospace" }}
+                >
+                    {value ?? "—"}
+                </Typography>
+            );
+        },
+        sortingFn: (a, b) =>
+            (a.original.instanceType ?? "").localeCompare(b.original.instanceType ?? ""),
         enableGlobalFilter: false,
     },
     {
@@ -194,9 +296,14 @@ function buildColumns(usage: NodeUsageMap): ColumnDef<Node>[] {
     ];
 }
 
-export function NodesTable() {
+// The nodes table body. Reads the shared View-mode / Value-format toggle from
+// resource-utilization-context (so it must render inside a ResourceUtilizationProvider — the
+// exported NodesTable below provides one), and drives the summary strip, bar columns, and
+// status badge off the cluster Performance snapshot.
+function NodesTableInner() {
     const { current } = useKubeContext();
     const navigate = useShareableNavigate();
+    const { mode, format } = useResourceUtilization();
     const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["cluster", "nodes", current],
         queryFn: () => fetchNodes(current!),
@@ -217,8 +324,11 @@ export function NodesTable() {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
 
-    const usageMap = buildNodeUsageMap(performance?.nodes ?? []);
-    const columns = buildColumns(usageMap);
+    const utilizationMap = buildNodeUtilizationMap(performance?.nodes ?? []);
+    const columns = buildColumns(utilizationMap, mode, format);
+    // Summary-strip band counts, computed from the per-node CPU-requests share of
+    // allocatable (independent of the View toggle, which only changes the bar bases).
+    const summary = buildNodeUtilizationSummary(performance?.nodes ?? []);
 
     // The filterable columns the shared editor offers: the Status and Health value
     // columns plus one column per label key present on the loaded nodes.
@@ -274,7 +384,9 @@ export function NodesTable() {
     return (
         <div className="flex flex-col gap-2">
             <ResourceStatsHeader stats={stats} testIdPrefix="nodes" />
+            <NodeSummaryStrip summary={summary} />
             <div className="flex flex-row gap-2 items-center">
+                <ViewToggles />
                 <TextField
                     size="small"
                     placeholder="Search nodes..."
@@ -352,5 +464,15 @@ export function NodesTable() {
                 </Table>
             </TableContainer>
         </div>
+    );
+}
+
+// The nodes table. Wraps the body in a ResourceUtilizationProvider so the View-mode /
+// Value-format toggles, the bar columns, and the status badge all read one shared choice.
+export function NodesTable() {
+    return (
+        <ResourceUtilizationProvider>
+            <NodesTableInner />
+        </ResourceUtilizationProvider>
     );
 }

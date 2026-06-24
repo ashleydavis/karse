@@ -57,6 +57,34 @@ absent — kwok reports `null`):
 curl -fsS 'http://127.0.0.1:5172/api/cluster/nodes?context=<ctx>' | jq '.nodes[] | {name, instanceType}'
 ```
 
+## Nodes list utilization (UI)
+
+The Nodes page table (`/nodes`) shows the bar-column + toggle utilization model. Start the
+stack with `KARSE_FAKE_METRICS=1` and open Nodes, then confirm:
+
+- A **summary strip** sits above the toolbar with three cards — Over-utilized (CPU requests ≥
+  85% of allocatable), Healthy (40–85%), Under-utilized (< 40%). The three counts sum to the
+  number of nodes whose CPU requests and allocatable are both readable, and each count equals
+  the number of rows that fall in that band (the strip is computed from the same per-node CPU
+  requests share, independent of the View toggle).
+- The toolbar carries the **View toggle** (Usage | Requests) and **Value-format toggle** (% |
+  Absolute). They drive the whole table together.
+- The **CPU** and **Memory** columns are inline bars with a right-aligned monospace value. In
+  Usage view the bar base is each node's usage ÷ its own allocatable; in Requests view it is
+  the node's summed pod requests ÷ allocatable. In % format the value is a percentage; in
+  Absolute it is a `used / total` pair (`vCPU` for CPU, `GB` for memory). A node with no usage
+  sample (a NotReady node) shows empty bars and an em-dash in Usage view, but still shows its
+  requests bars in Requests view.
+- The **Utilization** column is a status badge from the node classifier (over-utilized ≥ 85%,
+  under-utilized ≤ 35%, else healthy, em-dash when the active mode's CPU figure is null). The
+  badge tracks the active View mode — switching Usage↔Requests re-bands it.
+- The **Instance Type** column shows the node's cloud instance type in monospace, or an em-dash
+  when the node has no instance-type label (kwok reports null).
+- Clicking the **CPU** or **Memory** header sorts by that column's percentage in the active View
+  mode (highest first, then ascending); a node with no reading sorts to the bottom ascending.
+- Screenshots for human review (light and dark, default Usage and toggled Requests/Absolute
+  states) are captured under the ticket's `evidence/implementation-N/screenshots/`.
+
 ## Remaining (UI) checks
 
 The full manual test steps for this feature — starting the app, the kwok fixture, the

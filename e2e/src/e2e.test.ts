@@ -237,9 +237,9 @@ test.describe("karse e2e", () => {
         // snapshot, so both endpoints are mocked to keep the assertions deterministic.
         const SORT_NODES = {
             nodes: [
-                { name: "node-cool", status: "Ready", roles: [], version: "v1.30.0", createdAt: new Date().toISOString(), labels: {} },
-                { name: "node-hot", status: "Ready", roles: [], version: "v1.30.0", createdAt: new Date().toISOString(), labels: {} },
-                { name: "node-notready", status: "NotReady", roles: [], version: "v1.30.0", createdAt: new Date().toISOString(), labels: {} },
+                { name: "node-cool", status: "Ready", roles: [], version: "v1.30.0", createdAt: new Date().toISOString(), labels: {}, instanceType: "m5.large" },
+                { name: "node-hot", status: "Ready", roles: [], version: "v1.30.0", createdAt: new Date().toISOString(), labels: {}, instanceType: "m5.xlarge" },
+                { name: "node-notready", status: "NotReady", roles: [], version: "v1.30.0", createdAt: new Date().toISOString(), labels: {}, instanceType: null },
             ],
         };
 
@@ -252,9 +252,9 @@ test.describe("karse e2e", () => {
         const PERFORMANCE = {
             metricsAvailable: true,
             nodes: [
-                { name: "node-cool", usage: { cpuMillicores: 300, memoryBytes: 3_000_000_000 }, allocatable: { cpuMillicores: 1000, memoryBytes: 6_000_000_000 } },
-                { name: "node-hot", usage: { cpuMillicores: 1200, memoryBytes: 1_000_000_000 }, allocatable: { cpuMillicores: 2000, memoryBytes: 4_000_000_000 } },
-                { name: "node-notready", usage: { cpuMillicores: null, memoryBytes: null }, allocatable: { cpuMillicores: 1000, memoryBytes: 4_000_000_000 } },
+                { name: "node-cool", usage: { cpuMillicores: 300, memoryBytes: 3_000_000_000 }, requests: { cpuMillicores: 500, memoryBytes: 3_000_000_000 }, allocatable: { cpuMillicores: 1000, memoryBytes: 6_000_000_000 } },
+                { name: "node-hot", usage: { cpuMillicores: 1200, memoryBytes: 1_000_000_000 }, requests: { cpuMillicores: 1800, memoryBytes: 2_000_000_000 }, allocatable: { cpuMillicores: 2000, memoryBytes: 4_000_000_000 } },
+                { name: "node-notready", usage: { cpuMillicores: null, memoryBytes: null }, requests: { cpuMillicores: 200, memoryBytes: 1_000_000_000 }, allocatable: { cpuMillicores: 1000, memoryBytes: 4_000_000_000 } },
             ],
             pods: [],
         };

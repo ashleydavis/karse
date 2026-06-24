@@ -224,7 +224,10 @@ export function buildNodeUtilizationSummary(nodes: NodeUsage[]): {
     let healthy = 0;
     let under = 0;
     for (const node of nodes) {
-        const percent = nodePercent(node.requests.cpuMillicores, node.allocatable.cpuMillicores);
+        // requests is always present on a real snapshot; default a missing object to all-null
+        // so a partial snapshot leaves the node uncounted (info band) rather than throwing.
+        const requests = node.requests ?? { cpuMillicores: null, memoryBytes: null };
+        const percent = nodePercent(requests.cpuMillicores, node.allocatable.cpuMillicores);
         const band = classifyNodeSummaryBand(percent);
         if (band.level === "critical") {
             over += 1;
