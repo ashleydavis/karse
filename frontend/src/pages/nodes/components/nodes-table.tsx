@@ -235,7 +235,12 @@ export function NodesTable() {
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("nodes", columns, ["roles"]);
 
     const table = useReactTable({
-        data: data?.nodes ?? [],
+        // Pass a fresh array (not the stable React Query array) so TanStack rebuilds its row
+        // model when usage arrives. TanStack memoises the row model and its per-cell value
+        // cache on the data reference alone, not on columns; the CPU/Memory accessors close
+        // over `usageMap`, so reusing the same data array after the cluster Performance
+        // snapshot lands keeps showing the em-dash computed before it arrived.
+        data: [...(data?.nodes ?? [])],
         columns,
         state: { sorting, globalFilter, columnFilters: filter.columnFilters, columnOrder, columnVisibility: { ...columnVisibility, health: false } },
         onSortingChange: setSorting,

@@ -3132,8 +3132,14 @@ test.describe("karse e2e", () => {
             // Navigate fresh to clear the React Query cache so the next namespace
             // change definitely triggers a new HTTP request.
             await page.goto("/pods", { waitUntil: "networkidle" });
-            // Set up the request waiter after page settles, then change namespace.
-            const requestPromise = page.waitForRequest("**/api/pods*");
+            // Wait for the request that actually carries namespace=default, not merely the first
+            // /api/pods call. Selecting the namespace can briefly re-issue the unfiltered request
+            // first (more likely under parallel load), and a bare glob would capture that stray call
+            // and read namespace=null. Matching on the param waits for the request the test is about.
+            const requestPromise = page.waitForRequest(
+                (req) => req.url().includes("/api/pods")
+                    && new URL(req.url()).searchParams.get("namespace") === "default",
+            );
             await page.locator("[aria-label='namespace picker']").click();
             await page.locator("[data-test-id='namespace-quick-picker-row']").filter({ hasText: /^default/ }).click();
             const request = await requestPromise;
@@ -4600,7 +4606,14 @@ test.describe("karse e2e", () => {
                 await route.fulfill({ json: { events } });
             });
             await page.goto("/events", { waitUntil: "networkidle" });
-            const requestPromise = page.waitForRequest("**/api/events*");
+            // Wait for the request that actually carries namespace=default, not merely the first
+            // /api/events call. Selecting the namespace can briefly re-issue the unfiltered request
+            // first (more likely under parallel load), and a bare glob would capture that stray call
+            // and read namespace=null. Matching on the param waits for the request the test is about.
+            const requestPromise = page.waitForRequest(
+                (req) => req.url().includes("/api/events")
+                    && new URL(req.url()).searchParams.get("namespace") === "default",
+            );
             await page.locator("[aria-label='namespace picker']").click();
             await page.locator("[data-test-id='namespace-quick-picker-row']").filter({ hasText: /^default/ }).click();
             const request = await requestPromise;
@@ -4847,6 +4860,14 @@ test.describe("karse e2e", () => {
     test.describe("errors page", () => {
         // Predictable error data injected via route interception: one problem pod
         // and one Warning event.
+        // lastSeen is pinned to a fixed 2-hours-ago offset so the Age column renders a
+        // stable "2h". With `new Date()` (now) the Age grew with how long the suite took to
+        // reach this block; once it read "4m" the "search matches a term only in the Count
+        // column" test below matched BOTH rows via the Age cell instead of only the count-4
+        // row. A 2h offset floors to "2h" for the whole run (it never ticks to 3h within a
+        // run) and contains no digit the Count searches use, so the search stays unambiguous
+        // regardless of how long the suite takes — which varies a lot under parallel load.
+        const TWO_HOURS_AGO = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
         const FAKE_ERRORS = {
             errors: [
                 {
@@ -4858,7 +4879,7 @@ test.describe("karse e2e", () => {
                     message: "back-off 5m0s restarting failed container",
                     count: 1,
                     firstSeen: "2024-01-01T00:00:00Z",
-                    lastSeen: new Date().toISOString(),
+                    lastSeen: TWO_HOURS_AGO,
                 },
                 {
                     source: "Event",
@@ -4869,7 +4890,7 @@ test.describe("karse e2e", () => {
                     message: "0/3 nodes are available",
                     count: 4,
                     firstSeen: "2024-01-02T00:00:00Z",
-                    lastSeen: new Date().toISOString(),
+                    lastSeen: TWO_HOURS_AGO,
                 },
             ],
         };
@@ -5134,12 +5155,19 @@ test.describe("karse e2e", () => {
         let endY = targetBox.y + targetBox.height / 2;
         await page.mouse.move(startX, startY);
         await page.mouse.down();
-        // Step the pointer towards the target so dnd-kit starts and tracks the drag.
+        // Let dnd-kit's PointerSensor process the pointerdown and attach its move listeners
+        // before the pointer travels. Under heavy parallel-run CPU load that handler can run
+        // late, so without this pause the first moves are missed and the drag never starts (the
+        // row then never reorders).
+        await page.waitForTimeout(250);
+        // Step the pointer towards the target so dnd-kit starts and tracks the drag, pausing
+        // briefly between steps so a CPU-starved page keeps up with the moves.
         const steps = 10;
         for (let step = 1; step <= steps; step++) {
             const x = startX + ((endX - startX) * step) / steps;
             const y = startY + ((endY - startY) * step) / steps;
             await page.mouse.move(x, y);
+            await page.waitForTimeout(20);
         }
         // Re-aim at the target's LIVE position before releasing. When the target is a column row,
         // dnd-kit parks the dragged column at the cursor's insertion point during the drag, which
@@ -5149,14 +5177,14 @@ test.describe("karse e2e", () => {
         // real user's cursor would do — rather than in the bare area below it (which would append to
         // the end). For a section droppable target there is no row to reflow, so this is a harmless
         // no-op re-read.
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 8; i++) {
             const live = await target.boundingBox();
             if (live !== null) {
                 endX = live.x + live.width / 2;
                 endY = live.y + live.height / 2;
             }
             await page.mouse.move(endX, endY);
-            await page.waitForTimeout(60);
+            await page.waitForTimeout(120);
         }
         // A final settle move on the target, then release to drop.
         await page.mouse.move(endX, endY);
@@ -5194,11 +5222,15 @@ test.describe("karse e2e", () => {
             : Math.min(lastRowBox.y + lastRowBox.height + 10, sectionBox.y + sectionBox.height - 4);
         await page.mouse.move(startX, startY);
         await page.mouse.down();
+        // Let dnd-kit attach its pointer listeners before moving (see dragColumnOnto): under
+        // heavy load the pointerdown handler runs late and the drag would otherwise never start.
+        await page.waitForTimeout(250);
         const steps = 10;
         for (let step = 1; step <= steps; step++) {
             const x = startX + ((endX - startX) * step) / steps;
             const y = startY + ((endY - startY) * step) / steps;
             await page.mouse.move(x, y);
+            await page.waitForTimeout(20);
         }
         // Re-aim at the section's LIVE bare area before releasing. Parking the dragged column in the
         // destination during the drag grows the section and reflows its rows, so the end landing spot
@@ -5206,14 +5238,14 @@ test.describe("karse e2e", () => {
         // section's bottom edge (just inside its padding, past every row) so the drop lands in the
         // bare area — the END — rather than on a row; reading the live box a few times lets the layout
         // settle under the cursor, as a real user's cursor would track it.
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 8; i++) {
             const liveSection = await section.boundingBox();
             if (liveSection !== null) {
                 endX = liveSection.x + liveSection.width / 2;
                 endY = liveSection.y + liveSection.height - 4;
             }
             await page.mouse.move(endX, endY);
-            await page.waitForTimeout(60);
+            await page.waitForTimeout(120);
         }
         await page.mouse.move(endX, endY);
         await page.mouse.up();

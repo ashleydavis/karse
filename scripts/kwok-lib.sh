@@ -78,12 +78,26 @@ create_cluster() {
     sleep "$(( RANDOM % 4 ))"
     local attempt ctx="kwok-$name"
     for attempt in 1 2 3; do
+        # kwok has no flag for etcd's PEER port: it auto-assigns it itself, scanning
+        # down from 32767 with no cross-process coordination and a find-then-bind gap.
+        # Under parallelism several kwokctl processes pick the same top-of-range peer
+        # port, then one etcd dies with "creating peer listener failed: bind: address
+        # already in use", taking its apiserver down with it and leaving the cluster
+        # never-ready. Pin etcd's peer LISTEN url to a port from our coordinated registry
+        # (like the other five) so every cluster's peer listener is unique. Only
+        # listen-peer-urls actually binds, so overriding just it removes the collision;
+        # the advertise/initial-cluster metadata keep kwok's auto value but bind nothing,
+        # and a single-node etcd forms its cluster regardless. The override is appended
+        # after kwok's own value; etcd's URL flags are last-wins, so ours takes effect.
+        # (One etcd extra-arg only: kwok panics when several components each carry
+        # multiple --extra-args, which is why this is not three flags.)
         kwokctl create cluster --name "$name" --runtime binary --wait 60s \
             --kube-apiserver-port "$(reserve_port)" \
             --etcd-port "$(reserve_port)" \
             --kube-controller-manager-port "$(reserve_port)" \
             --kube-scheduler-port "$(reserve_port)" \
             --controller-port "$(reserve_port)" \
+            --extra-args=etcd=listen-peer-urls=http://0.0.0.0:"$(reserve_port)" \
             "$@" || true
         if cluster_ready "$ctx"; then return 0; fi
         echo "create_cluster: '$name' did not become ready (attempt $attempt/3); recreating with fresh ports..." >&2

@@ -31,12 +31,19 @@ export KUBECONFIG
 # cluster data. Lives under the kwok state dir (never /tmp, per project rule).
 KARSE_CACHE_DIR="$KARSE_KWOK_STATE_DIR/e2e-$RUN_ID.cache"
 export KARSE_CACHE_DIR
+# Per-run Playwright output directory. In main mode every parallel run executes from this
+# same repo, so without this they would all share e2e/test-results; Playwright clears and
+# recreates that dir (and its .playwright-artifacts-* temp dirs) at startup, so concurrent
+# runs race and one ENOENTs mid-mkdir. A unique dir per run (read by playwright.config.ts)
+# keeps each run's artifacts to itself. Kept under the kwok state dir, never /tmp.
+KARSE_E2E_OUTPUT_DIR="$KARSE_KWOK_STATE_DIR/e2e-$RUN_ID.test-results"
+export KARSE_E2E_OUTPUT_DIR
 
 cleanup() {
     [[ -n "$FRONTEND_PID" ]] && kill "$FRONTEND_PID" 2>/dev/null || true
     [[ -n "$BACKEND_PID" ]]  && kill "$BACKEND_PID"  2>/dev/null || true
     rm -f "$PORT_FILE" "$FRONTEND_LOG" "$KUBECONFIG"
-    rm -rf "$KARSE_CACHE_DIR"
+    rm -rf "$KARSE_CACHE_DIR" "$KARSE_E2E_OUTPUT_DIR"
     kwokctl delete cluster --name "$KWOK_CLUSTER_1" 2>/dev/null || true
     kwokctl delete cluster --name "$KWOK_CLUSTER_2" 2>/dev/null || true
     release_ports
