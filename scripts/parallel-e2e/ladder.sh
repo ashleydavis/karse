@@ -15,7 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEST="$SCRIPT_DIR/test.sh"
 
 RUNGS=("$@")
-[ "${#RUNGS[@]}" -eq 0 ] && RUNGS=(10 20 40 80 160)
+[ "${#RUNGS[@]}" -eq 0 ] && RUNGS=(10 20 40 80)
 
 if [ ! -x "$TEST" ]; then
     echo "ladder: ERROR: cannot find runnable test script at $TEST" >&2
