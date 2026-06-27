@@ -1,34 +1,35 @@
 #!/usr/bin/env bash
-# Proof ladder for the parallel e2e runner. Runs the suite at increasing
-# parallelism and ABORTS at the first level that does not pass 100%.
+# Stability ladder for the parallel e2e runner. Runs a FIXED-size parallel batch many
+# times in a row and ABORTS at the first batch that does not pass 100%.
 #
 # Usage:
-#   scripts/parallel-e2e/ladder.sh                 # default rungs: 10 20 40 80 160
-#   scripts/parallel-e2e/ladder.sh 10 20 40        # custom rungs
+#   scripts/parallel-e2e/ladder.sh                 # default: 20 in parallel, 10 times
+#   scripts/parallel-e2e/ladder.sh 20 10           # <parallel> <iterations>
 #
-# Each rung runs `scripts/parallel-e2e/test.sh test <N> main`, which exits 0 only
-# when every one of its N runs passed. On the first rung that does not fully pass
-# (or any other error) this script prints an error to stderr and exits 1.
+# Each iteration runs `scripts/parallel-e2e/test.sh test <parallel> main`, which exits 0 only
+# when every one of its <parallel> runs passed. On the first iteration that does not fully pass
+# (or any other error) this script prints an error to stderr and exits 1. If every iteration
+# passes it prints LADDER PASSED and exits 0.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEST="$SCRIPT_DIR/test.sh"
 
-RUNGS=("$@")
-[ "${#RUNGS[@]}" -eq 0 ] && RUNGS=(10 20 40 80)
+PARALLEL="${1:-20}"
+ITERATIONS="${2:-10}"
 
 if [ ! -x "$TEST" ]; then
     echo "ladder: ERROR: cannot find runnable test script at $TEST" >&2
     exit 1
 fi
 
-echo "LADDER START $(date '+%Y-%m-%d %H:%M:%S')  rungs: ${RUNGS[*]}"
-for N in "${RUNGS[@]}"; do
-    echo "========== RUNG $N START $(date '+%Y-%m-%d %H:%M:%S') =========="
-    if ! "$TEST" test "$N" main; then
-        echo "ladder: ERROR: FAILED at rung $N (not a 100% pass) $(date '+%Y-%m-%d %H:%M:%S')" >&2
+echo "LADDER START $(date '+%Y-%m-%d %H:%M:%S')  ${PARALLEL} in parallel x ${ITERATIONS} iterations"
+for i in $(seq 1 "$ITERATIONS"); do
+    echo "========== ITERATION $i/$ITERATIONS START $(date '+%Y-%m-%d %H:%M:%S') =========="
+    if ! "$TEST" test "$PARALLEL" main; then
+        echo "ladder: ERROR: FAILED at iteration $i/$ITERATIONS (not a 100% pass) $(date '+%Y-%m-%d %H:%M:%S')" >&2
         exit 1
     fi
-    echo "RUNG $N PASSED $(date '+%H:%M:%S')"
+    echo "ITERATION $i/$ITERATIONS PASSED $(date '+%H:%M:%S')"
 done
-echo "LADDER PASSED: all rungs (${RUNGS[*]}) fully passed $(date '+%Y-%m-%d %H:%M:%S')"
+echo "LADDER PASSED: all ${ITERATIONS} iterations of ${PARALLEL}-parallel fully passed $(date '+%Y-%m-%d %H:%M:%S')"
