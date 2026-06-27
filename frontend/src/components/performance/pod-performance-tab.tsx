@@ -5,7 +5,6 @@ import { fetchPodPerformance } from "../../lib/api-client";
 import { LoadingIndicator } from "../loading-indicator";
 import { LoadError } from "../load-error";
 import { MetricsUnavailable } from "./metrics-unavailable";
-import { PodNodeShare } from "./pod-node-share";
 import { PodResourcePanel } from "../resource-utilization/pod-resource-panel";
 
 // Props for the pod Performance tab. `active` is true only when this tab is the
@@ -19,13 +18,14 @@ type PodPerformanceTabProps = {
 
 // The pod Performance view (the leaf of the feature): a CPU section and a Memory section,
 // each with Requested / Limit / Usage-now tiles and a combined bar plotting live usage
-// against the request and limit (the PodResourcePanel). Below that, the "Share of node"
-// subsection keeps the pod's percentage of its scheduling node for CPU and memory (pod
-// usage ÷ node allocatable). Data comes from GET /pods/:namespace/:name/performance,
-// fetched lazily when the tab is active. There is no treemap; disk and network are not
-// shown at all (the Metrics API reports no pod disk/network usage). When the Metrics API
-// is unavailable the usage figures and node percentages degrade to "—" and the
-// MetricsUnavailable notice is shown (requests and limits, read from the spec, remain).
+// against the request and limit (the PodResourcePanel), with a Percentage / Absolute toggle
+// switching the tile figures between a percentage of the pod's own request and the raw
+// values. Data comes from GET /pods/:namespace/:name/performance, fetched lazily when the
+// tab is active. There is no treemap, and no "Share of node" subsection (the pod's share of
+// its scheduling node lives on the Status tab's "Node resources" panel instead); disk and
+// network are not shown at all (the Metrics API reports no pod disk/network usage). When the
+// Metrics API is unavailable the usage figures degrade to "—" and the MetricsUnavailable
+// notice is shown (requests and limits, read from the spec, remain).
 export function PodPerformanceTab({ namespace, name, active }: PodPerformanceTabProps) {
     const { current } = useKubeContext();
 
@@ -55,16 +55,6 @@ export function PodPerformanceTab({ namespace, name, active }: PodPerformanceTab
             {!data.metricsAvailable && <MetricsUnavailable />}
 
             <PodResourcePanel data={data} active={active} />
-
-            <Box data-test-id="perf-pod-node-share-section" sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                    Share of node
-                </Typography>
-                <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                    How much of its scheduling node this pod is using, as a percentage of the node.
-                </Typography>
-                <PodNodeShare data={data} />
-            </Box>
         </Box>
     );
 }

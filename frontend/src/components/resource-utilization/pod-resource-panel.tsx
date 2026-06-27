@@ -1,7 +1,10 @@
-import { Box, Paper, Typography, useTheme } from "@mui/material";
+import { useState } from "react";
+import { Box, Paper, ToggleButton, ToggleButtonGroup, Typography, useTheme } from "@mui/material";
 import type { PodPerformance } from "karse-types";
 import { formatCpu, formatMemory, podResourceRows } from "../../lib/performance";
-import type { PodResourceRow } from "../../lib/performance";
+import type { PodResourceRow, PodNodeShareResource } from "../../lib/performance";
+import { podRequestPercent } from "../../lib/resource-utilization";
+import type { ValueFormat } from "../../lib/resource-utilization";
 
 // Props for the pod Performance panel: the pod's performance snapshot and the `active`
 // flag (true only when the Performance tab is selected) so a parent can keep the data
@@ -10,6 +13,26 @@ type PodResourcePanelProps = {
     data: PodPerformance;
     active: boolean;
 };
+
+// The text shown in a Requested / Limit / Usage-now tile for the selected value format.
+// In **Absolute** the raw figure is shown via the metric's own formatter (cpu in m/cores,
+// memory in binary units). In **Percentage** the figure is shown as a percentage of the
+// pod's own request for that resource — the per-scope base the spec defines for pod detail
+// (so usage reads as "how close to its reservation", and the limit as "headroom over the
+// request"). A null figure (unset request/limit, or absent usage) renders the em-dash
+// placeholder in either format rather than a misleading 0.
+function tileText(
+    value: number | null,
+    request: number | null,
+    resource: PodNodeShareResource,
+    format: ValueFormat,
+): string {
+    if (format === "absolute") {
+        return (resource === "cpu" ? formatCpu : formatMemory)(value);
+    }
+    const percent = podRequestPercent(value, request);
+    return percent === null ? "—" : `${percent}%`;
+}
 
 // One small tile in a resource section: a label (Requested / Limit / Usage now) over a
 // large monospace value. A null figure renders the formatter's em-dash placeholder, so an
@@ -98,8 +121,7 @@ function CombinedBar({ row, testId }: { row: PodResourceRow; testId: string }) {
 // One resource section (CPU or Memory): the three tiles (Requested / Limit / Usage now) and
 // the combined usage-vs-request-vs-limit bar, with a small legend tying the markers to their
 // meaning. Uses the metric's own formatter (cpu in m/cores, memory in binary units).
-function ResourceSection({ row, testId }: { row: PodResourceRow; testId: string }) {
-    const fmt = row.resource === "cpu" ? formatCpu : formatMemory;
+function ResourceSection({ row, format, testId }: { row: PodResourceRow; format: ValueFormat; testId: string }) {
     const title = row.resource === "cpu" ? "CPU" : "Memory";
     return (
         <Paper data-test-id={testId} variant="outlined" sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
@@ -107,9 +129,21 @@ function ResourceSection({ row, testId }: { row: PodResourceRow; testId: string 
                 {title}
             </Typography>
             <Box sx={{ display: "flex", gap: 1.5 }}>
-                <ResourceTile label="Requested" valueText={fmt(row.request)} testId={`${testId}-requested`} />
-                <ResourceTile label="Limit" valueText={fmt(row.limit)} testId={`${testId}-limit`} />
-                <ResourceTile label="Usage now" valueText={fmt(row.usage)} testId={`${testId}-usage`} />
+                <ResourceTile
+                    label="Requested"
+                    valueText={tileText(row.request, row.request, row.resource, format)}
+                    testId={`${testId}-requested`}
+                />
+                <ResourceTile
+                    label="Limit"
+                    valueText={tileText(row.limit, row.request, row.resource, format)}
+                    testId={`${testId}-limit`}
+                />
+                <ResourceTile
+                    label="Usage now"
+                    valueText={tileText(row.usage, row.request, row.resource, format)}
+                    testId={`${testId}-usage`}
+                />
             </Box>
             <CombinedBar row={row} testId={`${testId}-bar`} />
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
@@ -138,15 +172,43 @@ function LegendItem({ color, label }: { color: string; label: string }) {
 // shared per-resource scale. Reads the pod's summed usage/requests/limits from the snapshot
 // (defensively defaulting an absent pod to all-null figures so the panel never throws). Bar
 // colours are neutral theme colours; the colours plan (plan 2) maps a semantic palette later.
+//
+// A shared Percentage / Absolute toggle (reusing the resource-utilization ValueFormat token
+// and the MUI ToggleButtonGroup styling of ViewToggles) drives both sections together: in
+// Absolute the tiles read the raw figures, in Percentage they read as a percentage of the
+// pod's own request. Default Absolute, since Requested / Limit / Usage-now are inherently
+// absolute readings. Exactly one option is always selected (a null change — clicking the
+// active button — is ignored), so the toggle can never end up with nothing chosen.
 export function PodResourcePanel({ data }: PodResourcePanelProps) {
+    const [format, setFormat] = useState<ValueFormat>("absolute");
     const usage = data.pod?.usage ?? { cpuMillicores: null, memoryBytes: null };
     const requests = data.pod?.requests ?? { cpuMillicores: null, memoryBytes: null };
     const limits = data.pod?.limits ?? { cpuMillicores: null, memoryBytes: null };
     const rows = podResourceRows(usage, requests, limits);
     return (
         <Box data-test-id="pod-resource-panel" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <ToggleButtonGroup
+                exclusive
+                size="small"
+                value={format}
+                onChange={(_, next: ValueFormat | null) => {
+                    if (next !== null) {
+                        setFormat(next);
+                    }
+                }}
+                data-test-id="pod-resource-format"
+                aria-label="resource value format"
+                sx={{ alignSelf: "flex-start" }}
+            >
+                <ToggleButton value="percent" data-test-id="pod-resource-format-percent">
+                    Percentage
+                </ToggleButton>
+                <ToggleButton value="absolute" data-test-id="pod-resource-format-absolute">
+                    Absolute
+                </ToggleButton>
+            </ToggleButtonGroup>
             {rows.map((row) => (
-                <ResourceSection key={row.resource} row={row} testId={`pod-resource-${row.resource}`} />
+                <ResourceSection key={row.resource} row={row} format={format} testId={`pod-resource-${row.resource}`} />
             ))}
         </Box>
     );
