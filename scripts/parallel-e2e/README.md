@@ -72,6 +72,27 @@ tail -f logs/parallel-e2e/<timestamp>/run-1.log
 
 At the end the script prints a summary table (PASS/FAIL and duration per run) and exits `0` only if every run passed.
 
+## Proof ladder (`ladder.sh`)
+
+`ladder.sh` runs the suite at increasing parallelism and stops at the first level that does not pass 100%. It is the bar for proving that a parallel-stability fix actually holds: passing once at one level can be luck, so the fix has to survive each step up.
+
+```
+scripts/parallel-e2e/ladder.sh                 # default rungs: 10 20 40 80 160
+scripts/parallel-e2e/ladder.sh 10 20 40        # custom rungs
+```
+
+- Each rung runs `scripts/parallel-e2e/test.sh test <N> main` and checks its exit code (the test script exits `0` only when all N runs passed).
+- The first rung that is not a full pass ends the ladder with a non-zero exit and a `LADDER FAILED at rung <N>` line. If every rung passes it prints `LADDER PASSED`.
+- It does nothing except run the test script per rung (no deleting or reaping), so each rung's own setup and cleanup are unchanged.
+- It is long-running. Launch it in the background and watch the log:
+
+  ```
+  bash scripts/parallel-e2e/ladder.sh 2>&1 | tee logs/parallel-e2e/ladder.log &
+  tail -f logs/parallel-e2e/ladder.log
+  ```
+
+Note: the top rungs are very heavy. At `160` parallel, main mode holds roughly 320 resident kwok clusters at once, so the top of the ladder can be bounded by host CPU/RAM rather than by any bug.
+
 ## main mode vs worktree mode
 
 - **worktree mode** isolates everything per run, including `e2e/test-results` and `e2e/playwright-report`. This is the cleanest way to test true parallelism, and it most closely matches how `pb:next` runs work from separate worktrees. The cost is a `git worktree add` plus a `bun install` per run, so startup is slower.
