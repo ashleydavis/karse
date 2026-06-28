@@ -6799,4 +6799,225 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("About");
         });
     });
+
+    // ── Resource utilization (closing coverage) ─────────────────────────────────
+    // The final resource-utilization slice (resource-utilization-13) gathers an
+    // end-to-end pass over every utilisation surface, in order, against the real
+    // KARSE_FAKE_METRICS=1 kwok fixture (set in scripts/e2e-tests.sh): the seeded
+    // cluster-1 nodes (node-cp / node-worker patched to 4-core/8Gi, plus the NotReady
+    // node-notready) and pods (web/api in default, worker in jobs, cache in infra) match
+    // the canned per-container fake metrics by name, so each surface renders populated
+    // usage and request figures. Detailed per-surface behaviour lives in the dedicated
+    // blocks above; this block is the consolidated walk the closing ticket requires,
+    // touching every surface and asserting both its default and a toggled state.
+    test.describe("resource utilization", () => {
+        test.describe.configure({ mode: "serial" });
+
+        test.beforeAll(() => {
+            setContext(CLUSTER_1);
+        });
+
+        // 1. Cluster Overview: stat cards + health-signals row + workloads-table toggle.
+        test.describe("cluster overview cards, health signals, and workloads table toggle", () => {
+            test.beforeAll(async () => {
+                setContext(CLUSTER_1);
+                await page.goto("/cluster", { waitUntil: "networkidle" });
+                // Overview is the default tab; its panel and the stat cards render from the
+                // overview snapshot, the rest from the cluster-performance snapshot.
+                await expect(page.locator("[data-test-id='cluster-panel-overview']")).toBeVisible();
+                await expect(page.locator("[data-test-id='stat-server-version']")).toBeVisible();
+            });
+
+            test("renders the five overview stat cards", async () => {
+                await expect(page.locator("[data-test-id='stat-tiles'] > div")).toHaveCount(5);
+                await expect(page.locator("[data-test-id='stat-nodes']")).toBeVisible();
+                await expect(page.locator("[data-test-id='stat-pods']")).toBeVisible();
+            });
+
+            test("shows the health-signals row with its five tiles", async () => {
+                const signals = page.locator("[data-test-id='cluster-health-signals']");
+                await expect(signals).toBeVisible({ timeout: 20000 });
+                // The five derived tiles: pending pods, OOMKills, CPU throttling (always
+                // N/A from kubectl), node count, and node pressure.
+                await expect(page.locator("[data-test-id='health-pending-pods']")).toBeVisible();
+                await expect(page.locator("[data-test-id='health-oomkills']")).toBeVisible();
+                await expect(page.locator("[data-test-id='health-cpu-throttling']")).toContainText("N/A");
+                await expect(page.locator("[data-test-id='health-node-count']")).toBeVisible();
+                await expect(page.locator("[data-test-id='health-node-pressure']")).toBeVisible();
+            });
+
+            test("shows the node-utilization summary strip", async () => {
+                // The strip renders when the snapshot has nodes whose requests/allocatable
+                // fall in a band; the seeded 4-core nodes carry pod requests, so it shows.
+                await expect(page.locator("[data-test-id='node-summary-strip']")).toBeVisible({ timeout: 20000 });
+            });
+
+            test("the workloads table toggles its CPU header between usage and requests", async () => {
+                const workloads = page.locator("[data-test-id='workloads-table']");
+                await expect(workloads).toBeVisible({ timeout: 20000 });
+                const cpuHeader = workloads.locator("thead th").filter({ hasText: "CPU" });
+                // Default View mode is Usage, so the column reads "CPU usage".
+                await expect(cpuHeader).toContainText("usage");
+                // The workloads section owns its own View-mode/Value-format toggles (each
+                // utilisation table wraps its own provider). It is the last util-view-mode on
+                // the Overview tab, after the utilisation panel's own toggle. Switching it to
+                // Requests re-labels this table's CPU column to "CPU requests".
+                const workloadsToggle = page.locator("[data-test-id='util-view-mode']").last();
+                await workloadsToggle.locator("[data-test-id='util-view-mode-requests']").click();
+                await expect(cpuHeader).toContainText("requests");
+                // Restore Usage so the default state is left clean.
+                await workloadsToggle.locator("[data-test-id='util-view-mode-usage']").click();
+                await expect(cpuHeader).toContainText("usage");
+            });
+        });
+
+        // 2. Cluster Performance tab: the node treemap with a long node-name leaf that is
+        // middle-truncated. The seeded cluster has no long-named node (other blocks assert
+        // node counts), so the /api/cluster/performance snapshot is mocked with a long node
+        // — the same fixture shape resource-utilization-5 introduced.
+        test.describe("performance tab treemap truncated label", () => {
+            const LONG_NODE = "node-with-a-very-long-hostname-worker-01";
+            const PERFORMANCE = {
+                metricsAvailable: true,
+                nodes: [
+                    { name: LONG_NODE, usage: { cpuMillicores: 1200, memoryBytes: 3_000_000_000 }, requests: { cpuMillicores: 1000, memoryBytes: 2_000_000_000 }, allocatable: { cpuMillicores: 4000, memoryBytes: 8_000_000_000 } },
+                    { name: "node-worker", usage: { cpuMillicores: 800, memoryBytes: 2_000_000_000 }, requests: { cpuMillicores: 600, memoryBytes: 1_000_000_000 }, allocatable: { cpuMillicores: 4000, memoryBytes: 8_000_000_000 } },
+                ],
+                pods: [],
+                totals: {
+                    usage: { cpuMillicores: 2000, memoryBytes: 5_000_000_000 },
+                    requests: { cpuMillicores: 1600, memoryBytes: 3_000_000_000 },
+                    allocatable: { cpuMillicores: 8000, memoryBytes: 16_000_000_000 },
+                },
+                health: {
+                    pendingPods: 0,
+                    oomKillCount: 0,
+                    nodeCount: 2,
+                    nodePressure: { memoryPressure: 0, diskPressure: 0, pidPressure: 0 },
+                    cpuThrottlingAvailable: false,
+                },
+                workloads: [],
+            };
+
+            test.beforeAll(async () => {
+                setContext(CLUSTER_1);
+                await page.route("**/api/cluster/performance*", async (route) => {
+                    await route.fulfill({ json: PERFORMANCE });
+                });
+                await page.goto("/cluster", { waitUntil: "networkidle" });
+                await page.locator("[data-test-id='cluster-tab-performance']").click();
+                await expect(page.locator("[data-test-id='perf-treemap']")).toBeVisible();
+            });
+
+            test.afterAll(async () => {
+                await page.unroute("**/api/cluster/performance*");
+            });
+
+            test("middle-truncates the long node leaf label and shows the full name on hover", async () => {
+                const labels = await page.locator("[data-test-id='perf-treemap'] text").allTextContents();
+                const joined = labels.join(" ");
+                // truncateMiddle(LONG_NODE, 14) keeps 7 start + "..." + 7 end chars.
+                expect(joined).toContain("node-wi...rker-01");
+                expect(joined).not.toContain(LONG_NODE);
+                // The hover tooltip shows the full untruncated name.
+                await page
+                    .locator("[data-test-id='perf-treemap'] text")
+                    .filter({ hasText: /node-wi\.\.\.rker-01/ })
+                    .first()
+                    .hover({ force: true });
+                const tooltip = page.locator("[data-test-id='perf-treemap-tooltip']");
+                await expect(tooltip).toBeVisible();
+                await expect(tooltip).toContainText(LONG_NODE);
+            });
+        });
+
+        // 3. Nodes list page: the summary strip (stats chips) plus the CPU/Memory resource
+        // bar columns, driven by the shared View-mode/Value-format toggles.
+        test.describe("nodes summary strip and bar columns", () => {
+            test.beforeAll(async () => {
+                setContext(CLUSTER_1);
+                await page.goto("/nodes", { waitUntil: "networkidle" });
+                await expect(page.locator("[data-test-id='node-row']").first()).toBeVisible();
+            });
+
+            test("shows the nodes summary strip and populated CPU/Memory bar columns", async () => {
+                // The summary strip (total / healthy / error chips) tops the page.
+                await expect(page.locator("[data-test-id='nodes-stats']")).toBeVisible();
+                await expect(page.locator("[data-test-id='nodes-stats-total']")).toBeVisible();
+                // The resource columns are fed by the cluster-performance query, which settles
+                // independently of networkidle, so wait for a real bar to render.
+                await expect(page.locator("[data-test-id='node-cpu-bar']").first()).toBeVisible({ timeout: 20000 });
+                await expect(page.locator("[data-test-id='node-memory-bar']").first()).toBeVisible({ timeout: 20000 });
+                // A ready node's CPU cell reads a percentage of its allocatable.
+                await expect(page.locator("[data-test-id='node-cpu-value']").first()).toHaveText(/\d+%|—/, { timeout: 20000 });
+            });
+
+            test("the View-mode/Value-format toggle switches the bar values to absolute", async () => {
+                await expect(page.locator("[data-test-id='util-view-mode']")).toBeVisible();
+                // Absolute format switches the CPU column away from a bare percentage to a
+                // cores figure (e.g. "0.3 / 4 vCPU"); assert it no longer reads "<n>%".
+                await page.locator("[data-test-id='util-value-format-absolute']").click();
+                await expect(page.locator("[data-test-id='node-cpu-value']").first()).not.toHaveText(/^\d+%$/, { timeout: 20000 });
+                // Restore the percentage default.
+                await page.locator("[data-test-id='util-value-format-percent']").click();
+            });
+        });
+
+        // 4. Node detail Performance tab: the CPU/Memory utilization cards, plus the Pods
+        // sub-tab's per-pod CPU/Memory bars. node-cp carries fake usage and a 4-core/8Gi
+        // allocatable, so both render populated.
+        test.describe("node detail utilization cards and pods bars", () => {
+            test.beforeAll(async () => {
+                setContext(CLUSTER_1);
+            });
+
+            test("the Performance tab shows the CPU/Memory utilization cards", async () => {
+                await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+                await page.locator("[data-test-id='node-tab-performance']").click();
+                await expect(page.locator("[data-test-id='node-utilization-cards']")).toBeVisible({ timeout: 20000 });
+                await expect(page.locator("[data-test-id='node-util-card-cpu']")).toBeVisible();
+                await expect(page.locator("[data-test-id='node-util-card-memory']")).toBeVisible();
+                // Default Usage + % shows a percentage figure on the CPU card.
+                await expect(page.locator("[data-test-id='node-util-card-cpu']")).toContainText("%");
+            });
+
+            test("the Pods sub-tab shows per-pod CPU/Memory bars", async () => {
+                await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+                await page.locator("[data-test-id='node-tab-pods']").click();
+                await expect(page.locator("[data-test-id='node-panel-pods']")).toBeVisible();
+                await expect(page.locator("[data-test-id='node-pod-row']").first()).toBeVisible({ timeout: 20000 });
+                await expect(page.locator("[data-test-id='node-pod-cpu-value']").first()).toContainText("%", { timeout: 20000 });
+                await expect(page.locator("[data-test-id='node-pod-memory-value']").first()).toBeVisible();
+            });
+        });
+
+        // 5. Pods list page: the per-pod CPU/Memory resource bars, each a percentage of the
+        // pod's own request, driven by the same shared toggles.
+        test.describe("pods table bars", () => {
+            test.beforeAll(async () => {
+                setContext(CLUSTER_1);
+                await page.goto("/pods", { waitUntil: "networkidle" });
+                await expect(page.locator("[data-test-id='pod-row']").first()).toBeVisible();
+            });
+
+            test("renders populated CPU/Memory bars on each pod row", async () => {
+                // The resource columns load from the cluster-performance query, separate from
+                // the pods list, so wait for a real bar rather than the transient em-dash.
+                await expect(page.locator("[data-test-id='pod-cpu-bar']").first()).toBeVisible({ timeout: 20000 });
+                await expect(page.locator("[data-test-id='pod-memory-bar']").first()).toBeVisible({ timeout: 20000 });
+                await expect(page.locator("[data-test-id='pod-cpu-value']").first()).toHaveText(/\d+%|—/, { timeout: 20000 });
+            });
+
+            test("toggling to Requests then Absolute switches the bars off a bare percentage", async () => {
+                await page.locator("[data-test-id='util-view-mode-requests']").click();
+                await page.locator("[data-test-id='util-value-format-absolute']").click();
+                // In Requests + Absolute the CPU cell reads the request quantity (cores/millicores),
+                // not a "<n>%" figure.
+                await expect(page.locator("[data-test-id='pod-cpu-value']").first()).not.toHaveText(/^\d+%$/, { timeout: 20000 });
+                // Restore the Usage + % defaults.
+                await page.locator("[data-test-id='util-view-mode-usage']").click();
+                await page.locator("[data-test-id='util-value-format-percent']").click();
+            });
+        });
+    });
 });

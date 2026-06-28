@@ -379,6 +379,11 @@ echo "--- GET /api/nodes/:name/performance (scoped node + pods) ---"
 NODE_PERF=$(curl -fsS "$BASE/api/nodes/fake-node-1/performance?context=$CURRENT_CTX")
 echo "$NODE_PERF" | jq -e '.metricsAvailable == true' > /dev/null
 echo "$NODE_PERF" | jq -e '.node.name == "fake-node-1" and (.node.usage.cpuMillicores | type == "number") and (.node.allocatable | has("cpuMillicores") and has("memoryBytes"))' > /dev/null
+# The scoped node also carries its summed pod-request reservation (node.requests),
+# populated from the specs of the pods scheduled on it, so the UI can show the node's
+# requested vs allocatable. cpuMillicores/memoryBytes are real numbers (0 when the
+# node's pods declare no requests), never null, on the scoped endpoint.
+echo "$NODE_PERF" | jq -e '(.node.requests | has("cpuMillicores") and has("memoryBytes")) and (.node.requests.cpuMillicores | type == "number") and (.node.requests.memoryBytes | type == "number")' > /dev/null
 # Scoped to fake-node-1: every returned pod is on that node, and smoke-pod is present
 # with its two containers retained for the treemap's pod -> container level.
 echo "$NODE_PERF" | jq -e '.pods | all(.node == "fake-node-1")' > /dev/null
