@@ -6348,13 +6348,31 @@ test.describe("karse e2e", () => {
     // disturbs the shared page state the "Performance tabs (cluster)" block relies on.
     test.describe("cluster treemap long node-name truncation", () => {
         const LONG_NODE = "node-with-a-very-long-hostname-worker-01";
+        // A full ClusterPerformance snapshot. The Cluster Overview tab (the default tab this
+        // block lands on before clicking Performance) renders health signals, the workloads
+        // table, and the node-utilization strip from this same endpoint, so totals/health/
+        // workloads and each node's requests must be present or the Overview render throws
+        // and the tab bar never appears. The treemap this block asserts on is built from nodes.
         const PERFORMANCE = {
             metricsAvailable: true,
             nodes: [
-                { name: LONG_NODE, usage: { cpuMillicores: 1200, memoryBytes: 3_000_000_000 }, allocatable: { cpuMillicores: 4000, memoryBytes: 8_000_000_000 } },
-                { name: "node-worker", usage: { cpuMillicores: 800, memoryBytes: 2_000_000_000 }, allocatable: { cpuMillicores: 4000, memoryBytes: 8_000_000_000 } },
+                { name: LONG_NODE, usage: { cpuMillicores: 1200, memoryBytes: 3_000_000_000 }, requests: { cpuMillicores: 1000, memoryBytes: 2_000_000_000 }, allocatable: { cpuMillicores: 4000, memoryBytes: 8_000_000_000 } },
+                { name: "node-worker", usage: { cpuMillicores: 800, memoryBytes: 2_000_000_000 }, requests: { cpuMillicores: 600, memoryBytes: 1_000_000_000 }, allocatable: { cpuMillicores: 4000, memoryBytes: 8_000_000_000 } },
             ],
             pods: [],
+            totals: {
+                usage: { cpuMillicores: 2000, memoryBytes: 5_000_000_000 },
+                requests: { cpuMillicores: 1600, memoryBytes: 3_000_000_000 },
+                allocatable: { cpuMillicores: 8000, memoryBytes: 16_000_000_000 },
+            },
+            health: {
+                pendingPods: 0,
+                oomKillCount: 0,
+                nodeCount: 2,
+                nodePressure: { memoryPressure: 0, diskPressure: 0, pidPressure: 0 },
+                cpuThrottlingAvailable: false,
+            },
+            workloads: [],
         };
 
         test.beforeAll(async () => {
