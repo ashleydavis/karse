@@ -81,3 +81,48 @@ The frontend's axios client (`frontend/src/lib/api-client.ts`) also sets a defau
 
 The one exception is the cluster overview's server-version call: if it fails (rejection or non-zero exit), `serverVersion` is reported as `null` rather than throwing, because a context can be valid in kubeconfig while the API server is unreachable. The three count calls still propagate real errors.
 
+## Resource utilization data flow
+
+The richer CPU/memory utilisation surfaces (cluster cards, health signals, the workloads
+table, the nodes/pods bar columns, and the node/pod detail panels) all read from three
+performance endpoints, served by the kubectl adapter from data already gathered for the
+Performance feature:
+
+- `GET /api/cluster/performance` — the extended `ClusterPerformance`: per-node `usage` /
+  `requests` / `allocatable`, cluster-wide `totals`, the `health` signals, and the per-controller
+  `workloads` rows. Drives the cluster Overview sections and the nodes/pods table bar columns
+  (all sharing one `["cluster-performance", current]` query key, so TanStack Query dedupes to a
+  single fetch per context).
+- `GET /api/nodes/:name/performance` — the one node's `usage` / `requests` / `allocatable` plus
+  its pods' per-pod figures. Drives the node-detail utilisation cards and the per-node pods bars.
+- `GET /api/pods/:namespace/:name/performance` — the one pod's summed `usage` / `requests` /
+  `limits`. Drives the pod-detail resource panel.
+
+The adapter (`backend/src/kubectl/kubectl-adapter.ts`) builds these by joining three sources:
+live **usage** from the Kubernetes Metrics API (`kubectl get --raw`), **requests/limits** from
+pod specs, and **allocatable** plus node conditions and container termination reasons from node
+and pod status. Usage is optional: when no metrics-server is present the endpoints set
+`metricsAvailable: false` and null the usage fields, while requests/allocatable still populate.
+A test mode, `KARSE_FAKE_METRICS=1`, returns a canned Metrics API payload so the surfaces can be
+exercised against clusters with no metrics-server (e.g. kwok). The shared contract types
+(`ClusterResourceTotals`, `ClusterHealthSignals`, `WorkloadUsage`, the extended
+`ClusterPerformance`, `NodeUsage.requests`, `Node.instanceType`) live in `packages/karse-types`.
+
+### Shared frontend resource-utilization lib and components
+
+The presentation is shared so every surface reads and behaves the same way:
+
+- `frontend/src/lib/resource-utilization.ts` — pure, React-free helpers: the per-scope
+  percentage functions, the absolute formatters, and the threshold classifiers (which return a
+  colour-free `{ level, label }` so a later colours plan can map levels → palette without
+  touching this file). `node-utilization.ts`, `pod-utilization.ts`, and `node-pod-usage.ts`
+  build the per-row figures for the tables.
+- `frontend/src/lib/resource-utilization-context.tsx` — a React context holding the shared
+  **View mode** (Usage/Requests) and **Value format** (%/Absolute) choice. Each surface wraps its
+  bars in a `ResourceUtilizationProvider` so one `ViewToggles` control drives them together.
+- `frontend/src/components/resource-utilization/` — the reusable presentational pieces:
+  `view-toggles`, `resource-bar-cell` (table-cell bar + value), `metric-card`, `status-badge`,
+  `health-signal-card`, `node-summary-strip`, `node-utilization-cards`, and `pod-resource-panel`.
+  They are consumed by the cluster Overview sections (`pages/cluster-home/components/`), the nodes
+  and pods tables, and the node and pod detail Performance/Pods tabs.
+

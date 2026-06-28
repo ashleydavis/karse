@@ -77,28 +77,44 @@ A table of all kubeconfig contexts. Each row shows the context name, cluster, us
 
 ## Cluster home page (`/`)
 
-The cluster home page has two tabs: **Overview** (the default) and **Performance**. The selected tab is remembered in the URL (`?tab=performance`), so a shared or reloaded link reopens the same tab.
+The cluster home page has two tabs: **Overview** (the default) and **Resource utilization**. The selected tab is remembered in the URL (the second tab keeps its original `?tab=performance` value so older shared links still work), so a reloaded link reopens the same tab.
 
 ### Overview tab
 
 #### Stat tiles
 
-Four cards summarise the active context:
+Cards across the top summarise the active context: **Server version** (the Kubernetes API server version, `-` if unreachable), **Nodes** (with a "ready of total" sublabel), **Namespaces**, **Pods** (with a running count), and **Errors**.
 
-- **Server version**: the Kubernetes API server version. Shows `-` if the cluster is unreachable.
-- **Nodes**: total node count.
-- **Namespaces**: number of namespaces.
-- **Pods**: number of pods across all namespaces.
+#### Node-utilization summary strip
 
-### Performance tab
+A strip of three cards classifying the cluster's nodes by their **CPU-requests** share of allocatable: **Over-utilized** (≥ 85%), **Healthy** (40–85%), and **Under-utilized** (< 40%). The counts come from the cluster performance snapshot and match the bands you would read on the Nodes page. The strip is omitted entirely (rather than shown as all zeros) when no node's CPU requests and allocatable are readable.
 
-A point-in-time view of cluster CPU and memory usage, read from the Kubernetes Metrics API. A **CPU / Memory** toggle at the top selects which metric every view below shows (CPU is selected by default). The tab has three views:
+#### Cluster-wide resources
 
-- **Breakdown** (treemap): cluster usage broken down node → namespace → pod, each rectangle sized by the pod's usage for the selected metric. Rectangles are coloured green→amber→red by how close the pod is to its limit. Hover a rectangle to see a tooltip with its label and its usage for the selected metric (CPU in m/cores, memory in Mi/Gi); click a rectangle to open that pod's detail page on its Performance tab.
-- **Hot spots** (heatmap): a row per node with **cpu%** and **mem%** cells (usage ÷ allocatable). Click a cell to open that node's detail page on its Performance tab.
-- **Top consumers** (table): pods ranked by the selected metric's usage. Click the **Usage** header to reverse the order; click a row to open that pod's detail page on its Performance tab.
+A **CPU** card and a **Memory** card showing the cluster's consumption against its total allocatable, with the shared **Usage / Requests** and **% / Absolute** toggles (see [Resource utilization toggles](#resource-utilization-toggles) below). In Usage view the cards read live usage ÷ cluster allocatable; in Requests view, summed pod requests ÷ cluster allocatable. If the cluster has no Metrics API, the usage cards show an em-dash and a "Metrics API not available" notice while the requests cards still populate from pod specs.
 
-If the cluster has no Metrics API (no metrics-server installed), the views are replaced by an information notice: live usage cannot be read, and only requests and limits from pod specs are available.
+#### Health signals
+
+Five tiles derived from the same snapshot: **Pending pods**, **OOMKills** (a point-in-time count of containers currently reporting an `OOMKilled` last-termination reason — not a 24-hour history), **CPU throttling** (a permanent "Not available" tile, since kubectl cannot report throttling), **Node count**, and **Node pressure** (per-condition Memory/Disk/PID counts, highlighted when any node is under pressure).
+
+#### Workloads
+
+A searchable, sortable table with one row per top-level controller (a Deployment, StatefulSet, DaemonSet, or bare Pod), showing each workload's CPU and Memory consumption as bars (a share of the cluster total) and a Status badge, all driven by the shared toggles. The CPU/Memory headers and the Status meaning change with the View mode (Usage grades each workload against its own request; Requests flags a workload claiming a large share of the cluster). Click a row to open that workload's detail page where one exists.
+
+### Resource utilization toggles
+
+Two shared toggles drive every utilisation surface that carries bars or cards:
+
+- **View** — **Usage** (live CPU/memory consumption from the Metrics API) or **Requests** (CPU/memory reserved by pod specs). Default **Usage**.
+- **Value format** — **%** (a percentage of the surface's base) or **Absolute** (a `used / total` figure, e.g. `1.6 / 4 vCPU`, `2.0 / 8 GB`). Default **%**.
+
+The percentage base depends on the scope: cluster cards and the workloads table use the cluster total; the nodes table and node detail use the node's allocatable; the pods table and pod detail use the pod's own request. Within a page section one choice drives every bar together. Where usage is unavailable (no Metrics API) a usage bar shows an em-dash and an empty bar rather than a fabricated zero, while requests bars still render.
+
+### Resource utilization tab
+
+A point-in-time **node treemap** of cluster CPU or memory usage, read from the Kubernetes Metrics API. A **CPU / Memory** toggle at the top selects which metric the treemap sizes by (CPU by default). Each box is one cluster node, sized by that node's usage for the selected metric, labelled with the node name and its share of the cluster, and coloured green→amber→red by utilisation. A long node name is **middle-truncated** in the box label (the start and end kept, the middle replaced with `...`); the hover tooltip shows the full untruncated name. Click a box to open that node's detail page on its Performance tab.
+
+If the cluster has no Metrics API (no metrics-server installed), the treemap is replaced by an information notice: live usage cannot be read.
 
 ## All resources page (`/all-resources`)
 
@@ -116,22 +132,27 @@ One combined, read-only table of every resource in the active context's cluster 
 A read-only table of the cluster's nodes:
 
 - **Name**, **Status** (Ready/NotReady/Unknown chip), **Version**, **Age**, and a **Roles** column that is **hidden by default** (it usually reads `<none>` on real clusters; reveal it from the **Columns** button if you want it).
+- **CPU** and **Memory** columns: inline utilisation bars with a right-aligned monospace value, each a percentage of the node's own allocatable. They follow the shared **Usage / Requests** and **% / Absolute** toggles in the toolbar (see [Resource utilization toggles](#resource-utilization-toggles)). A node with no usage reading shows an empty bar and an em-dash in Usage view.
+- **Utilization** column: a status badge classifying the node by its active-mode CPU figure (Over-utilized ≥ 85%, Under-utilized ≤ 35%, else Healthy). It re-bands when you switch Usage ↔ Requests.
+- **Instance Type** column: the node's cloud instance type (from its instance-type label) in monospace, or an em-dash when the node has no such label.
 
-Click a column header to sort; type in the search box to filter rows. Use the **Filter** dropdown (filter icon, beside the search box) to filter on any of the table's columns: tick **Status** values to show only nodes with those statuses, tick **Health** values to show only **Healthy** or only **Error** nodes (matching the stats header), or tick values under a label key. See [Column filtering](#column-filtering) below. Click the **Columns** button to open a modal where you can drag columns to reorder them and drag them between Visible and Hidden to show or hide them; the layout is saved per table and persists across reloads. The Columns button is available on every resource table.
+Click the **CPU** or **Memory** header to sort by that column's percentage in the active View mode; click any other header to sort; type in the search box to filter rows. Use the **Filter** dropdown (filter icon, beside the search box) to filter on any of the table's columns: tick **Status** values to show only nodes with those statuses, tick **Health** values to show only **Healthy** or only **Error** nodes (matching the stats header), or tick values under a label key. See [Column filtering](#column-filtering) below. Click the **Columns** button to open a modal where you can drag columns to reorder them and drag them between Visible and Hidden to show or hide them; the layout is saved per table and persists across reloads. The Columns button is available on every resource table.
 
-### Node detail Performance tab
+A node's detail page also has a **Pods** tab and a **Performance** tab carrying utilisation surfaces.
 
-A node's detail page has a **Performance** tab showing the node's point-in-time CPU and memory usage, scoped to that one node. A **CPU / Memory** toggle at the top selects which metric the view shows (CPU by default). The tab is a single **Breakdown** treemap: the node's usage drilled namespace → pod, with each pod box sized by the pod's share of the node (pod usage ÷ node allocatable) for the selected metric and coloured green→amber→red by how close it is to its limit. Hover a box to see a tooltip with its label and figure; click a box to open the owning pod's detail page on its Performance tab. The view is read-only.
+The **Pods** tab lists the pods scheduled on the node with sortable **CPU** and **Memory** bar columns, each the pod's share of the node's allocatable, driven by the shared **Usage / Requests** and **% / Absolute** toggles at the top of the panel. Click a row to open that pod's detail page.
 
-If the cluster has no Metrics API, the Breakdown treemap needs live usage it cannot get, so the tab shows a short note in place of the treemap explaining the share of the node cannot be computed.
+The **Performance** tab shows the node's point-in-time CPU and memory usage, scoped to that one node. At the top are two **utilisation cards** (CPU and Memory) showing the node's consumption against its allocatable, with their own **Usage / Requests** and **% / Absolute** toggles (independent of the treemap's metric toggle below). Below them, a **CPU / Memory** toggle selects which metric the **Breakdown** treemap sizes by (CPU by default): the node's usage drilled namespace → pod, with each pod box sized by the pod's share of the node (pod usage ÷ node allocatable) and coloured green→amber→red by how close it is to its limit. Hover a box to see a tooltip with its label and figure; click a box to open the owning pod's detail page on its Performance tab. The view is read-only.
+
+If the cluster has no Metrics API, the Breakdown treemap needs live usage it cannot get, so the tab shows a short note in place of the treemap explaining the share of the node cannot be computed. The utilisation cards still show the node's requests; their usage figures read an em-dash.
 
 ### Pod detail Performance tab
 
-A pod's detail page has a **Performance** tab showing the pod's point-in-time CPU and memory usage, scoped to that one pod (the leaf of the Performance feature). A **CPU / Memory** toggle at the top selects which metric the view shows (CPU by default). The tab has a single view:
+A pod's detail page has a **Performance** tab showing the pod's point-in-time CPU and memory usage, scoped to that one pod (the leaf of the feature). It has a **CPU** section and a **Memory** section, each with three tiles — **Requested**, **Limit**, **Usage now** — over a combined bar that plots live usage against the request and limit on a shared per-resource scale, with a small Usage/Request/Limit legend, so over- and under-provisioning is easy to spot. There is no treemap at the pod level.
 
-- **Provisioning** (bars): one row per container in the pod, with overlaid **Usage**, **Request**, and **Limit** bars (on a shared per-row scale) and the formatted figures alongside, so over- and under-provisioning is easy to spot. There is no treemap at the pod level.
+A **Percentage / Absolute** toggle (default Absolute) drives both sections: in Absolute the tiles read the raw figures (CPU in m/cores, memory in binary units); in Percentage each reads as a percentage of the pod's own request. An unset request or limit, or an absent usage reading, shows an em-dash rather than a fabricated zero.
 
-If the cluster has no Metrics API, an information notice is shown above the bars and the Usage bars read em-dash (empty), while the Request and Limit bars still render from the pod spec.
+If the cluster has no Metrics API, an information notice is shown above the sections and the Usage figures read an em-dash, while the Requested and Limit figures still render from the pod spec.
 
 ## Namespaces page (`/namespaces`)
 
@@ -157,6 +178,8 @@ Reached by clicking a namespace row. Organised into five tabs:
 ## Pods page (`/pods`)
 
 A table of pods for the active context. When a namespace is active, pods are scoped to that namespace; when no namespace is selected, all pods across all namespaces are shown. The Namespace column is always shown regardless of the active namespace.
+
+The table has **CPU** and **Memory** utilisation bar columns (each a percentage of the pod's own request) and a **Utilization** status badge, driven by the shared **Usage / Requests** and **% / Absolute** toggles in the toolbar (see [Resource utilization toggles](#resource-utilization-toggles)). In Usage view a bar reads usage ÷ request and the badge grades it (Under-provisioned / OK / Over-reserving); in Requests view the bar shows the request and the badge is omitted. A pod with no usage reading shows an em-dash.
 
 Type in the search box to filter rows. Use the **Filter** dropdown (filter icon, beside the search box) to filter on any of the table's columns: tick **Status** values to show only pods with those statuses, tick **Health** values to show only **Healthy** or only **Error** pods (matching the stats header), or tick values under a label key. The Deployments, StatefulSets, and DaemonSets pages have the same **Filter** dropdown (Health plus label keys). See [Column filtering](#column-filtering) below.
 
