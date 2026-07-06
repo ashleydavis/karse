@@ -10,3 +10,4 @@
 - The pod picker/filter needs to be bigger so I don't have to scroll to see all the pods when there are many and because the dropdown is too small.
 - Automatic scrolling in the logs view is broken. When scrolled to the end and new logs come in and are added to the end, the text should automatically be kept pinned to the end (essentially: scroll to the end automatically as new logs are added to the end, if we were already scrolled to the end). Wierdly this seems to work for the Logs tab under the Pod detail page, but doesn't work for the global Logs pages.
 - It would be good to remove pods from the logs page by clicking a close button at the end of each pod name label.
+- Errors and events and in tables and their detail pages should link to the detail pages for the resources they are related to.
