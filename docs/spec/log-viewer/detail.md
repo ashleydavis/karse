@@ -20,6 +20,7 @@ The single-container log panel used by the container detail page (`frontend/src/
 - `GET /api/pods/:namespace/:name/logs?container=<c?>&tail=<n?>` still returns the last `tail` lines (default 100) via `kubectl logs <name> [-c <container>] --tail=<n>`. This buffered endpoint backs the smoke tests and the container detail page and stays available.
 - Both buffered and streamed kubectl calls are audit-logged like every other kubectl invocation (see `audit-log`).
 - `KARSE_FAKE_LOGS=1` makes the adapter emit canned fake log lines instead of calling kubectl, so the viewer can be exercised against clusters without a real container runtime (e.g. kwok).
+- Rendered log lines highlight the severity keywords "error" (red) and "warning" (yellow) so they stand out while scanning. Highlighting is applied at render time only (`frontend/src/lib/log-highlight.ts` tokenises each rendered line); the stored/streamed log text is never altered. Matching is **case-insensitive** and **whole-word**: `[error]`, `level=error`, and `Warning:` match, but substrings such as "terror" or "errorField" do not, so unrelated text is never mangled. Every occurrence on a line is highlighted. Only the lines actually on screen are tokenised, so a large buffer is not re-scanned. The highlight colours use the theme palette's lighter error/warning shades, which stay legible on the viewer's dark panel in both the light and dark app themes.
 
 ## Acceptance Criteria
 
@@ -31,6 +32,7 @@ The single-container log panel used by the container detail page (`frontend/src/
 - [x] A container with no logs yet returns an empty string, not an error (buffered endpoint).
 - [x] Both buffered and streamed log reads are audit-logged.
 - [x] `KARSE_FAKE_LOGS=1` returns canned log lines without calling kubectl.
+- [x] Rendered log lines highlight "error" red and "warning" yellow, case-insensitively and whole-word (surrounding punctuation matches; substrings like "terror" do not), on both the Logs page and the Pod detail Logs tab, with colours legible in the light and dark app themes.
 
 ## Open Questions
 

@@ -1067,6 +1067,8 @@ const FAKE_LOG_LINES = [
     "2024-01-01T00:00:11.000000000Z stdout F 10.244.0.1 - - [01/Jan/2024:00:00:11 +0000] \"GET /readyz HTTP/1.1\" 200 2 \"-\" \"kube-probe/1.29\"",
     "2024-01-01T00:00:20.000000000Z stdout F 10.244.0.2 - - [01/Jan/2024:00:00:20 +0000] \"GET / HTTP/1.1\" 200 615 \"-\" \"Mozilla/5.0 (X11; Linux x86_64)\"",
     "2024-01-01T00:00:21.000000000Z stdout F 10.244.0.2 - - [01/Jan/2024:00:00:21 +0000] \"GET /static/main.css HTTP/1.1\" 200 1234 \"/\" \"Mozilla/5.0 (X11; Linux x86_64)\"",
+    "2024-01-01T00:00:22.000000000Z stderr F 2024/01/01 00:00:22 [warning] 30#30: *2 upstream server temporarily disabled while reading response header from upstream",
+    "2024-01-01T00:00:23.000000000Z stderr F 2024/01/01 00:00:23 [error] 30#30: *3 connect() failed (111: Connection refused) while connecting to upstream",
 ].join("\n") + "\n";
 
 // Returns the logs for a pod container. Defaults to the last 100 lines.

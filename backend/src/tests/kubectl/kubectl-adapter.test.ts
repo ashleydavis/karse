@@ -2441,6 +2441,10 @@ describe("getPodLogs", () => {
         const logs = await getPodLogs("ctx", "default", "my-pod");
         expect(logs).toContain("start worker processes");
         expect(logs).toContain("kube-probe/1.29");
+        // The canned stream includes an "error" and a "warning" line so the
+        // viewer's severity highlighting can be exercised without a real cluster.
+        expect(logs).toContain("[error]");
+        expect(logs).toContain("[warning]");
         expect(run).not.toHaveBeenCalled();
     });
 
@@ -2644,6 +2648,9 @@ describe("streamPodLogs", () => {
         const emitted = onLine.mock.calls.map((c: any[]) => c[0]).join("\n");
         expect(emitted).toContain("start worker processes");
         expect(emitted).toContain("kube-probe/1.29");
+        // Includes an "error" and a "warning" line for the viewer's highlighting.
+        expect(emitted).toContain("[error]");
+        expect(emitted).toContain("[warning]");
     });
 
     test("calls onClose after emitting fake log lines when KARSE_FAKE_LOGS=1", async () => {

@@ -22,6 +22,7 @@ import { fetchNamespaces, fetchPods, openLogStream } from "../lib/api-client";
 import { PodFilter } from "./pod-filter";
 import { LoadingIndicator } from "./loading-indicator";
 import { shouldFollow, bottomScrollTop, thumbMetrics, scrollTopForThumbTop, type ThumbMetrics } from "../lib/log-autoscroll";
+import { tokenizeLogLine } from "../lib/log-highlight";
 
 // A rendered log line tagged with a stable key for React reconciliation.
 type RenderedLine = LogStreamLine & { key: number };
@@ -62,6 +63,41 @@ function colorForPod(pod: string): string {
         hash = (hash * 31 + pod.charCodeAt(i)) >>> 0;
     }
     return PREFIX_COLORS[hash % PREFIX_COLORS.length]!;
+}
+
+// Renders one log line's text with "error" highlighted red and "warning"
+// yellow. The line is split by `tokenizeLogLine` (whole-word, case-insensitive)
+// and each matched keyword is wrapped in a bold, coloured span while plain
+// segments render unchanged, so the displayed text matches the stored text.
+// Colours use the theme palette's lighter error/warning shades, which stay
+// legible on the viewer's dark panel in both the light and dark app themes.
+function HighlightedLogLine({ text }: { text: string }) {
+    return (
+        <>
+            {tokenizeLogLine(text).map((segment, index) => {
+                if (segment.kind === "plain") {
+                    return (
+                        <Box component="span" key={index}>
+                            {segment.text}
+                        </Box>
+                    );
+                }
+                return (
+                    <Box
+                        component="span"
+                        key={index}
+                        data-test-id={`log-highlight-${segment.kind}`}
+                        sx={{
+                            color: segment.kind === "error" ? "error.light" : "warning.light",
+                            fontWeight: 700,
+                        }}
+                    >
+                        {segment.text}
+                    </Box>
+                );
+            })}
+        </>
+    );
 }
 
 // Props for the shared log viewer. `testIdPrefix` namespaces every data-test-id
@@ -555,7 +591,8 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
                                 <Box component="span" sx={{ color: colorForPod(entry.pod), fontWeight: 600 }}>
                                     {entry.namespace}/{entry.pod}
                                 </Box>
-                                <Box component="span"> {entry.line}</Box>
+                                {" "}
+                                <HighlightedLogLine text={entry.line} />
                             </Box>
                         ))
                     )}

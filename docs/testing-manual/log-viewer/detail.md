@@ -51,6 +51,25 @@ One node, one multi-container pod. The Logs tab streams the pod's logs via Serve
 ### Against a real cluster
 - On a cluster with real running containers, repeat with `bun run dev` (no fake logs). New log lines should append in real time as they are produced, with no user action. The backend stops the follow when the log view is left (the SSE connection closes).
 
+## Scenario C: "error" and "warning" are highlighted in the log text
+
+The shared viewer highlights the severity keywords in each rendered log line: "error" in red and "warning" in yellow. This applies on both the Pod detail Logs tab and the Logs page (`/logs`), since they are the same component.
+
+**Fixture:** [_fixtures-kwok/27-live-pod-logs](../_fixtures-kwok/27-live-pod-logs/)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/27-live-pod-logs/setup.sh
+```
+
+`kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse. The fake log stream (`bun run dev:test`) emits lines containing "error" and "warning" so the highlighting is visible.
+
+### What to check
+- Open the `web` pod detail page and its Logs tab (or the Logs page and stream the `web` pod). In the streamed lines, confirm occurrences of "error" are coloured red and "warning" coloured yellow, while the rest of each line stays the default log colour.
+- Confirm matching is case-insensitive: `ERROR`, `Error`, and `error` are all highlighted, as are `WARNING`/`Warning`/`warning`.
+- Confirm a keyword surrounded by punctuation (for example `[error]` or `level=warning`) is still highlighted, and that a keyword appearing as a substring of a larger word (for example "terror") is **not** highlighted.
+- Confirm every occurrence on a line is highlighted when a line contains the keyword more than once.
+- Toggle the app between light and dark theme (top bar) and confirm the red/yellow highlights stay legible on the dark log panel in both.
+
 Teardown:
 
 ```sh

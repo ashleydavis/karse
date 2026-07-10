@@ -2262,6 +2262,40 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-logs-viewer']")).toBeVisible();
         });
 
+        test("highlights 'error' red and 'warning' yellow in streamed log lines", async () => {
+            // log-viewer-1: the shared viewer colour-highlights the severity
+            // keywords in the rendered log text. Stream a line containing both
+            // (mixed case) and confirm each keyword is wrapped in its own
+            // highlight span, matched case-insensitively and whole-word.
+            await page.route("**/api/logs/stream*", async (route) => {
+                const podName = new URL(route.request().url()).searchParams.getAll("pods")[0] ?? "nginx-abc";
+                const started = `event: started\ndata: ${JSON.stringify({ pods: [{ namespace: "default", name: podName }] })}\n\n`;
+                const line = `event: line\ndata: ${JSON.stringify({ namespace: "default", pod: podName, line: "ERROR: upstream failed; Warning: retrying (terror ignored)" })}\n\n`;
+                await route.fulfill({
+                    headers: { "Content-Type": "text/event-stream" },
+                    body: started + line,
+                });
+            });
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-logs']").click();
+            const viewer = page.locator("[data-test-id='pod-logs-viewer']");
+            await expect(viewer).toBeVisible();
+            await expect(viewer).toContainText("upstream failed");
+            // The matched keywords are highlighted, preserving their original casing.
+            await expect(viewer.locator("[data-test-id='log-highlight-error']")).toHaveText("ERROR");
+            await expect(viewer.locator("[data-test-id='log-highlight-warning']")).toHaveText("Warning");
+            // "terror" contains "error" as a substring but must not be highlighted
+            // (whole-word matching), so there is exactly one error highlight.
+            await expect(viewer.locator("[data-test-id='log-highlight-error']")).toHaveCount(1);
+            await expect(viewer.locator("[data-test-id='log-highlight-warning']")).toHaveCount(1);
+            // Restore the shared interception for any later tests.
+            await page.unroute("**/api/logs/stream*");
+            await interceptPodLogsStream();
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-logs']").click();
+            await expect(page.locator("[data-test-id='pod-logs-viewer']")).toBeVisible();
+        });
+
         test("commands tab shows the read-only guided commands", async () => {
             await page.locator("[data-test-id='pod-tab-commands']").click();
             await expect(page.locator("[data-test-id='commands-tab']")).toBeVisible();
