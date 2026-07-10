@@ -5149,6 +5149,36 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='live-logs-line']").last()).toContainText("line 200");
         });
 
+        test("the viewer is the only scroll container, so the followed bottom line stays on-screen even in a short window", async () => {
+            // Regression guard for live-logs-2. The Logs page stacks the pod picker
+            // and the "Streaming N pod(s)" bar above the viewer, so in a short window
+            // a fixed viewer min-height used to overflow the page and make <main> its
+            // own scroll container. Auto-follow then still pinned the viewer to its
+            // own bottom, but that bottom sat below the page fold, so the newest line
+            // was offscreen and the view only looked like it had stopped following.
+            // Shrink the window into that regime and prove the viewer is the sole
+            // scroll container and the followed newest line is genuinely visible.
+            await page.setViewportSize({ width: 1280, height: 520 });
+            try {
+                const viewer = await streamLongLog();
+                // The viewer follows to its own bottom.
+                const distanceFromBottom = await viewer.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop);
+                expect(distanceFromBottom).toBeLessThanOrEqual(4);
+                // <main> must NOT itself be scrollable: the viewer shrinks to fit, so it
+                // is the only thing that scrolls (no second, page-level scroll container).
+                const mainScrolls = await page.locator("main").evaluate((el) => el.scrollHeight > el.clientHeight + 1);
+                expect(mainScrolls).toBe(false);
+                // And the auto-followed newest line is actually within the viewport,
+                // not pushed below the page fold.
+                const lastLine = page.locator("[data-test-id='live-logs-line']").last();
+                await expect(lastLine).toBeInViewport();
+                await expect(lastLine).toContainText("line 200");
+            } finally {
+                // Restore the shared page's viewport for the tests that follow.
+                await page.setViewportSize({ width: 1280, height: 800 });
+            }
+        });
+
         test("after scrolling up, the position is left alone (not yanked back down)", async () => {
             const viewer = await streamLongLog();
             // Scroll the user up to the very top and let the scroll handler run.

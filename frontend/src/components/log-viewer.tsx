@@ -537,8 +537,20 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
                 wrapper so the bar can be drawn over the viewer's right edge. The
                 native scrollbar is hidden (this browser renders it as an invisible
                 auto-hiding overlay), and an always-visible bar is drawn instead so
-                the streamed history is plainly reachable. */}
-            <Box sx={{ position: "relative", flex: 1, minHeight: 300, display: "flex" }}>
+                the streamed history is plainly reachable.
+
+                minHeight is 0 (not a fixed floor) so this flex child can shrink to
+                the height its parents actually leave it, keeping the Paper below the
+                sole scroll container. A non-zero floor taller than the space left by
+                the surrounding chrome (worst on the Logs page, which stacks the pod
+                picker and the "Streaming N pod(s)" bar above the viewer) would push
+                the whole surface past the page and make <main> scroll instead. Then
+                auto-follow still pins the viewer to its own bottom, but that bottom
+                sits below the page fold, so the newest line is offscreen and the view
+                only *looks* like it stopped following. Letting the viewer shrink keeps
+                it the only thing that scrolls, so the followed newest line stays in
+                view exactly as it does on the Pod detail Logs tab. */}
+            <Box sx={{ position: "relative", flex: 1, minHeight: 0, display: "flex" }}>
                 <Paper
                     ref={viewerRef}
                     onScroll={handleViewerScroll}
