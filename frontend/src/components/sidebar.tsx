@@ -12,7 +12,6 @@ const NAV_ITEMS = [
     { to: "/errors",       icon: faCircleExclamation, label: "Errors"   },
     { to: "/contexts",     icon: faLink,          label: "Contexts"     },
     { to: "/cluster",      icon: faDharmachakra,  label: "Cluster"      },
-    { to: "/all-resources", icon: faList,         label: "All resources" },
     { to: "/nodes",        icon: faServer,        label: "Nodes"        },
     { to: "/namespaces",   icon: faLayerGroup,    label: "Namespaces"   },
     { to: "/pods",         icon: faCube,          label: "Pods"         },
@@ -21,6 +20,7 @@ const NAV_ITEMS = [
     { to: "/daemonsets",   icon: faSitemap,       label: "DaemonSets"   },
     { to: "/autoscalers",  icon: faGaugeHigh,     label: "Autoscalers"  },
     { to: "/events",       icon: faBell,          label: "Events"       },
+    { to: "/all-resources", icon: faList,         label: "All resources" },
     { to: "/logs",         icon: faStream,        label: "Logs"         },
     { to: "/config",       icon: faGear,          label: "Config"       },
 ];

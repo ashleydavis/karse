@@ -20,7 +20,7 @@ Then open the frontend at `http://127.0.0.1:5173`. The fixture stands up a KWOK 
 
 ### What to check
 
-- **Sidebar**: an "All resources" nav item is visible (list icon) between "Cluster" and "Nodes". Click it; it becomes highlighted and the page opens at `/all-resources`. The header reads "All resources".
+- **Sidebar**: an "All resources" nav item is visible (list icon) between "Events" and "Logs". Click it; it becomes highlighted and the page opens at `/all-resources`. The header reads "All resources".
 - **Combined table**: the table has columns Kind, Namespace, Name, Status, Age, Labels. Rows span more than one kind: at least a Node (`fake-node-1`), a Deployment (`nginx`), a StatefulSet (`postgres`), a DaemonSet (`fluentd`), a HorizontalPodAutoscaler (`nginx`), and Namespace rows (e.g. `default`, `kube-system`).
   - **Cluster-scoped kinds**: Node and Namespace rows have a blank Namespace cell. Namespace rows show Status `Active` and Age `-` (the namespaces list carries no creation time).
   - **Namespaced kinds**: the Deployment / StatefulSet rows show Status as a ready ratio (e.g. `1/1`); the DaemonSet shows `ready/desired`.
