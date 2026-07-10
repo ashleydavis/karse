@@ -1,6 +1,4 @@
-import { Box, Typography } from "@mui/material";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faStream } from "@fortawesome/free-solid-svg-icons";
+import { Box } from "@mui/material";
 import { LogViewer } from "../../components/log-viewer";
 
 // The Logs page. It renders the shared LogViewer in full-picker mode: the user
@@ -8,19 +6,13 @@ import { LogViewer } from "../../components/log-viewer";
 // picker, then presses Stream. The same LogViewer backs the Pod detail Logs tab
 // (pinned to that one pod), so both surfaces expose the same options. There is no
 // "Tail" option and no Refresh button on either surface.
+//
+// The page title ("Logs") is shown once, in the navbar breadcrumb; the page does
+// not repeat it as an in-page heading.
 export function LiveLogsPage() {
     return (
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, height: "100%" }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <FontAwesomeIcon icon={faStream} />
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    Logs
-                </Typography>
-            </Box>
-
-            <Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>
-                <LogViewer testIdPrefix="live-logs" />
-            </Box>
+        <Box sx={{ display: "flex", height: "100%", minHeight: 0 }}>
+            <LogViewer testIdPrefix="live-logs" />
         </Box>
     );
 }

@@ -26,7 +26,7 @@ One node, three pods (`nginx-one`, `nginx-two`, `redis-main`).
 
 ### Navigation
 - The sidebar shows a "Logs" item with a stream icon. Click it.
-- The URL becomes `/logs` and the page title shows "Logs".
+- The URL becomes `/logs` and the navbar page title shows "Logs". The title appears only in the navbar; the page body does not repeat it as an in-page heading.
 
 ### Controls
 - A "Namespace" dropdown defaults to "All namespaces" and lists `default`.
