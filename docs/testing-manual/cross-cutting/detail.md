@@ -119,6 +119,24 @@ The URL should already contain everything: the page and resource in the path, an
 - **Params survive navigation**: with a context/namespace selected, click around the sidebar and into/out of detail pages. The query params stay attached the whole time.
 - **Backward compatible default**: open `/cluster` with no query params. The app falls back to the terminal's current context (cluster 1) and "all namespaces".
 
+## Pinned actions column on narrow windows
+
+Resource tables that carry an **Actions** column (the Contexts page and the Namespaces page) pin that column to the right edge, so on a window narrower than the table the action buttons stay reachable without dragging the horizontal scrollbar. The other columns scroll underneath the pinned column.
+
+Reuse the shareable-url-state fixture (two contexts plus namespaces), no new cluster needed:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/23-shareable-url-state/setup.sh
+```
+
+### What to check
+- **Contexts page**: go to `/contexts` and narrow the browser window until the table is wider than the viewport (a horizontal scrollbar appears under the table). Confirm the **Actions** header and each row's "Set as active" / "Set as default" buttons stay visible, pinned to the right edge, without scrolling right.
+- **Scrolled-under content is hidden**: drag the horizontal scrollbar. Confirm the other columns scroll *underneath* the pinned Actions column (the pinned column has a solid background and a soft left-edge shadow — no text shows through it).
+- **Hover matches**: hover a row. Confirm the pinned Actions cell takes the same hover tint as the rest of the row (no mismatched block at the right edge).
+- **Namespaces page**: repeat on `/namespaces` (Name, Labels, Resources, Actions). The "Set as active" / "Set as default" buttons stay pinned and reachable at a narrow width.
+- **No regression at normal width**: widen the window so the table fits. Confirm the layout is unchanged — no stray shadow or gap, the Actions column sits flush at the right like any other column.
+- **Light and dark**: repeat the narrow-width check in both colour modes (toggle in the header). The pinned column's background matches the surrounding paper in each mode.
+
 ## Local-only binding (loopback only)
 
 Karse is a local-only tool: neither the backend nor the frontend may be reachable from another machine on the LAN. Both bind to `127.0.0.1` only, never `0.0.0.0`. This needs no fixture.
@@ -145,3 +163,5 @@ Teardown:
 ./docs/testing-manual/_fixtures-kwok/22-breadcrumbs/teardown.sh
 ./docs/testing-manual/_fixtures-kwok/23-shareable-url-state/teardown.sh
 ```
+
+(The shareable-url-state fixture is shared by the pinned-actions-column scenario above; tear it down once here.)

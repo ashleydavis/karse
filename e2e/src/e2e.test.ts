@@ -1103,6 +1103,58 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Actions column pinned on a narrow window ──────────────────────────────
+
+    test.describe("actions column stays reachable on a narrow window", () => {
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            // A window narrower than the contexts table (Name, Cluster, User, Default
+            // Namespace, Actions) so it overflows horizontally and the right-pinned actions
+            // column is actually exercised.
+            await page.setViewportSize({ width: 640, height: 800 });
+            await page.goto("/contexts", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='context-row']").first()).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            // Restore the shared viewport for the test blocks that follow.
+            await page.setViewportSize({ width: 1280, height: 800 });
+        });
+
+        test("the contexts table overflows horizontally at this width", async () => {
+            // Guards the test: if the table did not overflow, pinning would be untested.
+            const overflow = await page.locator("[data-test-id='contexts-table']").evaluate(
+                (el) => el.scrollWidth > el.clientWidth + 1,
+            );
+            expect(overflow).toBe(true);
+        });
+
+        test("the Actions header stays within the viewport without horizontal scroll", async () => {
+            // Reset any horizontal scroll so we assert the state a user sees before touching
+            // the scrollbar.
+            await page.locator("[data-test-id='contexts-table']").evaluate((el) => {
+                el.scrollLeft = 0;
+            });
+            const header = page.locator("[data-test-id='contexts-table'] thead th").filter({ hasText: "Actions" });
+            await expect(header).toBeInViewport();
+        });
+
+        test("the row action buttons stay within the viewport and inside the container", async () => {
+            await page.locator("[data-test-id='contexts-table']").evaluate((el) => {
+                el.scrollLeft = 0;
+            });
+            const button = page.locator("[data-test-id='context-row']").first().locator("button", { hasText: "Set as active" });
+            await expect(button).toBeInViewport();
+            // The pinned actions cell sits at the right edge of the scroll container, so the
+            // button's right edge stays within the container's right edge (not scrolled off).
+            const containerBox = await page.locator("[data-test-id='contexts-table']").boundingBox();
+            const buttonBox = await button.boundingBox();
+            expect(containerBox).not.toBeNull();
+            expect(buttonBox).not.toBeNull();
+            expect(buttonBox!.x + buttonBox!.width).toBeLessThanOrEqual(containerBox!.x + containerBox!.width + 1);
+        });
+    });
+
     // ── Context picker ────────────────────────────────────────────────────────
 
     test.describe("context picker", () => {

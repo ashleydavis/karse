@@ -27,6 +27,7 @@ import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/fr
 import type { Context } from "karse-types";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
+import { ACTIONS_COLUMN_ID, stickyActionsHeaderSx, stickyActionsCellSx } from "../../../lib/sticky-actions";
 import { addContextCommands, addContextHeading, addContextIntro } from "../lib/add-context-help";
 
 type Props = {
@@ -74,7 +75,7 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
             },
         },
         {
-            id: "action",
+            id: ACTIONS_COLUMN_ID,
             header: "Actions",
             enableSorting: false,
             cell: (info) => {
@@ -140,7 +141,10 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
                                     <TableCell
                                         key={header.id}
                                         onClick={header.column.getToggleSortingHandler()}
-                                        sx={{ cursor: header.column.getCanSort() ? "pointer" : "default", userSelect: "none" }}
+                                        sx={[
+                                            { cursor: header.column.getCanSort() ? "pointer" : "default", userSelect: "none" },
+                                            stickyActionsHeaderSx(header.column.id === ACTIONS_COLUMN_ID),
+                                        ]}
                                     >
                                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                                             {flexRender(header.column.columnDef.header, header.getContext())}
@@ -205,7 +209,7 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
                         {rows.map((row) => (
                             <TableRow key={row.id} data-test-id="context-row" sx={tableRowSx(false)}>
                                 {row.getVisibleCells().map((cell) => (
-                                    <TableCell key={cell.id}>
+                                    <TableCell key={cell.id} sx={stickyActionsCellSx(cell.column.id === ACTIONS_COLUMN_ID)}>
                                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                     </TableCell>
                                 ))}
