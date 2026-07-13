@@ -6034,6 +6034,19 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='no-errors-empty']")).toBeVisible();
             await page.unroute("**/api/errors*");
         });
+
+        test("places the All resources link immediately after Events", async () => {
+            const nav = page.locator("[data-test-id='sidebar-nav']");
+            await expect(nav).toBeVisible();
+            // Read the nav links in rendered order and pin All resources to the slot
+            // straight after Events, so a reordering of the nav cannot regress silently.
+            const labels = await nav.locator("a[aria-label]").evaluateAll(
+                (links) => links.map((link) => link.getAttribute("aria-label")),
+            );
+            expect(labels).toContain("events");
+            expect(labels).toContain("all resources");
+            expect(labels.indexOf("all resources")).toBe(labels.indexOf("events") + 1);
+        });
     });
 
     // ── Loading indicator ──────────────────────────────────────────────────────
