@@ -5344,6 +5344,54 @@ test.describe("karse e2e", () => {
             expect((await viewerMetrics()).distanceFromBottom).toBeLessThanOrEqual(AT_BOTTOM_PX);
             await expect(page.locator("[data-test-id='live-logs-line']").last()).toBeInViewport();
         });
+
+        test("the jump-to-top and jump-to-bottom buttons sit to the far right of the Stream button", async () => {
+            await page.goto("/logs", { waitUntil: "networkidle" });
+            const streamBox = (await page.locator("[data-test-id='live-logs-start']").boundingBox())!;
+            const topBox = (await page.locator("[data-test-id='live-logs-jump-top']").boundingBox())!;
+            const bottomBox = (await page.locator("[data-test-id='live-logs-jump-bottom']").boundingBox())!;
+            // Both buttons are to the right of the Stream button, with Bottom rightmost.
+            expect(topBox.x).toBeGreaterThan(streamBox.x + streamBox.width);
+            expect(bottomBox.x).toBeGreaterThan(topBox.x + topBox.width);
+            // And they are pushed to the far right of the toolbar row, not left-packed
+            // next to Stream: the gap to Stream is far larger than the gap between them.
+            const gapToStream = topBox.x - (streamBox.x + streamBox.width);
+            const gapBetween = bottomBox.x - (topBox.x + topBox.width);
+            expect(gapToStream).toBeGreaterThan(gapBetween);
+        });
+
+        test("the jump-to-top button scrolls to the first line and stops auto-follow", async () => {
+            await streamLiveLog();
+            expect((await viewerMetrics()).distanceFromBottom).toBeLessThanOrEqual(AT_BOTTOM_PX);
+            await page.locator("[data-test-id='live-logs-jump-top']").click();
+            // The view jumps to the very first streamed line.
+            expect((await viewerMetrics()).scrollTop).toBe(0);
+            await expect(page.locator("[data-test-id='live-logs-line']").first()).toBeInViewport();
+            // And the lines that arrive next must NOT yank the reader back down: jumping
+            // to the top leaves the view off the bottom, so following is off.
+            await waitForMoreLines(10);
+            expect((await viewerMetrics()).scrollTop).toBe(0);
+        });
+
+        test("the jump-to-bottom button scrolls to the last line and re-engages auto-follow", async () => {
+            const viewer = await streamLiveLog();
+            // Scroll up into the history first, so following is off and there is a real
+            // distance to travel back.
+            await viewer.evaluate((el) => { el.scrollTop = 0; });
+            await waitForMoreLines(10);
+            expect((await viewerMetrics()).scrollTop).toBe(0);
+
+            await page.locator("[data-test-id='live-logs-jump-bottom']").click();
+            // The view jumps to the last line.
+            expect((await viewerMetrics()).distanceFromBottom).toBeLessThanOrEqual(AT_BOTTOM_PX);
+            await expect(page.locator("[data-test-id='live-logs-line']").last()).toBeInViewport();
+
+            // And it STICKS: this is a re-engagement of auto-follow, not a one-off scroll,
+            // so the lines that arrive after the click keep the view pinned to the end.
+            await waitForMoreLines(10);
+            expect((await viewerMetrics()).distanceFromBottom).toBeLessThanOrEqual(AT_BOTTOM_PX);
+            await expect(page.locator("[data-test-id='live-logs-line']").last()).toBeInViewport();
+        });
     });
 
     test.describe("live logs page pod-label cap", () => {

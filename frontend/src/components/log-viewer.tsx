@@ -14,7 +14,7 @@ import {
     Chip,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlay, faStop, faCircleXmark } from "@fortawesome/free-solid-svg-icons";
+import { faPlay, faStop, faCircleXmark, faAnglesUp, faAnglesDown } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { LogStreamLine } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
@@ -252,6 +252,25 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
         refreshThumb();
     }
 
+    // Jumps the viewer straight to its first or last line, backing the Logs page's
+    // jump-to-top / jump-to-bottom buttons. Auto-follow is re-derived from where the
+    // jump lands, the same rule the wheel, keyboard and thumb-drag paths use, so
+    // jumping to the top stops following and jumping to the bottom re-engages it: the
+    // view then stays locked to the end as new lines arrive, exactly as if the user had
+    // scrolled back to the bottom by hand. Reading the landed position (rather than
+    // trusting the scroll event) matters because assigning scrollTop only fires a scroll
+    // event when the value actually changes, so jumping to the bottom while already
+    // there fires none.
+    function jumpTo(edge: "top" | "bottom"): void {
+        const viewer = viewerRef.current;
+        if (viewer === null) {
+            return;
+        }
+        viewer.scrollTop = edge === "top" ? 0 : bottomScrollTop(viewer);
+        followRef.current = shouldFollow(viewer);
+        refreshThumb();
+    }
+
     // Starts dragging the custom scrollbar thumb. Subsequent pointer-moves map the
     // pointer's vertical travel onto the viewer's scrollTop until pointer-up.
     function handleThumbPointerDown(event: ReactPointerEvent<HTMLDivElement>): void {
@@ -472,6 +491,29 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
                     >
                         {formatLastUpdated(lastLineAt, now)}
                     </Typography>
+
+                    {/* Jump-to-top / jump-to-bottom, pushed to the far right of the
+                        toolbar row (ml: auto) so they sit clear of the Stream button.
+                        Bottom also re-engages auto-follow (see jumpTo), so it locks the
+                        view to the end rather than scrolling there once. */}
+                    <Box sx={{ ml: "auto", display: "flex", gap: 1 }}>
+                        <Button
+                            variant="outlined"
+                            onClick={() => jumpTo("top")}
+                            data-test-id={`${testIdPrefix}-jump-top`}
+                            startIcon={<FontAwesomeIcon icon={faAnglesUp} />}
+                        >
+                            Top
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            onClick={() => jumpTo("bottom")}
+                            data-test-id={`${testIdPrefix}-jump-bottom`}
+                            startIcon={<FontAwesomeIcon icon={faAnglesDown} />}
+                        >
+                            Bottom
+                        </Button>
+                    </Box>
                 </Paper>
             )}
 

@@ -87,6 +87,13 @@ One node, three pods (`nginx-one`, `nginx-two`, `redis-main`).
 - Follow is not a one-shot: repeat the scroll-up/scroll-back cycle several times, mixing the wheel and the thumb. Following must resume every single time the view returns to the bottom, for the whole session.
 - Make the window short (or open the browser dev tools to shrink the viewport) while a pod streams. The log panel shrinks to fit the remaining height rather than pushing the page past the window: the page itself must not gain its own scrollbar, and the newest line stays visible at the bottom of the panel as lines arrive. It must not slide below the window edge (which would leave auto-follow pinning an offscreen bottom, so the view only appears to stop following).
 
+### Jump to top and jump to bottom
+- Look at the far right of the toolbar row that holds the Stream button. Two buttons sit there, clear of Stream and to its right: "Top" (an up chevron) and "Bottom" (a down chevron), with "Bottom" rightmost.
+- Stream a pod (as above) and let the viewer fill past one screen so there is history to jump through.
+- Press "Top". The view jumps straight to the very first streamed line. New lines keep arriving, but the view stays at the top: it is not yanked back down.
+- Press "Bottom". The view jumps to the newest line, and it **sticks**: as further lines arrive the view stays pinned to the end, exactly as if you had scrolled back down by hand. It must not scroll to the end once and then be left behind by the next line.
+- Repeat the Top/Bottom cycle a few times, and mix in the wheel and the scrollbar thumb. Every press of "Bottom" must re-engage the follow behaviour for the rest of the stream.
+
 ### "Updated" indicator
 - Before streaming, the caption next to the Stream button reads "No logs yet".
 - Type `nginx` into the Pod filter and press "Stream". As soon as the first line arrives the caption reads "Updated just now".
