@@ -23,12 +23,10 @@ import { PodFilter } from "./pod-filter";
 import { LoadingIndicator } from "./loading-indicator";
 import { shouldFollow, bottomScrollTop, thumbMetrics, scrollTopForThumbTop, type ThumbMetrics } from "../lib/log-autoscroll";
 import { tokenizeLogLine } from "../lib/log-highlight";
+import { colorForPod } from "../lib/log-pod-colors";
 
 // A rendered log line tagged with a stable key for React reconciliation.
 type RenderedLine = LogStreamLine & { key: number };
-
-// Palette used to color pod-name prefixes, cycling through the colours per pod.
-const PREFIX_COLORS = ["#4fc3f7", "#81c784", "#ffb74d", "#ba68c8", "#e57373", "#4db6ac", "#f06292", "#9575cd"];
 
 // Maximum number of streaming-pod chips shown before the list is collapsed
 // behind a "..." expander, so a large stream does not eat vertical space.
@@ -54,15 +52,6 @@ function formatLastUpdated(lastLineAt: number | null, now: number): string {
     }
     const hours = Math.floor(minutes / 60);
     return `Updated ${hours}h ago`;
-}
-
-// Deterministically maps a pod name to one of the prefix colors.
-function colorForPod(pod: string): string {
-    let hash = 0;
-    for (let i = 0; i < pod.length; i++) {
-        hash = (hash * 31 + pod.charCodeAt(i)) >>> 0;
-    }
-    return PREFIX_COLORS[hash % PREFIX_COLORS.length]!;
 }
 
 // Renders one log line's text with "error" highlighted red and "warning"
@@ -588,7 +577,18 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
                     ) : (
                         lines.map((entry) => (
                             <Box key={entry.key} component="div" data-test-id={`${testIdPrefix}-line`}>
-                                <Box component="span" sx={{ color: colorForPod(entry.pod), fontWeight: 600 }}>
+                                {/* The pod-name prefix is coloured from the pod palette, which
+                                    deliberately excludes red and yellow: those two colours mean
+                                    "error" and "warning" in the highlighted log text, so a pod
+                                    name in either would make an ordinary line read as a problem. */}
+                                <Box
+                                    component="span"
+                                    data-test-id={`${testIdPrefix}-line-pod`}
+                                    sx={{
+                                        color: colorForPod(entry.pod),
+                                        fontWeight: 600,
+                                    }}
+                                >
                                     {entry.namespace}/{entry.pod}
                                 </Box>
                                 {" "}

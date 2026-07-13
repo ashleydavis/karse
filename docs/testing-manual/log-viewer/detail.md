@@ -68,7 +68,8 @@ The shared viewer highlights the severity keywords in each rendered log line: "e
 - Confirm matching is case-insensitive: `ERROR`, `Error`, and `error` are all highlighted, as are `WARNING`/`Warning`/`warning`.
 - Confirm a keyword surrounded by punctuation (for example `[error]` or `level=warning`) is still highlighted, and that a keyword appearing as a substring of a larger word (for example "terror") is **not** highlighted.
 - Confirm every occurrence on a line is highlighted when a line contains the keyword more than once.
-- Toggle the app between light and dark theme (top bar) and confirm the red/yellow highlights stay legible on the dark log panel in both.
+- Confirm the `namespace/pod` prefix at the start of each line (and the pod's chip in the "Streaming N pod(s)" row on the Logs page) is coloured cyan, blue, teal, green, or purple — **never red or yellow**, so an ordinary line is never mistaken for an error or a warning. Stream several pods at once (type a substring into the Logs page search box) and confirm every pod's colour stays out of the red/yellow range while each pod keeps one stable colour.
+- Toggle the app between light and dark theme (top bar) and confirm the red/yellow highlights, and the pod-name colours, stay legible on the dark log panel in both.
 
 Teardown:
 

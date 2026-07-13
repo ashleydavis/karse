@@ -2296,6 +2296,46 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-logs-viewer']")).toBeVisible();
         });
 
+        test("pod-name prefixes are coloured outside the error/warning colours", async () => {
+            // log-viewer-1: red means "error" and yellow means "warning" in the log
+            // text, so the pod-name prefix on every line must never be drawn in
+            // either, otherwise an ordinary line reads as a problem. Stream a plain
+            // line and check the prefix's rendered colour is clear of the red and
+            // orange/yellow arcs of the colour wheel.
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-logs']").click();
+            const podPrefix = page.locator("[data-test-id='pod-logs-line-pod']").first();
+            await expect(podPrefix).toBeVisible();
+            await expect(podPrefix).toHaveText("default/nginx-abc");
+            const hue = await podPrefix.evaluate((element) => {
+                const parsed = getComputedStyle(element).color.match(/\d+/g) ?? [];
+                const r = Number(parsed[0]) / 255;
+                const g = Number(parsed[1]) / 255;
+                const b = Number(parsed[2]) / 255;
+                const max = Math.max(r, g, b);
+                const chroma = max - Math.min(r, g, b);
+                if (chroma === 0) {
+                    return 0;
+                }
+                let value: number;
+                if (max === r) {
+                    value = ((g - b) / chroma) % 6;
+                }
+                else if (max === g) {
+                    value = (b - r) / chroma + 2;
+                }
+                else {
+                    value = (r - g) / chroma + 4;
+                }
+                value = value * 60;
+                return value < 0 ? value + 360 : value;
+            });
+            // Reds sit at ~340-360 and 0-20, orange/yellow at ~20-70. The pod palette
+            // is cyan/blue/green/purple only, so the hue lands well between them.
+            expect(hue).toBeGreaterThan(75);
+            expect(hue).toBeLessThan(330);
+        });
+
         test("commands tab shows the read-only guided commands", async () => {
             await page.locator("[data-test-id='pod-tab-commands']").click();
             await expect(page.locator("[data-test-id='commands-tab']")).toBeVisible();
