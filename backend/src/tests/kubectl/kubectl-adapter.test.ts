@@ -2639,7 +2639,7 @@ describe("streamPodLogs", () => {
     test("emits fake log lines without spawning when KARSE_FAKE_LOGS=1", () => {
         process.env.KARSE_FAKE_LOGS = "1";
         const onLine = jest.fn();
-        streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
+        const handle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
             onLine,
             onError: jest.fn(),
             onClose: jest.fn(),
@@ -2651,33 +2651,61 @@ describe("streamPodLogs", () => {
         // Includes an "error" and a "warning" line for the viewer's highlighting.
         expect(emitted).toContain("[error]");
         expect(emitted).toContain("[warning]");
-    });
-
-    test("calls onClose after emitting fake log lines when KARSE_FAKE_LOGS=1", async () => {
-        process.env.KARSE_FAKE_LOGS = "1";
-        const onClose = jest.fn();
-        streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
-            onLine: jest.fn(),
-            onError: jest.fn(),
-            onClose,
-        });
-        // The fake stream defers onClose so callers can attach listeners first.
-        expect(onClose).not.toHaveBeenCalled();
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    test("stop() suppresses the deferred onClose for fake streams", async () => {
-        process.env.KARSE_FAKE_LOGS = "1";
-        const onClose = jest.fn();
-        const handle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
-            onLine: jest.fn(),
-            onError: jest.fn(),
-            onClose,
-        });
+        // The fake stream follows until stopped, so stop it rather than leaking its timer.
         handle.stop();
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        expect(onClose).not.toHaveBeenCalled();
+    });
+
+    test("keeps emitting new fake log lines over time when KARSE_FAKE_LOGS=1", () => {
+        process.env.KARSE_FAKE_LOGS = "1";
+        jest.useFakeTimers();
+        try {
+            const onLine = jest.fn();
+            const onClose = jest.fn();
+            const handle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
+                onLine,
+                onError: jest.fn(),
+                onClose,
+            });
+            // The canned lines land immediately as the stream's backlog.
+            const backlog = onLine.mock.calls.length;
+            expect(backlog).toBe(12);
+            // The stream then follows: a new synthesised line every 100ms, so the viewer
+            // keeps overflowing and auto-follow can actually be exercised.
+            jest.advanceTimersByTime(500);
+            expect(onLine.mock.calls.length).toBe(backlog + 5);
+            // Each followed line is freshly synthesised (a rising counter), not a replay
+            // of the backlog.
+            expect(onLine.mock.calls[backlog]![0]).toContain("line=1");
+            expect(onLine.mock.calls[backlog + 4]![0]).toContain("line=5");
+            // Like a real `kubectl logs -f`, the stream does not end on its own.
+            expect(onClose).not.toHaveBeenCalled();
+            handle.stop();
+        }
+        finally {
+            jest.useRealTimers();
+        }
+    });
+
+    test("stop() ends the continuous fake stream when KARSE_FAKE_LOGS=1", () => {
+        process.env.KARSE_FAKE_LOGS = "1";
+        jest.useFakeTimers();
+        try {
+            const onLine = jest.fn();
+            const handle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
+                onLine,
+                onError: jest.fn(),
+                onClose: jest.fn(),
+            });
+            jest.advanceTimersByTime(300);
+            const emittedBeforeStop = onLine.mock.calls.length;
+            expect(emittedBeforeStop).toBe(15);
+            handle.stop();
+            jest.advanceTimersByTime(1000);
+            expect(onLine.mock.calls.length).toBe(emittedBeforeStop);
+        }
+        finally {
+            jest.useRealTimers();
+        }
     });
 });
 

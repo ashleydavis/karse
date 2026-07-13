@@ -277,9 +277,16 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
             return;
         }
         const nextThumbTop = drag.startTop + (event.clientY - drag.startY);
-        // A drag means the user is taking manual control, so stop auto-following.
-        followRef.current = false;
         viewer.scrollTop = scrollTopForThumbTop(nextThumbTop, viewer, drag.trackPx, drag.thumbHeightPx);
+        // Decide auto-follow from where the drag actually landed, not from the fact that a
+        // drag happened. Assigning scrollTop only fires a scroll event when the value
+        // *changes*, so handleViewerScroll cannot be relied on to settle the flag here: a
+        // drag that ends at the bottom (or a jitter that never moves the viewer off the
+        // bottom at all) would leave follow switched off with no scroll event left to
+        // switch it back on, and auto-follow would then never resume for the rest of the
+        // session. Reading the landed position instead means dragging up stops following
+        // and dragging back down to the bottom re-arms it, exactly like a wheel scroll.
+        followRef.current = shouldFollow(viewer);
         refreshThumb();
     }
 

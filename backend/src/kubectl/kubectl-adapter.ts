@@ -1071,6 +1071,28 @@ const FAKE_LOG_LINES = [
     "2024-01-01T00:00:23.000000000Z stderr F 2024/01/01 00:00:23 [error] 30#30: *3 connect() failed (111: Connection refused) while connecting to upstream",
 ].join("\n") + "\n";
 
+// How often the fake follow-mode stream emits a new synthesised line, in milliseconds.
+// KARSE_FAKE_LOGS=1 exists so the log viewer can be exercised without a real container
+// runtime, and the viewer's live behaviour (auto-follow, and re-following after the user
+// scrolls back to the bottom) only shows up once lines keep arriving and overflow the
+// panel. A finite burst of canned lines never overflows it, so the fake stream keeps
+// producing lines, roughly ten a second, just like `kubectl logs -f` on a busy pod.
+const FAKE_LOG_INTERVAL_MS = 100;
+
+// Request paths cycled through by the synthesised fake log lines, so a continuous fake
+// stream reads like a real access log rather than one line repeated forever.
+const FAKE_LOG_PATHS = ["/", "/healthz", "/readyz", "/static/main.css", "/api/items", "/favicon.ico"];
+
+// Builds one synthesised access-log line for the continuous fake stream, in the same
+// `<rfc3339-nano> stdout F <message>` shape kubectl emits with timestamps. `seq` is the
+// stream's line counter and is included in the line, so a person watching the viewer (or
+// an assertion in a test) can see the stream advancing rather than repeating.
+function fakeLogLine(seq: number): string {
+    const timestamp = new Date().toISOString().replace("Z", "000000Z");
+    const path = FAKE_LOG_PATHS[seq % FAKE_LOG_PATHS.length]!;
+    return `${timestamp} stdout F 10.244.0.1 - - "GET ${path} HTTP/1.1" 200 615 "-" "kube-probe/1.29" line=${seq}`;
+}
+
 // Returns the logs for a pod container. Defaults to the last 100 lines.
 // When KARSE_FAKE_LOGS=1 is set, returns pre-defined realistic fake log lines instead
 // of calling kubectl, so the log viewer can be exercised against clusters without
@@ -1168,8 +1190,11 @@ function emitLines(buffer: string, carry: string, onLine: (line: string) => void
 // Streams live logs (`kubectl logs -f`) from a single pod, emitting each line via
 // the handlers as it arrives. This is a READ-ONLY follow operation. The optional
 // container scopes the stream to one container; tail bounds the initial backlog.
-// When KARSE_FAKE_LOGS=1 is set, emits the canned FAKE_LOG_LINES (one per line)
-// then closes, so the live log viewer can be exercised without a real cluster.
+// When KARSE_FAKE_LOGS=1 is set, emits the canned FAKE_LOG_LINES as the initial backlog
+// and then keeps emitting a fresh synthesised line every FAKE_LOG_INTERVAL_MS until the
+// caller stops it, so the live log viewer behaves exactly like a real follow against a
+// busy pod and can be exercised without a real cluster. Like a real follow, the fake
+// stream never ends on its own; it ends when the returned handle is stopped.
 // Returns a handle the caller uses to terminate the underlying kubectl process.
 export function streamPodLogs(
     context: string,
@@ -1180,21 +1205,24 @@ export function streamPodLogs(
     handlers: LogStreamHandlers,
 ): LogStreamHandle {
     if (process.env.KARSE_FAKE_LOGS === "1") {
-        let cancelled = false;
+        // The canned lines are the backlog `--tail` would return...
         for (const line of FAKE_LOG_LINES.split("\n")) {
             if (line !== "") {
                 handlers.onLine(line);
             }
         }
-        // Defer the close so callers can wire up listeners synchronously first.
-        setTimeout(() => {
-            if (!cancelled) {
-                handlers.onClose();
-            }
-        }, 0);
+        // ...and then the stream keeps following, emitting new lines over time. This is
+        // what makes the viewer overflow and keep overflowing, which is the only way the
+        // live logging UI (auto-follow, and re-following on a scroll back to the bottom)
+        // can be exercised by hand or asserted in a test.
+        let seq = 0;
+        const timer = setInterval(() => {
+            seq++;
+            handlers.onLine(fakeLogLine(seq));
+        }, FAKE_LOG_INTERVAL_MS);
         return {
             stop: () => {
-                cancelled = true;
+                clearInterval(timer);
             },
         };
     }

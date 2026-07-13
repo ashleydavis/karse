@@ -457,15 +457,28 @@ fi
 echo "OK"
 
 echo "--- GET /api/logs/stream (SSE multi-pod live logs) ---"
-# KARSE_FAKE_LOGS=1 is set, so each matched pod's stream emits canned fake log
-# lines as SSE "line" events. The connection stays open (follow mode), so cap the
-# read with --max-time and confirm we received a started event and prefixed lines.
+# KARSE_FAKE_LOGS=1 is set, so each matched pod's stream emits a canned backlog and
+# then keeps following, emitting a fresh line every 100ms. The connection stays open
+# (follow mode), so cap the read with --max-time and confirm we received a started
+# event and prefixed lines.
 LOGS_STREAM=$(curl -fsS --max-time 5 -H "Accept: text/event-stream" \
     "$BASE/api/logs/stream?context=$CURRENT_CTX&namespace=default&filter=smoke" || true)
 echo "$LOGS_STREAM" | grep -q "event: started"
 echo "$LOGS_STREAM" | grep -q "event: line"
 echo "$LOGS_STREAM" | grep -q '"pod":"smoke-pod"'
 echo "$LOGS_STREAM" | grep -q "kube-probe"
+# The fake stream must keep streaming, not stop after the backlog: over a 5s read it
+# has to deliver far more than the 10 canned backlog lines, otherwise the log viewer
+# never overflows and its live behaviour (auto-follow) cannot be exercised at all.
+LINE_COUNT=$(echo "$LOGS_STREAM" | grep -c "^event: line" || true)
+if [[ "$LINE_COUNT" -le 20 ]]; then
+    echo "Expected the fake log stream to keep streaming (>20 lines in 5s), got $LINE_COUNT" >&2
+    exit 1
+fi
+# The followed lines carry a rising counter, so they are freshly synthesised over time
+# rather than the backlog replayed.
+echo "$LOGS_STREAM" | grep -q "line=1"
+echo "$LOGS_STREAM" | grep -q "line=20"
 echo "OK"
 
 echo "--- GET /api/logs/stream (no pods match) ---"

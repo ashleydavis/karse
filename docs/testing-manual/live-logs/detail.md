@@ -2,9 +2,9 @@
 
 Manual tests for the Logs page (`/logs`): multi-pod live log streaming. See the spec: [live-logs](../../spec/live-logs/detail.md).
 
-Streaming uses `kubectl logs -f` (read-only follow) on the backend, aggregated and pushed to the browser over Server-Sent Events. With `KARSE_FAKE_LOGS=1` (set by `bun run dev:test`) each pod stream emits simulated log lines so the page can be exercised against a kwok cluster that has no real container runtime.
+Streaming uses `kubectl logs -f` (read-only follow) on the backend, aggregated and pushed to the browser over Server-Sent Events. With `KARSE_FAKE_LOGS=1` (set by `bun run dev:test`) each pod stream emits a short backlog of simulated log lines and then keeps emitting a new line roughly every 100ms until you stop the stream, so the page can be exercised against a kwok cluster that has no real container runtime — including the live behaviour (auto-follow) that only shows up once the viewer overflows.
 
-Start the app first. From the repo root run the `dev:test` variant of `bun run dev` (it sets `KARSE_FAKE_LOGS=1` for simulated log lines):
+Start the app first. From the repo root run the `dev:test` variant of `bun run dev` (it sets `KARSE_FAKE_LOGS=1` for continuously streaming simulated log lines):
 
 ```sh
 bun run dev:test
@@ -77,11 +77,14 @@ One node, three pods (`nginx-one`, `nginx-two`, `redis-main`).
 - Select `default` from the Namespace dropdown and press "Stream". Only pods in `default` are streamed (all three pods here).
 
 ### Auto-follow and the scrollbar
-- Stream a pod that produces a steady flow of lines (the fake-logs mode emits lines continuously). Let it fill past one screen.
+- Started with `bun run dev:test` (above), the backend runs with `KARSE_FAKE_LOGS=1`, so every streamed pod emits a short backlog and then **keeps streaming**, a new line roughly every 100ms, for as long as the stream is open. That is what makes this section testable by hand: stream any pod and the viewer fills and keeps filling on its own.
+- Stream a pod and let it fill past one screen (a few seconds).
 - While the viewer is scrolled to the bottom, watch new lines arrive: the view stays pinned to the bottom, always showing the newest line.
 - Confirm the log panel shows a clearly visible scrollbar down its right edge: a track with a light-grey draggable thumb that plainly stands out against the dark panel. (This is the app's own custom bar; the browser's native overlay scrollbar is invisible against the dark panel, so do not rely on it.)
 - Drag the thumb up with the mouse (or use the mouse wheel) to scroll into the earlier output. Dragging the thumb scrolls the view and the earliest streamed lines remain reachable. New lines keep arriving but the view stays where you left it: it is not yanked back to the bottom.
-- Scroll back to the bottom. Auto-follow resumes: new lines again keep the view pinned to the end.
+- Scroll back to the bottom with the mouse wheel. Auto-follow resumes: new lines again keep the view pinned to the end.
+- Now repeat it using the scrollbar, which is the path that used to break: **drag the thumb** up into the history, watch a few lines arrive (the view holds still), then **drag the thumb all the way back down** to the bottom of the track and let go. Auto-follow must resume: the lines that arrive after the drag keep the view pinned to the newest line. It must not stay stuck at the bottom while new lines pile up below the fold.
+- Follow is not a one-shot: repeat the scroll-up/scroll-back cycle several times, mixing the wheel and the thumb. Following must resume every single time the view returns to the bottom, for the whole session.
 - Make the window short (or open the browser dev tools to shrink the viewport) while a pod streams. The log panel shrinks to fit the remaining height rather than pushing the page past the window: the page itself must not gain its own scrollbar, and the newest line stays visible at the bottom of the panel as lines arrive. It must not slide below the window edge (which would leave auto-follow pinning an offscreen bottom, so the view only appears to stop following).
 
 ### "Updated" indicator

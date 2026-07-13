@@ -5233,6 +5233,119 @@ test.describe("karse e2e", () => {
         });
     });
 
+    test.describe("live logs auto-follow with lines arriving over time", () => {
+        // This block deliberately does NOT intercept /api/logs/stream. It streams from the
+        // real backend, which runs under KARSE_FAKE_LOGS=1 (scripts/e2e-tests.sh) and now
+        // follows a pod indefinitely, emitting a fresh line every 100ms. A route fulfilled
+        // with a single canned SSE body delivers every line in one response, which cannot
+        // exercise what auto-follow is actually about: lines landing one at a time, over
+        // time, while the user scrolls around. The kwok pod `web` in namespace `default`
+        // is the stream source.
+
+        // The slack the viewer itself allows when deciding it is "at the bottom"
+        // (AT_BOTTOM_TOLERANCE_PX in frontend/src/lib/log-autoscroll.ts).
+        const AT_BOTTOM_PX = 4;
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+        });
+
+        // The viewer's live scroll metrics.
+        async function viewerMetrics(): Promise<{ scrollTop: number; distanceFromBottom: number }> {
+            return page.locator("[data-test-id='live-logs-viewer']").evaluate((el) => ({
+                scrollTop: el.scrollTop,
+                distanceFromBottom: el.scrollHeight - el.clientHeight - el.scrollTop,
+            }));
+        }
+
+        // How many log lines the viewer is currently rendering.
+        async function lineCount(): Promise<number> {
+            return page.locator("[data-test-id='live-logs-line']").count();
+        }
+
+        // Waits until at least `extra` further lines have arrived from the live stream, so
+        // the assertion that follows runs against a viewer that genuinely grew afterwards.
+        async function waitForMoreLines(extra: number): Promise<void> {
+            const before = await lineCount();
+            await expect.poll(lineCount, { timeout: 60000 }).toBeGreaterThanOrEqual(before + extra);
+        }
+
+        // Streams the kwok `web` pod's live logs and waits until the arriving lines have
+        // overflowed the viewer, so there is both history above and a bottom to follow.
+        async function streamLiveLog() {
+            await page.goto("/logs", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='live-logs-picker-trigger']").click();
+            await expect(page.locator("[data-test-id='live-logs-search']")).toBeVisible();
+            await page.locator("[data-test-id='live-logs-search'] input").fill("web");
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='live-logs-search']")).toHaveCount(0);
+            await page.locator("[data-test-id='live-logs-start']").click();
+            const viewer = page.locator("[data-test-id='live-logs-viewer']");
+            await expect.poll(
+                () => viewer.evaluate((el) => el.scrollHeight - el.clientHeight),
+                { timeout: 60000 },
+            ).toBeGreaterThan(200);
+            return viewer;
+        }
+
+        test("stays pinned to the newest line as lines arrive over time", async () => {
+            await streamLiveLog();
+            expect((await viewerMetrics()).distanceFromBottom).toBeLessThanOrEqual(AT_BOTTOM_PX);
+            // Let further lines land: the view must still be pinned to the newest one.
+            await waitForMoreLines(10);
+            expect((await viewerMetrics()).distanceFromBottom).toBeLessThanOrEqual(AT_BOTTOM_PX);
+            await expect(page.locator("[data-test-id='live-logs-line']").last()).toBeInViewport();
+        });
+
+        test("auto-follow resumes when the user scrolls back to the bottom", async () => {
+            const viewer = await streamLiveLog();
+            // Scroll up into the history. Following stops: the arriving lines must not yank
+            // the reader back down.
+            await viewer.evaluate((el) => { el.scrollTop = 0; });
+            await waitForMoreLines(10);
+            expect((await viewerMetrics()).scrollTop).toBe(0);
+            // Scroll back to the bottom. Following must RESUME, and keep the view pinned as
+            // the *next* lines arrive. Before live-logs-2 this never happened: once the user
+            // had scrolled, auto-follow was off for the rest of the session.
+            await viewer.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+            await waitForMoreLines(10);
+            expect((await viewerMetrics()).distanceFromBottom).toBeLessThanOrEqual(AT_BOTTOM_PX);
+            await expect(page.locator("[data-test-id='live-logs-line']").last()).toBeInViewport();
+        });
+
+        test("dragging the custom scrollbar thumb back to the bottom re-arms auto-follow", async () => {
+            // The reported live-logs-2 failure, in the user's own words: "it only works if
+            // you don't modify the scrollbar". The thumb drag used to switch auto-follow off
+            // unconditionally and leave it to the scroll handler to switch back on; but
+            // assigning scrollTop only fires a scroll event when the value *changes*, so a
+            // drag that landed on the bottom fired none and follow stayed off forever.
+            const viewer = await streamLiveLog();
+            const thumb = page.locator("[data-test-id='live-logs-scrollbar-thumb']");
+
+            // Drag the thumb up into the history: following stops and the position holds.
+            const fromBottom = (await thumb.boundingBox())!;
+            await page.mouse.move(fromBottom.x + fromBottom.width / 2, fromBottom.y + fromBottom.height / 2);
+            await page.mouse.down();
+            await page.mouse.move(fromBottom.x + fromBottom.width / 2, fromBottom.y - 1000, { steps: 10 });
+            await page.mouse.up();
+            const scrolledUp = await viewerMetrics();
+            expect(scrolledUp.distanceFromBottom).toBeGreaterThan(AT_BOTTOM_PX);
+            await waitForMoreLines(10);
+            expect((await viewerMetrics()).scrollTop).toBe(scrolledUp.scrollTop);
+
+            // Drag the thumb back down to the end of the track: following must resume, and
+            // the lines that arrive after the drag must keep the view pinned to the bottom.
+            const fromTop = (await thumb.boundingBox())!;
+            await page.mouse.move(fromTop.x + fromTop.width / 2, fromTop.y + fromTop.height / 2);
+            await page.mouse.down();
+            await page.mouse.move(fromTop.x + fromTop.width / 2, fromTop.y + 1000, { steps: 10 });
+            await page.mouse.up();
+            await waitForMoreLines(10);
+            expect((await viewerMetrics()).distanceFromBottom).toBeLessThanOrEqual(AT_BOTTOM_PX);
+            await expect(page.locator("[data-test-id='live-logs-line']").last()).toBeInViewport();
+        });
+    });
+
     test.describe("live logs page pod-label cap", () => {
         // Twelve fake pods, more than the page's 8-chip cap, to drive the
         // "..." expander that reveals the full streaming-pod list.

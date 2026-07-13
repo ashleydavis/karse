@@ -74,6 +74,24 @@ KARSE_PORT=5000 KARSE_FRONTEND_PORT=5001 bun run dev
 
 The Vite proxy target reads `KARSE_PORT`, so the backend port only needs to be set once and the proxy stays in sync.
 
+### Running with fake streaming logs
+
+kwok clusters run no real containers, so `kubectl logs` returns nothing against them and the logging UI cannot be exercised by hand. Run the app in fake-logs mode instead:
+
+```sh
+bun run dev:test
+```
+
+Then open the frontend at http://127.0.0.1:5173.
+
+`dev:test` is `bun run dev` with `KARSE_FAKE_LOGS=1`, which makes the backend synthesise log output instead of shelling out to `kubectl logs`. Streams (the Logs page at `/logs`, the Pod detail Logs tab, and the Container detail Logs tab) emit a short backlog and then **keep streaming**, a fresh line roughly every 100ms per pod, until you press Stop or leave the page — the same shape as `kubectl logs -f` against a busy pod. That is what makes the live behaviour testable by hand: the viewer fills past one screen on its own, so auto-follow (staying pinned to the newest line, releasing when you scroll up, and re-arming when you scroll back to the bottom) can actually be seen. The buffered `GET /api/pods/:namespace/:name/logs` endpoint returns the canned backlog in the same mode.
+
+`KARSE_FAKE_METRICS=1` does the equivalent for the Performance views, and can be combined with it:
+
+```sh
+KARSE_FAKE_METRICS=1 bun run dev:test
+```
+
 ## Project structure
 
 ```
