@@ -35,7 +35,7 @@ The spec is reverse-engineered from the shipped code and the prose docs (`docs/a
 | [loading-indicators](./loading-indicators/index.md) | Settled | Complete | Shared loading spinner shown while a page's primary data query is in flight, across list and detail pages. |
 | [column-config](./column-config/index.md) | Settled | Complete | Per-table configurable column visibility and order, persisted; shared across all tables. |
 | [quick-find](./quick-find/index.md) | Settled | Partial | Header quick-pickers for context and namespace. Global cross-kind quick-find is not yet shipped. |
-| [guided-commands](./guided-commands/index.md) | Settled | Complete | Copy-only kubectl command suggestions per resource; never executed. |
+| [guided-commands](./guided-commands/index.md) | Settled | Complete | Copy-only kubectl commands: per-resource suggestions, plus page help naming each page's data source. |
 | [yaml-viewer](./yaml-viewer/index.md) | Settled | Complete | View the raw YAML of a viewable resource on a detail-page sub tab. |
 | [labels-tab](./labels-tab/index.md) | Settled | Complete | A Labels sub tab on each resource detail page: that resource's own labels as a searchable, sortable table. |
 | [audit-log](./audit-log/index.md) | Settled | Complete | Every kubectl call is appended to a rolling on-disk audit log. |

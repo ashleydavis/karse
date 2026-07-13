@@ -7811,4 +7811,85 @@ test.describe("karse e2e", () => {
             });
         });
     });
+
+    // ── Context-sensitive page help ───────────────────────────────────────────
+    //
+    // The header's help button opens a panel naming the page's data source and the
+    // read-only kubectl commands that reproduce it, scoped to the selected context
+    // and namespace.
+    test.describe("page help", () => {
+        // Opens the help panel from the header and returns the commands it lists.
+        async function openHelp(): Promise<string[]> {
+            await page.locator("[data-test-id='page-help-button']").click();
+            await expect(page.locator("[data-test-id='page-help-panel']")).toBeVisible();
+            return page.locator("[data-test-id='page-help-panel'] [data-test-id='command-text']").allTextContents();
+        }
+
+        // Closes the help panel and waits for it to go away.
+        async function closeHelp(): Promise<void> {
+            await page.locator("[data-test-id='page-help-close']").click();
+            await expect(page.locator("[data-test-id='page-help-panel']")).toBeHidden();
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.goto("/nodes", { waitUntil: "networkidle" });
+            await waitForNodeRows();
+        });
+
+        test("the help panel stays closed until the help button is clicked", async () => {
+            await expect(page.locator("[data-test-id='page-help-button']")).toBeVisible();
+            await expect(page.locator("[data-test-id='page-help-panel']")).toBeHidden();
+        });
+
+        test("the nodes page help names its data source and the command that reproduces it", async () => {
+            const commands = await openHelp();
+            await expect(page.locator("[data-test-id='page-help-title']")).toHaveText("Nodes");
+            await expect(page.locator("[data-test-id='page-help-source']")).toContainText("one kubectl query for every node");
+            await expect(page.locator("[data-test-id='page-help-readonly-note']")).toBeVisible();
+            expect(commands).toContain(`kubectl --context ${CLUSTER_1} get nodes -o json`);
+            await closeHelp();
+        });
+
+        test("the pods page help lists the pod query, scoped to all namespaces", async () => {
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            const commands = await openHelp();
+            await expect(page.locator("[data-test-id='page-help-title']")).toHaveText("Pods");
+            await expect(page.locator("[data-test-id='page-help-source']")).toContainText("all namespaces");
+            expect(commands).toContain(`kubectl --context ${CLUSTER_1} get pods -A -o json`);
+            await closeHelp();
+        });
+
+        test("the pods page help scopes its command to the selected namespace", async () => {
+            await page.goto("/pods?namespace=default", { waitUntil: "networkidle" });
+            const commands = await openHelp();
+            await expect(page.locator("[data-test-id='page-help-source']")).toContainText("-n default");
+            expect(commands).toContain(`kubectl --context ${CLUSTER_1} get pods -n default -o json`);
+            await closeHelp();
+        });
+
+        test("a node detail page help lists that node's own queries", async () => {
+            await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
+            const commands = await openHelp();
+            await expect(page.locator("[data-test-id='page-help-title']")).toHaveText("Node: node-cp");
+            expect(commands).toContain(`kubectl --context ${CLUSTER_1} get node node-cp -o json`);
+            expect(commands).toContain(`kubectl --context ${CLUSTER_1} get pods -A --field-selector=spec.nodeName=node-cp -o json`);
+            await closeHelp();
+        });
+
+        test("the cluster page help lists the five overview queries", async () => {
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            const commands = await openHelp();
+            await expect(page.locator("[data-test-id='page-help-title']")).toHaveText("Cluster");
+            expect(commands).toContain(`kubectl --context ${CLUSTER_1} version -o json`);
+            expect(commands).toContain(`kubectl --context ${CLUSTER_1} get events -A --field-selector=type=Warning -o json`);
+            await closeHelp();
+        });
+
+        test("the About page has no help button, since no cluster data backs it", async () => {
+            await page.goto("/about", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='page-help-button']")).toHaveCount(0);
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+        });
+    });
 });

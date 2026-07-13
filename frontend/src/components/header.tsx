@@ -11,6 +11,7 @@ import { ContextPicker } from "./context-picker";
 import { ContextQuickPicker } from "./context-quick-picker";
 import { NamespaceQuickPicker } from "./namespace-quick-picker";
 import { Breadcrumbs } from "./breadcrumbs";
+import { PageHelp } from "./page-help";
 import { TOP_BAR_HEIGHT } from "../lib/layout";
 
 export function Header() {
@@ -98,6 +99,7 @@ export function Header() {
                             <FontAwesomeIcon icon={faLayerGroup} />
                         </IconButton>
                     </NamespaceQuickPicker>
+                    <PageHelp />
                     <Tooltip title="Color mode">
                         <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)} aria-label="color mode">
                             <FontAwesomeIcon icon={colorModeIcon} />

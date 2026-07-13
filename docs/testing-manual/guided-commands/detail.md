@@ -57,8 +57,25 @@ One node and one pod.
 - The detail page has "Status" and "Commands" tabs. Click "Commands".
 - The list includes describe, get YAML, restart rollout, rollout status, scale, and delete suggestions, each with a copy button and the read-only banner.
 
+### Page help: where this data comes from
+The header carries a question-mark button ("Where does this data come from?") next to the colour-mode button. It opens a panel naming the current page's data source and the read-only commands that reproduce it.
+
+- Navigate to `/nodes`. The panel is closed: nothing but the question-mark button is visible.
+- Click the question-mark button. A panel slides in from the right, titled "Nodes".
+- Under "Where this data comes from" it says the node table is one kubectl query for every node in the selected context.
+- Under "Run it yourself" an info banner says these are the read-only commands behind the page, and the list shows (with a copy button):
+  - `kubectl --context kwok-karse-test get nodes -o json`
+- Copy that command and run it in your terminal. It returns the same nodes the table shows.
+- Close the panel (the X, or click outside it).
+- Navigate to `/pods` with no namespace selected. Open the help: the source text says all namespaces are covered, and the command is `kubectl --context kwok-karse-test get pods -A -o json`.
+- Select the `default` namespace with the namespace picker (`Ctrl+Shift+K`). Open the help again: the command is now `kubectl --context kwok-karse-test get pods -n default -o json`, and the source text names the `default` namespace.
+- Open the `web` pod's detail page (`/pods/default/web`) and open the help. The title reads "Pod: web"; the commands query that pod, its events, and its logs, all scoped to `-n default` (the pod's own namespace, regardless of which namespace is selected).
+- Open `/errors` and open the help. It explains that Kubernetes has no "error" object and that Karse derives the feed from the Warning events plus the pods, and lists both queries.
+- Navigate to `/about`. There is **no** question-mark button: no cluster data backs that page.
+
 ### Read-only invariant
 - Confirm that opening the Commands tab and clicking copy never triggers any network request to the backend (check the browser dev tools network tab). The commands are generated entirely in the frontend and are never executed.
+- The same holds for the page help panel: opening it and copying a command issues no request. Every command it lists is a read-only query (`get`, `version`, `logs`, `describe`, `config view`); no command it shows can change the cluster.
 
 Teardown:
 

@@ -67,6 +67,15 @@ The header bar has two quick-picker buttons:
 
 The header also has a dropdown showing the current context and a **Refresh** button (circular-arrows icon) that empties the on-disk cluster-data cache and re-fetches all data fresh from the cluster. See the Config page below for the cache.
 
+### Page help: where this data comes from
+
+The header's **question-mark button** ("Where does this data come from?") opens a panel for whatever page you are on. It answers two things:
+
+- **Where this data comes from**: which cluster queries Karse ran to build the page. For example, the Errors feed is derived (Kubernetes has no "error" object): Karse combines the Warning events with the pods and their failing containers.
+- **Run it yourself**: the exact read-only `kubectl` commands behind the page, each with a copy button. They are pinned to your selected context (`--context <name>`) and scoped to your selected namespace (`-n <namespace>`, or `-A` when no namespace is selected), so you can paste one into a terminal and get the same information the page is showing. A detail page's commands use that resource's own namespace.
+
+Karse never runs a command on your behalf from this panel; it only shows you what it ran and what you can run. Pages with no cluster data behind them (About, Config) have no question-mark button. For commands that *act on* a resource (delete, scale, drain), see the **Commands** tab on that resource's detail page.
+
 ## Contexts page (`/contexts`)
 
 A table of all kubeconfig contexts. Each row shows the context name, cluster, user, and default namespace.

@@ -49,7 +49,7 @@ Single-test-cluster discipline (per `readme.md`): there is only ever ONE test cl
 | [loading-indicators](./loading-indicators/index.md) | Loading spinner shown while a page's primary data loads. |
 | [column-config](./column-config/index.md) | Per-table configurable column visibility and order. |
 | [quick-find](./quick-find/index.md) | Header context and namespace dropdown pickers. |
-| [guided-commands](./guided-commands/index.md) | Copy-only kubectl command suggestions. |
+| [guided-commands](./guided-commands/index.md) | Copy-only kubectl command suggestions, and the header page help. |
 | [yaml-viewer](./yaml-viewer/index.md) | Raw YAML sub tab on resource detail pages. |
 | [labels-tab](./labels-tab/index.md) | Per-detail-page Labels tab: a resource's own labels, searchable and sortable. |
 | [performance-tabs](./performance-tabs/index.md) | Performance tab scaffold: tabbed cluster home and Performance tab stubs on cluster, node, and pod pages. |
