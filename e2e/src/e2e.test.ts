@@ -4893,6 +4893,191 @@ test.describe("karse e2e", () => {
         });
     });
 
+    test.describe("live logs page enlarged pod picker", () => {
+        // A namespace with many pods, so the "have to scroll to see them all"
+        // problem live-logs-4 fixes is reproducible: with a small dropdown this
+        // list would be mostly hidden behind a scrollbar.
+        const MANY_PODS = {
+            pods: Array.from({ length: 30 }, (_, i) => ({
+                name: `pod-${String(i).padStart(2, "0")}`,
+                namespace: "default",
+                phase: "Running",
+                ready: "1/1",
+                restarts: 0,
+                createdAt: new Date().toISOString(),
+                node: "node-1",
+            })),
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: MANY_PODS });
+            });
+            await page.goto("/logs", { waitUntil: "networkidle" });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+            setContext(CLUSTER_1);
+        });
+
+        test("the pod picker dropdown is enlarged so many pods are visible before scrolling", async () => {
+            // The viewport is 1280x800 (set in beforeAll). The enlarged list grows up
+            // to 60% of that (~480px) before it scrolls, versus the old fixed 220px
+            // that hid most of a long list.
+            await page.locator("[data-test-id='live-logs-picker-trigger']").click();
+            await expect(page.locator("[data-test-id='live-logs-search']")).toBeVisible();
+            await expect(page.locator("[data-test-id='live-logs-pod-checkbox']")).toHaveCount(30);
+            // The dropdown opens with a Grow transition; wait for it to settle so
+            // the measured height is the final layout, not a mid-animation frame.
+            await page.waitForTimeout(500);
+
+            const list = page.locator("[data-test-id='live-logs-pod-list']");
+            const listBox = await list.boundingBox();
+            expect(listBox).not.toBeNull();
+            // Meaningfully taller than the old 220px cap: proves the enlargement.
+            expect(listBox!.height).toBeGreaterThan(400);
+            // But still bounded (does not grow past ~60% of the 800px viewport),
+            // so it cannot overrun the page.
+            expect(listBox!.height).toBeLessThan(560);
+
+            // The 30-pod list overflows that height, so it is still scrollable to
+            // reach the pods past the visible area.
+            const metrics = await list.evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
+            expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+
+            // The count/Clear header still sits above the (now taller) list.
+            const countBox = await page.locator("[data-test-id='live-logs-selected-count']").boundingBox();
+            expect(countBox!.y).toBeLessThan(listBox!.y);
+
+            // Search within the enlarged list still narrows it.
+            await page.locator("[data-test-id='live-logs-search'] input").fill("pod-1");
+            // pod-10 .. pod-19 -> 10 matches.
+            await expect(page.locator("[data-test-id='live-logs-pod-option']")).toHaveCount(10);
+            await page.locator("[data-test-id='live-logs-search'] input").fill("");
+            await expect(page.locator("[data-test-id='live-logs-pod-option']")).toHaveCount(30);
+
+            // Escape dismisses the dropdown. (The suite's other pod-picker tests click
+            // the Popover's invisible backdrop, but that clicks the backdrop's centre —
+            // which the now-enlarged panel covers, so it would intercept the click.
+            // Escape is independent of the panel's size.)
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='live-logs-search']")).toHaveCount(0);
+        });
+
+        test("scrolling the enlarged pod list reaches the last pod when it overflows", async () => {
+            // The enlargement must not trade "more pods visible" for "the rest are
+            // unreachable": a list longer than the (now larger) panel still has to
+            // scroll all the way to its final pod, not cut it off.
+            await page.locator("[data-test-id='live-logs-picker-trigger']").click();
+            await expect(page.locator("[data-test-id='live-logs-pod-checkbox']")).toHaveCount(30);
+            // The dropdown opens with a Grow transition; wait for it to settle so the
+            // measured boxes are the final layout, not a mid-animation frame.
+            await page.waitForTimeout(500);
+
+            const list = page.locator("[data-test-id='live-logs-pod-list']");
+            const lastPod = page.locator("[data-test-id='live-logs-pod-option']").last();
+            // 30 pods named pod-00..pod-29, ordered alphanumerically with none ticked,
+            // so the last row in the list is pod-29.
+            await expect(lastPod).toHaveText("pod-29");
+
+            const listBox = (await list.boundingBox())!;
+            const before = await list.evaluate((el) => ({
+                scrollTop: el.scrollTop,
+                scrollHeight: el.scrollHeight,
+                clientHeight: el.clientHeight,
+            }));
+            // The 30-pod list is longer than the panel shows, and starts unscrolled...
+            expect(before.scrollHeight).toBeGreaterThan(before.clientHeight);
+            expect(before.scrollTop).toBe(0);
+            // ...so pod-29 begins below the visible area of the list: it can only be
+            // reached by scrolling. (This is the state the picker is in on open.)
+            const lastBoxBefore = (await lastPod.boundingBox())!;
+            expect(lastBoxBefore.y).toBeGreaterThan(listBox.y + listBox.height);
+
+            // Scroll the list the way a user does: point at it and turn the wheel,
+            // until it is at its end (bounded, so a list that refused to scroll fails
+            // the assertions below rather than spinning forever).
+            await list.hover();
+            for (let i = 0; i < 30; i++) {
+                const atEnd = await list.evaluate(
+                    (el) => el.scrollTop >= el.scrollHeight - el.clientHeight - 1,
+                );
+                if (atEnd) break;
+                await page.mouse.wheel(0, 200);
+                await page.waitForTimeout(100);
+            }
+
+            // The wheel actually moved the list, and it reached the bottom of the list.
+            const after = await list.evaluate((el) => ({
+                scrollTop: el.scrollTop,
+                scrollHeight: el.scrollHeight,
+                clientHeight: el.clientHeight,
+            }));
+            expect(after.scrollTop).toBeGreaterThan(0);
+            expect(after.scrollTop).toBeGreaterThanOrEqual(after.scrollHeight - after.clientHeight - 1);
+
+            // pod-29 is now fully inside the list's visible area (top and bottom edges
+            // both within it, allowing a pixel of rounding) and on screen: the end of a
+            // long list is reachable, not cut off.
+            const lastBoxAfter = (await lastPod.boundingBox())!;
+            expect(lastBoxAfter.y).toBeGreaterThanOrEqual(listBox.y - 1);
+            expect(lastBoxAfter.y + lastBoxAfter.height).toBeLessThanOrEqual(listBox.y + listBox.height + 1);
+            await expect(lastPod).toBeInViewport();
+            // The last pod's checkbox is usable once scrolled to, so the pods past the
+            // fold are not merely visible but selectable.
+            await expect(lastPod.locator("input[type='checkbox']")).toBeEnabled();
+
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='live-logs-search']")).toHaveCount(0);
+        });
+
+        test("shows a visible scrollbar while the pod list overflows, and hides it when it fits", async () => {
+            // This browser renders the native scrollbar as an invisible auto-hiding
+            // overlay, so the picker draws its own always-visible bar. When 30 pods
+            // overflow the panel that bar must be present with a real, grabbable thumb,
+            // making the overflow-and-scroll state plain on screen — the thing the
+            // "scrolled to bottom" shots alone did not demonstrate.
+            await page.locator("[data-test-id='live-logs-picker-trigger']").click();
+            await expect(page.locator("[data-test-id='live-logs-pod-checkbox']")).toHaveCount(30);
+            await page.waitForTimeout(500);
+
+            const list = page.locator("[data-test-id='live-logs-pod-list']");
+            const track = page.locator("[data-test-id='live-logs-scrollbar-track']");
+            const thumb = page.locator("[data-test-id='live-logs-scrollbar-thumb']");
+
+            // The list overflows the panel, so the custom bar is drawn.
+            const metrics = await list.evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
+            expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+            await expect(track).toBeVisible();
+            await expect(thumb).toBeVisible();
+
+            // A real, grabbable thumb: non-trivial width and height, sitting inside the
+            // list's vertical extent (not overflowing the panel).
+            const listBox = (await list.boundingBox())!;
+            const thumbBox = (await thumb.boundingBox())!;
+            expect(thumbBox.width).toBeGreaterThanOrEqual(6);
+            expect(thumbBox.height).toBeGreaterThanOrEqual(24);
+            // The thumb is shorter than the track (only part of the list is on screen),
+            // so it is plainly a scroll indicator, not a full-height gutter.
+            expect(thumbBox.height).toBeLessThan(listBox.height);
+            expect(thumbBox.y).toBeGreaterThanOrEqual(listBox.y - 2);
+            expect(thumbBox.y + thumbBox.height).toBeLessThanOrEqual(listBox.y + listBox.height + 2);
+
+            // Narrow the list to a single pod so it no longer overflows: the bar is then
+            // hidden, proving it tracks real overflow rather than always showing.
+            await page.locator("[data-test-id='live-logs-search'] input").fill("pod-11");
+            await expect(page.locator("[data-test-id='live-logs-pod-option']")).toHaveCount(1);
+            await expect(track).toHaveCount(0);
+            await expect(thumb).toHaveCount(0);
+            await page.locator("[data-test-id='live-logs-search'] input").fill("");
+
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='live-logs-search']")).toHaveCount(0);
+        });
+    });
+
     test.describe("live logs auto-follow", () => {
         // One pod whose stream emits enough lines to overflow the viewer, so the
         // scroll position is meaningful (there is both history above and a bottom
