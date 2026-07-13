@@ -90,7 +90,7 @@ const columns: ColumnDef<DaemonSet>[] = [
         // search matches on both label keys and values.
         accessorFn: (row) => labelsToPairs(row.labels).join(" "),
         header: "Labels",
-        cell: (info) => <LabelsCell labels={info.row.original.labels} />,
+        cell: (info) => <LabelsCell labels={info.row.original.labels} resourceKind="DaemonSet" resourceName={info.row.original.name} />,
         enableSorting: false,
         // Keeps a row only when its labels satisfy the shared editor's label
         // selection. An empty selection clears this filter, so every row passes.

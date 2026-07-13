@@ -17,6 +17,10 @@ kubectl config use-context kwok-karse-test
 # Wait until the apiserver accepts requests before applying (avoids a kwok readiness race).
 for _ in $(seq 1 30); do kubectl get --raw=/readyz >/dev/null 2>&1 && break; sleep 0.5; done
 
+# fake-node-1 carries more labels than fit inline (five), so the Nodes table's Labels
+# column truncates to a "+N ..." chip and the labels modal is reachable from the nodes
+# table by hand. The nodes table is the one the modal was once unreachable from, so the
+# fixture has to be able to exercise it rather than leaving it untestable.
 kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: Node
@@ -25,6 +29,9 @@ metadata:
   labels:
     node-role.kubernetes.io/worker: ""
     kubernetes.io/hostname: fake-node-1
+    topology.kubernetes.io/region: eu-west
+    node.kubernetes.io/instance-type: m5.large
+    environment: prod
   annotations:
     kwok.x-k8s.io/node: fake
 spec: {}

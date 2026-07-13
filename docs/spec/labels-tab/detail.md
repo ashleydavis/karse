@@ -8,7 +8,9 @@ This is per-detail-page and per-resource. It is not a single shared or aggregate
 
 Containers do not carry their own labels (a `ContainerInfo` has no labels field), so the container detail page has no Labels tab.
 
-Backed by: `frontend/src/components/labels-tab.tsx` (the table component), `frontend/src/lib/label-rows.ts` (`buildLabelRows`, the pure rows builder), and the detail pages `frontend/src/pages/pod-detail/`, `node-detail/`, `namespace-detail/`, and `workload-detail/`. The label data is already part of each detail payload's `labels` field; no backend change is needed.
+Backed by: `frontend/src/components/labels-tab.tsx` (the tab), `frontend/src/components/labels-table.tsx` (`LabelsTable`, the shared searchable/sortable Key / Value table), `frontend/src/lib/label-rows.ts` (`buildLabelRows`, the pure rows builder; `compareLabelRows`, the pure sort comparator), and the detail pages `frontend/src/pages/pod-detail/`, `node-detail/`, `namespace-detail/`, and `workload-detail/`. The label data is already part of each detail payload's `labels` field; no backend change is needed.
+
+The Key / Value table itself is shared with [labels-modal](../labels-modal/detail.md), the modal opened from a truncated Labels cell in a resource table: both render the same `LabelsTable`, so the two label surfaces sort, search, and show their empty states identically.
 
 ## Behaviour
 

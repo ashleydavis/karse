@@ -7137,6 +7137,23 @@ test.describe("karse e2e", () => {
         });
 
         test.describe("many labels truncate to a searchable modal", () => {
+            // The modal renders the shared labels table, so its rows and headers
+            // carry that table's test ids. Scope every lookup to the modal so
+            // these never collide with a Labels tab rendered on a detail page.
+            const modal = () => page.locator("[data-test-id='labels-modal']");
+            const modalRows = () => modal().locator("[data-test-id='label-row']");
+
+            // Reads the modal's rows as "key=value" strings, in the order the
+            // table currently renders them, so sort order can be asserted.
+            async function modalPairs(): Promise<string[]> {
+                return await modalRows().evaluateAll((rows) =>
+                    rows.map((row) => {
+                        const cells = row.querySelectorAll("td");
+                        return `${cells[0]?.textContent ?? ""}=${cells[1]?.textContent ?? ""}`;
+                    }),
+                );
+            }
+
             test.beforeAll(async () => {
                 // Swap in the many-labelled pod list. This route is added after the
                 // outer beforeAll's, so it takes precedence (handlers match LIFO).
@@ -7156,30 +7173,236 @@ test.describe("karse e2e", () => {
                 await expect(manyRow.locator("[data-test-id='labels-cell-more'] .MuiChip-label")).toHaveText("+2 ...");
             });
 
-            test("clicking '...' opens a modal listing every label", async () => {
+            test("clicking '...' opens a modal listing every label as a Key / Value table", async () => {
                 const manyRow = page.locator("[data-test-id='pod-row']").filter({ hasText: "many-pod" });
                 await manyRow.locator("[data-test-id='labels-cell-more']").click();
-                await expect(page.locator("[data-test-id='labels-modal']")).toBeVisible();
-                // All five labels are listed in the modal.
-                await expect(page.locator("[data-test-id='labels-modal-chip']")).toHaveCount(5);
+                await expect(modal()).toBeVisible();
+                await expect(modal().locator("[data-test-id='labels-table']")).toBeVisible();
+                // Every label is listed, not just the three shown inline in the row.
+                await expect(modalRows()).toHaveCount(5);
+                // Initial order is by key, and each row shows the key and its value.
+                expect(await modalPairs()).toEqual([
+                    "app=many",
+                    "env=prod",
+                    "region=eu-west",
+                    "tier=backend",
+                    "version=1.2.3",
+                ]);
             });
 
-            test("the labels modal is searchable", async () => {
-                await page.locator("[data-test-id='labels-modal-search'] input").fill("region");
-                await expect(page.locator("[data-test-id='labels-modal-chip']")).toHaveCount(1);
-                await expect(page.locator("[data-test-id='labels-modal-chip'] .MuiChip-label")).toHaveText("region=eu-west");
-                // Clearing the search restores the full list.
-                await page.locator("[data-test-id='labels-modal-search'] input").fill("");
-                await expect(page.locator("[data-test-id='labels-modal-chip']")).toHaveCount(5);
+            test("the modal's title names the resource and counts every label", async () => {
+                // Opened from the pods table's many-pod row, so the title must name
+                // that pod (kind + name), not just say "Labels".
+                await expect(modal().locator("[data-test-id='labels-modal-title']")).toContainText("Pod many-pod labels (5)");
             });
 
-            test("clicking '...' opens the modal without navigating to the pod", async () => {
-                // Close the modal left open by the previous test.
-                await page.locator("[data-test-id='labels-modal-close']").click();
-                await expect(page.locator("[data-test-id='labels-modal']")).toBeHidden();
+            test("clicking the Key header sorts the labels by key, descending on the second click", async () => {
+                await modal().locator("[data-test-id='labels-header-key']").click();
+                expect(await modalPairs()).toEqual([
+                    "app=many",
+                    "env=prod",
+                    "region=eu-west",
+                    "tier=backend",
+                    "version=1.2.3",
+                ]);
+                await modal().locator("[data-test-id='labels-header-key']").click();
+                expect(await modalPairs()).toEqual([
+                    "version=1.2.3",
+                    "tier=backend",
+                    "region=eu-west",
+                    "env=prod",
+                    "app=many",
+                ]);
+            });
+
+            test("clicking the Value header sorts the labels by value", async () => {
+                // Ascending by value: 1.2.3, backend, eu-west, many, prod.
+                await modal().locator("[data-test-id='labels-header-value']").click();
+                expect(await modalPairs()).toEqual([
+                    "version=1.2.3",
+                    "tier=backend",
+                    "region=eu-west",
+                    "app=many",
+                    "env=prod",
+                ]);
+                await modal().locator("[data-test-id='labels-header-value']").click();
+                expect(await modalPairs()).toEqual([
+                    "env=prod",
+                    "app=many",
+                    "region=eu-west",
+                    "tier=backend",
+                    "version=1.2.3",
+                ]);
+            });
+
+            test("the labels modal is searchable by key and by value", async () => {
+                const search = modal().locator("[data-test-id='labels-filter'] input");
+
+                // Matching on a label key.
+                await search.fill("region");
+                await expect(modalRows()).toHaveCount(1);
+                expect(await modalPairs()).toEqual(["region=eu-west"]);
+
+                // Matching on a label value.
+                await search.fill("backend");
+                await expect(modalRows()).toHaveCount(1);
+                expect(await modalPairs()).toEqual(["tier=backend"]);
+
+                // A query that matches nothing.
+                await search.fill("zzzznope");
+                await expect(modalRows()).toHaveCount(0);
+                await expect(modal().locator("[data-test-id='no-labels-match']")).toBeVisible();
+
+                // Clearing the search restores every label.
+                await search.fill("");
+                await expect(modalRows()).toHaveCount(5);
+            });
+
+            test("pressing Escape dismisses the modal, leaving the pods table", async () => {
+                await page.keyboard.press("Escape");
+                await expect(modal()).toBeHidden();
+                // Escape closed the modal only; it did not navigate away.
+                await expect(page).toHaveURL(/\/pods(\?|$)/);
+                await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+            });
+
+            test("the close button dismisses the modal without navigating to the pod", async () => {
+                const manyRow = page.locator("[data-test-id='pod-row']").filter({ hasText: "many-pod" });
+                await manyRow.locator("[data-test-id='labels-cell-more']").click();
+                await expect(modal()).toBeVisible();
+                await modal().locator("[data-test-id='labels-modal-close']").click();
+                await expect(modal()).toBeHidden();
                 // Still on the pods list, not a pod detail page.
                 await expect(page).toHaveURL(/\/pods(\?|$)/);
                 await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+            });
+
+            test("the same modal opens from the nodes table, so it is shared not pod-specific", async () => {
+                // The Labels cell is shared by every resource table, so the modal it opens
+                // must be the same one everywhere. The nodes table is the table the ticket
+                // leads with, and the one that regressed: it used to hand TanStack a freshly
+                // spread `data` array on every render, which invalidated TanStack's row-model
+                // memo, fired its auto-reset, set table state, and re-rendered — a render loop
+                // that rebuilt the table's DOM continuously (~300 renders/sec). The labels
+                // chip was destroyed and recreated faster than it could be clicked, so the
+                // modal was unreachable here. This drives the real control on the real table,
+                // so a return of that loop fails the suite instead of shipping.
+                const FAKE_NODES_MANY = {
+                    nodes: [
+                        {
+                            name: "many-node",
+                            status: "Ready",
+                            roles: ["worker"],
+                            version: "v1.30.0",
+                            createdAt: new Date().toISOString(),
+                            labels: { app: "many", tier: "backend", env: "prod", region: "eu-west", version: "1.2.3" },
+                            instanceType: "m5.large",
+                        },
+                    ],
+                };
+                await page.route("**/api/cluster/nodes*", async (route) => {
+                    await route.fulfill({ json: FAKE_NODES_MANY });
+                });
+                await page.goto("/nodes", { waitUntil: "networkidle" });
+
+                const nodeRow = page.locator("[data-test-id='node-row']").filter({ hasText: "many-node" });
+                await expect(nodeRow).toBeVisible();
+                // The same truncation control appears on this table too.
+                await expect(nodeRow.locator("[data-test-id='labels-cell-more'] .MuiChip-label")).toHaveText("+2 ...");
+                // Would time out with "element was detached from the DOM" while the loop existed.
+                await nodeRow.locator("[data-test-id='labels-cell-more']").click();
+
+                // The same modal, with the same searchable/sortable table, listing all five
+                // of the node's labels.
+                await expect(modal()).toBeVisible();
+                await expect(modal().locator("[data-test-id='labels-table']")).toBeVisible();
+                // The title names this node, proving the identity is threaded through
+                // every table, not just the pods table.
+                await expect(modal().locator("[data-test-id='labels-modal-title']")).toContainText("Node many-node labels (5)");
+                await expect(modalRows()).toHaveCount(5);
+
+                // The modal must also STAY open. A re-render of the table remounts every cell
+                // subtree, which would silently discard the Labels cell's open state and close
+                // the modal underneath the user.
+                await page.waitForTimeout(1000);
+                await expect(modal()).toBeVisible();
+
+                // Sorting works here exactly as it does from the pods table.
+                await modal().locator("[data-test-id='labels-header-key']").click();
+                await modal().locator("[data-test-id='labels-header-key']").click();
+                expect(await modalPairs()).toEqual([
+                    "version=1.2.3",
+                    "tier=backend",
+                    "region=eu-west",
+                    "env=prod",
+                    "app=many",
+                ]);
+
+                // And so does searching.
+                await modal().locator("[data-test-id='labels-filter'] input").fill("region");
+                await expect(modalRows()).toHaveCount(1);
+                expect(await modalPairs()).toEqual(["region=eu-west"]);
+
+                await page.keyboard.press("Escape");
+                await expect(modal()).toBeHidden();
+                await page.unroute("**/api/cluster/nodes*");
+            });
+
+            test("the same modal opens from another resource table, so it is shared not pod-specific", async () => {
+                // The Labels cell is shared by every resource table, so the modal it
+                // opens must be the same one everywhere. Prove it on a second table
+                // (deployments), with a workload carrying more labels than fit inline.
+                const FAKE_DEPLOYMENTS_MANY = {
+                    deployments: [
+                        {
+                            name: "many-deploy",
+                            namespace: "default",
+                            ready: "1/1",
+                            upToDate: 1,
+                            available: 1,
+                            createdAt: new Date().toISOString(),
+                            labels: { app: "api", tier: "backend", env: "staging", region: "us-east", version: "2.0.1" },
+                        },
+                    ],
+                };
+                await page.route("**/api/deployments*", async (route) => {
+                    await route.fulfill({ json: FAKE_DEPLOYMENTS_MANY });
+                });
+                await page.goto("/deployments", { waitUntil: "networkidle" });
+
+                const deployRow = page.locator("[data-test-id='deployment-row']").filter({ hasText: "many-deploy" });
+                await expect(deployRow).toBeVisible();
+                // The same truncation control appears on this table too.
+                await expect(deployRow.locator("[data-test-id='labels-cell-more'] .MuiChip-label")).toHaveText("+2 ...");
+                await deployRow.locator("[data-test-id='labels-cell-more']").click();
+
+                // The same modal, with the same searchable/sortable table, listing
+                // all five of the deployment's labels.
+                await expect(modal()).toBeVisible();
+                await expect(modal().locator("[data-test-id='labels-table']")).toBeVisible();
+                // The title names this deployment.
+                await expect(modal().locator("[data-test-id='labels-modal-title']")).toContainText("Deployment many-deploy labels (5)");
+                await expect(modalRows()).toHaveCount(5);
+
+                // Sorting works here exactly as it does from the pods table.
+                await modal().locator("[data-test-id='labels-header-key']").click();
+                await modal().locator("[data-test-id='labels-header-key']").click();
+                expect(await modalPairs()).toEqual([
+                    "version=2.0.1",
+                    "tier=backend",
+                    "region=us-east",
+                    "env=staging",
+                    "app=api",
+                ]);
+
+                // And so does searching.
+                await modal().locator("[data-test-id='labels-filter'] input").fill("region");
+                await expect(modalRows()).toHaveCount(1);
+                expect(await modalPairs()).toEqual(["region=us-east"]);
+
+                await page.keyboard.press("Escape");
+                await expect(modal()).toBeHidden();
+                await page.unroute("**/api/deployments*");
             });
         });
     });

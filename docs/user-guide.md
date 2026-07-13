@@ -229,7 +229,7 @@ The table has **CPU** and **Memory** utilisation bar columns (each a percentage 
 
 Type in the search box to filter rows. Use the **Filter** dropdown (filter icon, beside the search box) to filter on any of the table's columns: tick **Status** values to show only pods with those statuses, tick **Health** values to show only **Healthy** or only **Error** pods (matching the stats header), or tick values under a label key. The Deployments, StatefulSets, and DaemonSets pages have the same **Filter** dropdown (Health plus label keys). See [Column filtering](#column-filtering) below.
 
-A Labels column shows each resource's labels as compact `key=value` chips (also present on the Nodes, Deployments, StatefulSets, DaemonSets, and Namespaces tables). The chips participate in the table's search, so typing a label key or value filters the rows.
+A Labels column shows each resource's labels as compact `key=value` chips (also present on the Nodes, Deployments, StatefulSets, DaemonSets, and Namespaces tables). The chips participate in the table's search, so typing a label key or value filters the rows. When a resource carries more labels than fit on one row, only the first three chips are shown and the rest sit behind a `+N ...` chip: click it to open the [labels modal](#labels-modal) with the full set.
 
 The search box matches across every column, not just the name. So you can also find resources by where they live: type a **node** name to keep the pods on that node, or a **namespace** to keep the resources in that namespace. Namespace search works on every namespaced table (pods, deployments, stateful sets, daemon sets, events, errors); node search applies to the pods table.
 
@@ -243,6 +243,18 @@ Every resource table has one shared **Filter** dropdown (filter icon) beside its
 - The editor has a search input at the top that filters the shown options by column name or value text, so you can quickly find a column or value to filter on.
 - "Clear" at the top clears every selection and returns to showing everything.
 - The filter works together with the search box: a row must satisfy the filter and the search.
+
+### Labels modal
+
+A table row has no space for a long label set, so the Labels column shows only the first three `key=value` chips and hides the rest behind a `+N ...` chip. Clicking that chip opens the **labels modal**: every label on that one resource, as a Key / Value table.
+
+- The title names the resource whose labels these are (its kind and name, e.g. `Pod web-1 labels (5)`), so you always know whose labels you are looking at.
+- Click a column header to sort the rows by Key or Value (ascending, then descending).
+- Type in the search box to filter the rows to matching labels; a query that matches nothing shows "No labels match the search."
+- Dismiss the modal with the close button, the **Escape** key, or a click outside it.
+- Opening the modal does not follow the row's link, so you stay on the list.
+
+The same modal is used by every table with a Labels column (Pods, Nodes, Deployments, StatefulSets, DaemonSets, Namespaces, and All Resources), so labels are read the same way wherever you meet them. Its Key / Value table is the same searchable, sortable table the Labels tab shows.
 
 ### Labels tab on detail pages
 

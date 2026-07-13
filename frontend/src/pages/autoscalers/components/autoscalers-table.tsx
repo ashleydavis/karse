@@ -154,7 +154,7 @@ const columns: ColumnDef<HorizontalPodAutoscaler>[] = [
         // matches on both label keys and values.
         accessorFn: (row) => labelsToPairs(row.labels).join(" "),
         header: "Labels",
-        cell: (info) => <LabelsCell labels={info.row.original.labels} />,
+        cell: (info) => <LabelsCell labels={info.row.original.labels} resourceKind="HorizontalPodAutoscaler" resourceName={info.row.original.name} />,
         enableSorting: false,
     },
 ];
