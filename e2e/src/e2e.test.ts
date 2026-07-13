@@ -4247,6 +4247,17 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Logs");
         });
 
+        test("shows the page title exactly once: in the navbar, never as an in-page heading", async () => {
+            // page-header-1: the Logs page used to render its title twice — once as
+            // the navbar breadcrumb, and again as an in-page <h6> heading. The
+            // breadcrumb is the sole title surface now, so the page body must carry
+            // no "Logs" heading. The breadcrumb itself is a Typography body element,
+            // not a heading, so it is not matched here; restoring the in-page h6
+            // would fail this assertion.
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Logs");
+            await expect(page.getByRole("heading", { name: "Logs", exact: true })).toHaveCount(0);
+        });
+
         test("renders namespace selector and a searchable pod picker dropdown", async () => {
             await expect(page.locator("[data-test-id='live-logs-namespace-select']")).toBeVisible();
             await expect(page.locator("[data-test-id='live-logs-pod-picker']")).toBeVisible();
