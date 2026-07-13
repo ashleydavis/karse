@@ -16,6 +16,7 @@ Backed by: `backend/src/kubectl/cache.ts` (the cache store and config), `backend
 - The staleness threshold is configurable in the UI on the Config page (`/config`), persisted server-side, and read on every request. A threshold of `0` disables the cache (every read is treated as stale and re-fetched).
 - The cache directory is `KARSE_CACHE_DIR` (default `../cache`, which resolves to the repo-root `cache/` given the backend's `backend/` cwd). It holds one JSON file per cached query plus a single `config.json` holding the threshold.
 - Clicking the navbar refresh button empties the cache (deletes every cached entry, preserving the threshold) and then re-fetches, so the next request returns fresh `kubectl` data.
+- Refresh re-fetches **every** view, on whatever page it is clicked: it invalidates all client-side queries rather than a named subset, so each page currently on screen (Cluster, Nodes, Pods, Deployments, StatefulSets, DaemonSets, Events, Errors, All resources, the detail pages, and the performance panels) issues its own fresh request. This is a requirement, not an implementation detail: a page added later must be refreshed without anyone remembering to register its query key.
 
 ## API
 
@@ -30,6 +31,7 @@ Backed by: `backend/src/kubectl/cache.ts` (the cache store and config), `backend
 - [x] When cached data is older than the configured threshold, Karse fetches fresh data via `kubectl`; otherwise it serves the cache.
 - [x] The staleness threshold is configurable from a config page in the UI and persisted.
 - [x] The navbar refresh button empties the local cache (then re-fetches).
+- [x] Refresh re-fetches on every page that shows cluster data, not a fixed subset of them.
 - [x] The read-only invariant is preserved: only read output is cached, never a cluster write, and write commands bypass the cache.
 - [x] A failed read is not cached.
 

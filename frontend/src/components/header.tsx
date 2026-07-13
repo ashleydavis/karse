@@ -54,9 +54,16 @@ export function Header() {
         // Empty the on-disk cluster-data cache first so the invalidated queries below
         // re-fetch fresh kubectl data rather than re-reading a still-fresh cache entry.
         await clearCache();
-        await qc.invalidateQueries({ queryKey: ["contexts"] });
-        await qc.invalidateQueries({ queryKey: ["cluster"] });
-        await qc.invalidateQueries({ queryKey: ["namespaces"] });
+        // Invalidate every query, with no key filter. Refresh means "re-read everything on
+        // this page", and only the unfiltered call can honour that: a filtered invalidation
+        // has to name the keys it reaches, and any such list silently misses every page whose
+        // key is not on it (the previous ["contexts"], ["cluster"], ["namespaces"] list reached
+        // 3 of the app's 19 root keys, so Pods, Deployments, Events and the detail pages issued
+        // no request at all). Naming keys here is the defect, so do not reintroduce a list: a
+        // page added tomorrow must be refreshed without touching this file. The one non-cluster
+        // key, ["cache-config"], is swept up too; re-reading the staleness threshold the server
+        // already holds is cheap and harmless, and excluding it would mean naming keys again.
+        await qc.invalidateQueries();
     }
 
     // Copy the current page URL (page, resource, context, and namespace) to the clipboard so it can be shared.

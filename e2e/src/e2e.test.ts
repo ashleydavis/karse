@@ -714,6 +714,40 @@ test.describe("karse e2e", () => {
             const cleared = await clearPromise;
             expect(cleared.status()).toBe(200);
         });
+
+        // Refresh must re-fetch on the resource pages too, not only on the cluster and
+        // nodes views. Each page owns its own query key, so a refresh that only invalidated
+        // a fixed list of keys left these pages issuing no data request at all.
+        test("clicking refresh triggers a new fetch of pods", async () => {
+            setContext(CLUSTER_1);
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']").first()).toBeVisible();
+            const responsePromise = page.waitForResponse(res =>
+                res.url().includes("/api/pods") && res.request().method() === "GET");
+            await page.locator("[aria-label='refresh']").click();
+            const pods = await responsePromise;
+            expect(pods.status()).toBe(200);
+        });
+
+        test("clicking refresh triggers a new fetch of deployments", async () => {
+            setContext(CLUSTER_1);
+            await page.goto("/deployments", { waitUntil: "networkidle" });
+            const responsePromise = page.waitForResponse(res =>
+                res.url().includes("/api/deployments") && res.request().method() === "GET");
+            await page.locator("[aria-label='refresh']").click();
+            const deployments = await responsePromise;
+            expect(deployments.status()).toBe(200);
+        });
+
+        test("clicking refresh triggers a new fetch of events", async () => {
+            setContext(CLUSTER_1);
+            await page.goto("/events", { waitUntil: "networkidle" });
+            const responsePromise = page.waitForResponse(res =>
+                res.url().includes("/api/events") && res.request().method() === "GET");
+            await page.locator("[aria-label='refresh']").click();
+            const events = await responsePromise;
+            expect(events.status()).toBe(200);
+        });
     });
 
     // ── Config page (cluster-data cache) ───────────────────────────────────────

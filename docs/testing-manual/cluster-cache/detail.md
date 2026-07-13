@@ -50,6 +50,16 @@ Then open the frontend at `http://127.0.0.1:5173`. Then run the fixture's `setup
 - Confirm the query JSON files under `cache/` are deleted (only `config.json` remains), and that the current view immediately re-fetches fresh data (a new audit line appears for the visible page's query).
 - Confirm the saved staleness threshold on the Config page is unchanged — refresh empties entries but keeps the configuration.
 
+## Scenario: Refresh re-fetches on every page, not just Cluster and Nodes
+
+Refresh invalidates all client-side queries, so it must re-fetch whatever page you are on. Check it away from the Cluster and Nodes views, which are the ones that always worked.
+
+### What to check
+- With a large threshold set, open the **Pods** page. Open the browser devtools Network tab and clear it.
+- Click the refresh (circular arrows) button in the navbar.
+- Confirm the click issues **both** a `POST /api/cache/clear` **and** a fresh `GET /api/pods` — not the clear on its own. A refetch that returns identical data looks like nothing happened, so watch the request, not the table.
+- Repeat on **Deployments**, **Events**, and a detail page (e.g. a pod's detail view, including its Performance tab), confirming each issues its own `GET /api/…` on the click.
+
 ## Scenario: Read-only cross-check
 
 ### What to check
