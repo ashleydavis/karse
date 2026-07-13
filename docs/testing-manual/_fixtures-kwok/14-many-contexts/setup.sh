@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Puts the repo's bin/ on PATH so kwokctl is the pinned copy from scripts/install-prereqs.sh.
+source "$(dirname "${BASH_SOURCE[0]}")/../../../../scripts/repo-bin.sh"
+
 # Multi-cluster fixture: tear down its own test clusters before building them fresh.
 for i in $(seq 1 5); do
     kwokctl delete cluster --name "karse-test-$i" 2>/dev/null || true

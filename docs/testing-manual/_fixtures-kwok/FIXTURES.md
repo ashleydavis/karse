@@ -14,7 +14,8 @@ To tear down every test cluster at once (after running several fixtures, or to c
 
 ## Prerequisites
 
-- `kwokctl` and `kubectl` on `PATH`.
+- `kwokctl`, installed by `bash scripts/install-prereqs.sh` from the repo root (it goes into the git-ignored `bin/`, and every fixture script puts that on `PATH` itself). Do not install `kwokctl` with mise: see [Installing kwokctl](../../development.md#installing-kwokctl).
+- `kubectl` on `PATH`.
 - Karse running locally: `bun run dev:test` from the repo root (this sets `KARSE_FAKE_LOGS=1` so the log fixtures emit simulated lines against KWOK, which runs no real containers).
 
 `kwokctl` adds the `kwok-karse-test` context to your kubeconfig automatically; select it in Karse.

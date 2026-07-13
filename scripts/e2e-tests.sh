@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Puts the repo's bin/ on PATH so kwokctl is the pinned copy from scripts/install-prereqs.sh.
+source "$(dirname "${BASH_SOURCE[0]}")/repo-bin.sh"
+
 for tool in jq curl kwokctl kubectl bun; do
-    command -v "$tool" >/dev/null 2>&1 || { echo "e2e-tests.sh requires '$tool' on PATH" >&2; exit 1; }
+    command -v "$tool" >/dev/null 2>&1 || { echo "e2e-tests.sh requires '$tool' on PATH (kwokctl: run 'bash scripts/install-prereqs.sh')" >&2; exit 1; }
 done
 
 # Shared kwok helpers: reserve_port / release_ports / create_cluster / retry / apply_manifest.

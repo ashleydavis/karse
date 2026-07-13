@@ -4,6 +4,8 @@ Shell scripts for automated testing.
 
 | Script | Purpose |
 |--------|---------|
+| `install-prereqs.sh` | Installs the pinned `kwokctl` into the repo's git-ignored `bin/` (straight from the kwok GitHub release, verified to be `kwokctl` and not the `kwok` controller binary, which is what mise's registry entry wrongly installs). Idempotent. Run it once per clone; CI runs it too. |
+| `repo-bin.sh` | Sourced one-liner that puts the repo's `bin/` on `PATH`, so every kwok caller uses the pinned `kwokctl` from `install-prereqs.sh`. A ticket worktree (no `bin/` of its own, as `bin/` is git-ignored) falls back to the main checkout's `bin/`. Not run directly. |
 | `smoke-tests.sh` | Spins up a KWOK cluster, starts the backend, and runs a suite of curl-based API checks. Requires `kwokctl`, `kubectl`, `bun`, `curl`, and `jq`. |
 | `e2e-tests.sh` | Runs the Playwright end-to-end test suite against a live stack. |
 | `test-fixture-discipline.sh` | Verifies the single-test-cluster discipline for the KWOK fixtures: re-running a setup does not double resources, an interrupted run does not leak stale resources into the next scenario, and each fixture's teardown removes its one cluster. Run via `bun run fixtures`. Requires `kwokctl` and `kubectl`. |

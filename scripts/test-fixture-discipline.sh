@@ -12,8 +12,11 @@ set -euo pipefail
 # on PATH. It only ever touches its own karse-test* clusters and cleans up after
 # itself (even on failure), so it is safe to run alongside other suites.
 
+# Puts the repo's bin/ on PATH so kwokctl is the pinned copy from scripts/install-prereqs.sh.
+source "$(dirname "${BASH_SOURCE[0]}")/repo-bin.sh"
+
 for tool in kwokctl kubectl; do
-    command -v "$tool" >/dev/null 2>&1 || { echo "test-fixture-discipline.sh requires '$tool' on PATH" >&2; exit 1; }
+    command -v "$tool" >/dev/null 2>&1 || { echo "test-fixture-discipline.sh requires '$tool' on PATH (kwokctl: run 'bash scripts/install-prereqs.sh')" >&2; exit 1; }
 done
 
 FIXTURES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../docs/testing-manual/_fixtures-kwok" && pwd)"

@@ -17,7 +17,10 @@ set -euo pipefail
 # Only ever touches karse-e2e-*, karse-smoke-*, and karse-test* clusters; any other
 # kwok cluster on the host is left alone.
 
-command -v kwokctl >/dev/null 2>&1 || { echo "reap-test-clusters.sh requires 'kwokctl' on PATH" >&2; exit 1; }
+# Puts the repo's bin/ on PATH so kwokctl is the pinned copy from scripts/install-prereqs.sh.
+source "$(dirname "${BASH_SOURCE[0]}")/repo-bin.sh"
+
+command -v kwokctl >/dev/null 2>&1 || { echo "reap-test-clusters.sh requires 'kwokctl' on PATH (run 'bash scripts/install-prereqs.sh')" >&2; exit 1; }
 
 MAX_AGE_MIN="${1:-${KARSE_REAP_AGE_MIN:-60}}"
 CLUSTERS_DIR="${KWOK_WORKDIR:-$HOME/.kwok}/clusters"

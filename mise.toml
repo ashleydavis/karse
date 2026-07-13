@@ -1,5 +1,9 @@
+# kwokctl is deliberately NOT pinned here. mise's registry entry for it
+# (aqua:kubernetes-sigs/kwok/kwokctl) downloads the wrong release asset: it fetches the
+# kwok controller binary and installs it as kwokctl, so every kwokctl command fails with
+# "unknown flag: --name". scripts/install-prereqs.sh installs the pinned kwokctl into the
+# repo's git-ignored bin/ instead, and the test scripts pick it up from there.
 [tools]
 bun = "1.3.14"
 kubectl = "1.36.1"
-kwokctl = "0.7.0"
 node = "22.22.2"

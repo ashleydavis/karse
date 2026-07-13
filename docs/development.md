@@ -7,36 +7,34 @@ This guide covers everything needed to develop, test, and contribute to Karse. F
 - **`bun`** on `PATH`. Install it however you prefer: the [official installer](https://bun.sh), Homebrew, mise, or your system package manager. See [Installing Bun via mise](#installing-bun-via-mise) below.
 - **`kubectl`** on `PATH`, configured against at least one kubeconfig context. The repo's `mise.toml` pins a `kubectl` version, so `mise install` provides it (see [Installing Bun via mise](#installing-bun-via-mise)).
 - **`jq`** and **`curl`** on `PATH` (required by `scripts/smoke-tests.sh`).
-- **`kwokctl`** on `PATH` (required by `scripts/smoke-tests.sh` and `scripts/e2e-tests.sh` to spin up local fake clusters). The repo's `mise.toml` pins a version, so `mise install` provides it (see [Installing Bun via mise](#installing-bun-via-mise)); otherwise see [Installing kwokctl](#installing-kwokctl) below.
+- **`kwokctl`**, required by `scripts/smoke-tests.sh` and `scripts/e2e-tests.sh` to spin up local fake clusters. Install it with [`scripts/install-prereqs.sh`](scripts/install-prereqs.sh); see [Installing kwokctl](#installing-kwokctl) below.
 
 ### Installing Bun via mise
 
-If you use [mise](https://mise.jdx.dev), the repo includes a `mise.toml` that pins `bun`, `kubectl`, and `kwokctl`. After cloning:
+If you use [mise](https://mise.jdx.dev), the repo includes a `mise.toml` that pins `bun` and `kubectl`. After cloning:
 
 ```sh
 mise trust   # approve the mise.toml in this repo
-mise install # install the pinned bun, kubectl, and kwokctl
+mise install # install the pinned bun and kubectl
 ```
 
 `mise trust` is required because mise will not read a `mise.toml` from an untrusted directory. You only need to run it once per clone. After that, `mise install` (or any `bun` invocation in the repo) will use the pinned version automatically.
 
 ### Installing kwokctl
 
-[kwok](https://kwok.sigs.k8s.io) is only needed to run the testing manual's KWOK fixtures under [`docs/testing-manual/_fixtures-kwok/`](docs/testing-manual/_fixtures-kwok/FIXTURES.md) and the smoke/e2e tests; Karse itself does not require it. A kwok release ships two binaries (`kwok` and `kwokctl`); the test scripts only use `kwokctl`. If you use mise, `mise install` at the repo root installs the pinned version from `mise.toml`.
+[kwok](https://kwok.sigs.k8s.io) is only needed to run the testing manual's KWOK fixtures under [`docs/testing-manual/_fixtures-kwok/`](docs/testing-manual/_fixtures-kwok/FIXTURES.md) and the smoke/e2e tests; Karse itself does not require it. A kwok release ships two binaries (`kwok` and `kwokctl`); the test scripts only use `kwokctl`.
 
-Otherwise install `kwokctl` manually (pinned to `v0.7.0`):
+Install it with the prerequisites script, from the repo root:
 
 ```sh
-KWOK_VERSION=v0.7.0
-OS=$(uname | tr '[:upper:]' '[:lower:]')              # linux or darwin
-ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-curl -L -o kwokctl "https://github.com/kubernetes-sigs/kwok/releases/download/${KWOK_VERSION}/kwokctl-${OS}-${ARCH}"
-chmod +x kwokctl
-sudo mv kwokctl /usr/local/bin/kwokctl
-kwokctl --version
+bash scripts/install-prereqs.sh
 ```
 
-On macOS you can instead use Homebrew, which installs both binaries:
+It downloads the pinned `kwokctl` (`v0.7.0`) from the kwok release into the repo's git-ignored `bin/`, verifies it really is `kwokctl`, and leaves an already-correct install alone. Every script that uses kwok (the smoke and e2e runners, the fixtures, the cluster reaper) sources `scripts/repo-bin.sh`, which puts `bin/` on `PATH`, so they all run this one pinned copy without you configuring anything. Ticket worktrees fall back to the main checkout's `bin/`, so kwokctl does not need installing per worktree. CI runs the same script, so CI and local machines run the identical `kwokctl`.
+
+**Do not install `kwokctl` with mise.** mise's registry entry for it (`aqua:kubernetes-sigs/kwok/kwokctl`) downloads the wrong release asset: it fetches the `kwok` controller binary and installs it under the name `kwokctl`. Every `kwokctl` command then fails with a baffling `unknown flag: --name`. To tell the two apart, `kwokctl --version` prints `kwokctl version ...`, while the impostor prints `kwok version ...`. That is why `mise.toml` does not pin it.
+
+On macOS you can instead use Homebrew, which installs both binaries correctly, though the version will not be the pinned one:
 
 ```sh
 brew install kwok

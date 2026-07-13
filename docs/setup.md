@@ -6,9 +6,18 @@ How to get Karse ready to run, test, and develop. Once set up, see [development.
 
 - **`bun`** on `PATH` (the [official installer](https://bun.sh), or `mise install` for the pinned version).
 - **`kubectl`** on `PATH`, configured against at least one kubeconfig context (`mise install` provides the pinned version).
-- **`jq`**, **`curl`**, and **`kwokctl`** on `PATH` for the smoke and e2e tests (`mise install` provides the pinned `kwokctl`; manual install is in [development.md](development.md#installing-kwokctl)).
+- **`jq`** and **`curl`** on `PATH` for the smoke and e2e tests (install with your system package manager).
+- **`kwokctl`**, which [`scripts/install-prereqs.sh`](../scripts/install-prereqs.sh) installs for you (see below). Do not install it with mise: see [Installing kwokctl](development.md#installing-kwokctl).
 
-If you use [mise](https://mise.jdx.dev), `mise trust && mise install` at the repo root installs the pinned `bun`, `kubectl`, and `kwokctl`.
+If you use [mise](https://mise.jdx.dev), `mise trust && mise install` at the repo root installs the pinned `bun` and `kubectl`.
+
+Then install the pinned `kwokctl`:
+
+```sh
+bash scripts/install-prereqs.sh
+```
+
+It downloads the pinned `kwokctl` into the repo's git-ignored `bin/` and checks it is the right binary. Re-running it is safe: an already-correct install is left alone. The smoke, e2e, and fixture scripts put `bin/` on `PATH` themselves, so nothing else needs configuring, and CI runs the same script.
 
 ## Set up the project
 

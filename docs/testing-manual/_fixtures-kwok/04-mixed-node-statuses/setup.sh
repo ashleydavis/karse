@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Puts the repo's bin/ on PATH so kwokctl is the pinned copy from scripts/install-prereqs.sh.
+source "$(dirname "${BASH_SOURCE[0]}")/../../../../scripts/repo-bin.sh"
+
 # kwok manages ALL nodes by default (--manage-all-nodes=true) and keeps every
 # node Ready, which makes a NotReady node impossible to emulate. We start the
 # kwok-controller with --manage-all-nodes=false and a node selector so it only

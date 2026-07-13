@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Puts the repo's bin/ on PATH so kwokctl is the pinned copy from scripts/install-prereqs.sh.
+source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/repo-bin.sh"
+
 # Tear down every karse test cluster, regardless of which scenario created it.
 # Enumerates the clusters kwokctl actually knows about rather than assuming a
 # fixed set of names, so partial or leftover clusters get cleaned up too.

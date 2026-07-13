@@ -28,14 +28,11 @@ jobs:
       - name: Frontend - compile
         run: cd frontend && bun run compile
 
-      - name: Install kwokctl
-        env:
-          KWOK_REPO: kubernetes-sigs/kwok
-        run: |
-          LATEST=$(curl -sSL "https://api.github.com/repos/${KWOK_REPO}/releases/latest" | jq -r '.tag_name')
-          curl -sSLo /usr/local/bin/kwokctl \
-            "https://github.com/${KWOK_REPO}/releases/download/${LATEST}/kwokctl-linux-amd64"
-          chmod +x /usr/local/bin/kwokctl
+      # Installs the pinned kwokctl into the repo's bin/, which the smoke, e2e, and
+      # fixture scripts put on PATH themselves. Same script developers run locally, so
+      # CI and local machines run the identical kwokctl.
+      - name: Install prerequisites (kwokctl)
+        run: bash scripts/install-prereqs.sh
 
       - name: Smoke tests
         run: bash scripts/smoke-tests.sh
