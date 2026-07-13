@@ -5017,6 +5017,149 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Related-resource links in the errors and events tables ──────────────────
+
+    test.describe("errors and events tables link to related resources", () => {
+        // Each fixture carries one reference to a kind that has a detail page (Pod)
+        // and one to a kind that does not (ReplicaSet), so both the linking and the
+        // graceful-degradation paths are covered from the table.
+        const LINK_ERRORS = {
+            errors: [
+                {
+                    source: "Pod",
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "crasher-abc",
+                    reason: "CrashLoopBackOff",
+                    message: "back-off 5m0s restarting failed container",
+                    count: 1,
+                    firstSeen: "2024-01-01T00:00:00Z",
+                    lastSeen: "2024-01-01T00:00:00Z",
+                },
+                {
+                    source: "Event",
+                    namespace: "default",
+                    objectKind: "ReplicaSet",
+                    objectName: "web-7d9",
+                    reason: "FailedCreate",
+                    message: "Error creating: pods \"web-7d9\" is forbidden",
+                    count: 2,
+                    firstSeen: "2024-01-01T00:00:00Z",
+                    lastSeen: "2024-01-01T00:00:00Z",
+                },
+            ],
+        };
+
+        const LINK_EVENTS = {
+            events: [
+                {
+                    uid: "evt-link-pod",
+                    type: "Warning",
+                    reason: "BackOff",
+                    message: "Back-off restarting failed container",
+                    count: 5,
+                    source: "kubelet",
+                    firstSeen: "2024-01-01T00:00:00Z",
+                    lastSeen: "2024-01-01T00:00:00Z",
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "nginx-abc",
+                },
+                {
+                    uid: "evt-link-rs",
+                    type: "Warning",
+                    reason: "FailedCreate",
+                    message: "Error creating: pods \"web-7d9\" is forbidden",
+                    count: 2,
+                    source: "replicaset-controller",
+                    firstSeen: "2024-01-01T00:00:00Z",
+                    lastSeen: "2024-01-01T00:00:00Z",
+                    namespace: "default",
+                    objectKind: "ReplicaSet",
+                    objectName: "web-7d9",
+                },
+            ],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/errors*", async (route) => {
+                await route.fulfill({ json: LINK_ERRORS });
+            });
+            await page.route("**/api/events*", async (route) => {
+                await route.fulfill({ json: LINK_EVENTS });
+            });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/errors*");
+            await page.unroute("**/api/events*");
+            setContext(CLUSTER_1);
+        });
+
+        test("an errors table row links its object to that pod's detail page", async () => {
+            await page.goto("/errors", { waitUntil: "networkidle" });
+            const link = page.locator("[data-test-id='error-row']")
+                .filter({ hasText: "CrashLoopBackOff" })
+                .locator("[data-test-id='error-row-object-link']");
+            await expect(link).toContainText("Pod/crasher-abc");
+            await link.click();
+            await expect(page).toHaveURL(/\/pods\/default\/crasher-abc/);
+        });
+
+        test("the errors table object link wins over the row's own navigation", async () => {
+            // The row itself navigates to the error detail page. Clicking the object
+            // link must navigate to the referenced pod instead, not the error detail.
+            await page.goto("/errors", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='error-row']")
+                .filter({ hasText: "CrashLoopBackOff" })
+                .locator("[data-test-id='error-row-object-link']")
+                .click();
+            await expect(page).toHaveURL(/\/pods\/default\/crasher-abc/);
+            await expect(page.locator("[data-test-id='error-detail']")).toHaveCount(0);
+        });
+
+        test("an errors table object with no detail page renders as plain text", async () => {
+            await page.goto("/errors", { waitUntil: "networkidle" });
+            const ref = page.locator("[data-test-id='error-row']")
+                .filter({ hasText: "FailedCreate" })
+                .locator("[data-test-id='error-row-object-link']");
+            await expect(ref).toContainText("ReplicaSet/web-7d9");
+            await expect(ref).toHaveJSProperty("tagName", "SPAN");
+        });
+
+        test("an events table row links its object to that pod's detail page", async () => {
+            await page.goto("/events", { waitUntil: "networkidle" });
+            const link = page.locator("[data-test-id='event-row']")
+                .filter({ hasText: "BackOff" })
+                .locator("[data-test-id='event-row-object-link']");
+            await expect(link).toContainText("Pod/nginx-abc");
+            await link.click();
+            await expect(page).toHaveURL(/\/pods\/default\/nginx-abc/);
+        });
+
+        test("the events table object link wins over the row's own navigation", async () => {
+            // The row itself navigates to the event detail page. Clicking the object
+            // link must navigate to the referenced pod instead, not the event detail.
+            await page.goto("/events", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='event-row']")
+                .filter({ hasText: "BackOff" })
+                .locator("[data-test-id='event-row-object-link']")
+                .click();
+            await expect(page).toHaveURL(/\/pods\/default\/nginx-abc/);
+            await expect(page.locator("[data-test-id='event-detail']")).toHaveCount(0);
+        });
+
+        test("an events table object with no detail page renders as plain text", async () => {
+            await page.goto("/events", { waitUntil: "networkidle" });
+            const ref = page.locator("[data-test-id='event-row']")
+                .filter({ hasText: "FailedCreate" })
+                .locator("[data-test-id='event-row-object-link']");
+            await expect(ref).toContainText("ReplicaSet/web-7d9");
+            await expect(ref).toHaveJSProperty("tagName", "SPAN");
+        });
+    });
+
     // ── Error detail page ───────────────────────────────────────────────────────
 
     test.describe("error detail page", () => {

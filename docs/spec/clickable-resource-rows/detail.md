@@ -28,6 +28,7 @@ Backed by: the per-page table components under `frontend/src/pages/*/components/
   - Workload detail page: the Namespace links to `/namespaces/:name`; the Node cell of each pod in the Pods sub-tab links to `/nodes/:name`.
   - Node detail page: the Namespace cell of each pod in the Pods sub-tab links to `/namespaces/:name`.
   - Error detail page: the related object links to its detail page; Event detail page: the involved object links to its detail page (see `errors-feed`, `event-detail`).
+  - Errors table and events table: each row's **Object** cell links to the referenced resource's detail page (see `errors-feed`, `events-feed`).
 - `resourcePath` maps `(kind, name, namespace)` to a route: namespaced kinds (Pod, Deployment, StatefulSet, DaemonSet) carry namespace + name; cluster-scoped kinds (Node, Namespace) carry name only.
 - An inline link inside a clickable row (e.g. the Node cell of a pod row) stops click propagation so it navigates to the referenced resource, not the row's own target.
 - A reference that cannot be resolved (empty name, an unsupported kind such as ReplicaSet / Job / Service, or a namespaced kind with no namespace) degrades gracefully to plain text rather than a broken link.
@@ -40,6 +41,7 @@ Backed by: the per-page table components under `frontend/src/pages/*/components/
 - [x] Clickable rows share a consistent hover/cursor affordance.
 - [x] Every inline reference to a resource renders as a link to that resource's detail page via the shared `ResourceRef` / `resourcePath`.
 - [x] The related/involved object on the error and event detail pages links to that object's detail page.
+- [x] The Object cell of each errors-table and events-table row links to the referenced resource's detail page.
 - [x] Inline references on detail pages (a pod's node/namespace, a workload's namespace, a container's pod/namespace) link to the referenced resource.
 - [x] Namespaced references carry namespace + name; cluster-scoped references carry name only; an unresolvable reference degrades to plain text.
 

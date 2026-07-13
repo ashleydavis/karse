@@ -36,6 +36,7 @@ import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
 import { useShareableNavigate } from "../../../lib/nav-state";
 import { tableRowSx } from "../../../lib/table-row-style";
+import { ResourceRef } from "../../../components/resource-ref";
 
 // Every selectable event type, in display order. Drives the type column in the
 // shared filter editor.
@@ -112,7 +113,21 @@ const columns: ColumnDef<ClusterEvent>[] = [
         id: "object",
         header: "Object",
         accessorFn: (row) => `${row.objectKind}/${row.objectName}`,
-        cell: (info) => info.getValue<string>(),
+        // The involved object links through to that resource's own detail page. The
+        // row itself navigates to the event detail page, so the link stops its click
+        // from bubbling up to the row. An involved object that cannot be resolved to
+        // a detail page (a kind Karse has no page for) degrades to plain text.
+        cell: ({ row, getValue }) => (
+            <span onClick={(e) => e.stopPropagation()}>
+                <ResourceRef
+                    kind={row.original.objectKind}
+                    name={row.original.objectName}
+                    namespace={row.original.namespace}
+                    label={getValue<string>()}
+                    testId="event-row-object-link"
+                />
+            </span>
+        ),
     },
     { accessorKey: "message", header: "Message" },
     { accessorKey: "count", header: "Count" },

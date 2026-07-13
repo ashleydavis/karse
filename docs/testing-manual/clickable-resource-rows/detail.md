@@ -75,7 +75,8 @@ Every inline mention of a concrete resource (in a detail field or a single table
 - Workload detail page (any deployment / stateful set / daemon set, e.g. `/deployments/:namespace/:name`), Status tab: the **Namespace** value links to that namespace. On the **Pods** sub-tab, each pod's **Node** cell is a link that navigates to that node's detail page; clicking the node link does NOT open the pod (the cell link wins over the row click).
 - Node detail page (`/nodes/<node>`), Pods sub-tab: each pod's **Namespace** cell is a link that navigates to that namespace; clicking it does NOT open the pod.
 - Error detail page (open an error from `/errors`): the **Object** field links to the related resource's detail page when it has one. Event detail page (open an event from `/events`): the **Object** field links to the involved resource's detail page.
-- Graceful degradation: an object whose kind has no detail page (e.g. a ReplicaSet on an error/event detail page) shows as plain text, with no link and no navigation on click.
+- Errors table (`/errors`) and events table (`/events`): each row's **Object** cell is a link. Click it and confirm it navigates to that resource's own detail page (e.g. `Pod/nginx-abc` opens `/pods/default/nginx-abc`), NOT to the error/event detail page the row itself opens (the cell link wins over the row click). Clicking anywhere else on the row still opens the error/event detail page.
+- Graceful degradation: an object whose kind has no detail page (e.g. a ReplicaSet) shows as plain text, with no link and no navigation on click — on the errors/events tables and on the error/event detail pages alike.
 
 ### Light and dark mode
 Toggle the colour-mode control in the top bar and confirm every inline reference above still reads as a link (it uses the theme's link colour) in both light and dark mode.
