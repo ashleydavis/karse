@@ -46,7 +46,7 @@ export function PodPerformanceTab({ namespace, name, active }: PodPerformanceTab
     return (
         <Box data-test-id="perf-pod" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                Performance
+                Resource utilization
             </Typography>
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 CPU and memory: what this pod requests, its limit, and how much it is using now.

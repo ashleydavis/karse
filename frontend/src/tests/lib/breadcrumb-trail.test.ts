@@ -89,7 +89,7 @@ describe("breadcrumb constants", () => {
 
 describe("tabLabel", () => {
     test("resolves the active pod tab to its label", () => {
-        expect(tabLabel(POD_TAB_LABELS, "performance")).toBe("Performance");
+        expect(tabLabel(POD_TAB_LABELS, "performance")).toBe("Resource utilization");
         expect(tabLabel(POD_TAB_LABELS, "containers")).toBe("Containers");
         expect(tabLabel(POD_TAB_LABELS, "init-containers")).toBe("Init Containers");
         expect(tabLabel(POD_TAB_LABELS, "labels")).toBe("Labels");
@@ -104,9 +104,10 @@ describe("tabLabel", () => {
         expect(tabLabel(POD_TAB_LABELS, "does-not-exist")).toBe("Status");
     });
 
-    test("does not read 'Status' for the Performance tab (regression: hard-coded Status)", () => {
+    test("does not read 'Status' for the Resource utilization tab (regression: hard-coded Status)", () => {
         // The pod breadcrumb used to show "Status" for every non-stub tab because
-        // its label map omitted them; the Performance tab must read "Performance".
+        // its label map omitted them; the Resource utilization tab (value "performance")
+        // must read "Resource utilization".
         expect(tabLabel(POD_TAB_LABELS, "performance")).not.toBe("Status");
     });
 

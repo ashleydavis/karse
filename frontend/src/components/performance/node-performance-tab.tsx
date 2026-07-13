@@ -69,7 +69,7 @@ export function NodePerformanceTab({ nodeName, active }: NodePerformanceTabProps
     return (
         <Box data-test-id="perf-node" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                Performance
+                Resource utilization
             </Typography>
 
             {!data.metricsAvailable && <MetricsUnavailable />}

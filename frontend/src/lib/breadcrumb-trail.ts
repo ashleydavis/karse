@@ -62,7 +62,7 @@ export const POD_TAB_LABELS: Record<string, string> = {
     containers: "Containers",
     "init-containers": "Init Containers",
     labels: "Labels",
-    performance: "Performance",
+    performance: "Resource utilization",
     logs: "Logs",
     commands: "Commands",
     yaml: "YAML",

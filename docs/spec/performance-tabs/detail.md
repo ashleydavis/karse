@@ -3,8 +3,11 @@
 **Spec:** Draft
 **Implementation:** Complete
 
-The Performance feature adds a per-scope "Performance" tab to the cluster, node, and pod
-pages, showing point-in-time CPU and memory usage in context. This document describes the
+The Performance feature adds a per-scope tab to the cluster, node, and pod
+pages, showing point-in-time CPU and memory usage in context. The visible tab label (and
+the in-tab heading) reads **"Resource utilization"** across all three scopes — renamed from
+"Performance" by performance-tabs-9; the internal feature name, routes, and `tab=performance`
+query value are unchanged. This document describes the
 data sources, scope, degradation behaviour, per-scope tab contents, and the test mode. The
 implementation is **Complete**: the cluster Performance tab (a node treemap), the node
 Performance tab (a single Breakdown treemap of each pod's share of the node), and the

@@ -184,7 +184,7 @@ export function PodDetailPage() {
                         />
                     )}
                     <Tab label="Labels" value="labels" data-test-id="pod-tab-labels" />
-                    <Tab label="Performance" value="performance" data-test-id="pod-tab-performance" />
+                    <Tab label="Resource utilization" value="performance" data-test-id="pod-tab-performance" />
                     <Tab label="Logs" value="logs" data-test-id="pod-tab-logs" />
                     <Tab label="Commands" value="commands" data-test-id="pod-tab-commands" />
                     <Tab label="YAML" value="yaml" data-test-id="pod-tab-yaml" />

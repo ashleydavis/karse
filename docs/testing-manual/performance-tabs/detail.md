@@ -1,5 +1,7 @@
 # performance-tabs manual tests
 
+Across the cluster, node, and pod pages the tab is labelled **Resource utilization** (renamed from "Performance" by performance-tabs-9; the internal feature name stays `performance-tabs`). The in-tab heading reads the same. This doc still refers to the feature as the Performance tabs.
+
 Manual tests for the Performance tabs. The cluster home page is tabbed (Overview + Resource utilization) and its **Resource utilization tab is populated** with a treemap of the cluster's **nodes** — one box per node, sized by usage and labelled with each node's share of the cluster total (the Hot spots heatmap and Top consumers table were removed by cluster-performance-1). The node and pod detail pages each have a **populated** Performance tab too: the node tab is a single **Breakdown** treemap of each pod's share of the node (the Provisioning subtab and the standalone Breakdown subtab were removed by node-performance-1), and the pod tab (the leaf) is a **CPU and Memory resource panel** (Requested / Limit / Usage-now tiles plus a combined usage-vs-request-vs-limit bar per resource, with a Percentage / Absolute toggle, added by resource-utilization-11; no Share of node subsection — that lives on the pod Status tab — no treemap, no Provisioning, no disk/network). The feature is complete.
 
 To see the populated cluster Performance tab against a kwok cluster (which has no metrics-server), start the app with the fake-metrics mode on: `KARSE_FAKE_METRICS=1 bun run dev`. See the [Cluster Performance tab](#cluster-performance-tab-populated) scenario below.
@@ -29,15 +31,15 @@ Then open the frontend at `http://127.0.0.1:5173`. The scenario fixture stands u
 
 ### Node detail Performance tab
 - Navigate to `/nodes` and click the `fake-node-1` row to open `/nodes/fake-node-1`.
-- The tab bar now includes a "Performance" tab (between "Labels" and "Commands").
+- The tab bar now includes a "Resource utilization" tab (between "Labels" and "Commands").
 - The other tabs (Status, Pods, Events, Labels, Commands, YAML) still render and behave as before.
-- Click the "Performance" tab. The Status cards are not visible on this tab. The node tab is now **populated** with a single **Breakdown** treemap of each pod's share of the node (no subtabs); see the [Node Performance tab (populated)](#node-performance-tab-populated) scenario below.
+- Click the "Resource utilization" tab. The Status cards are not visible on this tab. The node tab is now **populated** with a single **Breakdown** treemap of each pod's share of the node (no subtabs); see the [Node Performance tab (populated)](#node-performance-tab-populated) scenario below.
 
 ### Pod detail Performance tab
 - Navigate to `/pods` and click the `web` pod row to open its detail page.
-- The tab bar now includes a "Performance" tab (between "Labels" and "Logs").
+- The tab bar now includes a "Resource utilization" tab (between "Labels" and "Logs").
 - The other tabs (Status, Containers, Labels, Logs, Commands, YAML) still render and behave as before.
-- Click the "Performance" tab. The pod tab is now **populated** (a CPU and Memory resource panel with a Percentage / Absolute toggle, no share-of-node subsection, no treemap); see the [Pod Performance tab (populated)](#pod-performance-tab-populated) scenario below. The selected tab is reflected in the URL (`?tab=performance`), so reloading the page keeps the Performance tab open.
+- Click the "Resource utilization" tab. The pod tab is now **populated** (a CPU and Memory resource panel with a Percentage / Absolute toggle, no share-of-node subsection, no treemap); see the [Pod Performance tab (populated)](#pod-performance-tab-populated) scenario below. The selected tab is reflected in the URL (`?tab=performance`), so reloading the page keeps the Performance tab open.
 
 ## Scenario: Cluster Performance tab (populated) {#cluster-performance-tab-populated}
 
@@ -66,7 +68,7 @@ kubectl wait --for=condition=Ready node/node-cp node/node-worker --timeout=60s
 KARSE_FAKE_METRICS=1 bun run dev
 ```
 
-Open `/cluster`, click the **Performance** tab.
+Open `/cluster`, click the **Resource utilization** tab.
 
 - A **CPU / Memory** toggle shows at the top, with **CPU** selected by default.
 - **Node treemap**: one box per cluster node (e.g. `node-cp`, `node-worker`), sized by that node's usage for the selected metric and coloured green/amber/red by utilisation. Each box is labelled with the node name **and its share of the cluster total**, e.g. `node-cp 35%`. There are **no pod boxes** — the treemap shows nodes, not pods.
@@ -102,7 +104,7 @@ kubectl run cache  -n infra --image=nginx --overrides='{"spec":{"nodeName":"<nod
 KARSE_FAKE_METRICS=1 bun run dev
 ```
 
-Open `/nodes`, click the `<node>` row, then click the **Performance** tab.
+Open `/nodes`, click the `<node>` row, then click the **Resource utilization** tab.
 
 - **Utilization cards** show above the treemap: two cards, **CPU** and **Memory**, each with a value, a bar, and a sublabel, showing the node's consumption against its allocatable. Above the cards are their own **View** (Usage | Requests) and **Value format** (% | Absolute) toggles. Click **Requests**: the card values switch to the node's requests ÷ allocatable. Click **Absolute**: the values switch to a "used / total" string (e.g. `1.6 / 4 vCPU`). These card toggles are **independent** of the treemap's CPU / Memory metric toggle below — changing one does not change the other.
 - The treemap section below carries its own **CPU / Memory** toggle, with **CPU** selected by default.
@@ -147,9 +149,9 @@ kubectl run web -n default --image=nginx --overrides='{"spec":{"nodeName":"node-
 KARSE_FAKE_METRICS=1 bun run dev
 ```
 
-Open `/pods`, click the `web` row, then click the **Performance** tab.
+Open `/pods`, click the `web` row, then click the **Resource utilization** tab.
 
-- The view leads with "Performance" and the line "CPU and memory: what this pod requests, its limit, and how much it is using now."
+- The view leads with "Resource utilization" and the line "CPU and memory: what this pod requests, its limit, and how much it is using now."
 - A **resource panel** (PodResourcePanel, resource-utilization-11) with two sections, **CPU** and **Memory**. Each section shows three tiles — **Requested**, **Limit**, **Usage now** — over a **combined bar** that fills to the live usage and carries thin vertical markers for the request and limit on the same per-resource scale, with a Usage / Request / Limit legend. In the default **Absolute** format the tiles use the metric's own formatter (CPU in `m`/cores, memory in binary units). For `web`: usage ~120m CPU / ~320Mi memory; requests and limits are whatever the pod spec declares.
 - A **Percentage / Absolute** toggle sits at the top of the panel. Click **Percentage**: every tile re-reads as a percentage of the pod's own request for that resource — the **Requested** tile becomes `100%`, the **Limit** tile the limit ÷ request (e.g. `467%` for a 700m limit on a 150m request), and **Usage now** the usage ÷ request (e.g. `80%` for 120m on 150m). Click **Absolute** to restore the raw figures. The bar itself does not change.
 - There is **no Share of node** subsection, **no treemap**, **no Provisioning section** (no per-container Usage/Request/Limit bars), and **no Disk or Network rows**.

@@ -368,7 +368,7 @@ export function NodeDetailPage() {
                     <Tab label="Pods" value="pods" data-test-id="node-tab-pods" />
                     <Tab label="Events" value="events" data-test-id="node-tab-events" />
                     <Tab label="Labels" value="labels" data-test-id="node-tab-labels" />
-                    <Tab label="Performance" value="performance" data-test-id="node-tab-performance" />
+                    <Tab label="Resource utilization" value="performance" data-test-id="node-tab-performance" />
                     <Tab label="Commands" value="commands" data-test-id="node-tab-commands" />
                     <Tab label="YAML" value="yaml" data-test-id="node-tab-yaml" />
                 </Tabs>

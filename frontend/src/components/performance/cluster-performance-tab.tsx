@@ -62,7 +62,7 @@ export function ClusterPerformanceTab({ active }: ClusterPerformanceTabProps) {
         <Box data-test-id="perf-cluster" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    Performance
+                    Resource utilization
                 </Typography>
                 <Box sx={{ flexGrow: 1 }} />
                 <MetricToggle value={metric} onChange={setMetric} />

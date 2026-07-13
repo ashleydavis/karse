@@ -3040,11 +3040,14 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='cluster-panel-overview']")).toHaveCount(0);
         });
 
-        test("node detail shows a Performance tab that mounts the Performance panel when selected", async () => {
+        test("node detail shows a Resource utilization tab that mounts the Performance panel when selected", async () => {
             await page.goto("/nodes/node-cp", { waitUntil: "networkidle" });
-            // Existing tabs still render alongside the Performance tab.
+            // Existing tabs still render alongside the Resource utilization tab.
             await expect(page.locator("[data-test-id='node-tab-detail']")).toBeVisible();
             await expect(page.locator("[data-test-id='node-tab-performance']")).toBeVisible();
+            // The tab is labelled "Resource utilization" (performance-tabs-9); the "performance"
+            // tab value / test-id is unchanged so existing shareable links still work.
+            await expect(page.locator("[data-test-id='node-tab-performance']")).toHaveText("Resource utilization");
             await expect(page.locator("[data-test-id='node-panel-performance']")).toHaveCount(0);
             await page.locator("[data-test-id='node-tab-performance']").click();
             await expect(page.locator("[data-test-id='node-panel-performance']")).toBeVisible();
@@ -3053,11 +3056,14 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='perf-node-stub']")).toHaveCount(0);
         });
 
-        test("pod detail shows a Performance tab that mounts the Performance panel when selected", async () => {
+        test("pod detail shows a Resource utilization tab that mounts the Performance panel when selected", async () => {
             await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
-            // Existing tabs still render alongside the new Performance tab.
+            // Existing tabs still render alongside the Resource utilization tab.
             await expect(page.locator("[data-test-id='pod-tab-detail']")).toBeVisible();
             await expect(page.locator("[data-test-id='pod-tab-performance']")).toBeVisible();
+            // The tab is labelled "Resource utilization" (performance-tabs-9); the "performance"
+            // tab value / test-id is unchanged so existing shareable links still work.
+            await expect(page.locator("[data-test-id='pod-tab-performance']")).toHaveText("Resource utilization");
             await expect(page.locator("[data-test-id='pod-panel-performance']")).toHaveCount(0);
             await page.locator("[data-test-id='pod-tab-performance']").click();
             await expect(page.locator("[data-test-id='pod-panel-performance']")).toBeVisible();
@@ -4116,15 +4122,15 @@ test.describe("karse e2e", () => {
             expect(items).toEqual(["Pods", "default", "nginx-abc", "Logs"]);
         });
 
-        test("the sub-tab breadcrumb reads Performance on the pod Performance tab", async () => {
+        test("the sub-tab breadcrumb reads Resource utilization on the pod Resource utilization tab", async () => {
             await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='pod-tab-performance']").click();
             await expect(page).toHaveURL(/tab=performance/);
             // Regression: this leaf crumb used to read "Status" for every tab the
-            // breadcrumb label map omitted (including Performance).
-            await expect(page.locator("[data-test-id='breadcrumb-item']").last()).toHaveText("Performance");
+            // breadcrumb label map omitted (including the Resource utilization tab).
+            await expect(page.locator("[data-test-id='breadcrumb-item']").last()).toHaveText("Resource utilization");
             const items = await page.locator("[data-test-id='breadcrumb-item']").allTextContents();
-            expect(items).toEqual(["Pods", "default", "nginx-abc", "Performance"]);
+            expect(items).toEqual(["Pods", "default", "nginx-abc", "Resource utilization"]);
         });
 
         test("clicking the Pods breadcrumb navigates back to the pods list", async () => {
