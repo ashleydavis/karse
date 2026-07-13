@@ -299,6 +299,38 @@ curl -fsS 'http://127.0.0.1:5172/api/pods?context=my-ctx&namespace=default'
 }
 ```
 
+## GET /api/horizontalpodautoscalers
+
+Lists the horizontal pod autoscalers (HPAs) for the given context, optionally scoped to a namespace. Read by the Autoscalers page and the All resources page.
+
+- **Request query**: `context` (required), `namespace` (optional — omit or leave blank for all namespaces).
+- **Response 200**: `HorizontalPodAutoscalersResponse` — `{ "horizontalPodAutoscalers": HorizontalPodAutoscaler[] }`. `reference` is the scale target (`<Kind>/<name>`), `currentReplicas` the target's current scale and `desiredReplicas` the scale the HPA is driving it towards (they differ while a scale is in flight), and `targets` the metric summary kubectl prints in its TARGETS column (`<none>` when the HPA has no metrics; `<unknown>` for the current side when the cluster has not reported the metric yet).
+- **Response 400**: `{ "error": "context query parameter is required" }` when `context` is missing or blank.
+- **Response 500**: `{ "error": "<kubectl stderr>" }` when listing HPAs fails.
+
+```sh
+curl -fsS 'http://127.0.0.1:5172/api/horizontalpodautoscalers?context=my-ctx&namespace=default'
+```
+
+```json
+{
+  "horizontalPodAutoscalers": [
+    {
+      "name": "web",
+      "namespace": "default",
+      "reference": "Deployment/web",
+      "minReplicas": 2,
+      "maxReplicas": 10,
+      "currentReplicas": 4,
+      "desiredReplicas": 6,
+      "targets": "cpu: 55%/80%",
+      "createdAt": "2024-06-01T00:00:00Z",
+      "labels": { "app": "web" }
+    }
+  ]
+}
+```
+
 ## GET /api/nodes/:name/performance
 
 Returns a point-in-time performance snapshot scoped to a single node: the node's CPU/memory usage joined with its allocatable capacity, plus the pods scheduled on it with per-container usage. Backs the node Performance tab.

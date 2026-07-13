@@ -22,6 +22,7 @@ The spec is reverse-engineered from the shipped code and the prose docs (`docs/a
 | [deployments-view](./deployments-view/index.md) | Settled | Complete | Read-only deployments table. |
 | [statefulsets-view](./statefulsets-view/index.md) | Settled | Complete | Read-only stateful sets table. |
 | [daemonsets-view](./daemonsets-view/index.md) | Settled | Complete | Read-only daemon sets table. |
+| [autoscalers-view](./autoscalers-view/index.md) | Settled | Complete | Read-only autoscalers (HPA) table with metric-vs-target and replica bars. |
 | [workload-detail](./workload-detail/index.md) | Settled | Complete | Shared detail page for a deployment, stateful set, or daemon set. |
 | [clickable-resource-rows](./clickable-resource-rows/index.md) | Settled | Complete | Every resource table row links to that resource's detail page. |
 | [log-viewer](./log-viewer/index.md) | Settled | Complete | Read-only pod/container log viewer with container + tail selectors and a live follow. |

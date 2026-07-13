@@ -318,10 +318,11 @@ curl -fsS "$BASE/api/daemonsets?context=$CURRENT_CTX" \
 echo "OK"
 
 echo "--- GET /api/horizontalpodautoscalers ---"
-# The fixture defines one HPA (smoke-hpa); each item must carry the list fields
-# the All resources page reads (reference, min/max/current replicas, targets).
+# The fixture defines one HPA (smoke-hpa); each item must carry the list fields the
+# Autoscalers page and the All resources page read (reference, min/max/current/desired
+# replicas, targets).
 curl -fsS "$BASE/api/horizontalpodautoscalers?context=$CURRENT_CTX" \
-    | jq -e 'has("horizontalPodAutoscalers") and (.horizontalPodAutoscalers | all(has("name") and has("namespace") and has("reference") and has("minReplicas") and has("maxReplicas") and has("currentReplicas") and has("targets")))' \
+    | jq -e 'has("horizontalPodAutoscalers") and (.horizontalPodAutoscalers | all(has("name") and has("namespace") and has("reference") and has("minReplicas") and has("maxReplicas") and has("currentReplicas") and has("desiredReplicas") and has("targets")))' \
     > /dev/null
 echo "OK"
 

@@ -47,6 +47,7 @@ Karse currently ships the cluster home page, namespace scoping, the core workloa
 - **Events feed**: a recent cluster events view, sorted newest-first.
 - **Resource search**: in-table search and column sorting across the resource tables.
 - **All resources page**: a single "All resources" page (`/all-resources`) listing every resource across all kinds (pods, nodes, namespaces, deployments, stateful sets, daemon sets) in one combined, searchable, sortable, filterable table, with a Kind filter and clickable rows. See `docs/spec/all-resources/detail.md`.
+- **Autoscalers view**: an Autoscalers page (`/autoscalers`) listing the cluster's HPAs with their scale target, their current metric against its target, and their current/desired replicas against their min/max bounds, as sortable performance bars. See `docs/spec/autoscalers-view/detail.md`.
 - **Light/dark theming**: a color-mode setting (light, dark, or system) applied across the app.
 
 ## New items

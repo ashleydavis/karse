@@ -36,6 +36,7 @@ Single-test-cluster discipline (per `readme.md`): there is only ever ONE test cl
 | [deployments-view](./deployments-view/index.md) | Read-only deployments table. |
 | [statefulsets-view](./statefulsets-view/index.md) | Read-only stateful sets table. |
 | [daemonsets-view](./daemonsets-view/index.md) | Read-only daemon sets table. |
+| [autoscalers-view](./autoscalers-view/index.md) | Read-only autoscalers (HPA) table: performance bars, reference link. |
 | [workload-detail](./workload-detail/index.md) | Deployment / stateful set / daemon set detail pages. |
 | [clickable-resource-rows](./clickable-resource-rows/index.md) | Rows link to detail pages; consistent row hover. |
 | [log-viewer](./log-viewer/index.md) | Pod/container log viewer and live follow. |

@@ -1782,6 +1782,7 @@ describe("listHorizontalPodAutoscalers", () => {
         },
         status: {
             currentReplicas: 4,
+            desiredReplicas: 6,
             currentMetrics: [
                 { type: "Resource", resource: { name: "cpu", current: { averageUtilization: 55 } } },
             ],
@@ -1802,6 +1803,7 @@ describe("listHorizontalPodAutoscalers", () => {
                 minReplicas: 2,
                 maxReplicas: 10,
                 currentReplicas: 4,
+                desiredReplicas: 6,
                 targets: "cpu: 55%/80%",
                 createdAt: "2024-06-01T00:00:00Z",
                 labels: { app: "web" },
@@ -1837,6 +1839,7 @@ describe("listHorizontalPodAutoscalers", () => {
             minReplicas: 1,
             maxReplicas: 5,
             currentReplicas: 1,
+            desiredReplicas: 0,
             targets: "<none>",
             createdAt: "2024-06-01T00:00:00Z",
             labels: {},

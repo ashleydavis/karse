@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Box, Typography, List, ListItemButton, ListItemIcon, ListItemText, Divider, Tooltip, IconButton } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
-import { faLink, faDharmachakra, faServer, faLayerGroup, faCube, faCubes, faDatabase, faSitemap, faBell, faStream, faCircleExclamation, faList, faGear, faChevronLeft, faChevronRight, faCircleInfo } from "@fortawesome/free-solid-svg-icons";
+import { faLink, faDharmachakra, faServer, faLayerGroup, faCube, faCubes, faDatabase, faSitemap, faBell, faStream, faCircleExclamation, faList, faGear, faChevronLeft, faChevronRight, faCircleInfo, faGaugeHigh } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useShareableTo } from "../lib/nav-state";
 import { FROM_ALL_RESOURCES } from "../lib/breadcrumb-trail";
@@ -19,6 +19,7 @@ const NAV_ITEMS = [
     { to: "/deployments",  icon: faCubes,         label: "Deployments"  },
     { to: "/statefulsets", icon: faDatabase,      label: "StatefulSets" },
     { to: "/daemonsets",   icon: faSitemap,       label: "DaemonSets"   },
+    { to: "/autoscalers",  icon: faGaugeHigh,     label: "Autoscalers"  },
     { to: "/events",       icon: faBell,          label: "Events"       },
     { to: "/logs",         icon: faStream,        label: "Logs"         },
     { to: "/config",       icon: faGear,          label: "Config"       },

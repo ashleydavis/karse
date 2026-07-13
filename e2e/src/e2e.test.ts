@@ -1828,6 +1828,137 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Autoscalers page ──────────────────────────────────────────────────────
+
+    test.describe("autoscalers page", () => {
+        // Two HPAs on the same fixture: one mid scale-up with headroom, one maxed out.
+        const FAKE_AUTOSCALERS = {
+            horizontalPodAutoscalers: [
+                {
+                    name: "nginx",
+                    namespace: "default",
+                    reference: "Deployment/nginx",
+                    minReplicas: 2,
+                    maxReplicas: 10,
+                    currentReplicas: 4,
+                    desiredReplicas: 6,
+                    targets: "cpu: 40%/80%",
+                    createdAt: new Date().toISOString(),
+                    labels: { app: "nginx" },
+                },
+                {
+                    name: "api",
+                    namespace: "default",
+                    reference: "Deployment/api",
+                    minReplicas: 1,
+                    maxReplicas: 5,
+                    currentReplicas: 5,
+                    desiredReplicas: 5,
+                    targets: "cpu: 92%/80%",
+                    createdAt: new Date().toISOString(),
+                    labels: {},
+                },
+            ],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/horizontalpodautoscalers*", async (route) => {
+                await route.fulfill({ json: FAKE_AUTOSCALERS });
+            });
+            await page.goto("/autoscalers", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='autoscalers-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/horizontalpodautoscalers*");
+        });
+
+        test("is reachable from the sidebar nav", async () => {
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='sidebar-nav'] [aria-label='autoscalers']").click();
+            await expect(page.locator("[data-test-id='autoscalers-table']")).toBeVisible();
+            await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("Autoscalers");
+        });
+
+        test("has column headers Name, Namespace, Reference, Targets, Replicas, Min, Max, Age", async () => {
+            const table = page.locator("[data-test-id='autoscalers-table']");
+            for (const col of ["Name", "Namespace", "Reference", "Targets", "Replicas", "Min", "Max", "Age"]) {
+                await expect(table.getByRole("columnheader", { name: col, exact: true })).toBeVisible();
+            }
+        });
+
+        test("shows a row per autoscaler with its scale target reference", async () => {
+            await expect(page.locator("[data-test-id='autoscaler-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='autoscaler-reference']").first()).toHaveText("Deployment/nginx");
+        });
+
+        test("shows the current and target metric for each autoscaler", async () => {
+            const values = page.locator("[data-test-id='autoscaler-targets-value']");
+            await expect(values.nth(0)).toHaveText("cpu 40%/80%");
+            await expect(values.nth(1)).toHaveText("cpu 92%/80%");
+        });
+
+        test("grades the metric bar against the target (under target ok, over target critical)", async () => {
+            const bars = page.locator("[data-test-id='autoscaler-targets']");
+            // 40% of an 80% target is half way to it; 92% of 80% is over it.
+            await expect(bars.nth(0)).toHaveAttribute("data-level", "ok");
+            await expect(bars.nth(1)).toHaveAttribute("data-level", "critical");
+        });
+
+        test("shows current over desired replicas, and flags the maxed-out autoscaler", async () => {
+            const values = page.locator("[data-test-id='autoscaler-replicas-value']");
+            await expect(values.nth(0)).toHaveText("4/6");
+            await expect(values.nth(1)).toHaveText("5/5");
+            const bars = page.locator("[data-test-id='autoscaler-replicas']");
+            // nginx is mid scale-up (4 of a 10 max); api sits on its max of 5.
+            await expect(bars.nth(0)).toHaveAttribute("data-level", "warn");
+            await expect(bars.nth(1)).toHaveAttribute("data-level", "critical");
+        });
+
+        test("shows each autoscaler's replica bounds", async () => {
+            const firstRow = page.locator("[data-test-id='autoscaler-row']").first();
+            await expect(firstRow.locator("td").nth(5)).toHaveText("2");
+            await expect(firstRow.locator("td").nth(6)).toHaveText("10");
+        });
+
+        test("the reference links to the scale target's detail page", async () => {
+            await page.locator("[data-test-id='autoscaler-reference']").first().click();
+            await expect(page).toHaveURL(/\/deployments\/default\/nginx/);
+            await page.goto("/autoscalers", { waitUntil: "networkidle" });
+        });
+
+        test("search filters autoscaler rows by the typed term", async () => {
+            await page.locator("[data-test-id='autoscalers-search'] input").fill("nginx");
+            await expect(page.locator("[data-test-id='autoscaler-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='autoscaler-row'] td:first-child")).toHaveText("nginx");
+            await page.locator("[data-test-id='autoscalers-search'] input").fill("nothing-matches-this");
+            await expect(page.locator("[data-test-id='autoscaler-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-autoscalers-match']")).toBeVisible();
+            await page.locator("[data-test-id='autoscalers-search'] input").fill("");
+            await expect(page.locator("[data-test-id='autoscaler-row']")).toHaveCount(2);
+        });
+    });
+
+    test.describe("autoscalers page empty state", () => {
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/horizontalpodautoscalers*", async (route) => {
+                await route.fulfill({ json: { horizontalPodAutoscalers: [] } });
+            });
+            await page.goto("/autoscalers", { waitUntil: "networkidle" });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/horizontalpodautoscalers*");
+        });
+
+        test("shows the empty state when the cluster has no autoscalers", async () => {
+            await expect(page.locator("[data-test-id='no-autoscalers-empty']")).toBeVisible();
+            await expect(page.locator("[data-test-id='autoscaler-row']")).toHaveCount(0);
+        });
+    });
+
     test.describe("workload Pods sub-tab empty state", () => {
         const FAKE_DEPLOYMENT_NO_PODS = {
             kind: "deployments",

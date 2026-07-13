@@ -79,6 +79,7 @@ function makeHpa(name: string, targets = "cpu: 40%/80%"): HorizontalPodAutoscale
         minReplicas: 1,
         maxReplicas: 10,
         currentReplicas: 3,
+        desiredReplicas: 3,
         targets,
         createdAt: "2024-06-01T00:00:00Z",
         labels: { app: name },

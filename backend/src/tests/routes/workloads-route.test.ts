@@ -153,6 +153,7 @@ const FAKE_HPA = {
     minReplicas: 1,
     maxReplicas: 10,
     currentReplicas: 3,
+    desiredReplicas: 4,
     targets: "cpu: 40%/80%",
     createdAt: "2024-06-01T00:00:00Z",
     labels: {},

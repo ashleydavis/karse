@@ -123,9 +123,10 @@ export type DaemonSetsResponse = {
 
 // A single Kubernetes horizontal pod autoscaler (HPA) in the active cluster.
 // reference is the scale target it manages, e.g. "Deployment/web". minReplicas,
-// maxReplicas, and currentReplicas summarise its scaling bounds and current scale;
-// targets is the metric summary kubectl shows (e.g. "cpu: 40%/80%"), or "<none>"
-// when no metric status is available yet.
+// maxReplicas, currentReplicas, and desiredReplicas summarise its scaling bounds,
+// current scale, and the scale it is driving the target towards (they differ while
+// a scale-up or scale-down is in flight); targets is the metric summary kubectl
+// shows (e.g. "cpu: 40%/80%"), or "<none>" when no metric status is available yet.
 export type HorizontalPodAutoscaler = {
     name: string;
     namespace: string;
@@ -133,6 +134,7 @@ export type HorizontalPodAutoscaler = {
     minReplicas: number;
     maxReplicas: number;
     currentReplicas: number;
+    desiredReplicas: number;
     targets: string;
     createdAt: string;
     labels: Record<string, string>;  // metadata.labels; empty object when none

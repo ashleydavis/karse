@@ -19,6 +19,7 @@ const LIST_LABELS: Record<string, string> = {
     deployments: "Deployments",
     statefulsets: "StatefulSets",
     daemonsets: "DaemonSets",
+    autoscalers: "Autoscalers",
     logs: "Logs",
     events: "Events",
     errors: "Errors",

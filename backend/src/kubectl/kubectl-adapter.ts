@@ -357,6 +357,7 @@ export async function listHorizontalPodAutoscalers(context: string, namespace?: 
             minReplicas: item.spec?.minReplicas ?? 0,
             maxReplicas: item.spec?.maxReplicas ?? 0,
             currentReplicas: item.status?.currentReplicas ?? 0,
+            desiredReplicas: item.status?.desiredReplicas ?? 0,
             targets: formatHpaTargets(item),
             createdAt: item.metadata.creationTimestamp,
             labels: item.metadata.labels ?? {},
