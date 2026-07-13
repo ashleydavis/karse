@@ -64,6 +64,13 @@ One node, three pods (`nginx-one`, `nginx-two`, `redis-main`).
 - Only `nginx-one` and `nginx-two` appear as matched chips and in the log prefixes; `redis-main` does not appear.
 - A wildcard such as `nginx-*` works the same way: both `nginx-one` and `nginx-two` are streamed, `redis-main` excluded.
 
+### Removing a pod from the stream with its close button
+- Open the picker dropdown, check `nginx-one` and `redis-main`, close the dropdown and press "Stream". The row above the logs reads "Streaming 2 pod(s):" with a chip for each pod, and both pods' lines are arriving.
+- Each chip has a close ("x") button at the end of the pod name.
+- Click the close button on the `redis-main` chip. Its chip disappears, the row reads "Streaming 1 pod(s):", and no further `redis-main` lines arrive: the viewer now shows only `nginx-one` output.
+- Open the picker dropdown. The count reads "1 selected" and only `nginx-one` is checked, i.e. the same state you would get by unticking `redis-main` in the picker and pressing Stream again.
+- Click the close button on the last remaining chip (`nginx-one`). The stream stops and the page returns to its empty state: the "Streaming N pod(s)" row is gone, the button reads "Stream" (not "Stop"), the picker trigger is back to "Search pods...", the caption reads "No logs yet", and the log panel shows "Check pods or type a search, then press Stream." No error is shown and the page is still usable: pick pods and press Stream to start again.
+
 ### Scoping by namespace
 - Select `default` from the Namespace dropdown and press "Stream". Only pods in `default` are streamed (all three pods here).
 

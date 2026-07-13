@@ -4387,6 +4387,91 @@ test.describe("karse e2e", () => {
             await page.unroute("**/api/logs/stream*");
             await interceptStream();
         });
+
+        // Streams both fake pods from a fresh page by checking them in the picker,
+        // then presses Stream and waits for both chips and both log lines to land.
+        // The shared starting point for the pod-removal tests below.
+        async function streamBothPods(): Promise<void> {
+            await page.goto("/logs", { waitUntil: "networkidle" });
+            await openPicker();
+            await page.locator("[data-test-id='live-logs-pod-list'] [data-test-id='live-logs-pod-option']", { hasText: "nginx-abc" })
+                .locator("input").check();
+            await page.locator("[data-test-id='live-logs-pod-list'] [data-test-id='live-logs-pod-option']", { hasText: "redis-xyz" })
+                .locator("input").check();
+            await closePicker();
+            await page.locator("[data-test-id='live-logs-start']").click();
+            await expect(page.locator("[data-test-id='live-logs-matched-pod']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(2);
+        }
+
+        test("every streaming pod chip carries a close button at the end of its label", async () => {
+            await streamBothPods();
+            const removeButtons = page.locator("[data-test-id='live-logs-matched-pod-remove']");
+            await expect(removeButtons).toHaveCount(2);
+            // The close button sits at the end of the pod-name label: its left edge
+            // is past the midpoint of the chip it belongs to.
+            const chip = page.locator("[data-test-id='live-logs-matched-pod']", { hasText: "redis-xyz" });
+            const chipBox = await chip.boundingBox();
+            const buttonBox = await chip.locator("[data-test-id='live-logs-matched-pod-remove']").boundingBox();
+            expect(chipBox).not.toBeNull();
+            expect(buttonBox).not.toBeNull();
+            expect(buttonBox!.x).toBeGreaterThan(chipBox!.x + chipBox!.width / 2);
+        });
+
+        test("clicking a pod chip's close button removes that pod from the streamed set", async () => {
+            await streamBothPods();
+            await expect(page.locator("[data-test-id='live-logs-matched']")).toContainText("Streaming 2 pod(s)");
+            await expect(page.locator("[data-test-id='live-logs-viewer']")).toContainText("default/redis-xyz");
+
+            // Removing redis-xyz re-scopes the stream to the remaining pod only, so
+            // the removed pod's follow is torn down rather than left running.
+            const rescoped = page.waitForRequest((req) =>
+                req.url().includes("/api/logs/stream")
+                && req.url().includes("pods=nginx-abc")
+                && !req.url().includes("pods=redis-xyz"));
+            await page.locator("[data-test-id='live-logs-matched-pod']", { hasText: "redis-xyz" })
+                .locator("[data-test-id='live-logs-matched-pod-remove']").click();
+            await rescoped;
+
+            // Its chip is gone and the count decremented to the one remaining pod.
+            await expect(page.locator("[data-test-id='live-logs-matched-pod']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='live-logs-matched']")).toContainText("Streaming 1 pod(s)");
+            await expect(page.locator("[data-test-id='live-logs-matched']")).not.toContainText("redis-xyz");
+            // Its lines stopped: only the surviving pod's line is in the viewer.
+            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='live-logs-viewer']")).toContainText("default/nginx-abc");
+            await expect(page.locator("[data-test-id='live-logs-viewer']")).not.toContainText("redis-xyz");
+
+            // The picker agrees with the chips: removing via the close button leaves
+            // the same selection as unticking the pod in the picker would.
+            await openPicker();
+            await expect(page.locator("[data-test-id='live-logs-selected-count']")).toHaveText("1 selected");
+            const options = page.locator("[data-test-id='live-logs-pod-list'] [data-test-id='live-logs-pod-option']");
+            await expect(options.filter({ hasText: "nginx-abc" }).locator("input")).toBeChecked();
+            await expect(options.filter({ hasText: "redis-xyz" }).locator("input")).not.toBeChecked();
+            await closePicker();
+        });
+
+        test("removing the last streamed pod leaves the empty state, not a broken view", async () => {
+            await streamBothPods();
+            await page.locator("[data-test-id='live-logs-matched-pod']", { hasText: "redis-xyz" })
+                .locator("[data-test-id='live-logs-matched-pod-remove']").click();
+            await expect(page.locator("[data-test-id='live-logs-matched-pod']")).toHaveCount(1);
+
+            // Removing the only pod left stops the stream and empties the page.
+            await page.locator("[data-test-id='live-logs-matched-pod']", { hasText: "nginx-abc" })
+                .locator("[data-test-id='live-logs-matched-pod-remove']").click();
+            await expect(page.locator("[data-test-id='live-logs-matched']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(0);
+            // Back to the un-scoped starting state: Stream (not Stop), the picker
+            // cleared, and the viewer's guidance placeholder, with no error shown.
+            await expect(page.locator("[data-test-id='live-logs-start']")).toBeVisible();
+            await expect(page.locator("[data-test-id='live-logs-stop']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='live-logs-error']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='live-logs-viewer']")).toContainText("Check pods or type a search, then press Stream.");
+            await expect(page.locator("[data-test-id='live-logs-last-updated']")).toHaveText("No logs yet");
+            await expect(page.locator("[data-test-id='live-logs-picker-trigger']")).toContainText("Search pods...");
+        });
     });
 
     test.describe("live logs auto-follow", () => {

@@ -30,6 +30,14 @@ Streaming every pod in a context at once is not feasible, so the page requires t
 
 The "Streaming N pod(s)" row of pod-name chips above the logs is capped: at most 8 chips are shown. When more pods are streaming, a "... +M more" chip appears after them; clicking it expands the row to show every streaming pod, and a "Show fewer" chip then collapses it back to the cap. This keeps a large multi-pod stream from consuming the page's vertical space.
 
+#### Removing a pod from the stream
+
+Each pod-name chip in the "Streaming N pod(s)" row carries a close ("x") button at the end of its label, so a pod can be dropped from the stream without going back through the pod picker:
+
+- Clicking a chip's close button removes that pod from the streamed set: its chip disappears, the "Streaming N pod(s)" count decrements, and its log lines stop arriving.
+- The pods left over become the explicit picker selection and the stream is restarted over just them, so the removed pod's `kubectl logs -f` follow is torn down (no leaked lines) and the viewer shows only the remaining pods' output. The resulting state is exactly the one the user would reach by unticking that pod in the picker and pressing Stream again, so the two routes to removal stay consistent.
+- Removing the last streaming pod stops the stream and returns the page to its empty state: the chip row disappears, the button flips back to "Stream", the picker is cleared, the "Updated ..." caption resets to "No logs yet", and the viewer shows its "Check pods or type a search, then press Stream." guidance.
+
 The viewer auto-scrolls to the newest line and caps its in-memory buffer (5000 lines) so a long-running stream cannot exhaust memory. The stream is torn down on Stop and on page unmount (closing the SSE connection, which the backend uses to terminate the `kubectl logs -f` processes).
 
 #### Auto-follow and the visible scrollbar
@@ -59,6 +67,7 @@ Next to the Stream/Stop button the Logs page shows a small caption telling the u
 - [x] The Logs page (`/logs`) auto-follows the newest line only while the view is at the bottom; once the user scrolls up, new lines do not force-scroll them back down, and the viewer keeps a clearly visible, usable scrollbar so the streamed history stays reachable.
 - [x] The Logs page shows an "Updated ..." indicator next to the Stream/Stop button: "No logs yet" until the first line, then "Updated just now" / "Updated Ns/Nm/Nh ago" tracking the most recent appended log line, ticking once a second and resetting when a new stream starts.
 - [x] The Logs page (`/logs`) pod selector is a searchable, multi-select **dropdown** picker: a trigger drops an overlay panel holding a "Search pods..." box, the "N selected" count + Clear control in a header row above the list, and a checkbox list (one per pod), all inside the dropdown, so the list is not expanded inline and it stays usable with many pods. Checked pods stream verbatim; with nothing checked the search text is the substring filter.
+- [x] Each pod-name chip in the "Streaming N pod(s)" row has a close button at the end of its label. Clicking it removes that pod from the streamed set (its chip goes, the count decrements, its lines stop), leaving the same state as unticking the pod in the picker and re-streaming; removing the last pod stops the stream and returns the page to its empty state.
 - [x] The pod picker is the single shared `PodFilter` component (`frontend/src/components/pod-filter.tsx`) used everywhere pods can be selected, with no bespoke per-page selector. Its list shows selected pods at the top and unselected below, each group sorted alphanumerically, with a divider between the two groups drawn only when both are non-empty; the count and Clear sit in a header above the scrolling list.
 
 ## Open Questions

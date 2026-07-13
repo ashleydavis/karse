@@ -14,7 +14,7 @@ import {
     Chip,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlay, faStop } from "@fortawesome/free-solid-svg-icons";
+import { faPlay, faStop, faCircleXmark } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { LogStreamLine } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
@@ -331,6 +331,33 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
         startStream({ pods: selectedPods, filter: filterText, ns: namespace || undefined });
     }
 
+    // Removes one pod from the streamed set, driven by the close button on its
+    // chip in the "Streaming N pod(s)" row. The pods left over become the explicit
+    // selection and the stream is restarted over just them, so the removed pod's
+    // follow is torn down and no further lines arrive from it. That leaves exactly
+    // the state the user would reach by unticking the pod in the picker and
+    // pressing Stream again, keeping the two routes to removal consistent.
+    // Removing the last pod stops the stream and returns the page to its empty
+    // state (the "Check pods or type a search, then press Stream." placeholder).
+    function removeStreamingPod(name: string): void {
+        const remaining = matchedPods.filter((pod) => pod !== name);
+        setSelectedPods(remaining);
+        setSearch("");
+        if (remaining.length === 0) {
+            stopStream();
+            setLines([]);
+            setMatchedPods([]);
+            setStreamError(null);
+            setLastLineAt(null);
+            return;
+        }
+        startStream({
+            pods: remaining,
+            filter: "",
+            ns: namespace || undefined,
+        });
+    }
+
     // Fixed-pod mode (the Pod detail Logs tab) auto-starts the stream for its one
     // pod on mount, mirroring the Logs page's behaviour once a pod is chosen.
     // Re-runs if the context or pinned pod changes.
@@ -438,7 +465,26 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
                             size="small"
                             label={name}
                             data-test-id={`${testIdPrefix}-matched-pod`}
-                            sx={{ bgcolor: colorForPod(name), color: "#000" }}
+                            onDelete={() => removeStreamingPod(name)}
+                            deleteIcon={
+                                <Box
+                                    component="span"
+                                    role="button"
+                                    aria-label={`Remove ${name}`}
+                                    data-test-id={`${testIdPrefix}-matched-pod-remove`}
+                                    sx={{ display: "inline-flex", alignItems: "center" }}
+                                >
+                                    <FontAwesomeIcon icon={faCircleXmark} />
+                                </Box>
+                            }
+                            sx={{
+                                bgcolor: colorForPod(name),
+                                color: "#000",
+                                "& .MuiChip-deleteIcon": {
+                                    color: "rgba(0, 0, 0, 0.55)",
+                                    "&:hover": { color: "#000" },
+                                },
+                            }}
                         />
                     ))}
                     {matchedPods.length > MAX_VISIBLE_POD_CHIPS && !showAllPods && (
