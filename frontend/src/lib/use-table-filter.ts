@@ -26,13 +26,19 @@ export type TableFilterBinding = {
 // `collectLabelColumns`); this turns the user's ticks into column filters via
 // `buildColumnFilters`. An empty selection yields no filters (every row shows).
 //
+// `initialSelection` seeds the ticked values the table opens with, so a caller can
+// deep-link into a pre-filtered view (the cluster page's POD STATUS links seed the
+// pods table's Status filter this way). It is read once, when the table mounts:
+// afterwards the selection belongs to the user, who sees it in the filter editor
+// and can clear it like any other. Defaults to no selection (the filter is off).
+//
 // Callers typically rebuild the `columns` array on every render (it is derived
 // from freshly-fetched data), so the memo keys on the columns' content rather than
 // their array identity. This keeps `columnFilters` stable across renders, which
 // matters because an unstable column-filter identity would make TanStack re-render
 // the table on every parent render and detach its rows mid-interaction.
-export function useTableFilter(columns: FilterableColumn[]): TableFilterBinding {
-    const [selection, setSelection] = useState<FilterSelection>({});
+export function useTableFilter(columns: FilterableColumn[], initialSelection: FilterSelection = {}): TableFilterBinding {
+    const [selection, setSelection] = useState<FilterSelection>(initialSelection);
 
     const columnsKey = JSON.stringify(columns);
     const columnFilters = useMemo(

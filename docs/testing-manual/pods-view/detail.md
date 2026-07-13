@@ -90,6 +90,7 @@ Five pods in `default`, one each in Running, Pending, Succeeded, Failed, Unknown
 - **Check a second status** (for example `Pending`): both matching pods show (OR within the Status column) and the button reads `Filter: 2 selected`.
 - **Clear**: open the editor and click **Clear** (top of the editor): the selection clears, all five rows return, and the button reads `Filter: All`. With nothing selected, **Clear** is greyed out.
 - The filter combines with the search box: searching while a subset of statuses is checked narrows results further.
+- **Seeded from the URL**: open `http://127.0.0.1:5173/pods?phase=Running` directly. The page opens already filtered to `Running` (only `pod-running` listed) with the button reading `Filter: 1 selected` — the seeded value shows as ticked under **Status** and clears with **Clear** like any other. This is the param the Cluster page's POD STATUS counts link with (see [cluster-overview](../cluster-overview/detail.md)). A bad value (`?phase=Nonsense`) seeds nothing: every pod shows and the button reads `Filter: All`.
 - If KWOK overrides a patched terminal phase back to `Running`, re-run the patch commands from the setup script and reload.
 
 ## Scenario E.2: Pod health filter

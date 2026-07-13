@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
     useReactTable,
     getCoreRowModel,
@@ -33,7 +34,7 @@ import { LoadError } from "../../../components/load-error";
 import { TableFilter } from "../../../components/table-filter";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
-import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn } from "../../../lib/table-filter-state";
+import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn, type FilterSelection } from "../../../lib/table-filter-state";
 import { useTableFilter } from "../../../lib/use-table-filter";
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
@@ -132,6 +133,24 @@ const PHASE_ORDER: Record<PodPhase, number> = {
 
 // All selectable pod phases, in display order, for the phase filter dropdown.
 const ALL_PHASES: PodPhase[] = ["Running", "Pending", "Succeeded", "Failed", "Unknown"];
+
+// Turns the optional `?phase=` query param into the table's initial Status-filter
+// selection, so a link can open the pods list already narrowed to one phase (the
+// cluster page's POD STATUS counts link here). The seeded filter is an ordinary
+// selection: the filter button shows it as applied and the user can clear it. An
+// absent or unrecognised phase seeds nothing, leaving the filter off.
+function initialPhaseSelection(phase: string | null): FilterSelection {
+    if (phase === null) {
+        return {};
+    }
+    const match = ALL_PHASES.find((candidate) => candidate === phase);
+    if (match === undefined) {
+        return {};
+    }
+    return {
+        phase: [match],
+    };
+}
 
 // Builds the column definitions for the pods table. `figures` maps each pod
 // (namespace/name) to its raw CPU/memory usage and request figures (from the cluster
@@ -299,6 +318,7 @@ function PodsTableInner() {
     const { current } = useKubeContext();
     const { namespace } = useKubeNamespace();
     const navigate = useShareableNavigate();
+    const [searchParams] = useSearchParams();
     const { mode, format } = useResourceUtilization();
 
     const { data, error, isLoading, refetch } = useQuery({
@@ -333,7 +353,7 @@ function PodsTableInner() {
         { columnId: "health", label: "Health", options: HEALTH_FILTER_OPTIONS, kind: "value" },
         ...collectLabelColumns(data?.pods ?? []),
     ];
-    const filter = useTableFilter(filterableColumns);
+    const filter = useTableFilter(filterableColumns, initialPhaseSelection(searchParams.get("phase")));
 
     const table = useReactTable({
         data: data?.pods ?? [],

@@ -90,6 +90,14 @@ Cards across the top summarise the active context: **Server version** (the Kuber
 
 A strip of three cards classifying the cluster's nodes by their **CPU-requests** share of allocatable: **Over-utilized** (≥ 85%), **Healthy** (40–85%), and **Under-utilized** (< 40%). The counts come from the cluster performance snapshot and match the bands you would read on the Nodes page. The strip is omitted entirely (rather than shown as all zeros) when no node's CPU requests and allocatable are readable.
 
+#### Pod status
+
+A **POD STATUS** row counting the cluster's pods by phase: **Running**, **Pending**, **Failed**, and **Succeeded**.
+
+Each count is a link. Click one to open the [Pods page](#pods-page-pods) with its **Status** filter already set to that phase, so you go straight from "3 failed" to the three failed pods. The filter arrives switched on and visible — the Filter button reads "Filter: 1 selected" — so you can see it is applied and clear it (or add more values) like any filter you set by hand.
+
+A count of **0** is still a link: it opens the pods list filtered to that phase, which shows an empty result with the filter applied, rather than silently showing every pod. Clear the filter there to get the full list back.
+
 #### Cluster-wide resources
 
 A **CPU** card and a **Memory** card showing the cluster's consumption against its total allocatable, with the shared **Usage / Requests** and **% / Absolute** toggles (see [Resource utilization toggles](#resource-utilization-toggles) below). In Usage view the cards read live usage ÷ cluster allocatable; in Requests view, summed pod requests ÷ cluster allocatable. If the cluster has no Metrics API, the usage cards show an em-dash and a "Metrics API not available" notice while the requests cards still populate from pod specs.

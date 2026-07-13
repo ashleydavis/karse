@@ -80,9 +80,36 @@ Teardown:
 ./docs/testing-manual/_fixtures-kwok/32-errors-view/teardown.sh
 ```
 
+## Scenario D: POD STATUS counts link to the filtered pods list
+
+Confirms each POD STATUS count is a link that opens the pods list filtered to that phase, and that the applied filter is visible and clearable in the target view.
+
+**Fixture:** [_fixtures-kwok/10-mixed-pod-phases](../_fixtures-kwok/10-mixed-pod-phases/)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/10-mixed-pod-phases/setup.sh
+```
+
+`kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse.
+
+This fixture creates exactly one pod per phase (`pod-running`, `pod-pending`, `pod-failed`, `pod-succeeded`) in `default`, so every POD STATUS count reads `1` and each filtered list should hold exactly the one matching pod.
+
+### What to check
+- **Every count is a link**: on the Cluster page, the POD STATUS row shows Running, Pending, Failed, and Succeeded. Hover each one: the number and its phase name are a single link (the cursor changes and it underlines), and the browser's status bar shows it pointing at `/pods?...phase=<Phase>`.
+- **Clicking filters the pods list**: click **Running**. Karse opens the Pods page showing only `pod-running` — one row, matching the `1` you clicked. Repeat for **Pending**, **Failed**, and **Succeeded**: each opens the pods list holding only that phase's pod. Check each linked number matches the number of rows you land on.
+- **The filter is visible**: on the pods list you land on, the **Filter** button reads "Filter: 1 selected". Open it: the ticked value is the phase you clicked, under the **Status** group.
+- **The filter clears**: with the seeded filter applied, open the Filter dropdown and click **Clear**. All four pods come back and the button reads "Filter: All". The filter behaves exactly like one you tick by hand.
+- **A zero count still links**: no pod is in the `Unknown` phase here, but you can see the zero-count behaviour by deleting one phase's pod (e.g. `kubectl delete pod pod-failed -n default`) and refreshing the Cluster page. The **Failed** count now reads `0` and is still a link: clicking it opens the pods list filtered to Failed, showing "No pods match the search." with the Filter button reading "Filter: 1 selected" — the empty result with the filter applied, not an unfiltered list. Clear the filter to get the remaining pods back.
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/10-mixed-pod-phases/teardown.sh
+```
+
 ## Related coverage
 
-The "Select a context to see cluster overview." empty state (when no context is selected) is verified under [context-switching](../context-switching/detail.md) (no-contexts scenario). Tile counts also appear after a context switch in [context-switching](../context-switching/detail.md).
+The "Select a context to see cluster overview." empty state (when no context is selected) is verified under [context-switching](../context-switching/detail.md) (no-contexts scenario). Tile counts also appear after a context switch in [context-switching](../context-switching/detail.md). The pods-list Status filter itself (ticking values by hand, combining with search) is covered under [pods-view](../pods-view/detail.md).
 
 ## Teardown
 
@@ -91,5 +118,6 @@ Tear down any cluster you stood up while testing this doc:
 ```sh
 ./docs/testing-manual/_fixtures-kwok/01-empty-cluster-two-nodes/teardown.sh
 ./docs/testing-manual/_fixtures-kwok/02-empty-cluster-no-nodes/teardown.sh
+./docs/testing-manual/_fixtures-kwok/10-mixed-pod-phases/teardown.sh
 ./docs/testing-manual/_fixtures-kwok/32-errors-view/teardown.sh
 ```

@@ -3888,6 +3888,212 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Cluster overview: POD STATUS filter links ───────────────────────────────
+
+    test.describe("cluster overview pod status links", () => {
+        // One pod per linked phase, so every POD STATUS count reads 1 and the pods list
+        // each link opens holds exactly that one pod: the number clicked and the filtered
+        // result count are then directly comparable.
+        const LINKED_PODS = {
+            pods: [
+                {
+                    name: "pod-running",
+                    namespace: "default",
+                    phase: "Running",
+                    ready: "1/1",
+                    containerCount: 1,
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                    labels: { app: "web" },
+                },
+                {
+                    name: "pod-pending",
+                    namespace: "default",
+                    phase: "Pending",
+                    ready: "0/1",
+                    containerCount: 1,
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                    labels: { app: "web" },
+                },
+                {
+                    name: "pod-failed",
+                    namespace: "default",
+                    phase: "Failed",
+                    ready: "0/1",
+                    containerCount: 1,
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                    labels: { app: "batch" },
+                },
+                {
+                    name: "pod-succeeded",
+                    namespace: "default",
+                    phase: "Succeeded",
+                    ready: "0/1",
+                    containerCount: 1,
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                    labels: { app: "batch" },
+                },
+            ],
+        };
+
+        // A cluster overview whose pod counts match LINKED_PODS: four pods, one Running,
+        // one Pending, one Failed, leaving one Succeeded (the page derives the Succeeded
+        // count as the remainder of the total).
+        const LINKED_OVERVIEW = {
+            serverVersion: "v1.30.0",
+            clientVersion: "v1.30.0",
+            nodeCount: 1,
+            readyNodeCount: 1,
+            namespaceCount: 1,
+            podCount: 4,
+            runningPodCount: 1,
+            pendingPodCount: 1,
+            failedPodCount: 1,
+            errorCount: 0,
+        };
+
+        // A cluster holding only running pods, so the Failed and Succeeded counts read 0
+        // and the zero-count link can be exercised.
+        const RUNNING_ONLY_PODS = {
+            pods: [
+                {
+                    name: "pod-one",
+                    namespace: "default",
+                    phase: "Running",
+                    ready: "1/1",
+                    containerCount: 1,
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                    labels: { app: "web" },
+                },
+                {
+                    name: "pod-two",
+                    namespace: "default",
+                    phase: "Running",
+                    ready: "1/1",
+                    containerCount: 1,
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                    labels: { app: "web" },
+                },
+            ],
+        };
+
+        const RUNNING_ONLY_OVERVIEW = {
+            serverVersion: "v1.30.0",
+            clientVersion: "v1.30.0",
+            nodeCount: 1,
+            readyNodeCount: 1,
+            namespaceCount: 1,
+            podCount: 2,
+            runningPodCount: 2,
+            pendingPodCount: 0,
+            failedPodCount: 0,
+            errorCount: 0,
+        };
+
+        // The four phases the POD STATUS row links, and the pod each one filters down to.
+        const LINKED_PHASES = ["Running", "Pending", "Failed", "Succeeded"];
+
+        // Install route overrides serving the four-phase fixture to the cluster overview
+        // and the pods list.
+        async function interceptLinked(): Promise<void> {
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: LINKED_PODS });
+            });
+            await page.route("**/api/cluster/overview*", async (route) => {
+                await route.fulfill({ json: LINKED_OVERVIEW });
+            });
+        }
+
+        async function unrouteLinked(): Promise<void> {
+            await page.unroute("**/api/pods*");
+            await page.unroute("**/api/cluster/overview*");
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await interceptLinked();
+        });
+
+        test.afterAll(async () => {
+            await unrouteLinked();
+            setContext(CLUSTER_1);
+        });
+
+        test("every POD STATUS count is a link to the pods list for its phase", async () => {
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            for (const phase of LINKED_PHASES) {
+                const link = page.locator(`[data-test-id='pod-phase-link-${phase}']`);
+                await expect(link).toBeVisible();
+                await expect(link).toHaveAttribute("href", new RegExp(`/pods\\?.*phase=${phase}`));
+                // The count and its phase name are both inside the link, so the whole
+                // readout entry is clickable, not just the label.
+                await expect(link).toContainText(phase);
+                await expect(link).toContainText("1");
+            }
+        });
+
+        test("clicking a count opens the pods list filtered to that phase", async () => {
+            for (const phase of LINKED_PHASES) {
+                await page.goto("/cluster", { waitUntil: "networkidle" });
+                await page.locator(`[data-test-id='pod-phase-link-${phase}']`).click();
+                await expect(page).toHaveURL(new RegExp(`/pods\\?.*phase=${phase}`));
+                await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+                // Exactly the one pod in that phase: the filtered result count matches the
+                // count that was clicked.
+                await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+                await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText(`pod-${phase.toLowerCase()}`);
+                // The filter is visibly applied in the toolbar, so the user can see it.
+                await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: 1 selected");
+            }
+        });
+
+        test("the seeded filter clears like any other, restoring every pod", async () => {
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-phase-link-Running']").click();
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            await page.locator("[data-test-id='pods-filter-deselect-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(4);
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: All");
+        });
+
+        test("a zero count links to the empty filtered list with the filter applied", async () => {
+            await unrouteLinked();
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: RUNNING_ONLY_PODS });
+            });
+            await page.route("**/api/cluster/overview*", async (route) => {
+                await route.fulfill({ json: RUNNING_ONLY_OVERVIEW });
+            });
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            const failed = page.locator("[data-test-id='pod-phase-link-Failed']");
+            await expect(failed).toContainText("0");
+            await failed.click();
+            await expect(page).toHaveURL(/\/pods\?.*phase=Failed/);
+            // The zero count behaves like every other: the filter is applied and visible,
+            // and the list is empty (rather than showing every pod), so the user can see
+            // why there is nothing and clear the filter from there.
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: 1 selected");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-pods-match']")).toBeVisible();
+            // Restore the shared fixture for the rest of the run.
+            await unrouteLinked();
+            await interceptLinked();
+        });
+    });
+
     // ── Nodes page: status filter ───────────────────────────────────────────────
 
     test.describe("nodes page status filter", () => {

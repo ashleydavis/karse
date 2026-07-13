@@ -1,9 +1,10 @@
-import { Card, CardContent, CardActionArea, Typography, Grid, Box, Divider } from "@mui/material";
+import { Card, CardContent, CardActionArea, Typography, Grid, Box, Divider, Link as MuiLink } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleExclamation, faCube, faDharmachakra, faLayerGroup, faServer } from "@fortawesome/free-solid-svg-icons";
 import type { IconProp } from "@fortawesome/fontawesome-svg-core";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import type { PodPhase } from "karse-types";
 import { useKubeContext } from "../../../lib/kube-context";
 import { useShareableTo } from "../../../lib/nav-state";
 import { fetchClusterOverview, fetchClusterPerformance } from "../../../lib/api-client";
@@ -87,25 +88,41 @@ function PodPhaseRow({ running, pending, failed, total }: PodPhaseRowProps) {
                     Pod status
                 </Typography>
                 <Box sx={{ display: "flex", gap: 3, mt: 1, flexWrap: "wrap" }}>
-                    <PhaseCount label="Running"   count={running}   color="success.main" />
+                    <PhaseCount phase="Running"   count={running}   color="success.main" />
                     <Divider orientation="vertical" flexItem />
-                    <PhaseCount label="Pending"   count={pending}   color="warning.main" />
+                    <PhaseCount phase="Pending"   count={pending}   color="warning.main" />
                     <Divider orientation="vertical" flexItem />
-                    <PhaseCount label="Failed"    count={failed}    color="error.main" />
+                    <PhaseCount phase="Failed"    count={failed}    color="error.main" />
                     <Divider orientation="vertical" flexItem />
-                    <PhaseCount label="Succeeded" count={succeeded} color="text.secondary" />
+                    <PhaseCount phase="Succeeded" count={succeeded} color="text.secondary" />
                 </Box>
             </CardContent>
         </Card>
     );
 }
 
-function PhaseCount({ label, count, color }: { label: string; count: number; color: string }) {
+// One POD STATUS count: the number and its phase name, as a link to the pods list
+// filtered to that phase. The link carries the phase in the `phase` query param, which
+// the pods view reads to seed its Status filter, so the target opens narrowed to the
+// phase with the filter visibly applied and clearable.
+//
+// A zero count stays a link, like any other: it lands on the pods list filtered to that
+// phase, which shows the empty filtered result with the filter applied, so the user can
+// see why the list is empty and clear the filter from there. Keeping every count
+// interactive means the row behaves the same whatever the cluster happens to hold.
+function PhaseCount({ phase, count, color }: { phase: PodPhase; count: number; color: string }) {
+    const buildTo = useShareableTo();
     return (
-        <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.75 }}>
+        <MuiLink
+            component={Link}
+            to={buildTo("/pods", { phase })}
+            underline="hover"
+            data-test-id={`pod-phase-link-${phase}`}
+            sx={{ display: "flex", alignItems: "baseline", gap: 0.75 }}
+        >
             <Typography variant="h6" sx={{ fontWeight: 700, color }}>{count}</Typography>
-            <Typography variant="caption" color="text.secondary">{label}</Typography>
-        </Box>
+            <Typography variant="caption" color="text.secondary">{phase}</Typography>
+        </MuiLink>
     );
 }
 

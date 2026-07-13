@@ -20,6 +20,7 @@ Backed by: `GET /api/pods`, `backend/src/routes/pods-route.ts`, `backend/src/kub
   Per-pod usage and per-pod requests come from the cluster Performance snapshot (`GET /api/cluster/performance` → `{ pods: PodUsage[] }`), joined by namespace/name (no node join — the base is the pod's request). Both columns sort by the shown percentage in whichever mode is active; a pod with no usage reading, or no request set (or when the Metrics API is unavailable), shows an em-dash and an empty bar, and sorts below every pod that has a reading. Only CPU and memory are shown: the Kubernetes Metrics API reports neither disk nor network consumption (the documented exclusion in [performance-tabs](../performance-tabs/detail.md)), so there is no disk/network figure to show or sort by.
 - A **Utilization** column shows a status badge grading the pod's usage ÷ request ratio in usage mode (`classifyPodUsageRow`): **Over-reserving** (≤ 35%, reserving far more than it uses), **Under-provisioned** (≥ 90%, close to its reservation), or **OK** in between; an em-dash when the ratio cannot be computed. The badge is empty in requests mode (no ratio to grade). Colours are the MUI semantic palette for now; the threshold-colours plan maps the levels to the project palette later.
 - Columns are sortable and the table is searchable (see `resource-search`); rows link to the pod detail page (see `clickable-resource-rows`).
+- **The Status filter can be seeded from the URL.** An optional `phase=<Phase>` query param (one of Running/Pending/Succeeded/Failed/Unknown) sets the table's Status filter when the page mounts, so another view can deep-link into a pre-filtered pods list — the cluster page's POD STATUS counts do exactly this (see [cluster-overview](../cluster-overview/detail.md)). An absent or unrecognised value seeds nothing and the filter stays off. The seeded value is an ordinary filter selection, not a locked-in scope: it shows in the toolbar as "Filter: 1 selected" and the user can clear or extend it like any filter they set by hand. It is read once on mount, so clearing the filter does not fight the URL.
 
 ## Acceptance Criteria
 
@@ -29,6 +30,7 @@ Backed by: `GET /api/pods`, `backend/src/routes/pods-route.ts`, `backend/src/kub
 - [x] Columns are sortable and the table is searchable.
 - [x] The table has CPU and Memory utilisation bar columns whose usage-mode percentage base is the **pod's own request** (usage ÷ request), with shared Usage/Requests and %/Absolute toggles in the toolbar and a Utilization status-badge column; both bar columns sort ascending/descending by the shown percentage in each mode. (Disk and network are excluded: the Metrics API reports neither — see [performance-tabs](../performance-tabs/detail.md).)
 - [x] A Labels column shows each pod's labels as key=value chips and is searchable.
+- [x] A `phase=<Phase>` query param seeds the table's Status filter on mount (an unrecognised value seeds nothing), so other views can link into a pre-filtered pods list; the seeded filter shows in the toolbar and clears like any other.
 - [x] Rows link to the pod detail page.
 
 ## Open Questions
