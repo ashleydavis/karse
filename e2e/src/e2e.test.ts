@@ -7886,6 +7886,30 @@ test.describe("karse e2e", () => {
             await closeHelp();
         });
 
+        // A deployment's pods are found by label selector and traced through the
+        // ReplicaSets it owns, so the help must show both queries. A namespace-wide pod
+        // list would not reproduce the Pods tab, and `describe` is never run at all.
+        test("a deployment detail page help shows the selector and ReplicaSet queries it really runs", async () => {
+            await page.goto("/deployments/default/nginx", { waitUntil: "networkidle" });
+            const commands = await openHelp();
+            await expect(page.locator("[data-test-id='page-help-title']")).toHaveText("Deployments: nginx");
+            await expect(page.locator("[data-test-id='page-help-source']")).toContainText("ReplicaSets");
+            expect(commands).toContain(`kubectl --context ${CLUSTER_1} get replicasets -n default -l <selector> -o json`);
+            expect(commands).toContain(`kubectl --context ${CLUSTER_1} get pods -n default -l <selector> -o json`);
+            expect(commands).not.toContain(`kubectl --context ${CLUSTER_1} get pods -n default -o json`);
+            await closeHelp();
+        });
+
+        // The container page reads its spec and status out of the pod's JSON, so the pod
+        // query is the only one behind it: Karse never runs `kubectl describe`.
+        test("a container detail page help shows the pod query and never claims a describe", async () => {
+            await page.goto("/pods/default/nginx-abc/containers/nginx", { waitUntil: "networkidle" });
+            const commands = await openHelp();
+            expect(commands).toContain(`kubectl --context ${CLUSTER_1} get pod nginx-abc -n default -o json`);
+            expect(commands.every((c) => !c.includes("describe"))).toBe(true);
+            await closeHelp();
+        });
+
         test("the About page has no help button, since no cluster data backs it", async () => {
             await page.goto("/about", { waitUntil: "networkidle" });
             await expect(page.locator("[data-test-id='page-help-button']")).toHaveCount(0);

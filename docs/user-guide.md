@@ -74,6 +74,8 @@ The header's **question-mark button** ("Where does this data come from?") opens 
 - **Where this data comes from**: which cluster queries Karse ran to build the page. For example, the Errors feed is derived (Kubernetes has no "error" object): Karse combines the Warning events with the pods and their failing containers.
 - **Run it yourself**: the exact read-only `kubectl` commands behind the page, each with a copy button. They are pinned to your selected context (`--context <name>`) and scoped to your selected namespace (`-n <namespace>`, or `-A` when no namespace is selected), so you can paste one into a terminal and get the same information the page is showing. A detail page's commands use that resource's own namespace.
 
+A command may carry a placeholder in angle brackets where the value is yours to fill in: `<pod>` on the Logs page (whichever pod you pick), and `<selector>` on a workload's detail page (the workload's own `spec.selector.matchLabels`, which is how Karse finds the pods it owns). Substitute it and the command runs as-is.
+
 Karse never runs a command on your behalf from this panel; it only shows you what it ran and what you can run. Pages with no cluster data behind them (About, Config) have no question-mark button. For commands that *act on* a resource (delete, scale, drain), see the **Commands** tab on that resource's detail page.
 
 ## Contexts page (`/contexts`)

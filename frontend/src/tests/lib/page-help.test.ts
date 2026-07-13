@@ -76,10 +76,10 @@ describe("buildPageHelp list pages", () => {
         ]);
     });
 
-    test("the logs page lists pods and follows one pod's logs", () => {
+    test("the logs page lists pods and follows one pod's logs with the tail the stream really uses", () => {
         expect(commandsFor("/logs", ONE_NAMESPACE)).toEqual([
             "kubectl --context prod-cluster get pods -n web -o json",
-            "kubectl --context prod-cluster logs -f <pod> -n web --tail=200",
+            "kubectl --context prod-cluster logs -f <pod> -n web --tail=100",
         ]);
     });
 
@@ -108,7 +108,7 @@ describe("buildPageHelp detail pages", () => {
         expect(commandsFor("/pods/default/web-0", ONE_NAMESPACE)).toEqual([
             "kubectl --context prod-cluster get pod web-0 -n default -o json",
             "kubectl --context prod-cluster get events -n default --field-selector=involvedObject.name=web-0,involvedObject.namespace=default -o json",
-            "kubectl --context prod-cluster logs web-0 -n default",
+            "kubectl --context prod-cluster logs -f web-0 -n default --tail=100",
         ]);
     });
 
@@ -116,15 +116,26 @@ describe("buildPageHelp detail pages", () => {
         expect(buildPageHelp("/pods/default/web-0", ALL_NAMESPACES)!.title).toBe("Pod: web-0");
     });
 
-    test("a container detail page explains that a container has no object of its own", () => {
+    // The pod's Logs tab follows the stream from the last 100 lines, so the command must
+    // show that tail: without it, the help does not reproduce what the tab displays.
+    test("a pod detail page's log command carries the tail the Logs tab really uses", () => {
+        const help = buildPageHelp("/pods/default/web-0", ALL_NAMESPACES);
+        const logs = help!.commands.find((c) => c.label.startsWith("Logs"));
+        expect(logs!.command).toContain("--tail=100");
+    });
+
+    // A container has no object of its own: its spec and status are read out of the pod's
+    // JSON, which the first command already fetches. Karse never runs `kubectl describe`,
+    // so the help must not claim it does.
+    test("a container detail page shows only the queries Karse really runs, and never describe", () => {
         const help = buildPageHelp("/pods/default/web-0/containers/nginx", ALL_NAMESPACES);
         expect(help!.title).toBe("Container: nginx");
         expect(help!.source).toContain("no object of its own");
         expect(help!.commands.map((c) => c.command)).toEqual([
             "kubectl --context prod-cluster get pod web-0 -n default -o json",
-            "kubectl --context prod-cluster describe pod web-0 -n default",
-            "kubectl --context prod-cluster logs web-0 -c nginx -n default",
+            "kubectl --context prod-cluster logs -f web-0 -c nginx -n default --tail=100",
         ]);
+        expect(help!.commands.every((c) => !c.command.includes("describe"))).toBe(true);
     });
 
     test("a node detail page queries the node, its pods, and its events", () => {
@@ -147,12 +158,33 @@ describe("buildPageHelp detail pages", () => {
         ]);
     });
 
-    test("a workload detail page queries the workload, its events, and its pods", () => {
+    // The adapter finds a workload's pods with the workload's own label selector and then
+    // keeps the ones it owns. A bare namespace-wide pod list would return every pod in the
+    // namespace, so it must not be shown as the query behind the Pods tab.
+    test("a stateful set detail page finds its pods by label selector, not a namespace-wide list", () => {
         expect(commandsFor("/statefulsets/default/db", ALL_NAMESPACES)).toEqual([
             "kubectl --context prod-cluster get statefulsets db -n default -o json",
             "kubectl --context prod-cluster get events -n default --field-selector=involvedObject.name=db,involvedObject.namespace=default -o json",
-            "kubectl --context prod-cluster get pods -n default -o json",
+            "kubectl --context prod-cluster get pods -n default -l <selector> -o json",
         ]);
+    });
+
+    // A deployment owns ReplicaSets, which own the pods, so the adapter runs an extra
+    // ReplicaSet query to trace ownership. Only deployments do this.
+    test("a deployment detail page shows the ReplicaSet query it traces pod ownership through", () => {
+        expect(commandsFor("/deployments/default/web", ALL_NAMESPACES)).toEqual([
+            "kubectl --context prod-cluster get deployments web -n default -o json",
+            "kubectl --context prod-cluster get events -n default --field-selector=involvedObject.name=web,involvedObject.namespace=default -o json",
+            "kubectl --context prod-cluster get replicasets -n default -l <selector> -o json",
+            "kubectl --context prod-cluster get pods -n default -l <selector> -o json",
+        ]);
+        expect(buildPageHelp("/deployments/default/web", ALL_NAMESPACES)!.source).toContain("ReplicaSets");
+    });
+
+    test("a daemon set detail page runs no ReplicaSet query, because it owns its pods directly", () => {
+        const help = buildPageHelp("/daemonsets/default/agent", ALL_NAMESPACES);
+        expect(help!.commands.every((c) => !c.command.includes("replicasets"))).toBe(true);
+        expect(help!.source).toContain("owns its pods directly");
     });
 
     test("an event detail page reuses the event list query", () => {

@@ -246,11 +246,16 @@ function podsHelp(context: string | null, namespace: string | null): PageHelp {
     };
 }
 
+// The number of recent lines every log stream in Karse tails. The Logs page and the
+// pod/container Logs tabs all open the stream with this backlog, so the `kubectl logs`
+// commands shown in the help reproduce exactly what those views display.
+const LOG_TAIL_LINES = 100;
+
 // Help for a single pod's detail page: the pod plus the events raised against it.
 function podDetailHelp(context: string | null, namespace: string, name: string): PageHelp {
     return {
         title: `Pod: ${name}`,
-        source: `This page queries the pod "${name}" in the "${namespace}" namespace, and the events raised against it. The Logs tab streams the pod's logs; the Commands tab lists commands for acting on the pod yourself.`,
+        source: `This page queries the pod "${name}" in the "${namespace}" namespace, and the events raised against it. The Logs tab follows the pod's logs from the last ${LOG_TAIL_LINES} lines; the Commands tab lists commands for acting on the pod yourself.`,
         commands: [
             {
                 label: "The pod",
@@ -261,31 +266,28 @@ function podDetailHelp(context: string | null, namespace: string, name: string):
                 command: kubectlCommand(context, ["get", "events", "-n", namespace, `--field-selector=involvedObject.name=${name},involvedObject.namespace=${namespace}`, "-o", "json"]),
             },
             {
-                label: "Logs (as shown on the Logs tab)",
-                command: kubectlCommand(context, ["logs", name, "-n", namespace]),
+                label: "Logs (as the Logs tab streams them)",
+                command: kubectlCommand(context, ["logs", "-f", name, "-n", namespace, `--tail=${LOG_TAIL_LINES}`]),
             },
         ],
     };
 }
 
 // Help for a container's detail page. A container is part of its pod, so the page is
-// built from the pod's own query, narrowed to the named container.
+// built from the pod's own query, narrowed to the named container: the container's spec
+// and status are read straight out of the pod's JSON, so there is no second query.
 function containerDetailHelp(context: string | null, namespace: string, pod: string, container: string): PageHelp {
     return {
         title: `Container: ${container}`,
-        source: `A container has no object of its own in Kubernetes: this page comes from the pod "${pod}" in the "${namespace}" namespace, narrowed to the "${container}" container's spec and status. Its logs are the pod's logs for that container.`,
+        source: `A container has no object of its own in Kubernetes: this page comes from one query for the pod "${pod}" in the "${namespace}" namespace, narrowed to the "${container}" container. Its spec is read from the pod's spec.containers and its status from the pod's status.containerStatuses, so no separate query is run for the container. Its logs are the pod's logs for that container.`,
         commands: [
             {
-                label: "The pod that holds this container",
+                label: "The pod that holds this container (its spec and status)",
                 command: kubectlCommand(context, ["get", "pod", pod, "-n", namespace, "-o", "json"]),
             },
             {
-                label: "Container status (from the pod)",
-                command: kubectlCommand(context, ["describe", "pod", pod, "-n", namespace]),
-            },
-            {
-                label: "Logs for this container",
-                command: kubectlCommand(context, ["logs", pod, "-c", container, "-n", namespace]),
+                label: "Logs for this container (as the Logs tab streams them)",
+                command: kubectlCommand(context, ["logs", "-f", pod, "-c", container, "-n", namespace, `--tail=${LOG_TAIL_LINES}`]),
             },
         ],
     };
@@ -314,10 +316,33 @@ function workloadListHelp(kind: string, context: string | null, namespace: strin
 }
 
 // Help for a workload's detail page: the workload, its events, and the pods it owns.
+//
+// The pod query is not a plain namespace list. Karse reads the workload's
+// spec.selector.matchLabels, passes them to kubectl as a label selector (-l), and then
+// keeps only the pods the workload actually owns, so a selector shared with another
+// workload cannot pull in that workload's pods. The selector is the workload's own, so
+// the command carries a <selector> placeholder rather than an invented value.
+//
+// A deployment does not own its pods directly: it owns ReplicaSets, which own the pods.
+// Karse therefore runs an extra ReplicaSet query for deployments so it can trace pod
+// ownership through them. Stateful sets and daemon sets own their pods directly and need
+// no such lookup, so that command is shown only for deployments.
 function workloadDetailHelp(kind: string, context: string | null, namespace: string, name: string): PageHelp {
+    const singular = kind.replace(/s$/, "");
+    const isDeployment = kind === "deployments";
+
+    const ownership = isDeployment
+        ? `A deployment owns ReplicaSets, and those ReplicaSets own the pods, so Karse also lists the ReplicaSets carrying the same selector and keeps the ones this deployment owns. It then lists the pods matching the selector and keeps those owned by one of them.`
+        : `A ${singular} owns its pods directly, so Karse lists the pods matching the selector and keeps the ones this ${singular} owns.`;
+
+    const replicaSetCommand = {
+        label: "ReplicaSets it owns (pod ownership is traced through them)",
+        command: kubectlCommand(context, ["get", "replicasets", "-n", namespace, "-l", "<selector>", "-o", "json"]),
+    };
+
     return {
         title: `${WORKLOAD_TITLES[kind] ?? kind}: ${name}`,
-        source: `This page queries the ${kind.replace(/s$/, "")} "${name}" in the "${namespace}" namespace, the events raised against it, and the pods in that namespace, which Karse matches to the workload by its selector.`,
+        source: `This page queries the ${singular} "${name}" in the "${namespace}" namespace and the events raised against it, then finds its pods with the label selector from the ${singular}'s own spec.selector.matchLabels (shown below as <selector>). ${ownership}`,
         commands: [
             {
                 label: "The workload",
@@ -327,9 +352,10 @@ function workloadDetailHelp(kind: string, context: string | null, namespace: str
                 label: "Events for this workload",
                 command: kubectlCommand(context, ["get", "events", "-n", namespace, `--field-selector=involvedObject.name=${name},involvedObject.namespace=${namespace}`, "-o", "json"]),
             },
+            ...(isDeployment ? [replicaSetCommand] : []),
             {
-                label: "Pods it owns",
-                command: kubectlCommand(context, ["get", "pods", "-n", namespace, "-o", "json"]),
+                label: "Pods matching its selector (Karse then keeps the ones it owns)",
+                command: kubectlCommand(context, ["get", "pods", "-n", namespace, "-l", "<selector>", "-o", "json"]),
             },
         ],
     };
@@ -379,7 +405,7 @@ function liveLogsHelp(context: string | null, namespace: string | null): PageHel
     const ns = namespace ?? "<namespace>";
     return {
         title: "Logs",
-        source: `The pod picker is a kubectl pod list; the log stream is a followed kubectl logs call, one per selected pod, tailing the most recent lines. ${namespaceScope(namespace)}`,
+        source: `The pod picker is a kubectl pod list; the log stream is a followed kubectl logs call, one per selected pod, starting from the last ${LOG_TAIL_LINES} lines. ${namespaceScope(namespace)}`,
         commands: [
             {
                 label: "Pods to choose from",
@@ -387,7 +413,7 @@ function liveLogsHelp(context: string | null, namespace: string | null): PageHel
             },
             {
                 label: "Follow one pod's logs (as the stream does)",
-                command: kubectlCommand(context, ["logs", "-f", "<pod>", "-n", ns, "--tail=200"]),
+                command: kubectlCommand(context, ["logs", "-f", "<pod>", "-n", ns, `--tail=${LOG_TAIL_LINES}`]),
             },
         ],
     };
