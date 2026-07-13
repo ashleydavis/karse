@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
     useReactTable,
     getCoreRowModel,
@@ -33,7 +33,8 @@ import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type Fi
 import { useTableFilter } from "../../../lib/use-table-filter";
 import { LoadError } from "../../../components/load-error";
 import { ResourceRef } from "../../../components/resource-ref";
-import { tableRowSx } from "../../../lib/table-row-style";
+import { DataTableRows } from "../../../components/data-table-row";
+import { useSearchFilter } from "../../../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
@@ -121,7 +122,7 @@ export function DeploymentsTable() {
     });
 
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [globalFilter, setGlobalFilter] = useState("");
+    const { search, setSearch, deferredSearch } = useSearchFilter();
 
     // The filterable columns the shared editor offers: the Health value column plus
     // one column per label key present on the loaded deployments.
@@ -133,18 +134,22 @@ export function DeploymentsTable() {
 
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("deployments", columns);
 
+    const openDeployment = useCallback((deployment: Deployment) => {
+        navigate(`/deployments/${deployment.namespace}/${deployment.name}`);
+    }, [navigate]);
+
     const table = useReactTable({
         data: data?.deployments ?? [],
         columns,
         state: {
             sorting,
-            globalFilter,
+            globalFilter: deferredSearch,
             columnFilters: filter.columnFilters,
             columnOrder,
             columnVisibility: { ...columnVisibility, health: false },
         },
         onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
+        onGlobalFilterChange: setSearch,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -183,8 +188,8 @@ export function DeploymentsTable() {
                 <TextField
                     size="small"
                     placeholder="Search deployments..."
-                    value={globalFilter}
-                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                     data-test-id="deployments-search"
                     slotProps={{
                         input: {
@@ -242,20 +247,13 @@ export function DeploymentsTable() {
                                 </TableCell>
                             </TableRow>
                         )}
-                        {rows.map((row) => (
-                            <TableRow
-                                key={row.id}
-                                data-test-id="deployment-row"
-                                onClick={() => navigate(`/deployments/${row.original.namespace}/${row.original.name}`)}
-                                sx={tableRowSx(true)}
-                            >
-                                {row.getVisibleCells().map((cell) => (
-                                    <TableCell key={cell.id}>
-                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        ))}
+                        <DataTableRows
+                            rows={rows}
+                            visibleColumns={table.getVisibleLeafColumns()}
+                            testId="deployment-row"
+                            clickable={true}
+                            onOpen={openDeployment}
+                        />
                     </TableBody>
                 </Table>
             </TableContainer>

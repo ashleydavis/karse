@@ -8,6 +8,22 @@ export function tableHeadCellTint(theme: Theme): string {
     return theme.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.025)";
 }
 
+// The row style for a row that navigates to a detail page on click.
+const CLICKABLE_ROW_SX: SxProps<Theme> = {
+    cursor: "pointer",
+    "&:hover": {
+        bgcolor: "action.hover",
+    },
+};
+
+// The row style for a static row, which highlights on hover but does not navigate.
+const STATIC_ROW_SX: SxProps<Theme> = {
+    cursor: "default",
+    "&:hover": {
+        bgcolor: "action.hover",
+    },
+};
+
 // Consistent hover rule for all data tables across Karse:
 //   - Every data row (clickable or static) gets the same MUI "action.hover"
 //     background highlight on hover so the UX is uniform everywhere.
@@ -15,11 +31,8 @@ export function tableHeadCellTint(theme: Theme): string {
 //     pointer cursor to advertise the affordance; static rows keep the
 //     default cursor.
 // Pass clickable=true for rows wired to an onClick navigation handler.
+// Both styles are constants rather than fresh objects so a re-rendered row hands MUI the same
+// sx it had before, and emotion does not re-evaluate an identical style for every cell.
 export function tableRowSx(clickable: boolean): SxProps<Theme> {
-    return {
-        cursor: clickable ? "pointer" : "default",
-        "&:hover": {
-            bgcolor: "action.hover",
-        },
-    };
+    return clickable ? CLICKABLE_ROW_SX : STATIC_ROW_SX;
 }

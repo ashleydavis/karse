@@ -42,6 +42,14 @@ Open the **Pods page** with **no namespace selected** (so all namespaces show). 
 - **No match**: type `zzzqqq`. No rows match and the "No pods match the search." message appears.
 - **Clearing**: delete the query and confirm all four pods reappear.
 
+### Typing stays responsive on a big table
+
+Point Karse at a cluster with a few thousand pods (any real cluster, or a KWOK cluster seeded with a few thousand fake pods), open the **Pods page** with no namespace selected, and type a query such as `nginx-` into the search box at a normal typing speed.
+
+- Every character appears in the box the moment it is typed. The box never lags behind the keyboard, never drops a character, and never reorders what was typed.
+- The page does not freeze while typing: scrolling, the sidebar and the other controls all stay usable, and the table settles on the filtered rows as soon as typing pauses.
+- Delete the query and confirm the full list comes straight back. The rows a query selects are the same as ever — only the table's responsiveness changed.
+
 ### Search by label, node, and namespace
 On the same **Pods page** (no namespace selected):
 

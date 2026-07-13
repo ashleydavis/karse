@@ -22,7 +22,8 @@ import {
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
-import { tableRowSx } from "../lib/table-row-style";
+import { DataTableRows } from "./data-table-row";
+import { useSearchFilter } from "../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../lib/fuzzy-filter";
 import { buildLabelRows, compareLabelRows, type LabelRow } from "../lib/label-rows";
 
@@ -33,6 +34,16 @@ const labelSortingFn: SortingFn<LabelRow> = (rowA, rowB, columnId) => {
     return compareLabelRows(rowA.original, rowB.original, columnId);
 };
 
+// Label keys and values are shown as monospace text, truncated with an ellipsis rather than
+// wrapping. A constant, so a re-rendered row hands MUI the same sx it had before.
+const LABEL_CELL_SX = {
+    fontFamily: "monospace",
+    maxWidth: 500,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+};
+
 // The one searchable, sortable Key / Value table of a single resource's labels.
 // Shared by both label surfaces so they behave identically: the Labels tab on a
 // detail page (labels-tab.tsx) and the labels modal opened from a truncated
@@ -40,7 +51,7 @@ const labelSortingFn: SortingFn<LabelRow> = (rowA, rowB, columnId) => {
 // map and knows nothing about which resource or surface opened it.
 export function LabelsTable({ labels }: { labels: Record<string, string> | undefined | null }) {
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [globalFilter, setGlobalFilter] = useState("");
+    const { search, setSearch, deferredSearch } = useSearchFilter();
 
     const data = buildLabelRows(labels);
 
@@ -62,10 +73,10 @@ export function LabelsTable({ labels }: { labels: Record<string, string> | undef
         columns,
         state: {
             sorting,
-            globalFilter,
+            globalFilter: deferredSearch,
         },
         onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
+        onGlobalFilterChange: setSearch,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -101,8 +112,8 @@ export function LabelsTable({ labels }: { labels: Record<string, string> | undef
             <TextField
                 size="small"
                 placeholder="Search labels..."
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 data-test-id="labels-filter"
                 slotProps={{
                     input: {
@@ -143,15 +154,12 @@ export function LabelsTable({ labels }: { labels: Record<string, string> | undef
                                 </TableCell>
                             </TableRow>
                         )}
-                        {rows.map((row) => (
-                            <TableRow key={row.id} data-test-id="label-row" sx={tableRowSx(false)}>
-                                {row.getVisibleCells().map((cell) => (
-                                    <TableCell key={cell.id} sx={{ fontFamily: "monospace", maxWidth: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        ))}
+                        <DataTableRows
+                            rows={rows}
+                            visibleColumns={table.getVisibleLeafColumns()}
+                            testId="label-row"
+                            cellSx={LABEL_CELL_SX}
+                        />
                     </TableBody>
                 </Table>
             </TableContainer>

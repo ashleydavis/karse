@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
     useReactTable,
@@ -33,7 +33,8 @@ import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
 import { TableFilter } from "../../../components/table-filter";
 import { ResourceRef } from "../../../components/resource-ref";
-import { tableRowSx } from "../../../lib/table-row-style";
+import { DataTableRows } from "../../../components/data-table-row";
+import { useSearchFilter } from "../../../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn, type FilterSelection } from "../../../lib/table-filter-state";
 import { useTableFilter } from "../../../lib/use-table-filter";
@@ -355,33 +356,53 @@ function PodsTableInner() {
     });
 
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [globalFilter, setGlobalFilter] = useState("");
+    const { search, setSearch, deferredSearch } = useSearchFilter();
 
-    const figuresMap = buildPodFiguresMap(performance?.pods ?? []);
-    const columns = buildColumns(figuresMap, mode, format);
+    // The figures map and the columns it builds are memoised because the column definitions are
+    // what identify a row's cells: rebuilding them on every render would give every row new cells
+    // and defeat the row memoisation below, so a keystroke would re-render the whole table again.
+    const figuresMap = useMemo(() => buildPodFiguresMap(performance?.pods ?? []), [performance]);
+    const columns = useMemo(() => buildColumns(figuresMap, mode, format), [figuresMap, mode, format]);
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("pods", columns);
+
+    // Health is a filter-only column and is never shown, but the object saying so must keep its
+    // identity across renders, or TanStack rebuilds every row's visible-cell list each render.
+    const visibility = useMemo(() => ({
+        ...columnVisibility,
+        health: false,
+    }), [columnVisibility]);
+
+    const openPod = useCallback((pod: Pod) => {
+        navigate(`/pods/${pod.namespace}/${pod.name}`);
+    }, [navigate]);
 
     // The filterable columns the shared editor offers: the Status (phase) and
     // Health value columns plus one column per label key present on the loaded pods.
-    const filterableColumns: FilterableColumn[] = [
+    // Memoised on the data: collecting the label columns walks every pod, and doing that on every
+    // render would put the whole list back on the keystroke path.
+    const allPods = data?.pods ?? [];
+    const filterableColumns: FilterableColumn[] = useMemo(() => [
         { columnId: "phase", label: "Status", options: ALL_PHASES, kind: "value" },
         { columnId: "health", label: "Health", options: HEALTH_FILTER_OPTIONS, kind: "value" },
-        ...collectLabelColumns(data?.pods ?? []),
-    ];
+        ...collectLabelColumns(allPods),
+    ], [allPods]);
     const filter = useTableFilter(filterableColumns, initialPhaseSelection(searchParams.get("phase")));
+
+    // The stats header sums the whole list too, so it is memoised for the same reason.
+    const stats = useMemo(() => computePodStats(allPods), [allPods]);
 
     const table = useReactTable({
         data: data?.pods ?? [],
         columns,
         state: {
             sorting,
-            globalFilter,
+            globalFilter: deferredSearch,
             columnFilters: filter.columnFilters,
             columnOrder,
-            columnVisibility: { ...columnVisibility, health: false },
+            columnVisibility: visibility,
         },
         onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
+        onGlobalFilterChange: setSearch,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -397,8 +418,6 @@ function PodsTableInner() {
     }
 
     const rows = table.getRowModel().rows;
-    const allPods = data?.pods ?? [];
-    const stats = computePodStats(allPods);
 
     function SortIcon({ columnId }: { columnId: string }) {
         const col = table.getColumn(columnId);
@@ -419,8 +438,8 @@ function PodsTableInner() {
                 <TextField
                     size="small"
                     placeholder="Search pods..."
-                    value={globalFilter}
-                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                     data-test-id="pods-search"
                     slotProps={{
                         input: {
@@ -479,20 +498,13 @@ function PodsTableInner() {
                                 </TableCell>
                             </TableRow>
                         )}
-                        {rows.map((row) => (
-                            <TableRow
-                                key={row.id}
-                                data-test-id="pod-row"
-                                onClick={() => navigate(`/pods/${row.original.namespace}/${row.original.name}`)}
-                                sx={tableRowSx(true)}
-                            >
-                                {row.getVisibleCells().map((cell) => (
-                                    <TableCell key={cell.id}>
-                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        ))}
+                        <DataTableRows
+                            rows={rows}
+                            visibleColumns={table.getVisibleLeafColumns()}
+                            testId="pod-row"
+                            clickable={true}
+                            onOpen={openPod}
+                        />
                     </TableBody>
                 </Table>
             </TableContainer>

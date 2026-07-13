@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
     useReactTable,
     getCoreRowModel,
@@ -25,7 +25,8 @@ import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/fr
 import type { WorkloadUsage, ClusterResourceTotals } from "karse-types";
 import { useOriginTag, useShareableNavigate } from "../../../lib/nav-state";
 import { ResourceRef } from "../../../components/resource-ref";
-import { tableRowSx } from "../../../lib/table-row-style";
+import { DataTableRows } from "../../../components/data-table-row";
+import { useSearchFilter } from "../../../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { ResourceBarCell } from "../../../components/resource-utilization/resource-bar-cell";
 import { StatusBadge } from "../../../components/resource-utilization/status-badge";
@@ -65,6 +66,12 @@ function detailPathFor(workload: WorkloadUsage): string | null {
 // The figure a workload row shows for a metric under the selected View mode: live usage in
 // usage mode, reserved requests in requests mode. Null usage (Metrics API absent) keeps the
 // usage-mode bar honest with an em-dash.
+// A workload is clickable only when it has a detail page. A module-level function so the row
+// list keeps the same predicate on every render.
+function hasDetailPage(workload: WorkloadUsage): boolean {
+    return detailPathFor(workload) !== null;
+}
+
 function metricFor(workload: WorkloadUsage, mode: ViewMode, metric: "cpu" | "memory"): number | null {
     const reading = mode === "usage" ? workload.usage : workload.requests;
     return metric === "cpu" ? reading.cpuMillicores : reading.memoryBytes;
@@ -212,15 +219,25 @@ function WorkloadsTableInner({
     // breadcrumb shows "Cluster > <workload>" and links back here.
     const from = useOriginTag();
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [globalFilter, setGlobalFilter] = useState("");
+    const { search, setSearch, deferredSearch } = useSearchFilter();
 
-    const columns = buildColumns(mode, format, totals);
+    // Memoised so every row keeps the same cells across a render, and the memoised rows below
+    // can skip re-rendering when only the search text has changed.
+    const columns = useMemo(() => buildColumns(mode, format, totals), [mode, format, totals]);
+    const openWorkload = useCallback((workload: WorkloadUsage) => {
+        const path = detailPathFor(workload);
+        if (path !== null)
+        {
+            navigate(path, { from });
+        }
+    }, [navigate, from]);
+
     const table = useReactTable({
         data: workloads,
         columns,
-        state: { sorting, globalFilter },
+        state: { sorting, globalFilter: deferredSearch },
         onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
+        onGlobalFilterChange: setSearch,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -252,8 +269,8 @@ function WorkloadsTableInner({
             <TextField
                 size="small"
                 placeholder="Search workloads..."
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 data-test-id="workloads-search"
                 sx={{ maxWidth: 320 }}
                 slotProps={{
@@ -299,23 +316,13 @@ function WorkloadsTableInner({
                                 </TableCell>
                             </TableRow>
                         )}
-                        {rows.map((row) => {
-                            const path = detailPathFor(row.original);
-                            return (
-                                <TableRow
-                                    key={row.id}
-                                    data-test-id="workload-row"
-                                    onClick={path ? () => navigate(path, { from }) : undefined}
-                                    sx={tableRowSx(path !== null)}
-                                >
-                                    {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id}>
-                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                        </TableCell>
-                                    ))}
-                                </TableRow>
-                            );
-                        })}
+                        <DataTableRows
+                            rows={rows}
+                            visibleColumns={table.getVisibleLeafColumns()}
+                            testId="workload-row"
+                            isClickable={hasDetailPage}
+                            onOpen={openWorkload}
+                        />
                     </TableBody>
                 </Table>
             </TableContainer>

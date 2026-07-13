@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
     useReactTable,
     getCoreRowModel,
@@ -33,7 +33,8 @@ import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type Fi
 import { useTableFilter } from "../../../lib/use-table-filter";
 import { LoadError } from "../../../components/load-error";
 import { ResourceRef } from "../../../components/resource-ref";
-import { tableRowSx } from "../../../lib/table-row-style";
+import { DataTableRows } from "../../../components/data-table-row";
+import { useSearchFilter } from "../../../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
@@ -119,7 +120,7 @@ export function StatefulSetsTable() {
     });
 
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [globalFilter, setGlobalFilter] = useState("");
+    const { search, setSearch, deferredSearch } = useSearchFilter();
 
     // The filterable columns the shared editor offers: the Health value column plus
     // one column per label key present on the loaded stateful sets.
@@ -131,18 +132,22 @@ export function StatefulSetsTable() {
 
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("statefulsets", columns);
 
+    const openStatefulSet = useCallback((statefulSet: StatefulSet) => {
+        navigate(`/statefulsets/${statefulSet.namespace}/${statefulSet.name}`);
+    }, [navigate]);
+
     const table = useReactTable({
         data: data?.statefulSets ?? [],
         columns,
         state: {
             sorting,
-            globalFilter,
+            globalFilter: deferredSearch,
             columnFilters: filter.columnFilters,
             columnOrder,
             columnVisibility: { ...columnVisibility, health: false },
         },
         onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
+        onGlobalFilterChange: setSearch,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -181,8 +186,8 @@ export function StatefulSetsTable() {
                 <TextField
                     size="small"
                     placeholder="Search stateful sets..."
-                    value={globalFilter}
-                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                     data-test-id="statefulsets-search"
                     slotProps={{
                         input: {
@@ -240,20 +245,13 @@ export function StatefulSetsTable() {
                                 </TableCell>
                             </TableRow>
                         )}
-                        {rows.map((row) => (
-                            <TableRow
-                                key={row.id}
-                                data-test-id="statefulset-row"
-                                onClick={() => navigate(`/statefulsets/${row.original.namespace}/${row.original.name}`)}
-                                sx={tableRowSx(true)}
-                            >
-                                {row.getVisibleCells().map((cell) => (
-                                    <TableCell key={cell.id}>
-                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        ))}
+                        <DataTableRows
+                            rows={rows}
+                            visibleColumns={table.getVisibleLeafColumns()}
+                            testId="statefulset-row"
+                            clickable={true}
+                            onOpen={openStatefulSet}
+                        />
                     </TableBody>
                 </Table>
             </TableContainer>

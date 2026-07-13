@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
     useReactTable,
     getCoreRowModel,
@@ -35,12 +35,13 @@ import { LoadError } from "../../../components/load-error";
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
 import { useShareableNavigate } from "../../../lib/nav-state";
-import { tableRowSx } from "../../../lib/table-row-style";
 import { ResourceRef } from "../../../components/resource-ref";
 import { RowFilterMenu } from "../../../components/row-filter-menu";
 import { ActiveRowFilters } from "../../../components/active-row-filters";
 import { type EventFilter, applyEventFilters } from "../../../lib/event-filter";
 import { useEventFilters } from "../../../lib/use-event-filters";
+import { DataTableRows } from "../../../components/data-table-row";
+import { useSearchFilter } from "../../../lib/use-search-filter";
 
 // Every selectable event type, in display order. Drives the type column in the
 // shared filter editor.
@@ -185,7 +186,7 @@ export function EventsTable() {
     });
 
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [globalFilter, setGlobalFilter] = useState("");
+    const { search, setSearch, deferredSearch } = useSearchFilter();
 
     // The filterable columns the shared editor offers: the Type value column. An
     // empty selection means "show all" (the default); the filter activates on the
@@ -216,18 +217,22 @@ export function EventsTable() {
 
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("events", tableColumns);
 
+    const openEvent = useCallback((event: ClusterEvent) => {
+        navigate(`/events/${encodeURIComponent(event.uid)}`);
+    }, [navigate]);
+
     const table = useReactTable({
         data: visible,
         columns: tableColumns,
         state: {
             sorting,
-            globalFilter,
+            globalFilter: deferredSearch,
             columnFilters: filter.columnFilters,
             columnOrder,
             columnVisibility,
         },
         onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
+        onGlobalFilterChange: setSearch,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -263,8 +268,8 @@ export function EventsTable() {
                 <TextField
                     size="small"
                     placeholder="Search events..."
-                    value={globalFilter}
-                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                     data-test-id="events-search"
                     slotProps={{
                         input: {
@@ -335,20 +340,13 @@ export function EventsTable() {
                                 </TableCell>
                             </TableRow>
                         )}
-                        {rows.map((row) => (
-                            <TableRow
-                                key={row.id}
-                                data-test-id="event-row"
-                                onClick={() => navigate(`/events/${encodeURIComponent(row.original.uid)}`)}
-                                sx={tableRowSx(true)}
-                            >
-                                {row.getVisibleCells().map((cell) => (
-                                    <TableCell key={cell.id}>
-                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        ))}
+                        <DataTableRows
+                            rows={rows}
+                            visibleColumns={table.getVisibleLeafColumns()}
+                            testId="event-row"
+                            clickable={true}
+                            onOpen={openEvent}
+                        />
                     </TableBody>
                 </Table>
             </TableContainer>

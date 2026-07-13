@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
     useReactTable,
     getCoreRowModel,
@@ -24,9 +24,10 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import type { Namespace } from "karse-types";
-import { tableRowSx } from "../../../lib/table-row-style";
+import { DataTableRows } from "../../../components/data-table-row";
+import { useSearchFilter } from "../../../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
-import { ACTIONS_COLUMN_ID, stickyActionsHeaderSx, stickyActionsCellSx } from "../../../lib/sticky-actions";
+import { ACTIONS_COLUMN_ID, stickyActionsHeaderSx } from "../../../lib/sticky-actions";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
 import { LabelsCell } from "../../../components/labels-cell";
@@ -49,7 +50,7 @@ type Props = {
 
 export function NamespaceList({ namespaces, active, terminalDefault, isLoading, error, onRetry, onUse, onSetDefault, onOpen }: Props) {
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [globalFilter, setGlobalFilter] = useState("");
+    const { search, setSearch, deferredSearch } = useSearchFilter();
 
     // The filterable columns the shared editor offers: one column per label key
     // present on the loaded namespaces.
@@ -127,12 +128,16 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
         },
     ];
 
+    const openNamespace = useCallback((namespace: Namespace) => {
+        onOpen?.(namespace.name);
+    }, [onOpen]);
+
     const table = useReactTable({
         data: namespaces,
         columns,
-        state: { sorting, globalFilter, columnFilters: filter.columnFilters },
+        state: { sorting, globalFilter: deferredSearch, columnFilters: filter.columnFilters },
         onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
+        onGlobalFilterChange: setSearch,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -163,8 +168,8 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
                 <TextField
                     size="small"
                     placeholder="Search namespaces..."
-                    value={globalFilter}
-                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                     data-test-id="namespaces-filter"
                     slotProps={{
                         input: {
@@ -225,20 +230,13 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
                                 </TableCell>
                             </TableRow>
                         )}
-                        {rows.map((row) => (
-                            <TableRow
-                                key={row.id}
-                                data-test-id="namespace-row"
-                                onClick={onOpen ? () => onOpen(row.original.name) : undefined}
-                                sx={tableRowSx(onOpen !== undefined)}
-                            >
-                                {row.getVisibleCells().map((cell) => (
-                                    <TableCell key={cell.id} sx={stickyActionsCellSx(cell.column.id === ACTIONS_COLUMN_ID)}>
-                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        ))}
+                        <DataTableRows
+                            rows={rows}
+                            visibleColumns={table.getVisibleLeafColumns()}
+                            testId="namespace-row"
+                            clickable={onOpen !== undefined}
+                            onOpen={openNamespace}
+                        />
                     </TableBody>
                 </Table>
             </TableContainer>

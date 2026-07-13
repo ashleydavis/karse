@@ -227,6 +227,13 @@ State that lives above the pages (currently the selected kubectl context) is own
 
 `@tanstack/react-table` (headless) for tabular data, rendered with MUI primitives. Do not build table state by hand in component state.
 
+Every table with a search box shares two pieces, and a new table should use both:
+
+- `lib/use-search-filter.ts` — the search state. Bind the `TextField` to `search` (so the typed text appears immediately) and the table's `globalFilter` to `deferredSearch` (so React re-filters and re-renders the rows at a lower priority, and abandons that render when the next character arrives, instead of re-rendering the whole table once per keystroke).
+- `components/data-table-row.tsx` — the shared, memoised row. A row whose data has not changed skips its re-render, so a keystroke no longer re-creates and re-styles every cell of every surviving row. Pass a stable `onOpen` (a `useCallback`) — a fresh closure per render defeats the memo.
+
+For the memo to bail out, a row's cells must keep their identity across renders, and cells are derived from the columns. **A table's `columns` array must therefore be stable**: build it at module level, or wrap the `buildColumns(...)` call in a `useMemo` keyed on what it reads. The same goes for any object passed into the table's `state` (e.g. a `columnVisibility` object built with a spread). Rebuilding the columns in the render body gives every row new cells on every render and silently reintroduces the whole-table re-render this shares out.
+
 ### Routing
 
 React Router 7. Routes are declared centrally in `src/app.tsx`. Each page is colocated with its page-only components in its own directory: `src/pages/<page>/index.tsx` for the route-level component plus `src/pages/<page>/components/` for components used only by that page. Components shared across multiple pages (the app shell, header, sidebar, breadcrumbs, context/namespace pickers, the guided-commands tab, and the YAML sub-tab panel) live under `src/components/`.

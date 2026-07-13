@@ -25,9 +25,10 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import type { Context } from "karse-types";
-import { tableRowSx } from "../../../lib/table-row-style";
+import { DataTableRows } from "../../../components/data-table-row";
+import { useSearchFilter } from "../../../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
-import { ACTIONS_COLUMN_ID, stickyActionsHeaderSx, stickyActionsCellSx } from "../../../lib/sticky-actions";
+import { ACTIONS_COLUMN_ID, stickyActionsHeaderSx } from "../../../lib/sticky-actions";
 import { addContextCommands, addContextHeading, addContextIntro } from "../lib/add-context-help";
 
 type Props = {
@@ -40,7 +41,7 @@ type Props = {
 
 export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetDefault }: Props) {
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [globalFilter, setGlobalFilter] = useState("");
+    const { search, setSearch, deferredSearch } = useSearchFilter();
 
     const columns: ColumnDef<Context>[] = [
         {
@@ -97,9 +98,9 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
     const table = useReactTable({
         data: contexts,
         columns,
-        state: { sorting, globalFilter },
+        state: { sorting, globalFilter: deferredSearch },
         onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
+        onGlobalFilterChange: setSearch,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -121,8 +122,8 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
             <TextField
                 size="small"
                 placeholder="Search contexts..."
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 data-test-id="contexts-search"
                 slotProps={{
                     input: {
@@ -206,15 +207,11 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
                                 </TableCell>
                             </TableRow>
                         )}
-                        {rows.map((row) => (
-                            <TableRow key={row.id} data-test-id="context-row" sx={tableRowSx(false)}>
-                                {row.getVisibleCells().map((cell) => (
-                                    <TableCell key={cell.id} sx={stickyActionsCellSx(cell.column.id === ACTIONS_COLUMN_ID)}>
-                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        ))}
+                        <DataTableRows
+                            rows={rows}
+                            visibleColumns={table.getVisibleLeafColumns()}
+                            testId="context-row"
+                        />
                     </TableBody>
                 </Table>
             </TableContainer>

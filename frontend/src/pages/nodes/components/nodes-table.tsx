@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useShareableNavigate } from "../../../lib/nav-state";
 import {
     useReactTable,
@@ -30,7 +30,8 @@ import { fetchNodes, fetchClusterPerformance } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
 import { TableFilter } from "../../../components/table-filter";
-import { tableRowSx } from "../../../lib/table-row-style";
+import { DataTableRows } from "../../../components/data-table-row";
+import { useSearchFilter } from "../../../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn } from "../../../lib/table-filter-state";
 import { useTableFilter } from "../../../lib/use-table-filter";
@@ -320,7 +321,7 @@ function NodesTableInner() {
     });
 
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [globalFilter, setGlobalFilter] = useState("");
+    const { search, setSearch, deferredSearch } = useSearchFilter();
 
     const utilizationMap = useMemo(
         () => buildNodeUtilizationMap(performance?.nodes ?? []),
@@ -334,6 +335,10 @@ function NodesTableInner() {
     // unmount and remount each cell's subtree. That destroys any state a cell owns (the
     // Labels cell's open modal) and detaches its DOM mid-interaction, so a control inside a
     // cell — the labels "+N ..." chip — could never be clicked.
+    //
+    // The column definitions are also what identify a row's cells, so a stable `columns` is
+    // what lets the memoised rows below bail out: rebuilding it every render would give every
+    // row new cells and put the whole-table re-render back on every keystroke.
     const columns = useMemo(
         () => buildColumns(utilizationMap, mode, format),
         [utilizationMap, mode, format],
@@ -341,12 +346,18 @@ function NodesTableInner() {
 
     // The filterable columns the shared editor offers: the Status and Health value
     // columns plus one column per label key present on the loaded nodes.
-    const filterableColumns: FilterableColumn[] = [
+    // Memoised on the data: collecting the label columns walks every node, and doing that on every
+    // render would put the whole list back on the keystroke path.
+    const allNodes = data?.nodes ?? [];
+    const filterableColumns: FilterableColumn[] = useMemo(() => [
         { columnId: "status", label: "Status", options: ALL_STATUSES, kind: "value" },
         { columnId: "health", label: "Health", options: HEALTH_FILTER_OPTIONS, kind: "value" },
-        ...collectLabelColumns(data?.nodes ?? []),
-    ];
+        ...collectLabelColumns(allNodes),
+    ], [allNodes]);
     const filter = useTableFilter(filterableColumns);
+
+    // The stats header sums the whole list too, so it is memoised for the same reason.
+    const stats = useMemo(() => computeNodeStats(allNodes), [allNodes]);
 
     // The Roles column is hidden by default: on real single-distribution clusters
     // (e.g. docker-desktop) nodes carry no role labels, so it reads "<none>" and adds
@@ -355,27 +366,41 @@ function NodesTableInner() {
 
     // TanStack memoises its row model (and each row's per-column value cache) on the `data`
     // reference alone, not on `columns`. The CPU/Memory accessors close over the utilisation
-    // map, so the row model has to be rebuilt when the cluster Performance snapshot lands or
-    // those columns keep serving the em-dash values computed before it arrived.
+    // map and the View/Value toggles, so the row model has to be rebuilt when the cluster
+    // Performance snapshot lands or those columns keep serving the em-dash values computed
+    // before it arrived.
     //
-    // This therefore hands TanStack a new array whenever the node list or the utilisation map
-    // changes — and the SAME array on every other render. Spreading a fresh array inline on
-    // every render (as this once did) invalidates that memo continuously, and TanStack fires
-    // its auto-reset (`_autoResetPageIndex`) whenever the row-model memo re-runs. The reset
-    // sets table state, which re-renders, which spreads another new array: a self-sustaining
-    // render loop (~300 renders/sec) that rebuilt the table's DOM continuously and left no
-    // cell control on screen long enough to be clicked.
-    const tableData = useMemo(
+    // This therefore hands TanStack a new array whenever the node list, the utilisation map or
+    // the view toggles change — and the SAME array on every other render. Spreading a fresh
+    // array inline on every render (as this once did) invalidates that memo continuously, and
+    // TanStack fires its auto-reset (`_autoResetPageIndex`) whenever the row-model memo re-runs.
+    // The reset sets table state, which re-renders, which spreads another new array: a
+    // self-sustaining render loop (~300 renders/sec) that rebuilt the table's DOM continuously
+    // and left no cell control on screen long enough to be clicked. The stable identity is also
+    // what makes typing cheap: a keystroke changes none of these inputs, so the same rows are
+    // reused instead of every one of them being rebuilt per keystroke.
+    const rowData = useMemo(
         () => [...(data?.nodes ?? [])],
-        [data?.nodes, utilizationMap],
+        [data?.nodes, utilizationMap, mode, format],
     );
 
+    // Health is a filter-only column and is never shown, but the object saying so must keep its
+    // identity across renders, or TanStack rebuilds every row's visible-cell list each render.
+    const visibility = useMemo(() => ({
+        ...columnVisibility,
+        health: false,
+    }), [columnVisibility]);
+
+    const openNode = useCallback((node: Node) => {
+        navigate(`/nodes/${node.name}`);
+    }, [navigate]);
+
     const table = useReactTable({
-        data: tableData,
+        data: rowData,
         columns,
-        state: { sorting, globalFilter, columnFilters: filter.columnFilters, columnOrder, columnVisibility: { ...columnVisibility, health: false } },
+        state: { sorting, globalFilter: deferredSearch, columnFilters: filter.columnFilters, columnOrder, columnVisibility: visibility },
         onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
+        onGlobalFilterChange: setSearch,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -391,8 +416,6 @@ function NodesTableInner() {
     }
 
     const rows = table.getRowModel().rows;
-    const allNodes = data?.nodes ?? [];
-    const stats = computeNodeStats(allNodes);
 
     function SortIcon({ columnId }: { columnId: string }) {
         const col = table.getColumn(columnId);
@@ -410,8 +433,8 @@ function NodesTableInner() {
                 <TextField
                     size="small"
                     placeholder="Search nodes..."
-                    value={globalFilter}
-                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                     data-test-id="nodes-search"
                     slotProps={{
                         input: {
@@ -466,20 +489,13 @@ function NodesTableInner() {
                                 </TableCell>
                             </TableRow>
                         )}
-                        {rows.map((row) => (
-                            <TableRow
-                                key={row.id}
-                                data-test-id="node-row"
-                                onClick={() => navigate(`/nodes/${row.original.name}`)}
-                                sx={tableRowSx(true)}
-                            >
-                                {row.getVisibleCells().map((cell) => (
-                                    <TableCell key={cell.id}>
-                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        ))}
+                        <DataTableRows
+                            rows={rows}
+                            visibleColumns={table.getVisibleLeafColumns()}
+                            testId="node-row"
+                            clickable={true}
+                            onOpen={openNode}
+                        />
                     </TableBody>
                 </Table>
             </TableContainer>

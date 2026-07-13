@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { ColumnDef, VisibilityState } from "@tanstack/react-table";
 
 // Persisted, per-table configuration of which columns are visible and the order to show them in.
@@ -139,7 +139,7 @@ export type UseColumnConfigResult = {
 // saved configuration yet; a saved configuration always takes precedence over it.
 // Feed `columnOrder` and `columnVisibility` into useReactTable's state.
 export function useColumnConfig<T>(tableId: string, columns: ColumnDef<T>[], defaultHidden: string[] = []): UseColumnConfigResult {
-    const configurable = configurableColumns(columns);
+    const configurable = useMemo(() => configurableColumns(columns), [columns]);
     const [config, setConfigState] = useState<ColumnConfig>(() => reconcile(loadConfig(tableId), configurable, defaultHidden));
 
     const setConfig = useCallback((next: ColumnConfig) => {
@@ -149,15 +149,26 @@ export function useColumnConfig<T>(tableId: string, columns: ColumnDef<T>[], def
 
     // TanStack needs every column in the order array; non-configurable columns (e.g. actions)
     // are appended so they keep their place at the end of the row.
-    const allIds = columns.map((col) => columnId(col));
-    const configurableInOrder = config.order.filter((id) => allIds.includes(id));
-    const nonConfigurable = allIds.filter((id) => !configurable.some((c) => c.id === id));
-    const columnOrder = [...configurableInOrder, ...nonConfigurable];
+    //
+    // The order and the visibility map are memoised (and so is `configurable`) because TanStack
+    // keys a row's cells on the column order: handing it a new order array on every render gives
+    // every row new cells, which re-renders and re-styles the whole table on every keystroke.
+    // This only holds if the caller's `columns` array is stable too, so a table either defines
+    // its columns at module level or memoises the call that builds them.
+    const columnOrder = useMemo(() => {
+        const allIds = columns.map((col) => columnId(col));
+        const configurableInOrder = config.order.filter((id) => allIds.includes(id));
+        const nonConfigurable = allIds.filter((id) => !configurable.some((c) => c.id === id));
+        return [...configurableInOrder, ...nonConfigurable];
+    }, [columns, configurable, config]);
 
-    const columnVisibility: VisibilityState = {};
-    for (const id of config.hidden) {
-        columnVisibility[id] = false;
-    }
+    const columnVisibility: VisibilityState = useMemo(() => {
+        const visibility: VisibilityState = {};
+        for (const id of config.hidden) {
+            visibility[id] = false;
+        }
+        return visibility;
+    }, [config]);
 
     return {
         columnOrder,

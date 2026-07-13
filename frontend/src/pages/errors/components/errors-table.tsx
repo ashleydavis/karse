@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
     useReactTable,
     getCoreRowModel,
@@ -35,8 +35,9 @@ import { useTableFilter } from "../../../lib/use-table-filter";
 import { LoadError } from "../../../components/load-error";
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
-import { tableRowSx } from "../../../lib/table-row-style";
 import { ResourceRef } from "../../../components/resource-ref";
+import { DataTableRows } from "../../../components/data-table-row";
+import { useSearchFilter } from "../../../lib/use-search-filter";
 import { formatAge, errorsGlobalFilter } from "../../../lib/errors-search";
 import { RowFilterMenu } from "../../../components/row-filter-menu";
 import { ActiveRowFilters } from "../../../components/active-row-filters";
@@ -164,7 +165,7 @@ export function ErrorsTable() {
     });
 
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [globalFilter, setGlobalFilter] = useState("");
+    const { search, setSearch, deferredSearch } = useSearchFilter();
 
     // The filterable columns the shared editor offers: the Reason value column, whose
     // options are the distinct reasons present in the loaded errors. An empty selection
@@ -195,18 +196,26 @@ export function ErrorsTable() {
 
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("errors", tableColumns);
 
+    // The detail page selects an error by its index into the unfiltered, newest-first list it
+    // re-fetches, so a row opens by its position in that same list, not by its position in the
+    // current filtered/sorted view.
+    const openError = useCallback((error: ClusterError) => {
+        const unfiltered = data?.errors ?? [];
+        navigate(`/errors/${unfiltered.indexOf(error)}`);
+    }, [data, navigate]);
+
     const table = useReactTable({
         data: visible,
         columns: tableColumns,
         state: {
             sorting,
-            globalFilter,
+            globalFilter: deferredSearch,
             columnFilters: filter.columnFilters,
             columnOrder,
             columnVisibility,
         },
         onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
+        onGlobalFilterChange: setSearch,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -242,8 +251,8 @@ export function ErrorsTable() {
                 <TextField
                     size="small"
                     placeholder="Search errors..."
-                    value={globalFilter}
-                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                     data-test-id="errors-search"
                     slotProps={{
                         input: {
@@ -314,27 +323,13 @@ export function ErrorsTable() {
                                 </TableCell>
                             </TableRow>
                         )}
-                        {rows.map((row) => {
-                            // The detail page selects an error by its index into the
-                            // unfiltered, newest-first list it re-fetches, so the row
-                            // links by its position in that same list (`all`), not by
-                            // its position in the current filtered/sorted view.
-                            const detailIndex = all.indexOf(row.original);
-                            return (
-                                <TableRow
-                                    key={row.id}
-                                    data-test-id="error-row"
-                                    onClick={() => navigate(`/errors/${detailIndex}`)}
-                                    sx={tableRowSx(true)}
-                                >
-                                    {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id}>
-                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                        </TableCell>
-                                    ))}
-                                </TableRow>
-                            );
-                        })}
+                        <DataTableRows
+                            rows={rows}
+                            visibleColumns={table.getVisibleLeafColumns()}
+                            testId="error-row"
+                            clickable={true}
+                            onOpen={openError}
+                        />
                     </TableBody>
                 </Table>
             </TableContainer>

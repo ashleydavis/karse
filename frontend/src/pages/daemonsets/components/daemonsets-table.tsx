@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
     useReactTable,
     getCoreRowModel,
@@ -33,7 +33,8 @@ import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type Fi
 import { useTableFilter } from "../../../lib/use-table-filter";
 import { LoadError } from "../../../components/load-error";
 import { ResourceRef } from "../../../components/resource-ref";
-import { tableRowSx } from "../../../lib/table-row-style";
+import { DataTableRows } from "../../../components/data-table-row";
+import { useSearchFilter } from "../../../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
@@ -123,7 +124,7 @@ export function DaemonSetsTable() {
     });
 
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [globalFilter, setGlobalFilter] = useState("");
+    const { search, setSearch, deferredSearch } = useSearchFilter();
 
     // The filterable columns the shared editor offers: the Health value column plus
     // one column per label key present on the loaded daemon sets.
@@ -135,18 +136,22 @@ export function DaemonSetsTable() {
 
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("daemonsets", columns);
 
+    const openDaemonSet = useCallback((daemonSet: DaemonSet) => {
+        navigate(`/daemonsets/${daemonSet.namespace}/${daemonSet.name}`);
+    }, [navigate]);
+
     const table = useReactTable({
         data: data?.daemonSets ?? [],
         columns,
         state: {
             sorting,
-            globalFilter,
+            globalFilter: deferredSearch,
             columnFilters: filter.columnFilters,
             columnOrder,
             columnVisibility: { ...columnVisibility, health: false },
         },
         onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
+        onGlobalFilterChange: setSearch,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -185,8 +190,8 @@ export function DaemonSetsTable() {
                 <TextField
                     size="small"
                     placeholder="Search daemon sets..."
-                    value={globalFilter}
-                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                     data-test-id="daemonsets-search"
                     slotProps={{
                         input: {
@@ -244,20 +249,13 @@ export function DaemonSetsTable() {
                                 </TableCell>
                             </TableRow>
                         )}
-                        {rows.map((row) => (
-                            <TableRow
-                                key={row.id}
-                                data-test-id="daemonset-row"
-                                onClick={() => navigate(`/daemonsets/${row.original.namespace}/${row.original.name}`)}
-                                sx={tableRowSx(true)}
-                            >
-                                {row.getVisibleCells().map((cell) => (
-                                    <TableCell key={cell.id}>
-                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        ))}
+                        <DataTableRows
+                            rows={rows}
+                            visibleColumns={table.getVisibleLeafColumns()}
+                            testId="daemonset-row"
+                            clickable={true}
+                            onOpen={openDaemonSet}
+                        />
                     </TableBody>
                 </Table>
             </TableContainer>

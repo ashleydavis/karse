@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
     useReactTable,
     getCoreRowModel,
@@ -34,7 +34,8 @@ import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
 import { TableFilter } from "../../../components/table-filter";
 import { ResourceRef } from "../../../components/resource-ref";
-import { tableRowSx } from "../../../lib/table-row-style";
+import { DataTableRows } from "../../../components/data-table-row";
+import { useSearchFilter } from "../../../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn } from "../../../lib/table-filter-state";
 import { useTableFilter } from "../../../lib/use-table-filter";
@@ -66,6 +67,12 @@ function formatAge(createdAt: string): string {
 // Builds the column definitions for the All resources table: Kind, Namespace,
 // Name, Status, Age, Labels, plus a hidden Health column that backs the health
 // filter (matching every other table).
+// A resource is clickable only when it has a detail page. A module-level function so the row
+// list keeps the same predicate on every render.
+function hasDetailPage(resource: AllResource): boolean {
+    return resource.detailPath !== null;
+}
+
 function buildColumns(): ColumnDef<AllResource>[] {
     return [
         {
@@ -162,7 +169,7 @@ export function AllResourcesTable() {
     const [podsResult, nodesResult, namespacesResult, deploymentsResult, statefulSetsResult, daemonSetsResult, hpasResult] = results;
 
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [globalFilter, setGlobalFilter] = useState("");
+    const { search, setSearch, deferredSearch } = useSearchFilter();
 
     // TanStack's row model memoises on the identity of the `data` and `columns` arrays
     // it is handed. Rebuilding either on every render re-runs the row model, which fires
@@ -171,6 +178,10 @@ export function AllResourcesTable() {
     // each row (and the links inside it) faster than a user can click them. Memoising
     // both keeps the identities stable, so the row model rebuilds only when the resource
     // data genuinely changes.
+    //
+    // Stable identities are also what let the memoised rows below skip re-rendering: a row's
+    // cells are derived from `columns`, so a rebuilt `columns` would defeat the memo and put
+    // the whole-table re-render back on every keystroke.
     const columns = useMemo(() => buildColumns(), []);
 
     const allResources = useMemo(
@@ -201,17 +212,26 @@ export function AllResourcesTable() {
     ];
     const filter = useTableFilter(filterableColumns);
 
+    // Tags the destination with from=all-resources so the detail page's breadcrumb shows the
+    // All resources origin.
+    const openResource = useCallback((resource: AllResource) => {
+        if (resource.detailPath !== null)
+        {
+            navigate(resource.detailPath, { from: "all-resources" });
+        }
+    }, [navigate]);
+
     const table = useReactTable({
         data: allResources,
         columns,
         state: {
             sorting,
-            globalFilter,
+            globalFilter: deferredSearch,
             columnFilters: filter.columnFilters,
             columnVisibility: { health: false },
         },
         onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
+        onGlobalFilterChange: setSearch,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -250,8 +270,8 @@ export function AllResourcesTable() {
                 <TextField
                     size="small"
                     placeholder="Search resources..."
-                    value={globalFilter}
-                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                     data-test-id="all-resources-search"
                     slotProps={{
                         input: {
@@ -308,25 +328,13 @@ export function AllResourcesTable() {
                                 </TableCell>
                             </TableRow>
                         )}
-                        {rows.map((row) => {
-                            const path = row.original.detailPath;
-                            return (
-                                <TableRow
-                                    key={row.id}
-                                    data-test-id="all-resource-row"
-                                    // Tag the destination with from=all-resources so the
-                                    // detail page's breadcrumb shows the All resources origin.
-                                    onClick={path ? () => navigate(path, { from: "all-resources" }) : undefined}
-                                    sx={tableRowSx(path !== null)}
-                                >
-                                    {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id}>
-                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                        </TableCell>
-                                    ))}
-                                </TableRow>
-                            );
-                        })}
+                        <DataTableRows
+                            rows={rows}
+                            visibleColumns={table.getVisibleLeafColumns()}
+                            testId="all-resource-row"
+                            isClickable={hasDetailPage}
+                            onOpen={openResource}
+                        />
                     </TableBody>
                 </Table>
             </TableContainer>
