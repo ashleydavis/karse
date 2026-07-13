@@ -1153,6 +1153,76 @@ test.describe("karse e2e", () => {
             expect(buttonBox).not.toBeNull();
             expect(buttonBox!.x + buttonBox!.width).toBeLessThanOrEqual(containerBox!.x + containerBox!.width + 1);
         });
+
+        test("the pinned Actions header cell is opaque and matches the header row's colour", async () => {
+            // The pinned header cell must be fully opaque, or the header cells scrolling under
+            // it show through and their text paints into it, and it must render the same colour
+            // as the rest of the header row (paper + the head-cell tint), or the pinned cell
+            // reads as a mismatched block with a seam where the header row's tint stops.
+            await page.locator("[data-test-id='contexts-table']").evaluate((el) => {
+                el.scrollLeft = 0;
+            });
+            const colours = await page.locator("[data-test-id='contexts-table']").evaluate((container) => {
+                // "rgb(r, g, b)" / "rgba(r, g, b, a)" -> [r, g, b, a].
+                function parseColour(colour: string): number[] {
+                    const parts = (colour.match(/[\d.]+/g) ?? []).map(Number);
+                    return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0, parts[3] ?? 1];
+                }
+                // Composite a (possibly translucent) colour over an opaque one: "source over".
+                function composite(top: number[], bottom: number[]): number[] {
+                    return [0, 1, 2].map((i) => top[i] * top[3] + bottom[i] * (1 - top[3]));
+                }
+                const headCells = Array.from(container.querySelectorAll("thead th"));
+                const pinned = headCells[headCells.length - 1];
+                const other = headCells[0];
+                const paper = parseColour(getComputedStyle(container).backgroundColor);
+                const pinnedBase = parseColour(getComputedStyle(pinned).backgroundColor);
+                // The tint the pinned cell composites on top of its opaque base, as a gradient
+                // layer. "none" when there is no gradient, which parses to a no-op transparent.
+                const gradient = getComputedStyle(pinned).backgroundImage;
+                const pinnedTint = gradient === "none"
+                    ? [0, 0, 0, 0]
+                    : parseColour(gradient.slice(gradient.indexOf("(") + 1));
+                return {
+                    pinnedAlpha: pinnedBase[3],
+                    // What the pinned cell actually renders: its tint over its own background.
+                    pinnedRendered: composite(pinnedTint, composite(pinnedBase, paper)),
+                    // What every other header cell renders: the head tint over the table's paper.
+                    headerRowRendered: composite(parseColour(getComputedStyle(other).backgroundColor), paper),
+                };
+            });
+            // Opaque: nothing beneath the pinned cell can bleed through it.
+            expect(colours.pinnedAlpha).toBe(1);
+            // Same rendered colour as the header row (within one 8-bit step of rounding).
+            for (const channel of [0, 1, 2]) {
+                expect(Math.abs(colours.pinnedRendered[channel] - colours.headerRowRendered[channel])).toBeLessThanOrEqual(1);
+            }
+        });
+
+        test("the pinned Actions header cell paints over the header cells scrolled under it", async () => {
+            await page.locator("[data-test-id='contexts-table']").evaluate((el) => {
+                el.scrollLeft = 0;
+            });
+            // Hit-test a grid of points across the pinned header cell: every one must land in the
+            // pinned cell itself. If a scrolled-under header cell were on top at any of them, the
+            // topmost element there would belong to that cell instead.
+            const occluded = await page.locator("[data-test-id='contexts-table']").evaluate((container) => {
+                const headCells = Array.from(container.querySelectorAll("thead th"));
+                const pinned = headCells[headCells.length - 1];
+                const box = pinned.getBoundingClientRect();
+                const hits: string[] = [];
+                for (let fx = 0.1; fx <= 0.9; fx += 0.1) {
+                    for (let fy = 0.25; fy <= 0.75; fy += 0.25) {
+                        const hit = document.elementFromPoint(box.left + box.width * fx, box.top + box.height * fy);
+                        const cell = hit === null ? null : hit.closest("th");
+                        hits.push(cell === pinned ? "pinned" : `other:${cell === null ? "none" : cell.textContent}`);
+                    }
+                }
+                return hits;
+            });
+            expect(occluded.length).toBeGreaterThan(0);
+            expect(occluded.every((hit) => hit === "pinned")).toBe(true);
+        });
     });
 
     // ── Context picker ────────────────────────────────────────────────────────

@@ -132,6 +132,8 @@ Reuse the shareable-url-state fixture (two contexts plus namespaces), no new clu
 ### What to check
 - **Contexts page**: go to `/contexts` and narrow the browser window until the table is wider than the viewport (a horizontal scrollbar appears under the table). Confirm the **Actions** header and each row's "Set as active" / "Set as default" buttons stay visible, pinned to the right edge, without scrolling right.
 - **Scrolled-under content is hidden**: drag the horizontal scrollbar. Confirm the other columns scroll *underneath* the pinned Actions column (the pinned column has a solid background and a soft left-edge shadow — no text shows through it).
+- **The pinned header cell too**: check the header row specifically. The **Actions** header cell must be solid — the column headers scrolling under it (Cluster, User, ...) must not show through it, and their text must never overlap the word "Actions".
+- **Header colour matches**: the pinned **Actions** header cell is the same shade as the rest of the header row — no lighter block and no seam where the header row's tint stops.
 - **Hover matches**: hover a row. Confirm the pinned Actions cell takes the same hover tint as the rest of the row (no mismatched block at the right edge).
 - **Namespaces page**: repeat on `/namespaces` (Name, Labels, Resources, Actions). The "Set as active" / "Set as default" buttons stay pinned and reachable at a narrow width.
 - **No regression at normal width**: widen the window so the table fits. Confirm the layout is unchanged — no stray shadow or gap, the Actions column sits flush at the right like any other column.

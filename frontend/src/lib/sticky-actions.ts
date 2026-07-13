@@ -1,4 +1,5 @@
 import type { Theme, CSSObject } from "@mui/material/styles";
+import { tableHeadCellTint } from "./table-row-style";
 
 // A single sticky-column style: either a plain style object or a theme-reading callback.
 // Deliberately narrower than MUI's SxProps (which also permits arrays) so a value of this
@@ -24,17 +25,29 @@ function pinShadow(theme: Theme): string {
 // scrolling TableContainer with an opaque background so the other header cells pass beneath
 // it when the table is wider than the window. Returns an empty sx for every other column so
 // callers can apply it unconditionally to each header cell.
+//
+// The rules sit under a `&&&` selector to raise their specificity. The MuiTableHead theme
+// override in main.tsx styles head cells through a descendant selector
+// (`.MuiTableHead-root .MuiTableCell-head`), which out-specifies a plain sx class: a
+// background set here without the boost lost to the theme's translucent tint, leaving the
+// pinned header cell see-through so the scrolled-under header text showed through it.
 export function stickyActionsHeaderSx(isActionsColumn: boolean): StickySx {
     if (!isActionsColumn) {
         return {};
     }
     return (theme) => ({
-        position: "sticky",
-        right: 0,
-        // Above sibling header cells so scrolled columns pass underneath the pinned cell.
-        zIndex: 2,
-        backgroundColor: theme.palette.background.paper,
-        boxShadow: pinShadow(theme),
+        "&&&": {
+            position: "sticky",
+            right: 0,
+            // Above sibling header cells so scrolled columns pass underneath the pinned cell.
+            zIndex: 2,
+            // Opaque paper base with the head-cell tint composited on top as a gradient layer:
+            // the cell renders exactly the colour the rest of the header row does (paper + tint)
+            // while being fully opaque, so the columns scrolling under it cannot show through.
+            backgroundColor: theme.palette.background.paper,
+            backgroundImage: `linear-gradient(${tableHeadCellTint(theme)}, ${tableHeadCellTint(theme)})`,
+            boxShadow: pinShadow(theme),
+        },
     });
 }
 

@@ -7,6 +7,7 @@ import { config } from "@fortawesome/fontawesome-svg-core";
 import "@fortawesome/fontawesome-svg-core/styles.css";
 import "./index.css";
 import { queryClient } from "./lib/query-client";
+import { tableHeadCellTint } from "./lib/table-row-style";
 
 // Import the Font Awesome CSS above ourselves and stop the library injecting it again at runtime.
 config.autoAddCss = false;
@@ -61,9 +62,7 @@ function Root() {
                             textTransform: "uppercase" as const,
                             letterSpacing: "0.07em",
                             color: theme.palette.text.secondary,
-                            backgroundColor: theme.palette.mode === "dark"
-                                ? "rgba(255,255,255,0.04)"
-                                : "rgba(0,0,0,0.025)",
+                            backgroundColor: tableHeadCellTint(theme),
                         },
                     }),
                 },
