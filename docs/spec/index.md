@@ -34,6 +34,7 @@ The spec is reverse-engineered from the shipped code and the prose docs (`docs/a
 | [resource-stats](./resource-stats/index.md) | Settled | Complete | Per-page Total / Healthy / Error stats header on each resource list page. |
 | [loading-indicators](./loading-indicators/index.md) | Settled | Complete | Shared loading spinner shown while a page's primary data query is in flight, across list and detail pages. |
 | [column-config](./column-config/index.md) | Settled | Complete | Per-table configurable column visibility and order, persisted; shared across all tables. |
+| [timestamp-format](./timestamp-format/index.md) | Settled | Complete | Header toggle switching every timestamp in the app between its age and the absolute local time, persisted. |
 | [quick-find](./quick-find/index.md) | Settled | Partial | Header quick-pickers for context and namespace. Global cross-kind quick-find is not yet shipped. |
 | [guided-commands](./guided-commands/index.md) | Settled | Complete | Copy-only kubectl commands: per-resource suggestions, plus page help naming each page's data source. |
 | [yaml-viewer](./yaml-viewer/index.md) | Settled | Complete | View the raw YAML of a viewable resource on a detail-page sub tab. |

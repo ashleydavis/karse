@@ -38,13 +38,15 @@ import { ColumnConfigButton } from "../../../components/column-config-modal";
 import { ResourceRef } from "../../../components/resource-ref";
 import { DataTableRows } from "../../../components/data-table-row";
 import { useSearchFilter } from "../../../lib/use-search-filter";
-import { formatAge, errorsGlobalFilter } from "../../../lib/errors-search";
+import { makeErrorsGlobalFilter } from "../../../lib/errors-search";
 import { RowFilterMenu } from "../../../components/row-filter-menu";
 import { ActiveRowFilters } from "../../../components/active-row-filters";
 import { type EventFilter, applyEventFilters } from "../../../lib/event-filter";
 import { useEventFilters } from "../../../lib/use-event-filters";
 import { TimeRangeFilter } from "../../../components/time-range-filter";
 import { DEFAULT_TIME_RANGE, timeRangeColumnFilters, timeRangeFilterFn, type TimeRange } from "../../../lib/time-range";
+import { useTimestampFormat } from "../../../lib/use-timestamp-format";
+import { Timestamp } from "../../../components/timestamp";
 
 // The distinct error types (reasons) present in the data, in display order
 // (alphabetical). These are the checkboxes offered by the type filter.
@@ -84,7 +86,7 @@ const columns: ColumnDef<ClusterError>[] = [
         id: "lastSeen",
         accessorKey: "lastSeen",
         header: "Age",
-        cell: (info) => formatAge(info.getValue<string>()),
+        cell: (info) => <Timestamp value={info.getValue<string>()} />,
         sortingFn: (a, b) =>
             new Date(a.original.lastSeen).getTime() - new Date(b.original.lastSeen).getTime(),
         // Keeps a row only when its last-seen time falls inside the range chosen in
@@ -178,6 +180,11 @@ export function ErrorsTable() {
     // for weeks is older than the default range and is hidden until the range widens.
     const [timeRange, setTimeRange] = useState<TimeRange>(DEFAULT_TIME_RANGE);
 
+    // The search matches the text the table actually shows, and the first column's
+    // text depends on the timestamp mode, so the filter is rebuilt when it changes.
+    const { mode: timestampMode } = useTimestampFormat();
+    const globalFilterFn = useMemo(() => makeErrorsGlobalFilter(timestampMode), [timestampMode]);
+
     // The filterable columns the shared editor offers: the Reason value column, whose
     // options are the distinct reasons present in the loaded errors. An empty selection
     // means "show all" (the default); the filter activates on the first tick.
@@ -238,7 +245,7 @@ export function ErrorsTable() {
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
-        globalFilterFn: errorsGlobalFilter,
+        globalFilterFn,
     });
 
     if (error) {

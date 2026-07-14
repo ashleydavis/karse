@@ -1,6 +1,9 @@
 import type { Row } from "@tanstack/react-table";
 import type { ClusterError } from "karse-types";
-import { errorMatchesQuery, errorsGlobalFilter, errorDisplayStrings } from "../../lib/errors-search";
+import { errorMatchesQuery, makeErrorsGlobalFilter, errorDisplayStrings } from "../../lib/errors-search";
+
+// The errors table's filter in the default ("age") timestamp mode.
+const errorsGlobalFilter = makeErrorsGlobalFilter("age");
 
 // A problem-pod error whose distinctive text is spread across different columns,
 // so each test can target one column without another column also matching.
@@ -44,6 +47,12 @@ describe("errorMatchesQuery", () => {
     test("matches the displayed Age text, not the raw timestamp", () => {
         expect(errorMatchesQuery(error, "3h")).toBe(true);
         expect(errorMatchesQuery(error, error.lastSeen)).toBe(false);
+    });
+
+    test("matches the displayed local time, not the age, in local-time mode", () => {
+        const year = String(new Date(error.lastSeen).getFullYear());
+        expect(errorMatchesQuery(error, year, "local")).toBe(true);
+        expect(errorMatchesQuery(error, "3h", "local")).toBe(false);
     });
 
     test("is case-insensitive", () => {

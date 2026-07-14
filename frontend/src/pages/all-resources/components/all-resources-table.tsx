@@ -43,26 +43,7 @@ import { LabelsCell } from "../../../components/labels-cell";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
 import { HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
 import { aggregateResources, presentKinds, type AllResource } from "../../../lib/all-resources";
-
-// Formats a Kubernetes creationTimestamp into a human-readable age string. An
-// empty timestamp (kinds whose list carries no creation time, e.g. namespaces)
-// shows as "-".
-function formatAge(createdAt: string): string {
-    if (createdAt === "") {
-        return "-";
-    }
-    const ms = Date.now() - new Date(createdAt).getTime();
-    const minutes = Math.floor(ms / 60_000);
-    const hours = Math.floor(ms / 3_600_000);
-    const days = Math.floor(ms / 86_400_000);
-    if (days > 0) {
-        return `${days}d`;
-    }
-    if (hours > 0) {
-        return `${hours}h`;
-    }
-    return `${minutes}m`;
-}
+import { Timestamp } from "../../../components/timestamp";
 
 // Builds the column definitions for the All resources table: Kind, Namespace,
 // Name, Status, Age, Labels, plus a hidden Health column that backs the health
@@ -107,7 +88,7 @@ function buildColumns(): ColumnDef<AllResource>[] {
             id: "age",
             accessorKey: "createdAt",
             header: "Age",
-            cell: (info) => formatAge(info.getValue<string>()),
+            cell: (info) => <Timestamp value={info.getValue<string>()} />,
             // An empty timestamp sorts oldest (treated as 0) so age sort stays total.
             sortingFn: (a, b) => {
                 const ta = a.original.createdAt === "" ? 0 : new Date(a.original.createdAt).getTime();

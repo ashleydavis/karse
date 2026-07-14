@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useMemo, ReactNode } from "react";
 import { useMediaQuery } from "@mui/material";
+import type { TimestampMode } from "./timestamps";
 
 const STORAGE_KEY = "karse-config";
 
@@ -7,15 +8,22 @@ type ColorMode = "light" | "dark" | "system";
 
 type Config = {
     colorMode: ColorMode;
+    timestampMode: TimestampMode;
 };
 
 type ConfigContextValue = {
     config: Config;
     resolvedColorMode: "light" | "dark";
     setColorMode: (mode: ColorMode) => void;
+    setTimestampMode: (mode: TimestampMode) => void;
 };
 
-const defaultConfig: Config = { colorMode: "system" };
+// Timestamps default to "age" because that is how Karse has always shown them
+// (and how `kubectl get` shows them), so the default view is unchanged.
+const defaultConfig: Config = {
+    colorMode: "system",
+    timestampMode: "age",
+};
 
 function loadConfig(): Config {
     try {
@@ -35,6 +43,7 @@ const ConfigContext = createContext<ConfigContextValue>({
     config: defaultConfig,
     resolvedColorMode: "light",
     setColorMode: () => {},
+    setTimestampMode: () => {},
 });
 
 export function ConfigProvider({ children }: { children: ReactNode }) {
@@ -49,6 +58,13 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         resolvedColorMode,
         setColorMode: (mode) => {
             const next = { ...config, colorMode: mode };
+            setConfig(next);
+            saveConfig(next);
+        },
+        // Persisted alongside the colour mode, so the chosen timestamp format
+        // survives navigation and a page reload.
+        setTimestampMode: (mode) => {
+            const next = { ...config, timestampMode: mode };
             setConfig(next);
             saveConfig(next);
         },

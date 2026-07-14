@@ -93,6 +93,17 @@ A command may carry a placeholder in angle brackets where the value is yours to 
 
 Karse never runs a command on your behalf from this panel; it only shows you what it ran and what you can run. Pages with no cluster data behind them (About, Config) have no question-mark button. For commands that *act on* a resource (delete, scale, drain), see the **Commands** tab on that resource's detail page.
 
+### Timestamp format
+
+Karse shows every timestamp (a resource's age, an event's last-seen, an error's age, a node condition's last transition, the log stream's last-updated caption) in one of two formats. The **timestamp format** button in the header switches between them:
+
+- **Age** (clock icon, the default): the time since it happened, e.g. `2d`, `4h`, `37m`. This is how `kubectl get` reports age.
+- **Local time** (calendar icon): the absolute time in your own timezone, e.g. `14 Jul 2026, 09:23:45`.
+
+One click switches every timestamp in the app at once, and the choice is remembered across navigation and page reloads. Sorting is unaffected: an Age column always sorts by the real timestamp behind the cell, whichever format is shown.
+
+Two fields are deliberately left alone: **First seen** and **Last seen** on the event and error detail pages always show the absolute local time with the age in parentheses, because reporting the absolute time is what they are for.
+
 ## Contexts page (`/contexts`)
 
 A table of all kubeconfig contexts. Each row shows the context name, cluster, user, and default namespace.

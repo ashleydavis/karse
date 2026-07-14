@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import {
     Box,
@@ -33,21 +33,7 @@ import { ResourceRef } from "../../components/resource-ref";
 import { ResourceStatsHeader } from "../../components/resource-stats-header";
 import { computePodStats } from "../../lib/resource-stats";
 import { tableRowSx } from "../../lib/table-row-style";
-
-// Formats a Kubernetes creationTimestamp into a human-readable age string.
-function formatAge(createdAt: string): string {
-    const ms = Date.now() - new Date(createdAt).getTime();
-    const minutes = Math.floor(ms / 60_000);
-    const hours = Math.floor(ms / 3_600_000);
-    const days = Math.floor(ms / 86_400_000);
-    if (days > 0) {
-        return `${days}d`;
-    }
-    if (hours > 0) {
-        return `${hours}h`;
-    }
-    return `${minutes}m`;
-}
+import { Timestamp } from "../../components/timestamp";
 
 // Renders a chip indicating whether a workload event is Normal or Warning.
 function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
@@ -109,6 +95,14 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
         return <LoadingIndicator />;
     }
 
+    // The Details grid's label/value pairs: Age, then the workload's own stats. The
+    // values are ReactNodes because Age is a <Timestamp>, which renders as an age or
+    // a local time per the app-wide mode.
+    const detailFields: [string, ReactNode][] = [
+        ["Age", <Timestamp value={data.createdAt} />],
+        ...data.stats.map((stat): [string, ReactNode] => [stat.label, stat.value]),
+    ];
+
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }} data-test-id="workload-detail">
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -149,10 +143,7 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                                     <ResourceRef kind="Namespace" name={data.namespace} testId="workload-detail-namespace-link" />
                                 </Typography>
                             </Box>
-                            {[
-                                ["Age", formatAge(data.createdAt)],
-                                ...data.stats.map((stat): [string, string] => [stat.label, stat.value]),
-                            ].map(([label, value]) => (
+                            {detailFields.map(([label, value]) => (
                                 <Box key={label} data-test-id="workload-stat">
                                     <Typography variant="caption" color="text.secondary">{label}</Typography>
                                     <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{value}</Typography>
@@ -199,7 +190,7 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                                                 <TableCell>{ev.reason}</TableCell>
                                                 <TableCell sx={{ maxWidth: 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.message}</TableCell>
                                                 <TableCell>{ev.count}</TableCell>
-                                                <TableCell>{ev.lastSeen ? formatAge(ev.lastSeen) : "-"}</TableCell>
+                                                <TableCell><Timestamp value={ev.lastSeen} /></TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>

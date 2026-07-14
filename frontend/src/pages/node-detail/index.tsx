@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import {
     Box,
@@ -49,21 +49,7 @@ import {
 } from "../../lib/resource-utilization-context";
 import { ViewToggles } from "../../components/resource-utilization/view-toggles";
 import { ResourceBarCell } from "../../components/resource-utilization/resource-bar-cell";
-
-// Formats a Kubernetes creationTimestamp into a human-readable age string.
-function formatAge(createdAt: string): string {
-    const ms = Date.now() - new Date(createdAt).getTime();
-    const minutes = Math.floor(ms / 60_000);
-    const hours = Math.floor(ms / 3_600_000);
-    const days = Math.floor(ms / 86_400_000);
-    if (days > 0) {
-        return `${days}d`;
-    }
-    if (hours > 0) {
-        return `${hours}h`;
-    }
-    return `${minutes}m`;
-}
+import { Timestamp } from "../../components/timestamp";
 
 // Renders a colored MUI Chip for a node's Ready / NotReady / Unknown status.
 function StatusChip({ status }: { status: NodeStatus }) {
@@ -346,6 +332,14 @@ export function NodeDetailPage() {
         return <LoadingIndicator />;
     }
 
+    // The Details grid's label/value pairs. The values are ReactNodes because Age is
+    // a <Timestamp>, which renders as an age or a local time per the app-wide mode.
+    const detailFields: [string, ReactNode][] = [
+        ["Roles", data.roles.length > 0 ? data.roles.join(", ") : "<none>"],
+        ["Version", data.version],
+        ["Age", <Timestamp value={data.createdAt} />],
+    ];
+
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -382,11 +376,7 @@ export function NodeDetailPage() {
                     <Paper variant="outlined" sx={{ p: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Details</Typography>
                         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 1.5 }}>
-                            {[
-                                ["Roles", data.roles.length > 0 ? data.roles.join(", ") : "<none>"],
-                                ["Version", data.version],
-                                ["Age", formatAge(data.createdAt)],
-                            ].map(([label, value]) => (
+                            {detailFields.map(([label, value]) => (
                                 <Box key={label}>
                                     <Typography variant="caption" color="text.secondary">{label}</Typography>
                                     <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{value}</Typography>
@@ -436,7 +426,7 @@ export function NodeDetailPage() {
                                             <TableCell>{cond.type}</TableCell>
                                             <TableCell><ConditionStatusChip condition={cond} /></TableCell>
                                             <TableCell sx={{ maxWidth: 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cond.message}</TableCell>
-                                            <TableCell>{cond.lastTransition ? formatAge(cond.lastTransition) : "-"}</TableCell>
+                                            <TableCell><Timestamp value={cond.lastTransition} /></TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -510,7 +500,7 @@ export function NodeDetailPage() {
                                                     <TableCell>{ev.reason}</TableCell>
                                                     <TableCell sx={{ maxWidth: 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.message}</TableCell>
                                                     <TableCell>{ev.count}</TableCell>
-                                                    <TableCell>{ev.lastSeen ? formatAge(ev.lastSeen) : "-"}</TableCell>
+                                                    <TableCell><Timestamp value={ev.lastSeen} /></TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>

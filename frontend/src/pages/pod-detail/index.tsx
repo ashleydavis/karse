@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import {
     Box,
@@ -33,21 +34,7 @@ import { LogViewer } from "../../components/log-viewer";
 import { PodPerformanceTab } from "../../components/performance/pod-performance-tab";
 import { PodNodeResourcesPanel } from "../../components/performance/pod-node-share";
 import { resolveOrigin } from "../../lib/breadcrumb-trail";
-
-// Formats a Kubernetes creationTimestamp into a human-readable age string.
-function formatAge(createdAt: string): string {
-    const ms = Date.now() - new Date(createdAt).getTime();
-    const minutes = Math.floor(ms / 60_000);
-    const hours = Math.floor(ms / 3_600_000);
-    const days = Math.floor(ms / 86_400_000);
-    if (days > 0) {
-        return `${days}d`;
-    }
-    if (hours > 0) {
-        return `${hours}h`;
-    }
-    return `${minutes}m`;
-}
+import { Timestamp } from "../../components/timestamp";
 
 // Renders a colored MUI Chip for a pod phase value.
 function PhaseChip({ phase }: { phase: PodPhase }) {
@@ -154,6 +141,13 @@ export function PodDetailPage() {
     // height; only the Logs panel claims the leftover space (see below).
     const logsTabActive = effectiveTab === "logs";
 
+    // The Details grid's label/value pairs. The values are ReactNodes because Age is
+    // a <Timestamp>, which renders as an age or a local time per the app-wide mode.
+    const detailFields: [string, ReactNode][] = [
+        ["Pod IP", data.podIP || "-"],
+        ["Age", <Timestamp value={data.createdAt} />],
+    ];
+
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3, height: logsTabActive ? "100%" : undefined, minHeight: 0 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
@@ -211,10 +205,7 @@ export function PodDetailPage() {
                                         : "-"}
                                 </Typography>
                             </Box>
-                            {[
-                                ["Pod IP", data.podIP || "-"],
-                                ["Age", formatAge(data.createdAt)],
-                            ].map(([label, value]) => (
+                            {detailFields.map(([label, value]) => (
                                 <Box key={label}>
                                     <Typography variant="caption" color="text.secondary">{label}</Typography>
                                     <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{value}</Typography>
@@ -256,7 +247,7 @@ export function PodDetailPage() {
                                                 <TableCell>{ev.reason}</TableCell>
                                                 <TableCell sx={{ maxWidth: 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.message}</TableCell>
                                                 <TableCell>{ev.count}</TableCell>
-                                                <TableCell>{ev.lastSeen ? formatAge(ev.lastSeen) : "-"}</TableCell>
+                                                <TableCell><Timestamp value={ev.lastSeen} /></TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>

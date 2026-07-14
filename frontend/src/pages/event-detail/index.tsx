@@ -18,37 +18,21 @@ import { fetchEvents } from "../../lib/api-client";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { ResourceRef } from "../../components/resource-ref";
-
-// Formats a Kubernetes timestamp into a human-readable age string (e.g. "5m", "3h").
-// Returns "-" for an empty timestamp.
-function formatAge(timestamp: string): string {
-    if (timestamp === "")
-    {
-        return "-";
-    }
-    const ms = Date.now() - new Date(timestamp).getTime();
-    const minutes = Math.floor(ms / 60_000);
-    const hours = Math.floor(ms / 3_600_000);
-    const days = Math.floor(ms / 86_400_000);
-    if (days > 0)
-    {
-        return `${days}d`;
-    }
-    if (hours > 0)
-    {
-        return `${hours}h`;
-    }
-    return `${minutes}m`;
-}
+import { Timestamp } from "../../components/timestamp";
+import { formatAge, formatLocalTime, UNKNOWN_TIMESTAMP } from "../../lib/timestamps";
 
 // Formats a Kubernetes timestamp as an absolute local date-time, with the age in
-// parentheses. Returns "-" for an empty timestamp.
-function formatTimestamp(timestamp: string): string {
-    if (timestamp === "")
+// parentheses. The First/Last seen fields exist to report the absolute time, so
+// they always show it and are not switched by the app-wide timestamp toggle; the
+// Age field above them is what the toggle governs. Returns "-" for an empty or
+// unparseable timestamp.
+function formatSeenAt(timestamp: string): string {
+    const localTime = formatLocalTime(timestamp);
+    if (localTime === UNKNOWN_TIMESTAMP)
     {
-        return "-";
+        return UNKNOWN_TIMESTAMP;
     }
-    return `${new Date(timestamp).toLocaleString()} (${formatAge(timestamp)})`;
+    return `${localTime} (${formatAge(timestamp)})`;
 }
 
 // Renders a colored MUI Chip for an event type value (Warning or Normal).
@@ -176,9 +160,9 @@ export function EventDetailPage() {
                             : <ResourceRef kind="Namespace" name={event.namespace} testId="event-namespace-link" />}
                         testId="event-field-namespace"
                     />
-                    <Field label="Age" value={formatAge(event.lastSeen)} testId="event-field-age" />
-                    <Field label="First seen" value={formatTimestamp(event.firstSeen)} testId="event-field-first-seen" />
-                    <Field label="Last seen" value={formatTimestamp(event.lastSeen)} testId="event-field-last-seen" />
+                    <Field label="Age" value={<Timestamp value={event.lastSeen} />} testId="event-field-age" />
+                    <Field label="First seen" value={formatSeenAt(event.firstSeen)} testId="event-field-first-seen" />
+                    <Field label="Last seen" value={formatSeenAt(event.lastSeen)} testId="event-field-last-seen" />
                 </Box>
             </Paper>
 

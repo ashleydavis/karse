@@ -48,6 +48,7 @@ Single-test-cluster discipline (per `readme.md`): there is only ever ONE test cl
 | [resource-stats](./resource-stats/index.md) | Per-page Total / Healthy / Error stats header on each resource list page. |
 | [loading-indicators](./loading-indicators/index.md) | Loading spinner shown while a page's primary data loads. |
 | [column-config](./column-config/index.md) | Per-table configurable column visibility and order. |
+| [timestamp-format](./timestamp-format/index.md) | Header toggle switching every timestamp between its age and the local time. |
 | [quick-find](./quick-find/index.md) | Header context and namespace dropdown pickers. |
 | [guided-commands](./guided-commands/index.md) | Copy-only kubectl command suggestions, and the header page help. |
 | [yaml-viewer](./yaml-viewer/index.md) | Raw YAML sub tab on resource detail pages. |

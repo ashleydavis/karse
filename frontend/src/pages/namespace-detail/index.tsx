@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import {
     Box,
@@ -29,21 +29,7 @@ import { LoadError } from "../../components/load-error";
 import { tableRowSx } from "../../lib/table-row-style";
 import { ResourcesTable } from "./components/resources-table";
 import { namespaceResourceCount } from "../../lib/namespace-resource-count";
-
-// Formats a Kubernetes creationTimestamp into a human-readable age string.
-function formatAge(createdAt: string): string {
-    const ms = Date.now() - new Date(createdAt).getTime();
-    const minutes = Math.floor(ms / 60_000);
-    const hours = Math.floor(ms / 3_600_000);
-    const days = Math.floor(ms / 86_400_000);
-    if (days > 0) {
-        return `${days}d`;
-    }
-    if (hours > 0) {
-        return `${hours}h`;
-    }
-    return `${minutes}m`;
-}
+import { Timestamp } from "../../components/timestamp";
 
 // Renders a colored chip for a namespace's lifecycle phase.
 function PhaseChip({ phase }: { phase: string }) {
@@ -87,6 +73,15 @@ export function NamespaceDetailPage() {
     // the same number on the list and the detail page.
     const podCount = namespaceResourceCount(data.resources);
 
+    // The Details grid's label/value pairs. The values are ReactNodes because Age is
+    // a <Timestamp>, which renders as an age or a local time per the app-wide mode.
+    const detailFields: [string, ReactNode][] = [
+        ["Name", data.name],
+        ["Status", data.phase],
+        ["Age", <Timestamp value={data.createdAt} />],
+        ["Resources", `${podCount}`],
+    ];
+
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }} data-test-id="namespace-detail">
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -121,12 +116,7 @@ export function NamespaceDetailPage() {
                     <Paper variant="outlined" sx={{ p: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Details</Typography>
                         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 1.5 }}>
-                            {[
-                                ["Name", data.name],
-                                ["Status", data.phase],
-                                ["Age", formatAge(data.createdAt)],
-                                ["Resources", `${podCount}`],
-                            ].map(([label, value]) => (
+                            {detailFields.map(([label, value]) => (
                                 <Box
                                     key={label}
                                     data-test-id="namespace-stat"

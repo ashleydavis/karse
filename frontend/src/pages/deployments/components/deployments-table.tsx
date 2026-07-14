@@ -42,21 +42,7 @@ import { ResourceStatsHeader } from "../../../components/resource-stats-header";
 import { computeDeploymentStats, deploymentHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
-
-// Formats a Kubernetes creationTimestamp into a human-readable age string.
-function formatAge(createdAt: string): string {
-    const ms = Date.now() - new Date(createdAt).getTime();
-    const minutes = Math.floor(ms / 60_000);
-    const hours = Math.floor(ms / 3_600_000);
-    const days = Math.floor(ms / 86_400_000);
-    if (days > 0) {
-        return `${days}d`;
-    }
-    if (hours > 0) {
-        return `${hours}h`;
-    }
-    return `${minutes}m`;
-}
+import { Timestamp } from "../../../components/timestamp";
 
 // Column definitions for the deployments table.
 const columns: ColumnDef<Deployment>[] = [
@@ -79,7 +65,7 @@ const columns: ColumnDef<Deployment>[] = [
         id: "age",
         accessorKey: "createdAt",
         header: "Age",
-        cell: (info) => formatAge(info.getValue<string>()),
+        cell: (info) => <Timestamp value={info.getValue<string>()} />,
         sortingFn: (a, b) =>
             new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
     },

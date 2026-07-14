@@ -9565,4 +9565,123 @@ test.describe("karse e2e", () => {
             await expect(nodeRow.locator("a[data-test-id='all-resources-row-namespace-link']")).toHaveCount(0);
         });
     });
+
+    // ── Timestamp format toggle (age ⇄ local time) ─────────────────────────────
+
+    test.describe("timestamp format toggle", () => {
+        // Events pinned two hours back, so the Last seen column reads a stable "2h" in
+        // age mode and a real wall-clock date-time in local-time mode.
+        const TWO_HOURS_AGO = new Date(Date.now() - 2 * 3_600_000).toISOString();
+        const FAKE_EVENTS = {
+            events: [
+                {
+                    type: "Warning",
+                    reason: "BackOff",
+                    message: "Back-off restarting failed container",
+                    count: 5,
+                    lastSeen: TWO_HOURS_AGO,
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "nginx-abc",
+                },
+            ],
+        };
+
+        // An age reads as a number and a unit ("2h", "13m", "4d"). A local time carries a
+        // four-digit year and a wall-clock time; the browser's locale decides their order,
+        // so the pattern does not pin one.
+        const AGE = /^\d+[dhm]$/;
+        const LOCAL_TIME = /\d{4}.*\d{2}:\d{2}:\d{2}/;
+        // The detail-page stat renders its label and value in one box ("Age" + "3h"), so
+        // its age is matched at the end of the box's text rather than as the whole of it.
+        const TRAILING_AGE = /\d+[dhm]$/;
+
+        // The header toggle. Its data-timestamp-mode attribute names the mode in force.
+        function toggle() {
+            return page.locator("[data-test-id='timestamp-format-toggle']");
+        }
+
+        // The events table's Last seen cells (the first column).
+        function eventTimes() {
+            return page.locator("[data-test-id='event-row'] td:first-child");
+        }
+
+        // The text of every Age cell in the nodes table. The Age column is found from the
+        // header row rather than assumed to sit at a fixed position, because the column
+        // order is configurable (and Roles is hidden by default).
+        async function nodeAges(): Promise<string[]> {
+            const headers = await page.locator("[data-test-id='nodes-table'] thead th").allTextContents();
+            const index = headers.findIndex((header) => header.trim().startsWith("Age"));
+            expect(index).toBeGreaterThanOrEqual(0);
+            return page.locator(`[data-test-id='node-row'] td:nth-child(${index + 1})`).allTextContents();
+        }
+
+        // The namespace detail page's Age stat, a non-table timestamp surface.
+        function namespaceAge() {
+            return page.locator("[data-test-id='namespace-stat'][data-stat='age']");
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/events*", async (route) => {
+                await route.fulfill({ json: FAKE_EVENTS });
+            });
+            // The column-config tests leave the nodes table with its Age column hidden and
+            // reordered, so start from the default columns and the default timestamp mode.
+            await page.goto("/events", { waitUntil: "networkidle" });
+            await page.evaluate(() => {
+                localStorage.removeItem("karse-columns-nodes");
+                localStorage.removeItem("karse-config");
+            });
+            await page.reload({ waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='events-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/events*");
+            setContext(CLUSTER_1);
+        });
+
+        test("starts in age mode, showing the events Last seen column as an age", async () => {
+            await expect(toggle()).toHaveAttribute("data-timestamp-mode", "age");
+            await expect(eventTimes().first()).toHaveText("2h");
+        });
+
+        test("switches the events table to a readable local time", async () => {
+            await toggle().click();
+            await expect(toggle()).toHaveAttribute("data-timestamp-mode", "local");
+            await expect(eventTimes().first()).toHaveText(LOCAL_TIME);
+        });
+
+        test("carries the chosen mode across navigation to the nodes table", async () => {
+            await navigateToNodes();
+            await expect(toggle()).toHaveAttribute("data-timestamp-mode", "local");
+            for (const age of await nodeAges()) {
+                expect(age.trim()).toMatch(LOCAL_TIME);
+            }
+        });
+
+        test("switches a detail page's Age to local time too", async () => {
+            await page.goto("/namespaces/kube-system", { waitUntil: "networkidle" });
+            await expect(namespaceAge()).toContainText(LOCAL_TIME);
+        });
+
+        test("keeps the chosen mode across a reload", async () => {
+            await page.reload({ waitUntil: "networkidle" });
+            await expect(toggle()).toHaveAttribute("data-timestamp-mode", "local");
+            await expect(namespaceAge()).toContainText(LOCAL_TIME);
+        });
+
+        test("switches back to age, restoring the relative ages everywhere", async () => {
+            await toggle().click();
+            await expect(toggle()).toHaveAttribute("data-timestamp-mode", "age");
+            await expect(namespaceAge()).toContainText(TRAILING_AGE);
+            await navigateToNodes();
+            for (const age of await nodeAges()) {
+                expect(age.trim()).toMatch(AGE);
+            }
+            await page.goto("/events", { waitUntil: "networkidle" });
+            await expect(eventTimes().first()).toHaveText("2h");
+        });
+    });
 });

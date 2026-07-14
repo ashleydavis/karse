@@ -18,37 +18,19 @@ import { fetchErrors } from "../../lib/api-client";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { ResourceRef } from "../../components/resource-ref";
-
-// Formats a Kubernetes timestamp into a human-readable age string, falling back
-// to "-" when the timestamp is empty/unknown.
-function formatAge(timestamp: string): string {
-    if (timestamp === "") {
-        return "-";
-    }
-    const ms = Date.now() - new Date(timestamp).getTime();
-    const minutes = Math.floor(ms / 60_000);
-    const hours = Math.floor(ms / 3_600_000);
-    const days = Math.floor(ms / 86_400_000);
-    if (days > 0) {
-        return `${days}d`;
-    }
-    if (hours > 0) {
-        return `${hours}h`;
-    }
-    return `${minutes}m`;
-}
+import { Timestamp } from "../../components/timestamp";
+import { formatAge, formatLocalTime, UNKNOWN_TIMESTAMP } from "../../lib/timestamps";
 
 // Formats a Kubernetes timestamp into an absolute, human-readable date-time with
-// the computed age in parentheses, or "-" when unknown.
-function formatTimestamp(timestamp: string): string {
-    if (timestamp === "") {
-        return "-";
+// the computed age in parentheses, or "-" when unknown. The First/Last seen fields
+// exist to report the absolute time, so they always show it and are not switched by
+// the app-wide timestamp toggle; the Age field above them is what the toggle governs.
+function formatSeenAt(timestamp: string): string {
+    const localTime = formatLocalTime(timestamp);
+    if (localTime === UNKNOWN_TIMESTAMP) {
+        return UNKNOWN_TIMESTAMP;
     }
-    const date = new Date(timestamp);
-    if (Number.isNaN(date.getTime())) {
-        return "-";
-    }
-    return `${date.toLocaleString()} (${formatAge(timestamp)} ago)`;
+    return `${localTime} (${formatAge(timestamp)} ago)`;
 }
 
 // Renders a colored MUI Chip indicating where an error originated.
@@ -177,15 +159,15 @@ export function ErrorDetailPage() {
                     </Box>
                     <Box data-test-id="error-detail-age">
                         <Typography variant="caption" color="text.secondary">Age</Typography>
-                        <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{formatAge(item.lastSeen)}</Typography>
+                        <Typography variant="body2" sx={{ fontFamily: "monospace" }}><Timestamp value={item.lastSeen} /></Typography>
                     </Box>
                     <Box data-test-id="error-detail-first-seen">
                         <Typography variant="caption" color="text.secondary">First seen</Typography>
-                        <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{formatTimestamp(item.firstSeen)}</Typography>
+                        <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{formatSeenAt(item.firstSeen)}</Typography>
                     </Box>
                     <Box data-test-id="error-detail-last-seen">
                         <Typography variant="caption" color="text.secondary">Last seen</Typography>
-                        <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{formatTimestamp(item.lastSeen)}</Typography>
+                        <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{formatSeenAt(item.lastSeen)}</Typography>
                     </Box>
                 </Box>
             </Paper>

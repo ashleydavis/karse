@@ -40,21 +40,7 @@ import {
     parseHpaTargets, metricPercent, metricLevel, formatHpaMetrics,
     replicaPercent, replicaLevel, formatReplicas,
 } from "../../../lib/autoscalers";
-
-// Formats a Kubernetes creationTimestamp into a human-readable age string.
-function formatAge(createdAt: string): string {
-    const ms = Date.now() - new Date(createdAt).getTime();
-    const minutes = Math.floor(ms / 60_000);
-    const hours = Math.floor(ms / 3_600_000);
-    const days = Math.floor(ms / 86_400_000);
-    if (days > 0) {
-        return `${days}d`;
-    }
-    if (hours > 0) {
-        return `${hours}h`;
-    }
-    return `${minutes}m`;
-}
+import { Timestamp } from "../../../components/timestamp";
 
 // Splits an HPA's scale target reference ("Deployment/web") into its kind and name so
 // the Reference cell can link to that workload's own detail page. Returns empty strings
@@ -144,7 +130,7 @@ const columns: ColumnDef<HorizontalPodAutoscaler>[] = [
         id: "age",
         accessorKey: "createdAt",
         header: "Age",
-        cell: (info) => formatAge(info.getValue<string>()),
+        cell: (info) => <Timestamp value={info.getValue<string>()} />,
         sortingFn: (a, b) =>
             new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
     },

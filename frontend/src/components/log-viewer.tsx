@@ -28,6 +28,8 @@ import { shouldFollow, bottomScrollTop, thumbMetrics, scrollTopForThumbTop, type
 import { tokenizeLogLine } from "../lib/log-highlight";
 import { colorForPod } from "../lib/log-pod-colors";
 import { DEFAULT_TIME_RANGE, timeRangeSeconds, type TimeRange } from "../lib/time-range";
+import { formatLocalTime, type TimestampMode } from "../lib/timestamps";
+import { useTimestampFormat } from "../lib/use-timestamp-format";
 
 // A rendered log line tagged with a stable key for React reconciliation.
 type RenderedLine = LogStreamLine & { key: number };
@@ -46,11 +48,16 @@ type StreamScope = {
 const MAX_VISIBLE_POD_CHIPS = 8;
 
 // Builds the "last updated" caption from the timestamp of the most recent log
-// line. Reads "Updated just now" within the first few seconds, then ages into
-// "Updated Ns/Nm/Nh ago" so the user can tell how fresh the streamed output is.
-function formatLastUpdated(lastLineAt: number | null, now: number): string {
+// line, in the app-wide timestamp mode. In "age" mode it reads "Updated just now"
+// within the first few seconds, then ages into "Updated Ns/Nm/Nh ago" so the user
+// can tell how fresh the streamed output is. In "local" mode it names the wall-clock
+// time the last line landed instead.
+function formatLastUpdated(lastLineAt: number | null, now: number, mode: TimestampMode): string {
     if (lastLineAt === null) {
         return "No logs yet";
+    }
+    if (mode === "local") {
+        return `Updated at ${formatLocalTime(new Date(lastLineAt).toISOString())}`;
     }
     const seconds = Math.max(0, Math.floor((now - lastLineAt) / 1000));
     if (seconds < 5) {
@@ -151,6 +158,9 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
     // reach. Changing it therefore re-opens the stream rather than re-filtering the
     // lines on screen, because the excluded lines were never fetched.
     const [range, setRange] = useState<TimeRange>(DEFAULT_TIME_RANGE);
+    // The app-wide timestamp mode, which decides whether the caption below reports
+    // how long ago the last line landed or the wall-clock time it landed at.
+    const { mode: timestampMode } = useTimestampFormat();
 
     // Holds the active stream's close function so it survives re-renders.
     const closeRef = useRef<(() => void) | null>(null);
@@ -544,7 +554,7 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
                         color="text.secondary"
                         data-test-id={`${testIdPrefix}-last-updated`}
                     >
-                        {formatLastUpdated(lastLineAt, now)}
+                        {formatLastUpdated(lastLineAt, now, timestampMode)}
                     </Typography>
 
                     {/* Jump-to-top / jump-to-bottom, pushed to the far right of the

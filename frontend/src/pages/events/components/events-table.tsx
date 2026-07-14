@@ -44,28 +44,11 @@ import { DataTableRows } from "../../../components/data-table-row";
 import { useSearchFilter } from "../../../lib/use-search-filter";
 import { TimeRangeFilter } from "../../../components/time-range-filter";
 import { DEFAULT_TIME_RANGE, timeRangeColumnFilters, timeRangeFilterFn, type TimeRange } from "../../../lib/time-range";
+import { Timestamp } from "../../../components/timestamp";
 
 // Every selectable event type, in display order. Drives the type column in the
 // shared filter editor.
 const ALL_EVENT_TYPES: ClusterEvent["type"][] = ["Warning", "Normal"];
-
-// Formats a Kubernetes timestamp into a human-readable age string.
-function formatAge(lastSeen: string): string {
-    if (lastSeen === "") {
-        return "-";
-    }
-    const ms = Date.now() - new Date(lastSeen).getTime();
-    const minutes = Math.floor(ms / 60_000);
-    const hours = Math.floor(ms / 3_600_000);
-    const days = Math.floor(ms / 86_400_000);
-    if (days > 0) {
-        return `${days}d`;
-    }
-    if (hours > 0) {
-        return `${hours}h`;
-    }
-    return `${minutes}m`;
-}
 
 // Renders a colored MUI Chip for an event type value.
 function TypeChip({ type }: { type: ClusterEvent["type"] }) {
@@ -101,7 +84,7 @@ const columns: ColumnDef<ClusterEvent>[] = [
         id: "lastSeen",
         accessorKey: "lastSeen",
         header: "Last seen",
-        cell: (info) => formatAge(info.getValue<string>()),
+        cell: (info) => <Timestamp value={info.getValue<string>()} />,
         sortingFn: (a, b) =>
             new Date(a.original.lastSeen).getTime() - new Date(b.original.lastSeen).getTime(),
         // Keeps a row only when its last-seen time falls inside the range chosen in

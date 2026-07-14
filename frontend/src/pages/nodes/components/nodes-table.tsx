@@ -66,16 +66,7 @@ import { ResourceBarCell } from "../../../components/resource-utilization/resour
 import { ViewToggles } from "../../../components/resource-utilization/view-toggles";
 import { StatusBadge } from "../../../components/resource-utilization/status-badge";
 import type { ViewMode } from "../../../lib/resource-utilization";
-
-function formatAge(createdAt: string): string {
-    const ms = Date.now() - new Date(createdAt).getTime();
-    const minutes = Math.floor(ms / 60_000);
-    const hours = Math.floor(ms / 3_600_000);
-    const days = Math.floor(ms / 86_400_000);
-    if (days > 0) return `${days}d`;
-    if (hours > 0) return `${hours}h`;
-    return `${minutes}m`;
-}
+import { Timestamp } from "../../../components/timestamp";
 
 function StatusChip({ status }: { status: NodeStatus }) {
     if (status === "Ready") {
@@ -264,7 +255,7 @@ function buildColumns(util: NodeUtilizationMap, mode: ViewMode, format: ValueFor
         id: "age",
         accessorKey: "createdAt",
         header: "Age",
-        cell: (info) => formatAge(info.getValue<string>()),
+        cell: (info) => <Timestamp value={info.getValue<string>()} />,
         sortingFn: (a, b) =>
             new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
     },

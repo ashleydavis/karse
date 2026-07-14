@@ -57,21 +57,7 @@ import { ViewToggles } from "../../../components/resource-utilization/view-toggl
 import { ResourceBarCell } from "../../../components/resource-utilization/resource-bar-cell";
 import { StatusBadge } from "../../../components/resource-utilization/status-badge";
 import type { ViewMode, ValueFormat } from "../../../lib/resource-utilization";
-
-// Formats a Kubernetes creationTimestamp into a human-readable age string.
-function formatAge(createdAt: string): string {
-    const ms = Date.now() - new Date(createdAt).getTime();
-    const minutes = Math.floor(ms / 60_000);
-    const hours = Math.floor(ms / 3_600_000);
-    const days = Math.floor(ms / 86_400_000);
-    if (days > 0) {
-        return `${days}d`;
-    }
-    if (hours > 0) {
-        return `${hours}h`;
-    }
-    return `${minutes}m`;
-}
+import { Timestamp } from "../../../components/timestamp";
 
 // Renders a colored MUI Chip for a pod phase value.
 function PhaseChip({ phase }: { phase: PodPhase }) {
@@ -284,7 +270,7 @@ function buildColumns(figures: PodFiguresMap, mode: ViewMode, format: ValueForma
             id: "age",
             accessorKey: "createdAt",
             header: "Age",
-            cell: (info) => formatAge(info.getValue<string>()),
+            cell: (info) => <Timestamp value={info.getValue<string>()} />,
             sortingFn: (a, b) =>
                 new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),
         },

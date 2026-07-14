@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { AppBar, Toolbar, IconButton, Alert, Tooltip, Box, Menu, MenuItem, ListItemIcon, ListItemText, Chip } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLink, faLayerGroup, faSun, faMoon, faCircleHalfStroke, faCheck, faShareNodes, faRotate } from "@fortawesome/free-solid-svg-icons";
+import { faLink, faLayerGroup, faSun, faMoon, faCircleHalfStroke, faCheck, faShareNodes, faRotate, faClockRotateLeft, faCalendarDays } from "@fortawesome/free-solid-svg-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
 import { useConfig } from "../lib/config";
+import { nextTimestampMode } from "../lib/timestamps";
 import { clearCache } from "../lib/api-client";
 import { ContextPicker } from "./context-picker";
 import { ContextQuickPicker } from "./context-quick-picker";
@@ -17,7 +18,7 @@ import { TOP_BAR_HEIGHT } from "../lib/layout";
 export function Header() {
     const { contexts, current, isLoading, error, switchTo } = useKubeContext();
     const { namespace } = useKubeNamespace();
-    const { config: { colorMode }, setColorMode } = useConfig();
+    const { config: { colorMode, timestampMode }, setColorMode, setTimestampMode } = useConfig();
     const qc = useQueryClient();
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
     const [copied, setCopied] = useState(false);
@@ -41,6 +42,13 @@ export function Header() {
     }, []);
 
     const colorModeIcon = colorMode === "dark" ? faSun : colorMode === "light" ? faMoon : faCircleHalfStroke;
+
+    // The timestamp toggle shows the mode it is currently in, and its tooltip names
+    // the mode a click would switch to, so one button covers both directions.
+    const timestampIcon = timestampMode === "age" ? faClockRotateLeft : faCalendarDays;
+    const timestampTitle = timestampMode === "age"
+        ? "Timestamps: age. Click to show local time"
+        : "Timestamps: local time. Click to show age";
 
     async function handleRefresh(): Promise<void> {
         // Empty the on-disk cluster-data cache first so the invalidated queries below
@@ -100,6 +108,17 @@ export function Header() {
                         </IconButton>
                     </NamespaceQuickPicker>
                     <PageHelp />
+                    <Tooltip title={timestampTitle}>
+                        <IconButton
+                            size="small"
+                            onClick={() => setTimestampMode(nextTimestampMode(timestampMode))}
+                            aria-label="timestamp format"
+                            data-test-id="timestamp-format-toggle"
+                            data-timestamp-mode={timestampMode}
+                        >
+                            <FontAwesomeIcon icon={timestampIcon} />
+                        </IconButton>
+                    </Tooltip>
                     <Tooltip title="Color mode">
                         <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)} aria-label="color mode">
                             <FontAwesomeIcon icon={colorModeIcon} />
