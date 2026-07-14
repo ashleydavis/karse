@@ -46,13 +46,51 @@ spec:
     image: nginx:latest
 EOF
 
-# kwok does not emit lifecycle events on its own, so we create a couple of
+# kwok does not emit lifecycle events on its own, so we create a few
 # representative Events by hand: one Normal and one Warning, in two namespaces.
 # This exercises the type chip, the object column, the count column, and
 # namespace scoping in the Events view.
 kubectl create namespace demo 2>/dev/null || true
 
-kubectl apply -f - <<'EOF'
+# The event timestamps are generated relative to now, not hardcoded, so the seeded
+# events keep realistic ages every time the fixture runs. This matters to the
+# Events page's time-range filter, which defaults to the last 7 days: fixed
+# timestamps in the past would age out of the default range and the whole table
+# would come up empty. Their ages are deliberately graded so the range control has
+# something to bite on at every setting:
+#
+#   nginx.backoff       10 minutes ago   (inside every range down to "last 1 hour")
+#   nginx.scheduled     30 minutes ago   (inside every range down to "last 1 hour")
+#   demo.pulled          2 days ago      (inside the 7-day default, outside "last 1 day")
+#   nginx.failedmount   30 days ago      (outside the 7-day default; needs "all time")
+#
+# `bun` is a prerequisite of this project (see docs/setup.md), so it is used to do
+# the date arithmetic portably rather than relying on GNU vs BSD `date` flags.
+iso_minutes_ago() {
+    KARSE_FIXTURE_MINUTES="$1" bun -e 'console.log(new Date(Date.now() - Number(process.env.KARSE_FIXTURE_MINUTES) * 60_000).toISOString())'
+}
+
+BACKOFF_FIRST="$(iso_minutes_ago 15)"
+BACKOFF_LAST="$(iso_minutes_ago 10)"
+SCHEDULED_AT="$(iso_minutes_ago 30)"
+PULLED_AT="$(iso_minutes_ago 2880)"
+FAILEDMOUNT_AT="$(iso_minutes_ago 43200)"
+
+# The row-filter fixtures below (the `noisy` and `exit-codes` namespaces) are dated
+# relative to now for the same reason as the events above: the Events page's time-range
+# filter defaults to the last 7 days, so a hardcoded past date ages out of the default
+# range and those scenarios would open on an empty table — "0 of 4 events" instead of
+# the "4 of 4 events" their checks call for. Every one sits well inside the default,
+# and their relative order (which row is newest) is preserved.
+NOISY_FIRST="$(iso_minutes_ago 30)"
+NOISY_WEB_X2K9P_LAST="$(iso_minutes_ago 20)"
+NOISY_WEB_Q4M2T_LAST="$(iso_minutes_ago 21)"
+NOISY_API_JMNBK_LAST="$(iso_minutes_ago 22)"
+NOISY_FAILEDSCHED_LAST="$(iso_minutes_ago 23)"
+EXIT_CODE_1_LAST="$(iso_minutes_ago 24)"
+EXIT_CODE_137_LAST="$(iso_minutes_ago 25)"
+
+kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Event
 metadata:
@@ -69,8 +107,8 @@ type: Normal
 count: 1
 source:
   component: default-scheduler
-firstTimestamp: "2024-01-01T00:00:00Z"
-lastTimestamp: "2024-01-01T00:00:00Z"
+firstTimestamp: "${SCHEDULED_AT}"
+lastTimestamp: "${SCHEDULED_AT}"
 ---
 apiVersion: v1
 kind: Event
@@ -89,8 +127,8 @@ count: 9
 source:
   component: kubelet
   host: fake-node-1
-firstTimestamp: "2024-01-01T00:00:05Z"
-lastTimestamp: "2024-01-01T00:10:00Z"
+firstTimestamp: "${BACKOFF_FIRST}"
+lastTimestamp: "${BACKOFF_LAST}"
 ---
 apiVersion: v1
 kind: Event
@@ -108,8 +146,28 @@ type: Normal
 count: 1
 source:
   component: deployment-controller
-firstTimestamp: "2024-01-01T00:02:00Z"
-lastTimestamp: "2024-01-01T00:02:00Z"
+firstTimestamp: "${PULLED_AT}"
+lastTimestamp: "${PULLED_AT}"
+---
+apiVersion: v1
+kind: Event
+metadata:
+  name: nginx.failedmount
+  namespace: default
+involvedObject:
+  apiVersion: v1
+  kind: Pod
+  name: nginx
+  namespace: default
+reason: FailedMount
+message: Unable to attach or mount volumes for pod nginx
+type: Warning
+count: 2
+source:
+  component: kubelet
+  host: fake-node-1
+firstTimestamp: "${FAILEDMOUNT_AT}"
+lastTimestamp: "${FAILEDMOUNT_AT}"
 EOF
 
 
@@ -119,7 +177,7 @@ EOF
 # `web` pod. Selecting the `noisy` namespace in Karse shows exactly these four.
 kubectl create namespace noisy 2>/dev/null || true
 
-kubectl apply -f - <<'EOF'
+kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Event
 metadata:
@@ -137,8 +195,8 @@ count: 5
 source:
   component: kubelet
   host: fake-node-1
-firstTimestamp: "2024-01-01T00:00:00Z"
-lastTimestamp: "2024-01-01T00:20:00Z"
+firstTimestamp: "${NOISY_FIRST}"
+lastTimestamp: "${NOISY_WEB_X2K9P_LAST}"
 ---
 apiVersion: v1
 kind: Event
@@ -157,8 +215,8 @@ count: 3
 source:
   component: kubelet
   host: fake-node-1
-firstTimestamp: "2024-01-01T00:00:00Z"
-lastTimestamp: "2024-01-01T00:19:00Z"
+firstTimestamp: "${NOISY_FIRST}"
+lastTimestamp: "${NOISY_WEB_Q4M2T_LAST}"
 ---
 apiVersion: v1
 kind: Event
@@ -177,8 +235,8 @@ count: 2
 source:
   component: kubelet
   host: fake-node-1
-firstTimestamp: "2024-01-01T00:00:00Z"
-lastTimestamp: "2024-01-01T00:18:00Z"
+firstTimestamp: "${NOISY_FIRST}"
+lastTimestamp: "${NOISY_API_JMNBK_LAST}"
 ---
 apiVersion: v1
 kind: Event
@@ -196,8 +254,8 @@ type: Warning
 count: 1
 source:
   component: default-scheduler
-firstTimestamp: "2024-01-01T00:00:00Z"
-lastTimestamp: "2024-01-01T00:17:00Z"
+firstTimestamp: "${NOISY_FIRST}"
+lastTimestamp: "${NOISY_FAILEDSCHED_LAST}"
 EOF
 
 
@@ -208,7 +266,7 @@ EOF
 # checks above.
 kubectl create namespace exit-codes 2>/dev/null || true
 
-kubectl apply -f - <<'EOF'
+kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Event
 metadata:
@@ -226,8 +284,8 @@ count: 4
 source:
   component: kubelet
   host: fake-node-1
-firstTimestamp: "2024-01-01T00:00:00Z"
-lastTimestamp: "2024-01-01T00:16:00Z"
+firstTimestamp: "${NOISY_FIRST}"
+lastTimestamp: "${EXIT_CODE_1_LAST}"
 ---
 apiVersion: v1
 kind: Event
@@ -246,8 +304,8 @@ count: 2
 source:
   component: kubelet
   host: fake-node-1
-firstTimestamp: "2024-01-01T00:00:00Z"
-lastTimestamp: "2024-01-01T00:15:00Z"
+firstTimestamp: "${NOISY_FIRST}"
+lastTimestamp: "${EXIT_CODE_137_LAST}"
 EOF
 
 echo "Cluster ready. Select the 'kwok-karse-test' context in Karse."

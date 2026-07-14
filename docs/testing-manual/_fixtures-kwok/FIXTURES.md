@@ -51,11 +51,11 @@ To tear down every test cluster at once (after running several fixtures, or to c
 | [25-live-logs](25-live-logs/) | One node, three pods | live-logs |
 | [26-table-row-hover](26-table-row-hover/) | One node, one multi-container pod | clickable-resource-rows |
 | [27-live-pod-logs](27-live-pod-logs/) | One node, one multi-container pod | log-viewer |
-| [28-events-view](28-events-view/) | Seeded events across two namespaces | events-feed |
+| [28-events-view](28-events-view/) | Seeded events across two namespaces, aged from 10 minutes to 30 days | events-feed |
 | [29-fuzzy-search](29-fuzzy-search/) | Pods with shared characters | resource-search |
 | [30-workload-detail-pages](30-workload-detail-pages/) | One deployment, stateful set, daemon set | workload-detail |
 | [31-node-detail-tabs](31-node-detail-tabs/) | One node, two pods, node events | node-detail |
-| [32-errors-view](32-errors-view/) | Problem pod + Warning event + healthy pod | errors-feed |
+| [32-errors-view](32-errors-view/) | Problem pod + Warning event + healthy pod + a 30-day-old problem pod | errors-feed |
 | [33-labels-column](33-labels-column/) | A five-label `fake-node-1` + labelled pods and a labelled deployment in `default` | pods-view, deployments-view, labels-modal |
 | [34-namespace-detail](34-namespace-detail/) | One namespace with a deployment, stateful set, resource quota, and limit range | namespace-detail |
 | [35-workload-pods-subtab](35-workload-pods-subtab/) | Two deployments sharing the `app=web` selector (each owning its own pods via a ReplicaSet), an idle 0-replica deployment, and a daemon set with one pod per node | workload-detail |

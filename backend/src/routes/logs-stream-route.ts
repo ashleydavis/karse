@@ -47,14 +47,27 @@ function parseSelectedPods(raw: unknown): string[] {
     return names;
 }
 
-// GET /logs/stream?context=&namespace=&pods=&filter=&tail=
+// Parses the `sinceSeconds` query parameter: the viewer's time range, as a whole
+// number of seconds before now, applied at fetch so the backlog kubectl replays is
+// bounded by age as well as by `tail`. Absent, blank, or malformed means "all time",
+// which imposes no lower bound and is the behaviour the endpoint had before the range
+// existed (so an older client, or the smoke suite's plain curl, still gets everything).
+function parseSinceSeconds(raw: unknown): number | undefined {
+    if (typeof raw !== "string" || !/^\d+$/.test(raw)) {
+        return undefined;
+    }
+    return parseInt(raw, 10);
+}
+
+// GET /logs/stream?context=&namespace=&pods=&filter=&tail=&sinceSeconds=
 // Streams aggregated, pod-prefixed log lines as SSE. Each "line" event carries
 // { namespace, pod, container, line }; a "started" event lists the matched pods;
 // an "error" event carries a message. The connection stays open (follow mode)
 // until the client disconnects, at which point all kubectl processes are killed.
 // When one or more `pods` are given they are streamed verbatim (the picker's
 // explicit checkbox selection wins); otherwise the wildcard/substring `filter`
-// chooses which of the namespace's pods to stream.
+// chooses which of the namespace's pods to stream. `sinceSeconds` is the viewer's
+// time range, applied at fetch to bound how far back each pod's backlog reaches.
 logsStreamRouter.get("/logs/stream", async (req, res) => {
     const context = req.query.context;
     if (typeof context !== "string" || context.trim() === "") {
@@ -68,6 +81,7 @@ logsStreamRouter.get("/logs/stream", async (req, res) => {
     const filter = typeof req.query.filter === "string" ? req.query.filter : "";
     const tailRaw = req.query.tail;
     const tail = typeof tailRaw === "string" && /^\d+$/.test(tailRaw) ? parseInt(tailRaw, 10) : 100;
+    const sinceSeconds = parseSinceSeconds(req.query.sinceSeconds);
 
     let pods: Pod[];
     try {
@@ -120,7 +134,7 @@ logsStreamRouter.get("/logs/stream", async (req, res) => {
     }
 
     for (const pod of matched) {
-        const handle = kubectl.streamPodLogs(context, pod.namespace, pod.name, undefined, tail, {
+        const handle = kubectl.streamPodLogs(context, pod.namespace, pod.name, undefined, tail, sinceSeconds, {
             onLine: (line) => {
                 if (closed) {
                     return;

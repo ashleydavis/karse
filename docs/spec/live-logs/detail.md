@@ -60,6 +60,23 @@ Next to the Stream/Stop button the Logs page shows a small caption telling the u
 - Once a line lands it reads "Updated just now", then ages into "Updated Ns ago", "Updated Nm ago", and "Updated Nh ago" relative to the most recent appended log line.
 - It ticks once a second so the relative time advances on its own, and it resets to "No logs yet" whenever a fresh stream is started.
 
+#### Time-range filter
+
+The Logs page and the Pod detail Logs tab carry the same **Range** control the Events and Errors feeds do (see [events-feed](../events-feed/detail.md#time-range-filter)): "All time", or "Last X \<period\>" over minute/hour/day/week/month, defaulting to **last 7 days**.
+
+**The stream has a backlog, and that is what the range bounds.** A `-f` stream is not only future output. The viewer opens it with `tail=100`, so the backend runs `kubectl logs -f <pod> --tail=100`, which prints the **last 100 lines already written to the log** before it starts following. Those lines are real history — for a pod that has been quiet they can be arbitrarily old — and each is delivered to the viewer as an ordinary `line` event, indistinguishable from a live one. So the Logs view does show history, and a range has something to exclude.
+
+**The range is applied at fetch, not on screen.** This is the one difference from Events and Errors, and it follows from the data: a streamed line (`LogStreamLine`) is `{ namespace, pod, line }` — raw container output with no per-line timestamp — so there is no field a client-side predicate could read after the fact. Instead the chosen range is converted to a whole number of seconds (`timeRangeSeconds`), sent to `GET /api/logs/stream` as `sinceSeconds`, and passed to the adapter, which adds `--since=<n>s` to the argv. kubectl then bounds the backlog by age as well as by line count: `--tail` and `--since` intersect, so the viewer receives at most 100 lines, none older than the cutoff. "All time" sends no `sinceSeconds` and adds no flag, leaving the backlog bounded by `--tail` alone.
+
+Two consequences follow from applying it at fetch:
+
+- **Changing the range re-opens the stream.** The lines a narrower range excludes were never sent, and the lines a wider one admits are not on the client to reveal, so the range cannot be re-applied to what is already on screen. Changing it while streaming re-requests the same pods with the new cutoff.
+- **Seconds are the unit.** kubectl parses `--since` with Go's `time.ParseDuration`, which has no day or week unit, so every period is normalised to seconds (a week is `604800s`). The relative `--since` is used in preference to the absolute `--since-time` so the cutoff is evaluated against the cluster's own clock, and a user whose machine clock is skewed from the cluster's still gets the range they asked for.
+
+The command stays read-only (`docs/rules/security.md`): the flag is hard-coded in the adapter and only its value comes from the caller, exactly as `--tail` already did. The route accepts `sinceSeconds` only as a run of digits and ignores anything else, so nothing else can reach the argv.
+
+The container detail Logs panel (`PodLogsPanel`) has no Range control and passes no cutoff; its backlog is bounded by its own Tail lines selector.
+
 ## Acceptance Criteria
 
 - [x] The kubectl-based Logs page (`/logs`) streams multi-pod `kubectl logs -f` output over SSE, merged into one viewer.
@@ -75,6 +92,7 @@ Next to the Stream/Stop button the Logs page shows a small caption telling the u
 - [x] Each pod-name chip in the "Streaming N pod(s)" row has a close button at the end of its label. Clicking it removes that pod from the streamed set (its chip goes, the count decrements, its lines stop), leaving the same state as unticking the pod in the picker and re-streaming; removing the last pod stops the stream and returns the page to its empty state.
 - [x] The pod picker is the single shared `PodFilter` component (`frontend/src/components/pod-filter.tsx`) used everywhere pods can be selected, with no bespoke per-page selector. Its list shows selected pods at the top and unselected below, each group sorted alphanumerically, with a divider between the two groups drawn only when both are non-empty; the count and Clear sit in a header above the scrolling list.
 - [x] The pod picker dropdown is sized generously (a wide 440px panel, capped to the viewport width, and a list growing up to 60% of the viewport height, capped at 520px) so a typical multi-pod namespace is visible at once with little or no scrolling, while a very long list still scrolls past the visible area. Because the native scrollbar renders as an invisible auto-hiding overlay in the app's browser, the list draws its own always-visible scrollbar (track + draggable grey thumb, shown only while the list overflows), so it is plainly visible that an overflowing pod list scrolls.
+- [x] The Logs page and the Pod detail Logs tab carry the shared time-range control (`Range: Last 7 days` by default, offering "All time" or "Last X \<period\>"). The range is applied **at fetch**: it is sent to `GET /api/logs/stream` as `sinceSeconds` and becomes `kubectl logs --since=<n>s`, so it bounds the backlog `--tail` replays rather than filtering lines already on screen. Changing it re-opens the stream, and "All time" adds no flag. The command stays read-only.
 
 ## Open Questions
 

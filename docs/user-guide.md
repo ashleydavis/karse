@@ -256,6 +256,31 @@ A table row has no space for a long label set, so the Labels column shows only t
 
 The same modal is used by every table with a Labels column (Pods, Nodes, Deployments, StatefulSets, DaemonSets, Namespaces, and All Resources), so labels are read the same way wherever you meet them. Its Key / Value table is the same searchable, sortable table the Labels tab shows.
 
+### Time-range filtering
+
+The time-based views — the **Events** page (`/events`), the **Errors** page (`/errors`), and the **Logs** page (`/logs`, and the Logs tab on a pod) — have a **Range** button (clock icon), which scopes the view by how old each item is. Open it and choose either:
+
+- **All time**: no lower bound; every row shows, however old.
+- **Last X \<period\>**: type a whole number and pick a period (minutes, hours, days, weeks, or months). Only rows at least that recent are shown.
+
+Details worth knowing:
+
+- The default is **Last 7 days**. It is view state, not a saved preference: reloading returns to the default.
+- A week is 7 days and a month is 30 days, so "Last 1 month" means "the last 30 days", not the calendar month.
+- On Events and Errors the range works together with the search box and the Filter dropdown — a row must satisfy all three. If the range excludes everything, you get the usual "No events/errors match the search." message.
+- On Events and Errors, a row whose timestamp is missing or unreadable is kept rather than hidden, so nothing disappears just because its age is unknown.
+
+**What the range can and cannot show you.** Karse stores nothing itself: it reads live cluster state through `kubectl` on each request, so these views only ever show what the cluster still holds.
+
+- **Events**: Kubernetes garbage-collects events at its `--event-ttl` (**1 hour** by default), so the Events page rarely holds anything older than an hour whatever range you pick. The default 7-day range therefore excludes nothing in practice; the useful settings here are the sub-hour ones ("Last 15 minutes", "Last 1 hour"), for narrowing a busy feed. Widening to "All time" cannot bring back an event Kubernetes has already discarded — nothing can.
+- **Errors**: an error's age comes from the pod's start time for a problem-pod row, and those track live pod state rather than an expiring event. A pod that has been broken for a month is genuinely a month old, so it falls outside the 7-day default and only appears once you widen the range. This is where the control earns its keep: the default keeps recent breakage in view without a long-standing failure crowding it out, and "All time" shows you everything that is currently wrong.
+- **Logs**: pressing Stream does not start you from an empty screen. Karse asks for the last 100 lines each pod has *already* written before it starts following, so the viewer immediately fills with that backlog — and for a pod that has been quiet, those lines can be hours or days old. That backlog is what the range bounds. Set it to "Last 15 minutes" and you get only the lines written in the last fifteen minutes, plus whatever arrives live from then on.
+
+**The Logs range works differently from the other two, in a way you can see.** On Events and Errors the rows are already fetched and the range just hides some of them, so changing it is instant and reversible. On Logs the range is applied *when the lines are fetched*: Karse asks the cluster only for lines newer than your cutoff, so the excluded ones are never sent. Two things follow:
+
+- **Changing the range restarts the stream.** The viewer clears and refills with a fresh backlog for the new range. Widening the range is how you get older lines back — they were never on your machine to un-hide.
+- **The range cannot recover more than the last 100 lines per pod.** The line cap and the time range apply together: you get at most 100 lines of backlog per pod, and none older than the range. Widening to "All time" lifts the age bound, not the line cap.
+
 ### Labels tab on detail pages
 
 Every resource detail page that carries labels (pod, node, namespace, and the workload pages: deployment, stateful set, daemon set) has a **Labels** tab. It shows only that one resource's own labels, as a Key / Value table:

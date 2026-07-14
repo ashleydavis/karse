@@ -42,6 +42,8 @@ import { type EventFilter, applyEventFilters } from "../../../lib/event-filter";
 import { useEventFilters } from "../../../lib/use-event-filters";
 import { DataTableRows } from "../../../components/data-table-row";
 import { useSearchFilter } from "../../../lib/use-search-filter";
+import { TimeRangeFilter } from "../../../components/time-range-filter";
+import { DEFAULT_TIME_RANGE, timeRangeColumnFilters, timeRangeFilterFn, type TimeRange } from "../../../lib/time-range";
 
 // Every selectable event type, in display order. Drives the type column in the
 // shared filter editor.
@@ -102,6 +104,10 @@ const columns: ColumnDef<ClusterEvent>[] = [
         cell: (info) => formatAge(info.getValue<string>()),
         sortingFn: (a, b) =>
             new Date(a.original.lastSeen).getTime() - new Date(b.original.lastSeen).getTime(),
+        // Keeps a row only when its last-seen time falls inside the range chosen in
+        // the shared time-range control. "All time" installs no filter at all, so
+        // this never runs in that case.
+        filterFn: timeRangeFilterFn,
     },
     {
         accessorKey: "type",
@@ -187,6 +193,10 @@ export function EventsTable() {
 
     const [sorting, setSorting] = useState<SortingState>([]);
     const { search, setSearch, deferredSearch } = useSearchFilter();
+    // The time range the table is scoped to. Starts on the shared default (last 7
+    // days), which for events is effectively everything the cluster still holds:
+    // Kubernetes garbage-collects events at its `--event-ttl` (1 hour by default).
+    const [timeRange, setTimeRange] = useState<TimeRange>(DEFAULT_TIME_RANGE);
 
     // The filterable columns the shared editor offers: the Type value column. An
     // empty selection means "show all" (the default); the filter activates on the
@@ -206,6 +216,14 @@ export function EventsTable() {
         [all, rowFilters.filters],
     );
     const hiddenCount = all.length - visible.length;
+
+    // The time range is just another column filter (on `lastSeen`), so it composes
+    // with the type filter, the search box and the row filters above, and the table's
+    // existing "no rows match" empty state covers a range that excludes everything.
+    const columnFilters = useMemo(
+        () => [...filter.columnFilters, ...timeRangeColumnFilters("lastSeen", timeRange)],
+        [filter.columnFilters, timeRange],
+    );
 
     // The table's columns are the display columns plus the trailing "..." actions column.
     // `addFilter` is stable and the loaded events only change on a refetch, so the table is
@@ -227,7 +245,7 @@ export function EventsTable() {
         state: {
             sorting,
             globalFilter: deferredSearch,
-            columnFilters: filter.columnFilters,
+            columnFilters,
             columnOrder,
             columnVisibility,
         },
@@ -286,6 +304,11 @@ export function EventsTable() {
                     onDeselectAll={filter.onDeselectAll}
                     totalSelected={filter.totalSelected}
                     testIdPrefix="events-filter"
+                />
+                <TimeRangeFilter
+                    range={timeRange}
+                    onChange={setTimeRange}
+                    testIdPrefix="events-range"
                 />
                 <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
                 <Typography variant="body2" color="text.secondary" data-test-id="events-count">

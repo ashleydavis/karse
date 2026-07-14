@@ -12,7 +12,16 @@ Then open the frontend at `http://127.0.0.1:5173`. The scenario's fixture stands
 
 ## Scenario: Events view
 
-A cluster seeded with a few events (one Warning, two Normal) across two namespaces. Note: kwok does not generate lifecycle events on its own, so the setup script creates representative `Event` objects by hand.
+A cluster seeded with four events (two Warning, two Normal) across two namespaces. Note: kwok does not generate lifecycle events on its own, so the setup script creates representative `Event` objects by hand, with ages generated relative to now so they are realistic every run:
+
+| Event | Namespace | Type | Age |
+|---|---|---|---|
+| `BackOff` | `default` | Warning | 10 minutes |
+| `Scheduled` | `default` | Normal | 30 minutes |
+| `ScalingReplicaSet` | `demo` | Normal | 2 days |
+| `FailedMount` | `default` | Warning | 30 days |
+
+The 30-day-old `FailedMount` event is **outside the page's default "last 7 days" range**, so it is hidden until the time-range control is widened. Every check below assumes the default range unless it says otherwise.
 
 **Fixture:** [_fixtures-kwok/28-events-view](../_fixtures-kwok/28-events-view/)
 
@@ -23,19 +32,19 @@ A cluster seeded with a few events (one Warning, two Normal) across two namespac
 `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse.
 
 ### What to check
-- **Events page**: navigate to `/events` (or click "Events" in the sidebar). The table shows columns Last seen, Type, Reason, Object, Message, Count, Namespace.
+- **Events page**: navigate to `/events` (or click "Events" in the sidebar). The table shows columns Last seen, Type, Reason, Object, Message, Count, Namespace, and **three** rows (`BackOff`, `Scheduled`, `ScalingReplicaSet`) — the 30-day-old `FailedMount` is outside the default range.
 - **Type chips**: the `BackOff` event shows a yellow "Warning" chip; the `Scheduled` and `ScalingReplicaSet` events show a "Normal" chip.
 - **Object column**: the `BackOff` row shows `Pod/nginx`; the `ScalingReplicaSet` row shows `Deployment/api`.
 - **Count column**: the `BackOff` row shows a count of 9.
 - **Sidebar**: the Events nav item (bell icon) is visible and highlighted when active.
 - **Page title**: the header shows "Events".
-- **Namespace scoping**: select the `default` namespace. Only the two `default` events (`Scheduled`, `BackOff`) appear; the `demo` `ScalingReplicaSet` event is hidden. Select the `demo` namespace and confirm only the `ScalingReplicaSet` event appears. Clear the namespace and all three events appear again.
+- **Namespace scoping**: select the `default` namespace. Only the two in-range `default` events (`Scheduled`, `BackOff`) appear; the `demo` `ScalingReplicaSet` event is hidden. Select the `demo` namespace and confirm only the `ScalingReplicaSet` event appears. Clear the namespace and all three in-range events appear again.
 - **Sort by Type**: click the Type header. Warning events sort to the top.
 - **Search**: type `BackOff` in the search box and confirm only that row is shown. Type a non-matching string and confirm the "No events match the search." message appears.
 - **Type filter (default)**: the shared filter button next to the search reads "Filter: All" and every event is shown.
 - **Type filter (narrow)**: open the filter and, under the **Type** heading, check `Warning`. The button reads "Filter: 1 selected" and only the `Warning` event (`BackOff`) remains; the `Normal` events are hidden. Also check `Normal`: the button reads "Filter: 2 selected" and all events return.
 - **Type filter (only Normal)**: uncheck `Warning` so only `Normal` is checked. Only the `Normal` events appear.
-- **Clear**: open the filter and click "Clear". The button returns to "Filter: All" and every event is shown again.
+- **Clear**: open the filter and click "Clear". The button returns to "Filter: All" and every in-range event is shown again.
 - **Row click drills down**: hover an event row; the cursor becomes a pointer and the row highlights (the standard clickable-row affordance). Click the `BackOff` row. The app navigates to that event's detail page (`/events/:uid`); see the `event-detail` manual tests.
 
 ### Row filtering (the "..." menu)
@@ -61,6 +70,19 @@ The fixture seeds a `noisy` namespace holding exactly four events for this: the 
 - **Reset restores everything**: click **Reset filters**. All four events return and the bar disappears.
 - **Composes with search and the Type filter**: with a hide filter active, typing in the search box narrows further; the count always reflects what is shown.
 - **Different numbers are different problems**: switch to the **`exit-codes` namespace**, which holds two `Failed` events on two pods of one `cruncher` deployment — one reading "Container exited with code 1" (a clean exit) and one "Container exited with code 137" (an out-of-memory kill). On the code-1 row choose **Hide all like this**: its menu line must read `Matches 1 of 2 events`, and after hiding, the code-137 event must still be showing. Two failures that differ only in a number saying *what* went wrong are not alike, and hiding the harmless one must never take the serious one with it. Reset.
+
+### Time-range filter
+
+Check these in **both light and dark mode** (toggle with the header colour-mode button).
+
+- **Default**: the "Range: Last 7 days" button sits beside the Filter dropdown. Three rows are shown; the 30-day-old `FailedMount` event is **not** among them.
+- **All time**: open the control and select "All time". The button reads "Range: All time" and a fourth row appears — `FailedMount`, with an age around `30d`.
+- **Custom "last X period"**: open the control, type `1` in the number box and pick `days` in the period dropdown. The button reads "Range: Last 1 day", and only the two events under an hour old (`BackOff`, `Scheduled`) remain — the 2-day-old `ScalingReplicaSet` drops out.
+- **Every period**: the period dropdown offers minutes, hours, days, weeks, and months. Try "Last 1 hour" (same two rows) and "Last 2 months" (all four rows).
+- **Empty result**: set the range to "Last 1 minute". Every event is older than that, so no rows are shown and the "No events match the search." message appears.
+- **Composes with the other filters**: set the range to "Last 2 months" (all four rows), then open the Filter dropdown and check `Warning`. Two rows remain (`BackOff`, `FailedMount`). Now narrow the range back to "Last 7 days": only `BackOff` remains, because the two filters intersect. Clear both.
+- **Reset on reload**: reload the page. The range returns to "Last 7 days" — it is view state and is not persisted.
+- **What the range can honestly offer**: the fixture's ages are synthetic. On a real cluster Kubernetes garbage-collects events at its `--event-ttl` (1 hour by default) and Karse stores nothing itself, so a real Events page rarely holds anything older than an hour and the 7-day default excludes nothing. The sub-hour ranges are the ones that bite in practice.
 
 Teardown:
 

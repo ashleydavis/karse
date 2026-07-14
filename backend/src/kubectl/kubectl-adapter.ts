@@ -1053,23 +1053,89 @@ export async function getNamespaceDetail(context: string, name: string): Promise
     };
 }
 
-// Realistic fake log lines returned when KARSE_FAKE_LOGS=1 is set.
-// Covers common Kubernetes workload log formats so the log viewer can be exercised
-// without a cluster that supports real container log streaming.
-const FAKE_LOG_LINES = [
-    "2024-01-01T00:00:00.000000000Z stdout F 2024/01/01 00:00:00 [notice] 1#1: using the \"epoll\" event method",
-    "2024-01-01T00:00:00.001000000Z stdout F 2024/01/01 00:00:00 [notice] 1#1: nginx/1.25.3",
-    "2024-01-01T00:00:00.002000000Z stdout F 2024/01/01 00:00:00 [notice] 1#1: built by gcc 12.2.0 (Debian 12.2.0-14)",
-    "2024-01-01T00:00:00.003000000Z stdout F 2024/01/01 00:00:00 [notice] 1#1: start worker processes",
-    "2024-01-01T00:00:00.004000000Z stdout F 2024/01/01 00:00:00 [notice] 1#1: start worker process 30",
-    "2024-01-01T00:00:01.000000000Z stdout F 10.244.0.1 - - [01/Jan/2024:00:00:01 +0000] \"GET / HTTP/1.1\" 200 615 \"-\" \"kube-probe/1.29\"",
-    "2024-01-01T00:00:06.000000000Z stdout F 10.244.0.1 - - [01/Jan/2024:00:00:06 +0000] \"GET /healthz HTTP/1.1\" 200 2 \"-\" \"kube-probe/1.29\"",
-    "2024-01-01T00:00:11.000000000Z stdout F 10.244.0.1 - - [01/Jan/2024:00:00:11 +0000] \"GET /readyz HTTP/1.1\" 200 2 \"-\" \"kube-probe/1.29\"",
-    "2024-01-01T00:00:20.000000000Z stdout F 10.244.0.2 - - [01/Jan/2024:00:00:20 +0000] \"GET / HTTP/1.1\" 200 615 \"-\" \"Mozilla/5.0 (X11; Linux x86_64)\"",
-    "2024-01-01T00:00:21.000000000Z stdout F 10.244.0.2 - - [01/Jan/2024:00:00:21 +0000] \"GET /static/main.css HTTP/1.1\" 200 1234 \"/\" \"Mozilla/5.0 (X11; Linux x86_64)\"",
-    "2024-01-01T00:00:22.000000000Z stderr F 2024/01/01 00:00:22 [warning] 30#30: *2 upstream server temporarily disabled while reading response header from upstream",
-    "2024-01-01T00:00:23.000000000Z stderr F 2024/01/01 00:00:23 [error] 30#30: *3 connect() failed (111: Connection refused) while connecting to upstream",
-].join("\n") + "\n";
+// One canned fake log line: how long before "now" it was written, which stream it
+// came from, and how its message renders at that instant.
+//
+// The lines are dated relative to now rather than pinned to a fixed date. A hard-coded
+// date would fall outside every time range the log viewer offers, so with a range
+// applied the fake stream would come up empty and the viewer would look broken in the
+// very mode built to exercise it without a cluster (KARSE_FAKE_LOGS=1, used by
+// `bun run dev:test` and by the smoke and e2e suites, since kwok serves no real
+// container logs).
+type FakeLogLine = {
+    agoSeconds: number;
+    stream: "stdout" | "stderr";
+    text: (at: Date) => string;
+};
+
+// Month abbreviations for the nginx access-log timestamp format.
+const NGINX_LOG_MONTHS = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+// Renders an instant as an nginx notice/error timestamp ("2024/01/01 00:00:00", UTC).
+function nginxNoticeTime(at: Date): string {
+    const iso = at.toISOString();
+    return iso.slice(0, 10).replace(/-/g, "/") + " " + iso.slice(11, 19);
+}
+
+// Renders an instant as an nginx access-log timestamp ("01/Jan/2024:00:00:01 +0000", UTC).
+function nginxAccessTime(at: Date): string {
+    const day = String(at.getUTCDate()).padStart(2, "0");
+    const month = NGINX_LOG_MONTHS[at.getUTCMonth()];
+    const time = at.toISOString().slice(11, 19);
+    return `${day}/${month}/${at.getUTCFullYear()}:${time} +0000`;
+}
+
+// The canned fake log lines returned when KARSE_FAKE_LOGS=1 is set, oldest first, as a
+// real log is written. They cover common Kubernetes workload log formats (nginx startup
+// notices, access lines, a warning and an error) and are deliberately spread from two
+// hours ago to seconds ago so a time range narrower than their span really does exclude
+// some of them.
+const FAKE_LOG_LINES: FakeLogLine[] = [
+    { agoSeconds: 7200, stream: "stdout", text: (at) => `${nginxNoticeTime(at)} [notice] 1#1: using the "epoll" event method` },
+    { agoSeconds: 7199, stream: "stdout", text: (at) => `${nginxNoticeTime(at)} [notice] 1#1: nginx/1.25.3` },
+    { agoSeconds: 7198, stream: "stdout", text: (at) => `${nginxNoticeTime(at)} [notice] 1#1: built by gcc 12.2.0 (Debian 12.2.0-14)` },
+    { agoSeconds: 7197, stream: "stdout", text: (at) => `${nginxNoticeTime(at)} [notice] 1#1: start worker processes` },
+    { agoSeconds: 7196, stream: "stdout", text: (at) => `${nginxNoticeTime(at)} [notice] 1#1: start worker process 30` },
+    { agoSeconds: 3600, stream: "stdout", text: (at) => `10.244.0.1 - - [${nginxAccessTime(at)}] "GET / HTTP/1.1" 200 615 "-" "kube-probe/1.29"` },
+    { agoSeconds: 1800, stream: "stdout", text: (at) => `10.244.0.1 - - [${nginxAccessTime(at)}] "GET /healthz HTTP/1.1" 200 2 "-" "kube-probe/1.29"` },
+    { agoSeconds: 900, stream: "stdout", text: (at) => `10.244.0.1 - - [${nginxAccessTime(at)}] "GET /readyz HTTP/1.1" 200 2 "-" "kube-probe/1.29"` },
+    { agoSeconds: 300, stream: "stdout", text: (at) => `10.244.0.2 - - [${nginxAccessTime(at)}] "GET / HTTP/1.1" 200 615 "-" "Mozilla/5.0 (X11; Linux x86_64)"` },
+    { agoSeconds: 120, stream: "stdout", text: (at) => `10.244.0.2 - - [${nginxAccessTime(at)}] "GET /static/main.css HTTP/1.1" 200 1234 "/" "Mozilla/5.0 (X11; Linux x86_64)"` },
+    { agoSeconds: 45, stream: "stderr", text: (at) => `${nginxNoticeTime(at)} [warning] 30#30: *2 upstream server temporarily disabled while reading response header from upstream` },
+    { agoSeconds: 10, stream: "stderr", text: (at) => `${nginxNoticeTime(at)} [error] 30#30: *3 connect() failed (111: Connection refused) while connecting to upstream` },
+];
+
+// Renders the canned fake log lines the way `kubectl logs` prints them: oldest first,
+// each prefixed with the CRI header (RFC3339 nanosecond timestamp, stream name, and the
+// F "full line" tag) that a real log line carries.
+//
+// The two bounds mirror kubectl's own and intersect exactly as kubectl's do: `since`
+// (seconds, from `--since`) drops every line older than that many seconds, and `tail`
+// (from `--tail`) then keeps only the most recent N of what is left. An undefined
+// `since` means "all time" and holds nothing back. Honouring `since` here is what makes
+// the viewer's time range work in fake mode rather than silently doing nothing.
+function renderFakeLogs(tail: number, sinceSeconds: number | undefined): string {
+    const now = Date.now();
+    const kept: string[] = [];
+    for (const line of FAKE_LOG_LINES) {
+        if (sinceSeconds !== undefined && line.agoSeconds > sinceSeconds) {
+            continue;
+        }
+        const at = new Date(now - line.agoSeconds * 1000);
+        // toISOString() gives millisecond precision; pad it out to the nanoseconds a
+        // real CRI log timestamp carries.
+        const stamp = at.toISOString().replace("Z", "000000Z");
+        kept.push(`${stamp} ${line.stream} F ${line.text(at)}`);
+    }
+    const tailed = kept.slice(Math.max(0, kept.length - tail));
+    if (tailed.length === 0) {
+        return "";
+    }
+    return tailed.join("\n") + "\n";
+}
 
 // How often the fake follow-mode stream emits a new synthesised line, in milliseconds.
 // KARSE_FAKE_LOGS=1 exists so the log viewer can be exercised without a real container
@@ -1107,7 +1173,8 @@ export async function getPodLogs(
     tail: number = 100,
 ): Promise<string> {
     if (process.env.KARSE_FAKE_LOGS === "1") {
-        return FAKE_LOG_LINES;
+        // This buffered endpoint carries no time range, so nothing is excluded by age.
+        return renderFakeLogs(tail, undefined);
     }
     const containerArgs = container ? ["-c", container] : [];
     const result = await kubectl([
@@ -1189,12 +1256,32 @@ function emitLines(buffer: string, carry: string, onLine: (line: string) => void
 
 // Streams live logs (`kubectl logs -f`) from a single pod, emitting each line via
 // the handlers as it arrives. This is a READ-ONLY follow operation. The optional
-// container scopes the stream to one container; tail bounds the initial backlog.
-// When KARSE_FAKE_LOGS=1 is set, emits the canned FAKE_LOG_LINES as the initial backlog
-// and then keeps emitting a fresh synthesised line every FAKE_LOG_INTERVAL_MS until the
-// caller stops it, so the live log viewer behaves exactly like a real follow against a
-// busy pod and can be exercised without a real cluster. Like a real follow, the fake
-// stream never ends on its own; it ends when the returned handle is stopped.
+// container scopes the stream to one container.
+//
+// Two bounds limit the backlog kubectl prints before it starts following, and they
+// intersect: `tail` caps it to the last N lines (`--tail`), and `sinceSeconds` drops
+// anything written more than that many seconds ago (`--since`). The backlog is real
+// history — for a quiet pod it can be arbitrarily old — so `sinceSeconds` is how the
+// viewer's time range is applied, at fetch, before the lines are ever sent. Undefined
+// means "all time": no `--since` at all, and no lower bound on age. Neither bound
+// applies to the follow that comes after: a line emitted live is new by definition, so
+// it is inside every range the control offers.
+//
+// Seconds are the unit because kubectl parses `--since` with Go's time.ParseDuration,
+// which understands h/m/s but has no day or week unit, so every range is normalised to
+// seconds (a week is 604800s). The relative `--since` is used in preference to the
+// absolute `--since-time` so the cutoff is evaluated against the cluster's own clock: a
+// user whose machine clock is skewed from the cluster's still gets the range they asked
+// for. The flag itself is hard-coded here and only its value comes from the caller (a
+// whole number of seconds), exactly as `--tail` already does, so the argv stays fixed
+// and the command stays read-only.
+//
+// When KARSE_FAKE_LOGS=1 is set, emits the canned fake lines (honouring both bounds) as
+// the initial backlog and then keeps emitting a fresh synthesised line every
+// FAKE_LOG_INTERVAL_MS until the caller stops it, so the live log viewer behaves exactly
+// like a real follow against a busy pod and can be exercised without a real cluster. Like
+// a real follow, the fake stream never ends on its own; it ends when the returned handle
+// is stopped.
 // Returns a handle the caller uses to terminate the underlying kubectl process.
 export function streamPodLogs(
     context: string,
@@ -1202,11 +1289,13 @@ export function streamPodLogs(
     name: string,
     container: string | undefined,
     tail: number,
+    sinceSeconds: number | undefined,
     handlers: LogStreamHandlers,
 ): LogStreamHandle {
     if (process.env.KARSE_FAKE_LOGS === "1") {
-        // The canned lines are the backlog `--tail` would return...
-        for (const line of FAKE_LOG_LINES.split("\n")) {
+        // The canned lines are the backlog `--tail` and `--since` would return, so a
+        // narrow range really does hold some of them back in fake mode too...
+        for (const line of renderFakeLogs(tail, sinceSeconds).split("\n")) {
             if (line !== "") {
                 handlers.onLine(line);
             }
@@ -1228,9 +1317,13 @@ export function streamPodLogs(
     }
 
     const containerArgs = container ? ["-c", container] : [];
+    // "All time" adds no flag at all, leaving the backlog bounded only by --tail.
+    const sinceArgs = sinceSeconds === undefined
+        ? []
+        : [`--since=${Math.trunc(sinceSeconds)}s`];
     const args = [
         "--context", context, "-n", namespace, "logs", "-f", name,
-        ...containerArgs, `--tail=${tail}`,
+        ...containerArgs, `--tail=${tail}`, ...sinceArgs,
     ];
     const now = new Date();
     // Audit-log the streamed command exactly like the buffered kubectl() helper.

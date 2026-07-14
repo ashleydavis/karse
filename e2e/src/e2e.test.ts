@@ -2323,6 +2323,16 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-logs-viewer']")).toContainText("default/nginx-abc");
         });
 
+        // time-range-filter-1: the Logs tab carries the same Range control as the Logs
+        // page, defaulting to last 7 days. What the range then does to the fetched
+        // backlog is proved in the "live logs time range" block (this block's stream is a
+        // fixed canned body that cannot model a range) and, over real HTTP against the
+        // real route and adapter, by the smoke suite's /api/logs/stream sinceSeconds check.
+        test("the Logs tab carries the shared time-range control", async () => {
+            await page.locator("[data-test-id='pod-tab-logs']").click();
+            await expect(page.locator("[data-test-id='pod-logs-range-button']")).toContainText("Range: Last 7 days");
+        });
+
         test("the Logs tab's log viewer stretches down to fill the remaining viewport height", async () => {
             // Regression for logs-reusable-1: on the Pod detail Logs tab the log
             // text area must fill the leftover space down to near the viewport
@@ -5078,6 +5088,160 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // time-range-filter-1. The Logs page's Range control is applied at fetch, not to
+    // lines already on screen: it is sent as `sinceSeconds`, which the backend turns into
+    // `kubectl logs --since=<n>s`, bounding the backlog `--tail=100` would otherwise
+    // replay in full (up to 100 lines already written before the follow begins, and
+    // arbitrarily old for a quiet pod). These tests stand a backlog up behind the stream
+    // and prove a narrow range really does restrict what the viewer receives.
+    test.describe("live logs time range", () => {
+        const RANGE_PODS = {
+            pods: [
+                { name: "nginx-abc", namespace: "default", phase: "Running", ready: "1/1", restarts: 0, createdAt: new Date().toISOString(), node: "node-1" },
+            ],
+        };
+
+        // The backlog the pod replays, oldest first. Each line's age is what the range
+        // admits or excludes, and its text names that age so an assertion can say exactly
+        // which lines survived. No age sits exactly on a range the tests select (the
+        // cutoff is inclusive, so a line exactly on the boundary is kept, which would
+        // make an assertion about it read as an off-by-one).
+        const BACKLOG = [
+            { agoSeconds: 7200, label: "two-hours-old" },
+            { agoSeconds: 2700, label: "forty-five-minutes-old" },
+            { agoSeconds: 30, label: "thirty-seconds-old" },
+            { agoSeconds: 5, label: "five-seconds-old" },
+        ];
+
+        // The last `sinceSeconds` value the frontend sent, so a test can assert on the
+        // request the control produced as well as on what the viewer rendered.
+        let lastSince: string | null = null;
+
+        // Stands in for the backend, applying the range the way kubectl's --since does:
+        // every backlog line older than the cutoff is dropped before anything is sent, so
+        // the excluded lines never reach the client at all. No cutoff means all time.
+        async function interceptRangedStream(): Promise<void> {
+            await page.route("**/api/logs/stream*", async (route) => {
+                const params = new URL(route.request().url()).searchParams;
+                lastSince = params.get("sinceSeconds");
+                const since = lastSince === null ? null : parseInt(lastSince, 10);
+                const podName = RANGE_PODS.pods[0]!.name;
+                let body = `event: started\ndata: ${JSON.stringify({ pods: [{ namespace: "default", name: podName }] })}\n\n`;
+                for (const entry of BACKLOG) {
+                    if (since !== null && entry.agoSeconds > since) {
+                        continue;
+                    }
+                    const line = `${entry.label} log line from ${podName}`;
+                    body += `event: line\ndata: ${JSON.stringify({ namespace: "default", pod: podName, line })}\n\n`;
+                }
+                await route.fulfill({
+                    headers: { "Content-Type": "text/event-stream" },
+                    body,
+                });
+            });
+        }
+
+        // Opens the Range control, sets it to "Last <count> <unit>", and closes it.
+        async function setRange(count: number, unit: string): Promise<void> {
+            await page.locator("[data-test-id='live-logs-range-button']").click();
+            await expect(page.locator("[data-test-id='live-logs-range-menu']")).toBeVisible();
+            await page.locator("[data-test-id='live-logs-range-unit']").click();
+            await page.locator(`[data-test-id='live-logs-range-unit-${unit}']`).click();
+            const countBox = page.locator("[data-test-id='live-logs-range-count'] input");
+            await countBox.fill(String(count));
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='live-logs-range-menu']")).toHaveCount(0);
+        }
+
+        // Presses Stream over the one pod, via the search box as the substring filter.
+        async function stream(): Promise<void> {
+            await page.locator("[data-test-id='live-logs-picker-trigger']").click();
+            await page.locator("[data-test-id='live-logs-search'] input").fill("nginx");
+            await page.locator(".MuiModal-root .MuiBackdrop-root").last().click();
+            await page.locator("[data-test-id='live-logs-start']").click();
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: RANGE_PODS });
+            });
+            await interceptRangedStream();
+        });
+
+        test.beforeEach(async () => {
+            lastSince = null;
+            await page.goto("/logs", { waitUntil: "networkidle" });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+            await page.unroute("**/api/logs/stream*");
+            setContext(CLUSTER_1);
+        });
+
+        test("the Logs page has a time-range control defaulting to last 7 days", async () => {
+            await expect(page.locator("[data-test-id='live-logs-range-button']")).toContainText("Range: Last 7 days");
+        });
+
+        test("the default range fetches the whole backlog (nothing here is 7 days old)", async () => {
+            await stream();
+            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(4);
+            // 7 days as the seconds cutoff the backend turns into --since=604800s.
+            expect(lastSince).toBe("604800");
+        });
+
+        test("a narrow range restricts the backlog the viewer receives", async () => {
+            await setRange(1, "minute");
+            await stream();
+            // Only the two lines younger than a minute are fetched at all. The 45-minute
+            // and two-hour-old lines are excluded at the source: never sent, never shown.
+            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(2);
+            const viewer = page.locator("[data-test-id='live-logs-viewer']");
+            await expect(viewer).toContainText("thirty-seconds-old");
+            await expect(viewer).toContainText("five-seconds-old");
+            await expect(viewer).not.toContainText("forty-five-minutes-old");
+            await expect(viewer).not.toContainText("two-hours-old");
+            expect(lastSince).toBe("60");
+        });
+
+        test("widening the range to all time re-fetches the excluded history", async () => {
+            await setRange(1, "minute");
+            await stream();
+            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(2);
+
+            // Switching to All time while streaming re-opens the stream with no cutoff.
+            // The older lines were never sent, so they can only come back by re-fetching:
+            // this is what proves the range is applied at fetch rather than on screen.
+            await page.locator("[data-test-id='live-logs-range-button']").click();
+            await page.locator("[data-test-id='live-logs-range-all'] input").click();
+            await page.keyboard.press("Escape");
+
+            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(4);
+            await expect(page.locator("[data-test-id='live-logs-viewer']")).toContainText("two-hours-old");
+            await expect(page.locator("[data-test-id='live-logs-range-button']")).toContainText("Range: All time");
+            expect(lastSince).toBeNull();
+        });
+
+        test("narrowing the range while streaming re-opens the stream and drops the old lines", async () => {
+            await stream();
+            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(4);
+
+            // Narrow to the last hour without stopping first. The stream is re-opened with
+            // the new cutoff: the two-hour-old line goes, the 45-minute-old one survives.
+            await setRange(1, "hour");
+            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(3);
+            const viewer = page.locator("[data-test-id='live-logs-viewer']");
+            await expect(viewer).not.toContainText("two-hours-old");
+            await expect(viewer).toContainText("forty-five-minutes-old");
+            // Still streaming, not stopped: the range change re-opened it rather than
+            // tearing it down.
+            await expect(page.locator("[data-test-id='live-logs-stop']")).toBeVisible();
+            expect(lastSince).toBe("3600");
+        });
+
+    });
+
     test.describe("live logs auto-follow", () => {
         // One pod whose stream emits enough lines to overflow the viewer, so the
         // scroll position is meaningful (there is both history above and a bottom
@@ -6143,6 +6307,150 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Events page: time-range filter ─────────────────────────────────────────
+
+    test.describe("events page time range filter", () => {
+        // Three events spread across the age boundaries the ranges under test cut on:
+        // one 5 minutes old, one 3 days old, one 30 days old. The ages are computed
+        // when the request is fulfilled (not at module load) so they are exact no
+        // matter how long the suite takes to reach this block, and the margins are wide
+        // (5 minutes sits comfortably inside "last 1 hour" and outside "last 1 minute")
+        // so no assertion can flip as a run drags on under parallel load.
+        function rangeEvents(): { events: any[] } {
+            const now = Date.now();
+            const at = (ms: number) => new Date(now - ms).toISOString();
+            return {
+                events: [
+                    {
+                        uid: "evt-recent",
+                        type: "Warning",
+                        reason: "RecentBackOff",
+                        message: "Five minutes old",
+                        count: 1,
+                        source: "kubelet",
+                        firstSeen: at(5 * 60 * 1000),
+                        lastSeen: at(5 * 60 * 1000),
+                        namespace: "default",
+                        objectKind: "Pod",
+                        objectName: "recent-pod",
+                    },
+                    {
+                        uid: "evt-midrange",
+                        type: "Normal",
+                        reason: "MidrangeScheduled",
+                        message: "Three days old",
+                        count: 1,
+                        source: "default-scheduler",
+                        firstSeen: at(3 * 24 * 60 * 60 * 1000),
+                        lastSeen: at(3 * 24 * 60 * 60 * 1000),
+                        namespace: "default",
+                        objectKind: "Pod",
+                        objectName: "midrange-pod",
+                    },
+                    {
+                        uid: "evt-ancient",
+                        type: "Normal",
+                        reason: "AncientScheduled",
+                        message: "Thirty days old",
+                        count: 1,
+                        source: "default-scheduler",
+                        firstSeen: at(30 * 24 * 60 * 60 * 1000),
+                        lastSeen: at(30 * 24 * 60 * 60 * 1000),
+                        namespace: "default",
+                        objectKind: "Pod",
+                        objectName: "ancient-pod",
+                    },
+                ],
+            };
+        }
+
+        // Sets the control to a custom "Last <count> <unit>" range.
+        async function setLastRange(count: string, unit: string): Promise<void> {
+            await page.locator("[data-test-id='events-range-button']").click();
+            await page.locator("[data-test-id='events-range-count'] input").fill(count);
+            await page.locator("[data-test-id='events-range-unit']").click();
+            await page.locator(`[data-test-id='events-range-unit-${unit}']`).click();
+            await page.keyboard.press("Escape");
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/events*", async (route) => {
+                await route.fulfill({ json: rangeEvents() });
+            });
+            await page.goto("/events", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='events-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/events*");
+            setContext(CLUSTER_1);
+        });
+
+        test("defaults to the last 7 days, hiding anything older", async () => {
+            await expect(page.locator("[data-test-id='events-range-button']")).toHaveText("Range: Last 7 days");
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "RecentBackOff" })).toBeVisible();
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "MidrangeScheduled" })).toBeVisible();
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "AncientScheduled" })).toHaveCount(0);
+        });
+
+        test("all time widens the table to every event, however old", async () => {
+            await page.locator("[data-test-id='events-range-button']").click();
+            await page.locator("[data-test-id='events-range-all'] input").check();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='events-range-button']")).toHaveText("Range: All time");
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "AncientScheduled" })).toBeVisible();
+        });
+
+        test("a custom last 1 hour range narrows to just the recent event", async () => {
+            await setLastRange("1", "hour");
+            await expect(page.locator("[data-test-id='events-range-button']")).toHaveText("Range: Last 1 hour");
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "RecentBackOff" })).toBeVisible();
+        });
+
+        test("a custom last 2 weeks range readmits the 3-day-old event but not the 30-day-old one", async () => {
+            await setLastRange("2", "week");
+            await expect(page.locator("[data-test-id='events-range-button']")).toHaveText("Range: Last 2 weeks");
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "AncientScheduled" })).toHaveCount(0);
+        });
+
+        test("a custom last 2 months range readmits every event", async () => {
+            await setLastRange("2", "month");
+            await expect(page.locator("[data-test-id='events-range-button']")).toHaveText("Range: Last 2 months");
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(3);
+        });
+
+        test("a range that excludes everything shows the empty-result message", async () => {
+            await setLastRange("1", "minute");
+            await expect(page.locator("[data-test-id='events-range-button']")).toHaveText("Range: Last 1 minute");
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-events-match']")).toBeVisible();
+        });
+
+        test("the range composes with the type filter", async () => {
+            await setLastRange("2", "month");
+            await page.locator("[data-test-id='events-filter-button']").click();
+            await page.locator("[data-test-id='events-filter-item-type-Normal']").click();
+            await page.keyboard.press("Escape");
+            // Both Normal events are inside a 2-month range.
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(2);
+
+            // Narrowing the range to 7 days drops the 30-day-old Normal event, leaving
+            // only the 3-day-old one: the two filters intersect.
+            await setLastRange("7", "day");
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "MidrangeScheduled" })).toBeVisible();
+
+            await page.locator("[data-test-id='events-filter-button']").click();
+            await page.locator("[data-test-id='events-filter-deselect-all']").click();
+            await page.keyboard.press("Escape");
+        });
+    });
+
     // ── Errors page ───────────────────────────────────────────────────────────
 
     test.describe("errors page", () => {
@@ -6289,6 +6597,14 @@ test.describe("karse e2e", () => {
         // Each fixture carries one reference to a kind that has a detail page (Pod)
         // and one to a kind that does not (ReplicaSet), so both the linking and the
         // graceful-degradation paths are covered from the table.
+        //
+        // The timestamps are a fixed 2-hours-ago offset, not a hardcoded date. Both
+        // tables default their time-range filter to the last 7 days, so a row stamped
+        // with a fixed calendar date ages out of that range and stops rendering at
+        // all — these link tests would then find no row to click. Two hours keeps the
+        // rows comfortably inside the default range while rendering a stable "2h" in
+        // the Age column for the whole run.
+        const LINK_SEEN = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
         const LINK_ERRORS = {
             errors: [
                 {
@@ -6299,8 +6615,8 @@ test.describe("karse e2e", () => {
                     reason: "CrashLoopBackOff",
                     message: "back-off 5m0s restarting failed container",
                     count: 1,
-                    firstSeen: "2024-01-01T00:00:00Z",
-                    lastSeen: "2024-01-01T00:00:00Z",
+                    firstSeen: LINK_SEEN,
+                    lastSeen: LINK_SEEN,
                 },
                 {
                     source: "Event",
@@ -6310,8 +6626,8 @@ test.describe("karse e2e", () => {
                     reason: "FailedCreate",
                     message: "Error creating: pods \"web-7d9\" is forbidden",
                     count: 2,
-                    firstSeen: "2024-01-01T00:00:00Z",
-                    lastSeen: "2024-01-01T00:00:00Z",
+                    firstSeen: LINK_SEEN,
+                    lastSeen: LINK_SEEN,
                 },
             ],
         };
@@ -6325,8 +6641,8 @@ test.describe("karse e2e", () => {
                     message: "Back-off restarting failed container",
                     count: 5,
                     source: "kubelet",
-                    firstSeen: "2024-01-01T00:00:00Z",
-                    lastSeen: "2024-01-01T00:00:00Z",
+                    firstSeen: LINK_SEEN,
+                    lastSeen: LINK_SEEN,
                     namespace: "default",
                     objectKind: "Pod",
                     objectName: "nginx-abc",
@@ -6338,8 +6654,8 @@ test.describe("karse e2e", () => {
                     message: "Error creating: pods \"web-7d9\" is forbidden",
                     count: 2,
                     source: "replicaset-controller",
-                    firstSeen: "2024-01-01T00:00:00Z",
-                    lastSeen: "2024-01-01T00:00:00Z",
+                    firstSeen: LINK_SEEN,
+                    lastSeen: LINK_SEEN,
                     namespace: "default",
                     objectKind: "ReplicaSet",
                     objectName: "web-7d9",
@@ -7152,6 +7468,98 @@ test.describe("karse e2e", () => {
             await page.locator("[data-test-id='errors-reset-filters']").click();
             await expect(page.locator("[data-test-id='error-row']")).toHaveCount(4);
             await expect(page.locator("[data-test-id='errors-active-filters']")).toHaveCount(0);
+        });
+    });
+
+    // ── Errors page: time-range filter ───────────────────────────────────────────
+
+    test.describe("errors page time range filter", () => {
+        // One error inside the default 7-day window and one long-standing error well
+        // outside it. The Errors feed is where the default range genuinely bites: a
+        // problem pod's `lastSeen` comes from its start time, so a pod that has been
+        // broken for a month is older than the default range and is hidden until the
+        // user widens it. Ages are computed at fulfil time so they stay exact however
+        // long the suite takes to reach this block.
+        function rangeErrors(): { errors: any[] } {
+            const now = Date.now();
+            const at = (ms: number) => new Date(now - ms).toISOString();
+            return {
+                errors: [
+                    {
+                        source: "Pod",
+                        namespace: "default",
+                        objectKind: "Pod",
+                        objectName: "recent-crasher",
+                        reason: "CrashLoopBackOff",
+                        message: "Broke two hours ago",
+                        count: 3,
+                        firstSeen: at(2 * 60 * 60 * 1000),
+                        lastSeen: at(2 * 60 * 60 * 1000),
+                    },
+                    {
+                        source: "Pod",
+                        namespace: "default",
+                        objectKind: "Pod",
+                        objectName: "ancient-crasher",
+                        reason: "ImagePullBackOff",
+                        message: "Broken for a month",
+                        count: 1,
+                        firstSeen: at(30 * 24 * 60 * 60 * 1000),
+                        lastSeen: at(30 * 24 * 60 * 60 * 1000),
+                    },
+                ],
+            };
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/errors*", async (route) => {
+                await route.fulfill({ json: rangeErrors() });
+            });
+            await page.goto("/errors", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='errors-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/errors*");
+            setContext(CLUSTER_1);
+        });
+
+        test("defaults to the last 7 days, hiding the month-old error", async () => {
+            await expect(page.locator("[data-test-id='errors-range-button']")).toHaveText("Range: Last 7 days");
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='error-row']").filter({ hasText: "recent-crasher" })).toBeVisible();
+            await expect(page.locator("[data-test-id='error-row']").filter({ hasText: "ancient-crasher" })).toHaveCount(0);
+        });
+
+        test("all time reveals the month-old error", async () => {
+            await page.locator("[data-test-id='errors-range-button']").click();
+            await page.locator("[data-test-id='errors-range-all'] input").check();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='errors-range-button']")).toHaveText("Range: All time");
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='error-row']").filter({ hasText: "ancient-crasher" })).toBeVisible();
+        });
+
+        test("a custom last 1 hour range excludes both errors and shows the empty-result message", async () => {
+            await page.locator("[data-test-id='errors-range-button']").click();
+            await page.locator("[data-test-id='errors-range-count'] input").fill("1");
+            await page.locator("[data-test-id='errors-range-unit']").click();
+            await page.locator("[data-test-id='errors-range-unit-hour']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='errors-range-button']")).toHaveText("Range: Last 1 hour");
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-errors-match']")).toBeVisible();
+        });
+
+        test("widening back to a custom last 6 months range restores both errors", async () => {
+            await page.locator("[data-test-id='errors-range-button']").click();
+            await page.locator("[data-test-id='errors-range-count'] input").fill("6");
+            await page.locator("[data-test-id='errors-range-unit']").click();
+            await page.locator("[data-test-id='errors-range-unit-month']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='errors-range-button']")).toHaveText("Range: Last 6 months");
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(2);
         });
     });
 
@@ -9043,6 +9451,11 @@ test.describe("karse e2e", () => {
         test("a pod reached from an errors-table object link shows the Errors page as its origin", async () => {
             // The Object cell links to the referenced resource (clickable-resource-rows-1);
             // this ticket makes the resource it opens remember it was reached from Errors.
+            // lastSeen is a fixed 2-hours-ago offset, not a hardcoded date: the Errors
+            // table defaults its time-range filter to the last 7 days, so a row stamped
+            // with a fixed calendar date ages out of that range and stops rendering at
+            // all — this test would then find no object link to click. (firstSeen is not
+            // filtered on, so it stays a fixed date, as elsewhere in this file.)
             await page.route("**/api/errors*", async (route) => {
                 await route.fulfill({
                     json: {
@@ -9056,7 +9469,7 @@ test.describe("karse e2e", () => {
                                 message: "back-off restarting failed container",
                                 count: 1,
                                 firstSeen: "2024-01-01T00:00:00Z",
-                                lastSeen: "2024-01-01T00:00:00Z",
+                                lastSeen: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
                             },
                         ],
                     },

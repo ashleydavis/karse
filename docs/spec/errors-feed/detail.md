@@ -15,6 +15,7 @@ Backed by: `GET /api/errors`, `backend/src/routes/errors-route.ts`, `backend/src
 - Rows are sorted newest-first by `lastSeen`. The table is sortable and searchable (see `resource-search`).
 - The **Object** cell (`kind/name`) is a link to that resource's own detail page, using the same shared `ResourceRef` / `resourcePath` resolver as the detail page (see `clickable-resource-rows`). It stops click propagation, so clicking the object opens the referenced resource while clicking anywhere else on the row opens the error detail page. An object kind with no detail page renders as plain text.
 - The table declares its `reason` column filterable in the shared column-filter editor (see `resource-search`), so the single "Filter" dropdown beside the search box offers a **Reason** group listing the distinct error types present, one checkbox each, in alphabetical order. Include semantics: with nothing checked (the default) every error shows; checking one or more reasons narrows the table to errors of those reasons. A "Clear" control clears the selection. The button reads "Filter: All" when nothing is checked and "Filter: N selected" otherwise. The filter composes with the search box and column sorting.
+- A **time-range control** sits beside the filter dropdown, scoping the table by error age: "All time" or a custom "Last X \<period\>", defaulting to the last 7 days. It is the same shared control the Events feed uses; its behaviour is specified once under [events-feed](../events-feed/detail.md#time-range-filter). It bites harder here than on the Events feed: a problem-pod row's `lastSeen` is the pod's start time, so a pod that has been broken for longer than the range (a month-old `ImagePullBackOff`, say) is hidden until the range is widened to "all time".
 
 ### Row filtering (the per-row "..." menu)
 
@@ -53,6 +54,7 @@ A busy cluster reports the same handful of errors over and over, so each row car
 - [x] A "Reset filters" control clears every row filter, restoring the full list and count.
 - [x] Each "..." menu action states how many of the loaded errors it covers and the group it is keyed on, before it is applied.
 - [x] Two errors that differ only in a number that says what went wrong (an exit code, an HTTP status) are different groups, so hiding one does not hide the other.
+- [x] The table has the shared time-range control, defaulting to "last 7 days" and offering "all time" or a custom "last X \<period\>"; selecting a range filters the table to errors within it.
 - [x] Each error row is clickable and navigates to a per-error detail page (`/errors/:index`).
 - [x] The detail page shows every table field (source, object, reason, namespace, count, age) plus the full untruncated message.
 - [x] The detail page shows the first-seen and last-seen times.

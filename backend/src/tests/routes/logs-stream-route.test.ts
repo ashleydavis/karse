@@ -85,7 +85,7 @@ describe("GET /api/logs/stream", () => {
         kubectlMocks.listPods.mockResolvedValue([pod("nginx-1", "default"), pod("nginx-2", "default")]);
         // Each streamed pod emits one line then closes.
         kubectlMocks.streamPodLogs.mockImplementation(
-            (_ctx: string, _ns: string, name: string, _c: unknown, _t: number, handlers: any) => {
+            (_ctx: string, _ns: string, name: string, _c: unknown, _t: number, _since: number | undefined, handlers: any) => {
                 handlers.onLine(`hello from ${name}`);
                 handlers.onClose();
                 return { stop: jest.fn() };
@@ -109,7 +109,7 @@ describe("GET /api/logs/stream", () => {
     test("substring filter restricts which pods are streamed", async () => {
         kubectlMocks.listPods.mockResolvedValue([pod("api-server", "default"), pod("worker", "default")]);
         kubectlMocks.streamPodLogs.mockImplementation(
-            (_ctx: string, _ns: string, name: string, _c: unknown, _t: number, handlers: any) => {
+            (_ctx: string, _ns: string, name: string, _c: unknown, _t: number, _since: number | undefined, handlers: any) => {
                 handlers.onLine(`line ${name}`);
                 handlers.onClose();
                 return { stop: jest.fn() };
@@ -123,7 +123,7 @@ describe("GET /api/logs/stream", () => {
 
         expect(kubectlMocks.streamPodLogs).toHaveBeenCalledTimes(1);
         expect(kubectlMocks.streamPodLogs).toHaveBeenCalledWith(
-            "my-ctx", "default", "api-server", undefined, 100, expect.any(Object)
+            "my-ctx", "default", "api-server", undefined, 100, undefined, expect.any(Object)
         );
         expect(text).toContain("api-server");
         expect(text).not.toContain("\"pod\":\"worker\"");
@@ -136,7 +136,7 @@ describe("GET /api/logs/stream", () => {
             pod("redis-xyz", "default"),
         ]);
         kubectlMocks.streamPodLogs.mockImplementation(
-            (_ctx: string, _ns: string, _name: string, _c: unknown, _t: number, handlers: any) => {
+            (_ctx: string, _ns: string, _name: string, _c: unknown, _t: number, _since: number | undefined, handlers: any) => {
                 handlers.onClose();
                 return { stop: jest.fn() };
             }
@@ -155,7 +155,7 @@ describe("GET /api/logs/stream", () => {
             pod("redis-xyz", "default"),
         ]);
         kubectlMocks.streamPodLogs.mockImplementation(
-            (_ctx: string, _ns: string, _name: string, _c: unknown, _t: number, handlers: any) => {
+            (_ctx: string, _ns: string, _name: string, _c: unknown, _t: number, _since: number | undefined, handlers: any) => {
                 handlers.onClose();
                 return { stop: jest.fn() };
             }
@@ -176,7 +176,7 @@ describe("GET /api/logs/stream", () => {
             pod("redis-xyz", "default"),
         ]);
         kubectlMocks.streamPodLogs.mockImplementation(
-            (_ctx: string, _ns: string, _name: string, _c: unknown, _t: number, handlers: any) => {
+            (_ctx: string, _ns: string, _name: string, _c: unknown, _t: number, _since: number | undefined, handlers: any) => {
                 handlers.onClose();
                 return { stop: jest.fn() };
             }
@@ -215,11 +215,86 @@ describe("GET /api/logs/stream", () => {
         expect(body).toEqual({ error: "cluster unreachable" });
     });
 
+    // time-range-filter-1: the Logs view's time range reaches kubectl as --since, so the
+    // backlog each pod replays is bounded by age at fetch. These pin the query param to
+    // the adapter argument that becomes that flag.
+    describe("sinceSeconds (the viewer's time range, applied at fetch)", () => {
+        // Stubs every pod's stream as an immediately-closing no-op, so only the arguments
+        // streamPodLogs was called with are under test.
+        function stubStreams(): void {
+            kubectlMocks.streamPodLogs.mockImplementation(
+                (_ctx: string, _ns: string, _name: string, _c: unknown, _t: number, _since: number | undefined, handlers: any) => {
+                    handlers.onClose();
+                    return { stop: jest.fn() };
+                }
+            );
+        }
+
+        test("passes sinceSeconds through to the adapter", async () => {
+            kubectlMocks.listPods.mockResolvedValue([pod("nginx-1", "default")]);
+            stubStreams();
+
+            await readStream(
+                `http://127.0.0.1:${port}/api/logs/stream?context=my-ctx&filter=nginx&sinceSeconds=3600`,
+                60
+            );
+
+            expect(kubectlMocks.streamPodLogs).toHaveBeenCalledWith(
+                "my-ctx", "default", "nginx-1", undefined, 100, 3600, expect.any(Object)
+            );
+        });
+
+        test("an absent sinceSeconds means all time: no cutoff is passed", async () => {
+            kubectlMocks.listPods.mockResolvedValue([pod("nginx-1", "default")]);
+            stubStreams();
+
+            await readStream(
+                `http://127.0.0.1:${port}/api/logs/stream?context=my-ctx&filter=nginx`,
+                60
+            );
+
+            expect(kubectlMocks.streamPodLogs).toHaveBeenCalledWith(
+                "my-ctx", "default", "nginx-1", undefined, 100, undefined, expect.any(Object)
+            );
+        });
+
+        test("a malformed sinceSeconds is ignored rather than passed on", async () => {
+            kubectlMocks.listPods.mockResolvedValue([pod("nginx-1", "default")]);
+            stubStreams();
+
+            // Anything that is not a run of digits cannot be a cutoff. It must not reach
+            // the argv, where it would corrupt the --since flag.
+            await readStream(
+                `http://127.0.0.1:${port}/api/logs/stream?context=my-ctx&filter=nginx&sinceSeconds=-5s%20--all`,
+                60
+            );
+
+            expect(kubectlMocks.streamPodLogs).toHaveBeenCalledWith(
+                "my-ctx", "default", "nginx-1", undefined, 100, undefined, expect.any(Object)
+            );
+        });
+
+        test("the range applies to every pod in a multi-pod stream", async () => {
+            kubectlMocks.listPods.mockResolvedValue([pod("nginx-1", "default"), pod("nginx-2", "default")]);
+            stubStreams();
+
+            await readStream(
+                `http://127.0.0.1:${port}/api/logs/stream?context=my-ctx&filter=nginx&sinceSeconds=60`,
+                60
+            );
+
+            expect(kubectlMocks.streamPodLogs).toHaveBeenCalledTimes(2);
+            for (const call of kubectlMocks.streamPodLogs.mock.calls) {
+                expect(call[5]).toBe(60);
+            }
+        });
+    });
+
     test("client disconnect stops every pod stream", async () => {
         kubectlMocks.listPods.mockResolvedValue([pod("nginx-1", "default")]);
         const stop = jest.fn();
         kubectlMocks.streamPodLogs.mockImplementation(
-            (_ctx: string, _ns: string, _name: string, _c: unknown, _t: number, handlers: any) => {
+            (_ctx: string, _ns: string, _name: string, _c: unknown, _t: number, _since: number | undefined, handlers: any) => {
                 handlers.onLine("a line");
                 // Do not call onClose: simulate a long-lived follow stream.
                 return { stop };

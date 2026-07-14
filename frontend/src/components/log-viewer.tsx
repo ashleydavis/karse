@@ -23,12 +23,23 @@ import { useKubeContext } from "../lib/kube-context";
 import { fetchNamespaces, fetchPods, openLogStream } from "../lib/api-client";
 import { PodFilter } from "./pod-filter";
 import { LoadingIndicator } from "./loading-indicator";
+import { TimeRangeFilter } from "./time-range-filter";
 import { shouldFollow, bottomScrollTop, thumbMetrics, scrollTopForThumbTop, type ThumbMetrics } from "../lib/log-autoscroll";
 import { tokenizeLogLine } from "../lib/log-highlight";
 import { colorForPod } from "../lib/log-pod-colors";
+import { DEFAULT_TIME_RANGE, timeRangeSeconds, type TimeRange } from "../lib/time-range";
 
 // A rendered log line tagged with a stable key for React reconciliation.
 type RenderedLine = LogStreamLine & { key: number };
+
+// The pods a stream covers: an explicit pod list (checkbox selection or the fixed pod)
+// or a wildcard/substring filter, within an optional namespace. Held onto while a
+// stream is open so it can be re-opened unchanged when only the time range changes.
+type StreamScope = {
+    pods: string[];
+    filter: string;
+    ns: string | undefined;
+};
 
 // Maximum number of streaming-pod chips shown before the list is collapsed
 // behind a "..." expander, so a large stream does not eat vertical space.
@@ -133,9 +144,24 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
     // A clock that ticks once a second so the relative "Updated ..." caption
     // ages without a new log line having to arrive.
     const [now, setNow] = useState<number>(() => Date.now());
+    // The time range the stream is fetched with. Unlike the Events and Errors feeds,
+    // which filter rows already in hand, this range is applied at fetch: it becomes
+    // `kubectl logs --since`, bounding how far back the backlog each pod replays (up to
+    // `tail` lines, and arbitrarily old for a pod that has been quiet) is allowed to
+    // reach. Changing it therefore re-opens the stream rather than re-filtering the
+    // lines on screen, because the excluded lines were never fetched.
+    const [range, setRange] = useState<TimeRange>(DEFAULT_TIME_RANGE);
 
     // Holds the active stream's close function so it survives re-renders.
     const closeRef = useRef<(() => void) | null>(null);
+    // The scope the open stream was started with, so a range change can re-open the
+    // same pods with the new cutoff. Null when no stream is open.
+    const activeScopeRef = useRef<StreamScope | null>(null);
+    // The current range, readable without making it a dependency of the fixed-pod
+    // auto-start effect (which must not re-fire on a range change: `handleRangeChange`
+    // already re-opens the stream, and both firing would open it twice).
+    const rangeRef = useRef<TimeRange>(range);
+    rangeRef.current = range;
     const keyRef = useRef(0);
     // The scrollable log viewer element, so the append effect can read its scroll
     // metrics and pin it to the bottom when auto-following.
@@ -327,11 +353,13 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
         return () => clearInterval(id);
     }, [lastLineAt]);
 
-    // Opens a fresh stream with the given scope, replacing any existing one. The
-    // scope is either an explicit pod list (checkbox selection or the fixed pod)
-    // or a wildcard/substring filter; with neither, streaming is refused and
-    // guidance is shown instead (see logs-require-pods-1).
-    const startStream = useCallback((scope: { pods: string[]; filter: string; ns: string | undefined }): void => {
+    // Opens a fresh stream with the given scope and time range, replacing any existing
+    // one. The scope is either an explicit pod list (checkbox selection or the fixed
+    // pod) or a wildcard/substring filter; with neither, streaming is refused and
+    // guidance is shown instead (see logs-require-pods-1). The range is passed in
+    // rather than read from state so this stays stable across range changes, and is
+    // sent to the backend as a cutoff in seconds ("all time" sends none).
+    const startStream = useCallback((scope: StreamScope, streamRange: TimeRange): void => {
         if (current === null) {
             return;
         }
@@ -341,9 +369,11 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
             setMatchedPods([]);
             setStreamError(null);
             setNeedsSelection(true);
+            activeScopeRef.current = null;
             return;
         }
         stopStream();
+        activeScopeRef.current = scope;
         setLines([]);
         setMatchedPods([]);
         setShowAllPods(false);
@@ -354,7 +384,7 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
         // A fresh stream starts pinned to the bottom (following the newest line).
         followRef.current = true;
         setStreaming(true);
-        closeRef.current = openLogStream(current, scope.ns, scope.pods, scope.filter, 100, {
+        closeRef.current = openLogStream(current, scope.ns, scope.pods, scope.filter, 100, timeRangeSeconds(streamRange), {
             onStarted: (started) => {
                 setMatchedPods(started.pods.map((p) => p.name));
             },
@@ -381,7 +411,20 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
     // the search box is the wildcard/substring filter the backend matches against.
     function handleStreamClick(): void {
         const filterText = selectedPods.length > 0 ? "" : search;
-        startStream({ pods: selectedPods, filter: filterText, ns: namespace || undefined });
+        startStream({ pods: selectedPods, filter: filterText, ns: namespace || undefined }, range);
+    }
+
+    // Applies a newly chosen time range. Because the range is applied at fetch, the
+    // lines it would exclude were never sent and the ones it would newly admit are not
+    // on the client to show, so a live stream is re-opened over the same pods with the
+    // new cutoff instead of re-filtering what is already on screen. With no stream
+    // running the range is simply remembered and used the next time Stream is pressed.
+    function handleRangeChange(next: TimeRange): void {
+        setRange(next);
+        const scope = activeScopeRef.current;
+        if (streaming && scope !== null) {
+            startStream(scope, next);
+        }
     }
 
     // Removes one pod from the streamed set, driven by the close button on its
@@ -402,13 +445,14 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
             setMatchedPods([]);
             setStreamError(null);
             setLastLineAt(null);
+            activeScopeRef.current = null;
             return;
         }
         startStream({
             pods: remaining,
             filter: "",
             ns: namespace || undefined,
-        });
+        }, range);
     }
 
     // Fixed-pod mode (the Pod detail Logs tab) auto-starts the stream for its one
@@ -418,7 +462,7 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
         if (fixedPod === undefined || current === null) {
             return;
         }
-        startStream({ pods: [fixedPod.podName], filter: "", ns: fixedPod.namespace });
+        startStream({ pods: [fixedPod.podName], filter: "", ns: fixedPod.namespace }, rangeRef.current);
     }, [fixedPod, current, startStream]);
 
     return (
@@ -462,6 +506,15 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
                         onTogglePod={togglePod}
                         onClear={clearSelection}
                         testIdPrefix={testIdPrefix}
+                    />
+
+                    {/* The time range the stream is fetched with. It bounds how far back
+                        each pod's replayed backlog reaches, so changing it while streaming
+                        re-opens the stream (see handleRangeChange). */}
+                    <TimeRangeFilter
+                        range={range}
+                        onChange={handleRangeChange}
+                        testIdPrefix={`${testIdPrefix}-range`}
                     />
 
                     {!streaming ? (
@@ -521,6 +574,19 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
                         </Tooltip>
                     </Box>
                 </Paper>
+            )}
+
+            {/* Fixed-pod mode (the Pod detail Logs tab) hides the scoping toolbar, since
+                its pod is already chosen, but it replays the same `--tail` backlog and so
+                needs the same range control. It gets a slim row of its own. */}
+            {fixedPod !== undefined && (
+                <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                    <TimeRangeFilter
+                        range={range}
+                        onChange={handleRangeChange}
+                        testIdPrefix={`${testIdPrefix}-range`}
+                    />
+                </Box>
             )}
 
             {needsSelection && (

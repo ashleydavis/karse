@@ -100,8 +100,21 @@ One node, three pods (`nginx-one`, `nginx-two`, `redis-main`).
 - Leave the stream idle (or watch a stream whose lines have stopped). After a few seconds the caption ages: "Updated Ns ago", then "Updated Nm ago" after a minute, then "Updated Nh ago" after an hour. It tracks the most recent line and ticks on its own.
 - Press "Stream" again (or start a fresh stream). The caption resets to "No logs yet" until the first new line lands.
 
+### Time range
+The simulated backlog spans roughly two hours: nginx startup notices about two hours old, `kube-probe` requests an hour to fifteen minutes old, and a warning and an error only seconds old. That spread is what the range has to bite on.
+
+- Before streaming, a "Range" button with a clock icon sits beside the Stream button, reading "Range: Last 7 days".
+- Type `nginx` into the pod picker's search box, close the dropdown, and press "Stream". The whole backlog arrives: you can scroll back to the "start worker processes" startup notices and see the `kube-probe` request lines.
+- Click "Range". The menu offers "All time" and a "Last" row with a number box and a period dropdown (minutes, hours, days, weeks, months).
+- Set it to "Last 10 minutes" and close the menu. The stream **restarts** (the viewer clears and refills) and comes back with visibly fewer lines: the two-hour-old startup notices and the `kube-probe` lines are gone, while the newest lines (the `[warning]` and `[error]` ones) are still there. This is the range being applied at fetch: Karse asked the cluster only for lines newer than the cutoff, so the older ones were never sent.
+- Choose "All time" and close the menu. The stream restarts again and the full backlog returns, startup notices and all. Widening the range is the only way to get those lines back, because they were never on the page to un-hide.
+- Set the number to a value below 1 (or clear the box). The applied range does not change and the viewer does not blank out mid-keystroke.
+
+The Pod detail Logs tab (see [pod-detail](../pod-detail/detail.md)) carries the same Range control and behaves the same way.
+
 ### Read-only invariant
 - Tail `logs/audit-*.log` while streaming and confirm only `logs -f` and `get` kubectl commands are recorded. No mutating verbs ever appear.
+- Set a Range other than "All time" and stream again. The recorded command gains a `--since=<n>s` flag (for example `--since=600s` for "Last 10 minutes") on the same read-only `logs -f` invocation. No mutating verb appears, and no other flag changes.
 
 ### Capped streaming-pod labels
 - This needs more than 8 streaming pods to exercise the cap. Use a namespace/fixture with at least 9 pods (for example scale the fixture up, or stream across all namespaces on a busier cluster).

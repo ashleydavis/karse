@@ -2558,7 +2558,7 @@ describe("streamPodLogs", () => {
 
     test("invokes kubectl logs -f with follow flag and tail", () => {
         captureStream();
-        streamPodLogs("ctx", "default", "my-pod", undefined, 50, {
+        streamPodLogs("ctx", "default", "my-pod", undefined, 50, undefined, {
             onLine: jest.fn(),
             onError: jest.fn(),
             onClose: jest.fn(),
@@ -2572,7 +2572,7 @@ describe("streamPodLogs", () => {
 
     test("passes container flag when a container is specified", () => {
         captureStream();
-        streamPodLogs("ctx", "default", "my-pod", "nginx", 100, {
+        streamPodLogs("ctx", "default", "my-pod", "nginx", 100, undefined, {
             onLine: jest.fn(),
             onError: jest.fn(),
             onClose: jest.fn(),
@@ -2584,10 +2584,141 @@ describe("streamPodLogs", () => {
         );
     });
 
+    // time-range-filter-1: the Logs view's time range is applied at fetch, because a
+    // `kubectl logs -f --tail=N` backlog is real history (up to N lines already written
+    // before the follow begins, arbitrarily old for a quiet pod) and the lines carry no
+    // timestamp to filter on afterwards. --since is what bounds it by age.
+    test("passes --since when a time range is given, bounding the backlog by age", () => {
+        captureStream();
+        streamPodLogs("ctx", "default", "my-pod", undefined, 100, 3600, {
+            onLine: jest.fn(),
+            onError: jest.fn(),
+            onClose: jest.fn(),
+        });
+        expect(stream).toHaveBeenCalledWith(
+            "kubectl",
+            ["--context", "ctx", "-n", "default", "logs", "-f", "my-pod", "--tail=100", "--since=3600s"],
+            expect.any(Object)
+        );
+    });
+
+    test("passes a 7-day range as --since=604800s (kubectl has no day unit)", () => {
+        captureStream();
+        streamPodLogs("ctx", "default", "my-pod", undefined, 100, 604800, {
+            onLine: jest.fn(),
+            onError: jest.fn(),
+            onClose: jest.fn(),
+        });
+        const args = stream.mock.calls[0][1];
+        expect(args).toContain("--since=604800s");
+    });
+
+    test("omits --since entirely for an all-time range", () => {
+        captureStream();
+        streamPodLogs("ctx", "default", "my-pod", undefined, 100, undefined, {
+            onLine: jest.fn(),
+            onError: jest.fn(),
+            onClose: jest.fn(),
+        });
+        const args: string[] = stream.mock.calls[0][1];
+        expect(args.some((arg) => arg.startsWith("--since"))).toBe(false);
+    });
+
+    test("the streamed command stays read-only whatever the range", () => {
+        captureStream();
+        streamPodLogs("ctx", "default", "my-pod", undefined, 100, 60, {
+            onLine: jest.fn(),
+            onError: jest.fn(),
+            onClose: jest.fn(),
+        });
+        const args: string[] = stream.mock.calls[0][1];
+        // The range contributes a value, never a subcommand or a new flag: the only
+        // verb in the argv is still `logs` (docs/rules/security.md).
+        expect(args).toContain("logs");
+        for (const forbidden of ["apply", "create", "delete", "patch", "exec", "scale"]) {
+            expect(args).not.toContain(forbidden);
+        }
+    });
+
+    test("a narrow range restricts the fake backlog to the lines inside it", () => {
+        process.env.KARSE_FAKE_LOGS = "1";
+        const onLine = jest.fn();
+        // The canned lines span from two hours ago to seconds ago. A one-minute range
+        // admits only the newest of them. The backlog is emitted synchronously, so it is
+        // all that has arrived at this point: the follow's first line is 100ms away.
+        const narrowed = streamPodLogs("ctx", "default", "my-pod", undefined, 100, 60, {
+            onLine,
+            onError: jest.fn(),
+            onClose: jest.fn(),
+        });
+        const emitted: string[] = onLine.mock.calls.map((c: any[]) => c[0]);
+        expect(emitted.length).toBeGreaterThan(0);
+        // The startup notices are two hours old, so the range excludes them...
+        expect(emitted.join("\n")).not.toContain("start worker processes");
+        // ...while the newest line (10s old) is still delivered.
+        expect(emitted.join("\n")).toContain("[error]");
+        // The fake stream follows until stopped, so stop it rather than leaking its timer.
+        narrowed.stop();
+
+        // The same stream with no range at all delivers strictly more.
+        onLine.mockReset();
+        const allTimeHandle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, undefined, {
+            onLine,
+            onError: jest.fn(),
+            onClose: jest.fn(),
+        });
+        const allTime: string[] = onLine.mock.calls.map((c: any[]) => c[0]);
+        expect(allTime.length).toBeGreaterThan(emitted.length);
+        expect(allTime.join("\n")).toContain("start worker processes");
+        allTimeHandle.stop();
+    });
+
+    test("a range narrower than every line's age admits no backlog at all", () => {
+        process.env.KARSE_FAKE_LOGS = "1";
+        const onLine = jest.fn();
+        // The newest canned line is 10s old, so a 1s range excludes even that, and the
+        // backlog (emitted synchronously) is empty. This is a claim about the backlog
+        // only: the stream then follows, and a line it synthesises later is new by
+        // definition, so it is inside even a 1s range. A real `kubectl logs -f --since=1s`
+        // behaves the same way.
+        const handle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, 1, {
+            onLine,
+            onError: jest.fn(),
+            onClose: jest.fn(),
+        });
+        expect(onLine).not.toHaveBeenCalled();
+        // The fake stream follows until stopped, so stop it rather than leaking its timer.
+        handle.stop();
+    });
+
+    test("the fake backlog is dated relative to now, so the default range keeps it", () => {
+        process.env.KARSE_FAKE_LOGS = "1";
+        const onLine = jest.fn();
+        // A hard-coded log date would fall outside every range the viewer offers and the
+        // fake stream would come up empty under the 7-day default. Every line must be
+        // younger than that default, and stamped with a plausible current date.
+        const handle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, 604800, {
+            onLine,
+            onError: jest.fn(),
+            onClose: jest.fn(),
+        });
+        const emitted: string[] = onLine.mock.calls.map((c: any[]) => c[0]);
+        expect(emitted).toHaveLength(12);
+        const cutoff = Date.now() - 604800 * 1000;
+        for (const line of emitted) {
+            const at = new Date(line.slice(0, line.indexOf(" "))).getTime();
+            expect(Number.isNaN(at)).toBe(false);
+            expect(at).toBeGreaterThanOrEqual(cutoff);
+            expect(at).toBeLessThanOrEqual(Date.now());
+        }
+        // The fake stream follows until stopped, so stop it rather than leaking its timer.
+        handle.stop();
+    });
+
     test("splits streamed chunks into complete lines", () => {
         const cap = captureStream();
         const onLine = jest.fn();
-        streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
+        streamPodLogs("ctx", "default", "my-pod", undefined, 100, undefined, {
             onLine,
             onError: jest.fn(),
             onClose: jest.fn(),
@@ -2602,7 +2733,7 @@ describe("streamPodLogs", () => {
         const cap = captureStream();
         const onLine = jest.fn();
         const onClose = jest.fn();
-        streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
+        streamPodLogs("ctx", "default", "my-pod", undefined, 100, undefined, {
             onLine,
             onError: jest.fn(),
             onClose,
@@ -2616,7 +2747,7 @@ describe("streamPodLogs", () => {
     test("forwards stream errors", () => {
         const cap = captureStream();
         const onError = jest.fn();
-        streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
+        streamPodLogs("ctx", "default", "my-pod", undefined, 100, undefined, {
             onLine: jest.fn(),
             onError,
             onClose: jest.fn(),
@@ -2627,7 +2758,7 @@ describe("streamPodLogs", () => {
 
     test("stop() kills the underlying process", () => {
         const cap = captureStream();
-        const handle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
+        const handle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, undefined, {
             onLine: jest.fn(),
             onError: jest.fn(),
             onClose: jest.fn(),
@@ -2639,7 +2770,7 @@ describe("streamPodLogs", () => {
     test("emits fake log lines without spawning when KARSE_FAKE_LOGS=1", () => {
         process.env.KARSE_FAKE_LOGS = "1";
         const onLine = jest.fn();
-        const handle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
+        const handle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, undefined, {
             onLine,
             onError: jest.fn(),
             onClose: jest.fn(),
@@ -2661,7 +2792,8 @@ describe("streamPodLogs", () => {
         try {
             const onLine = jest.fn();
             const onClose = jest.fn();
-            const handle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
+            // No range (all time), so the whole canned backlog is admitted.
+            const handle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, undefined, {
                 onLine,
                 onError: jest.fn(),
                 onClose,
@@ -2691,7 +2823,8 @@ describe("streamPodLogs", () => {
         jest.useFakeTimers();
         try {
             const onLine = jest.fn();
-            const handle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, {
+            // No range (all time), so the whole canned backlog is admitted.
+            const handle = streamPodLogs("ctx", "default", "my-pod", undefined, 100, undefined, {
                 onLine,
                 onError: jest.fn(),
                 onClose: jest.fn(),

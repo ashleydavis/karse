@@ -12,7 +12,15 @@ Then open the frontend at `http://127.0.0.1:5173`. The scenario's fixture stands
 
 ## Scenario: Errors view
 
-A cluster seeded with one error condition from each source the Errors page surfaces: a pod stuck in `ImagePullBackOff` (a problem pod) and a `Warning` event (`FailedScheduling`). A healthy pod is also created and must never appear. Note: kwok does not generate lifecycle events or container states on its own, so the setup script patches the broken pod's container state and creates the `Warning` `Event` object by hand.
+A cluster seeded with one error condition from each source the Errors page surfaces: a pod stuck in `ImagePullBackOff` (a problem pod) and a `Warning` event (`FailedScheduling`). A healthy pod is also created and must never appear. A second problem pod, `long-broken`, has been failing for 30 days, so it sits **outside the page's default "last 7 days" range** and is hidden until the time-range control is widened. Note: kwok does not generate lifecycle events or container states on its own, so the setup script patches the broken pods' container states and creates the `Warning` `Event` object by hand, with ages generated relative to now so they are realistic every run.
+
+| Row | Source | Reason | Age |
+|---|---|---|---|
+| `Pod/broken` | Pod | `ImagePullBackOff` | 2 hours |
+| `Pod/broken` | Event | `FailedScheduling` | 20 minutes |
+| `Pod/long-broken` | Pod | `ImagePullBackOff` | 30 days |
+
+Every check below assumes the default range unless it says otherwise.
 
 **Fixture:** [_fixtures-kwok/32-errors-view](../_fixtures-kwok/32-errors-view/)
 
@@ -25,10 +33,11 @@ A cluster seeded with one error condition from each source the Errors page surfa
 ### What to check
 - **Sidebar top link**: the "Errors" nav item (circle-exclamation icon) is the **first** item at the **top** of the left sidebar's nav list, above the other nav items. Clicking it opens the Errors page.
 - **Page title**: the header shows "Errors".
-- **Errors page**: the table shows columns Age, Source, Object, Reason, Message, Count, Namespace.
+- **Errors page**: the table shows columns Age, Source, Object, Reason, Message, Count, Namespace, and **two** rows — the 30-day-old `long-broken` row is outside the default range.
 - **Problem pod row**: a row for `Pod/broken` with reason `ImagePullBackOff`, a red "Pod" source chip, and count 1.
 - **Warning event row**: a row for `Pod/broken` with reason `FailedScheduling`, a yellow "Event" source chip, and count 4.
 - **Healthy pod excluded**: there is no row for the `healthy` pod.
+- **Long-standing failure hidden by default**: there is no row for `Pod/long-broken` — it is 30 days old, outside the default "last 7 days" range. The Time-range filter section below reveals it.
 - **Namespace scoping**: select the `default` namespace; both error rows still appear.
 - **Search**: type `ImagePullBackOff` in the search box and confirm only the problem-pod row is shown. Type a non-matching string and confirm the "No errors match the search." message appears.
 - **Cross-column search**: the search box matches the text shown in *any* column, not just the reason. Confirm each of the following narrows the table to the one matching row, then clear the box and confirm both rows return:
@@ -60,6 +69,17 @@ The fixture seeds a `noisy` namespace holding exactly four Warning events (which
 - **Filters accumulate**: hide the `BackOff` errors, then use the `FailedScheduling` row's menu to hide those too. The bar shows two chips, the table shows "No errors match the current filters.", and the count reads "0 of 4 errors".
 - **Removing one filter**: click the X on one chip. Just that filter is dropped; the other stays active.
 - **Reset restores everything**: click **Reset filters**. All four errors return and the bar disappears.
+
+### Time-range filter
+
+Check these in **both light and dark mode** (toggle with the header colour-mode button).
+
+- **Default**: the "Range: Last 7 days" button sits beside the Filter dropdown. Two rows are shown; `Pod/long-broken` is not among them.
+- **All time**: open the control and select "All time". The button reads "Range: All time" and a third row appears — `Pod/long-broken`, `ImagePullBackOff`, with an age around `30d`. This is the case the filter exists for: a long-standing failure that would otherwise bury the recent ones.
+- **Custom "last X period"**: open the control, type `1` in the number box and pick `hours` in the period dropdown. The button reads "Range: Last 1 hour". Only the 20-minute-old `FailedScheduling` event row remains; the 2-hour-old problem pod drops out.
+- **Empty result**: set the range to "Last 1 minute". Every error is older than that, so no rows are shown and the "No errors match the search." message appears.
+- **Widen again**: set the range to "Last 6 months" and confirm all three rows return.
+- **Reset on reload**: reload the page. The range returns to "Last 7 days" — it is view state and is not persisted.
 
 ### Error detail drill-down
 - **Row click**: hover an error row and confirm the cursor becomes a pointer and the row highlights (the same affordance as other resource tables). Click the `ImagePullBackOff` row and confirm the URL changes to `/errors/<n>` and an error detail page opens.

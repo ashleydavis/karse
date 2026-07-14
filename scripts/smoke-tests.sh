@@ -481,6 +481,47 @@ echo "$LOGS_STREAM" | grep -q "line=1"
 echo "$LOGS_STREAM" | grep -q "line=20"
 echo "OK"
 
+echo "--- GET /api/logs/stream (sinceSeconds bounds the backlog by age) ---"
+# time-range-filter-1. The Logs view's time range is applied at fetch: it arrives as
+# sinceSeconds and the adapter turns it into `kubectl logs --since=<n>s`, so the backlog
+# the stream replays is bounded by age as well as by --tail. This exercises that path
+# over real HTTP through the real route and adapter (with KARSE_FAKE_LOGS=1 standing in
+# for the container runtime kwok does not have, its canned lines spanning 2 hours to
+# seconds old). Without a range the oldest line (a startup notice, ~2h old) is present;
+# with a 60-second range it must be gone while the newest lines still arrive.
+ALL_TIME=$(curl -fsS --max-time 5 -H "Accept: text/event-stream" \
+    "$BASE/api/logs/stream?context=$CURRENT_CTX&namespace=default&filter=smoke" || true)
+echo "$ALL_TIME" | grep -q "start worker processes"
+
+NARROW=$(curl -fsS --max-time 5 -H "Accept: text/event-stream" \
+    "$BASE/api/logs/stream?context=$CURRENT_CTX&namespace=default&filter=smoke&sinceSeconds=60" || true)
+if echo "$NARROW" | grep -q "start worker processes"; then
+    echo "Expected a 60s range to exclude the ~2h-old startup line from the backlog" >&2
+    exit 1
+fi
+# The stream is narrowed, not broken: the newest line (~10s old) still arrives.
+echo "$NARROW" | grep -q "event: line"
+echo "$NARROW" | grep -q "connect() failed"
+
+# A range narrower than every canned line's age (the newest is ~10s old) excludes the
+# whole backlog. It does not empty the stream: the fake follow keeps synthesising a new
+# line every 100ms, and a line emitted now is inside every range, exactly as a real
+# `kubectl logs -f --since=1s` keeps printing whatever the pod writes next. So the test
+# is that no *backlog* line survives, not that no line does. The canned lines are named
+# by text the synthesised ones never carry ("line=<seq>" access lines).
+NARROWEST=$(curl -fsS --max-time 5 -H "Accept: text/event-stream" \
+    "$BASE/api/logs/stream?context=$CURRENT_CTX&namespace=default&filter=smoke&sinceSeconds=1" || true)
+echo "$NARROWEST" | grep -q "event: started"
+for CANNED in "start worker processes" "nginx/1.25.3" "connect() failed" "upstream server temporarily disabled"; do
+    if echo "$NARROWEST" | grep -qF "$CANNED"; then
+        echo "Expected a 1s range to exclude every canned backlog line, but found: $CANNED" >&2
+        exit 1
+    fi
+done
+# The stream is narrowed, not broken: the live follow still delivers fresh lines.
+echo "$NARROWEST" | grep -q "line="
+echo "OK"
+
 echo "--- GET /api/logs/stream (no pods match) ---"
 NO_MATCH=$(curl -fsS --max-time 5 -H "Accept: text/event-stream" \
     "$BASE/api/logs/stream?context=$CURRENT_CTX&filter=does-not-exist-xyz" || true)

@@ -171,7 +171,7 @@ describe("GET /api/pods/:namespace/:name/logs/stream", () => {
     // Wires streamPodLogs to push the given lines, then close, via the route handlers.
     function fakeStream(lines: string[]): void {
         kubectlMocks.streamPodLogs.mockImplementation(
-            (_ctx: string, _ns: string, _name: string, _container: string | undefined, _tail: number, handlers: any) => {
+            (_ctx: string, _ns: string, _name: string, _container: string | undefined, _tail: number, _since: number | undefined, handlers: any) => {
                 for (const line of lines) {
                     handlers.onLine(line);
                 }
@@ -191,7 +191,7 @@ describe("GET /api/pods/:namespace/:name/logs/stream", () => {
         expect(body).toContain("data: world");
         expect(body).toContain("event: end");
         expect(kubectlMocks.streamPodLogs).toHaveBeenCalledWith(
-            "my-ctx", "default", "nginx-abc", undefined, 100, expect.any(Object)
+            "my-ctx", "default", "nginx-abc", undefined, 100, undefined, expect.any(Object)
         );
     });
 
@@ -202,13 +202,13 @@ describe("GET /api/pods/:namespace/:name/logs/stream", () => {
         );
         await res.text();
         expect(kubectlMocks.streamPodLogs).toHaveBeenCalledWith(
-            "my-ctx", "default", "nginx-abc", "nginx", 50, expect.any(Object)
+            "my-ctx", "default", "nginx-abc", "nginx", 50, undefined, expect.any(Object)
         );
     });
 
     test("emits an error event when the adapter reports a failure", async () => {
         kubectlMocks.streamPodLogs.mockImplementation(
-            (_ctx: string, _ns: string, _name: string, _container: string | undefined, _tail: number, handlers: any) => {
+            (_ctx: string, _ns: string, _name: string, _container: string | undefined, _tail: number, _since: number | undefined, handlers: any) => {
                 handlers.onError(new Error("boom"));
                 return { stop: jest.fn() };
             }

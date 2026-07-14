@@ -308,19 +308,25 @@ export type LogStreamCallbacks = {
 // each event to the callbacks. When `pods` lists one or more pod names, exactly
 // those pods are streamed (the picker's explicit checkbox selection); otherwise
 // the wildcard/substring `filter` chooses which of the namespace's pods to stream
-// from. Returns a function that closes the stream (terminating the backend
-// kubectl processes via the request-close handler).
+// from. `sinceSeconds` is the viewer's time range in seconds (null for "all time"),
+// which the backend applies at fetch as `kubectl logs --since`, bounding how far back
+// each pod's replayed backlog reaches. Returns a function that closes the stream
+// (terminating the backend kubectl processes via the request-close handler).
 export function openLogStream(
     context: string,
     namespace: string | undefined,
     pods: string[],
     filter: string,
     tail: number,
+    sinceSeconds: number | null,
     callbacks: LogStreamCallbacks,
 ): () => void {
     const params = new URLSearchParams({ context, filter, tail: String(tail) });
     if (namespace) {
         params.set("namespace", namespace);
+    }
+    if (sinceSeconds !== null) {
+        params.set("sinceSeconds", String(sinceSeconds));
     }
     for (const pod of pods) {
         params.append("pods", pod);

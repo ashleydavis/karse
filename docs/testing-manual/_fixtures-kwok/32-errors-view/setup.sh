@@ -33,9 +33,15 @@ EOF
 
 kubectl wait --for=condition=Ready node/fake-node-1 --timeout=30s
 
-# A healthy pod (must NOT appear on the Errors page) plus a pod stuck waiting in
-# ImagePullBackOff (must appear, sourced from the pod's container state). kwok does
-# not set container states on its own, so the waiting state is patched in below.
+# A healthy pod (must NOT appear on the Errors page), a pod stuck waiting in
+# ImagePullBackOff (must appear, sourced from the pod's container state), and a
+# second broken pod that has been failing for a month. kwok does not set container
+# states on its own, so the waiting states are patched in below.
+#
+# `long-broken` exists for the Errors page's time-range filter, which defaults to
+# the last 7 days. An error row's age comes from the pod's start time, so a pod
+# broken for a month is outside the default range and is hidden until the range is
+# widened to "all time" — the case the filter exists to manage.
 kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: Pod
@@ -58,13 +64,51 @@ spec:
   containers:
   - name: app
     image: does-not-exist:latest
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: long-broken
+  namespace: default
+spec:
+  nodeName: fake-node-1
+  containers:
+  - name: app
+    image: also-does-not-exist:latest
 EOF
 
+# The pod start times and event timestamps are generated relative to now, not
+# hardcoded, so the seeded errors keep realistic ages every time the fixture runs.
+# Fixed timestamps in the past would all age out of the Errors page's default
+# 7-day range and the table would come up empty. `bun` is a prerequisite of this
+# project (see docs/setup.md), so it does the date arithmetic portably rather than
+# relying on GNU vs BSD `date` flags.
+iso_minutes_ago() {
+    KARSE_FIXTURE_MINUTES="$1" bun -e 'console.log(new Date(Date.now() - Number(process.env.KARSE_FIXTURE_MINUTES) * 60_000).toISOString())'
+}
+
+BROKEN_START="$(iso_minutes_ago 120)"
+LONG_BROKEN_START="$(iso_minutes_ago 43200)"
+EVENT_FIRST="$(iso_minutes_ago 25)"
+EVENT_LAST="$(iso_minutes_ago 20)"
+
+# The row-filter fixtures below (the `noisy` namespace) are dated relative to now for
+# the same reason: the Errors page's time-range filter defaults to the last 7 days, so
+# a hardcoded past date ages out of the default range and those scenarios would open on
+# an empty table — "0 of 4 errors" instead of the "4 of 4 errors" their checks call for.
+# Every one sits well inside the default, and their relative order is preserved.
+NOISY_FIRST="$(iso_minutes_ago 30)"
+NOISY_WEB_X2K9P_LAST="$(iso_minutes_ago 20)"
+NOISY_WEB_Q4M2T_LAST="$(iso_minutes_ago 21)"
+NOISY_API_JMNBK_LAST="$(iso_minutes_ago 22)"
+NOISY_FAILEDSCHED_LAST="$(iso_minutes_ago 23)"
+
 # Patch the broken pod's status so a container is waiting in ImagePullBackOff.
+# Started 2 hours ago: well inside the Errors page's default 7-day range.
 kubectl patch pod broken -n default --subresource=status --type=merge -p '{
   "status": {
     "phase": "Pending",
-    "startTime": "2024-01-01T00:00:00Z",
+    "startTime": "'"${BROKEN_START}"'",
     "containerStatuses": [
       {
         "name": "app",
@@ -84,9 +128,34 @@ kubectl patch pod broken -n default --subresource=status --type=merge -p '{
   }
 }'
 
+# The long-standing failure: same reason, but started 30 days ago, so it falls
+# outside the default 7-day range and only appears once the range is widened.
+kubectl patch pod long-broken -n default --subresource=status --type=merge -p '{
+  "status": {
+    "phase": "Pending",
+    "startTime": "'"${LONG_BROKEN_START}"'",
+    "containerStatuses": [
+      {
+        "name": "app",
+        "image": "also-does-not-exist:latest",
+        "imageID": "",
+        "ready": false,
+        "restartCount": 0,
+        "started": false,
+        "state": {
+          "waiting": {
+            "reason": "ImagePullBackOff",
+            "message": "Back-off pulling image \"also-does-not-exist:latest\""
+          }
+        }
+      }
+    ]
+  }
+}'
+
 # kwok does not emit lifecycle events on its own, so create a representative
 # Warning event by hand. It must appear on the Errors page with source "Event".
-kubectl apply -f - <<'EOF'
+kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Event
 metadata:
@@ -103,8 +172,8 @@ type: Warning
 count: 4
 source:
   component: default-scheduler
-firstTimestamp: "2024-01-01T00:00:05Z"
-lastTimestamp: "2024-01-01T00:05:00Z"
+firstTimestamp: "${EVENT_FIRST}"
+lastTimestamp: "${EVENT_LAST}"
 EOF
 
 
@@ -114,7 +183,7 @@ EOF
 # `web` pod. Selecting the `noisy` namespace in Karse shows exactly these four.
 kubectl create namespace noisy 2>/dev/null || true
 
-kubectl apply -f - <<'EOF'
+kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Event
 metadata:
@@ -132,8 +201,8 @@ count: 5
 source:
   component: kubelet
   host: fake-node-1
-firstTimestamp: "2024-01-01T00:00:00Z"
-lastTimestamp: "2024-01-01T00:20:00Z"
+firstTimestamp: "${NOISY_FIRST}"
+lastTimestamp: "${NOISY_WEB_X2K9P_LAST}"
 ---
 apiVersion: v1
 kind: Event
@@ -152,8 +221,8 @@ count: 3
 source:
   component: kubelet
   host: fake-node-1
-firstTimestamp: "2024-01-01T00:00:00Z"
-lastTimestamp: "2024-01-01T00:19:00Z"
+firstTimestamp: "${NOISY_FIRST}"
+lastTimestamp: "${NOISY_WEB_Q4M2T_LAST}"
 ---
 apiVersion: v1
 kind: Event
@@ -172,8 +241,8 @@ count: 2
 source:
   component: kubelet
   host: fake-node-1
-firstTimestamp: "2024-01-01T00:00:00Z"
-lastTimestamp: "2024-01-01T00:18:00Z"
+firstTimestamp: "${NOISY_FIRST}"
+lastTimestamp: "${NOISY_API_JMNBK_LAST}"
 ---
 apiVersion: v1
 kind: Event
@@ -191,8 +260,8 @@ type: Warning
 count: 1
 source:
   component: default-scheduler
-firstTimestamp: "2024-01-01T00:00:00Z"
-lastTimestamp: "2024-01-01T00:17:00Z"
+firstTimestamp: "${NOISY_FIRST}"
+lastTimestamp: "${NOISY_FAILEDSCHED_LAST}"
 EOF
 
 echo "Cluster ready. Select the 'kwok-karse-test' context in Karse."

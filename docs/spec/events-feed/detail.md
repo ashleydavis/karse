@@ -14,6 +14,7 @@ Backed by: `GET /api/events`, `backend/src/routes/events-route.ts`, `backend/src
 - The table is sortable and searchable (see `resource-search`).
 - The **Object** cell (`kind/name`) is a link to that resource's own detail page, using the same shared `ResourceRef` / `resourcePath` resolver as the event detail page (see `clickable-resource-rows`). It stops click propagation, so clicking the object opens the referenced resource while clicking anywhere else on the row opens the event detail page. An object kind with no detail page renders as plain text.
 - The table declares its `type` column filterable in the shared column-filter editor (see `resource-search`), so the single "Filter" dropdown beside the search box offers a **Type** group listing the event types (`Warning`, `Normal`). It shows every event by default (nothing checked); checking one or more types narrows the table to just those types. A "Clear" control clears the selection, restoring the show-all default. The button reads "Filter: All" / "Filter: N selected". The filter is a frontend-only concern (a TanStack column filter); `GET /api/events` is unchanged. Backed by `frontend/src/components/table-filter.tsx` and `frontend/src/lib/table-filter-state.ts`.
+- A **time-range control** sits beside the filter dropdown, scoping the table by event age. See the shared `time-range-filter` behaviour below.
 - Each row is clickable (the standard `clickable-resource-rows` affordance) and navigates to the event detail page `/events/:uid`. See `event-detail`.
 
 ### Row filtering (the per-row "..." menu)
@@ -72,6 +73,20 @@ Using the menu never triggers the row's own navigation to the event detail page.
 
 Filters are per-page and per-session: they are not persisted, and they do not affect the cluster-overview **Errors** stat tile (a backend-computed, cluster-level count).
 
+### Time-range filter
+
+The Events and Errors feeds share one time-range control (`frontend/src/components/time-range-filter.tsx`, backed by `frontend/src/lib/time-range.ts`).
+
+- The button reads the applied range ("Range: Last 7 days") and opens an editor offering either **All time** (no lower bound) or a custom **Last X \<period\>**, where X is a whole number of at least 1 and the period is one of minute, hour, day, week, or month.
+- The default on first load is **last 7 days**. The range is view state: it is not persisted and resets on reload.
+- A week is a fixed 7 days and a month a fixed 30 days: "last 1 month" means "the last 30 days", not the calendar month.
+- The lower bound is inclusive, so an item landing exactly on the boundary is kept. An item whose timestamp is missing or unparseable cannot be placed in time and is kept rather than hidden, so a row visible in the unfiltered list is never silently dropped.
+- Editing the number or the period applies a "Last" range immediately; a number below 1, or a part-typed empty box, leaves the applied range alone so the table never blanks out mid-keystroke. Switching to "All time" and back keeps the number and period the user last chose.
+- The range is applied as a TanStack column filter on the table's `lastSeen` column, so it composes with the search box and the type/reason filter (they intersect), and a range that excludes every row falls into the table's existing "No events/errors match the search." empty state. "All time" installs no filter at all. The value-filter dropdown's options are drawn from the whole fetched list, not the range-scoped one, so widening the range never surprises the user with new options appearing.
+- Filtering is **client-side**, over the already-fetched list. `GET /api/events` and `GET /api/errors` are unchanged: they are unpaginated snapshots of current cluster state, so there is nothing to push down to the query and no extra fetch to save.
+
+**What the range can honestly offer.** Karse persists nothing; the backend is a stateless `kubectl` wrapper with only a short response cache, so these views show only what the cluster itself still holds. Kubernetes garbage-collects Events at its `--event-ttl` (1 hour by default), so the Events feed in practice holds roughly the last hour and the 7-day default excludes nothing there; the ranges that bite on Events are the sub-hour ones. The default does bite on the Errors feed, whose problem-pod rows come from live pod state and can be arbitrarily old. Neither view offers history beyond what the cluster retains, and no range setting can recover an event Kubernetes has already collected.
+
 ## Acceptance Criteria
 
 - [x] `GET /api/events` requires `context` and optionally scopes to `namespace`.
@@ -90,6 +105,7 @@ Filters are per-page and per-session: they are not persisted, and they do not af
 - [x] Numbers that say what went wrong separate groups: exit code 1 and exit code 137 have different details hashes, as do a 404 and a 500 probe failure.
 - [x] Messages naming another object group across it: a replicaset's `SuccessfulCreate` events for different pods share one details hash.
 - [x] Each "..." menu action states how many of the loaded events it covers and the group it is keyed on, before it is applied; each active chip names the service it reaches and the group's details.
+- [x] The table has a time-range control defaulting to "last 7 days", offering "all time" and a custom "last X \<period\>" (period ∈ minute/hour/day/week/month), and selecting a range filters the table to events within it.
 
 ## Open Questions
 

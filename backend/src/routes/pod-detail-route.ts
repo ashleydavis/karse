@@ -77,7 +77,9 @@ podDetailRouter.get("/pods/:namespace/:name/logs/stream", (req, res) => {
         res.write("data: " + line + "\n\n");
     };
 
-    const handle = kubectl.streamPodLogs(context, namespace!, name!, container, tail, {
+    // This single-container stream carries no time range (the container detail Logs
+    // panel has no Range control), so the backlog is bounded by `tail` alone.
+    const handle = kubectl.streamPodLogs(context, namespace!, name!, container, tail, undefined, {
         onLine: (line) => {
             sendLine(line);
         },

@@ -43,6 +43,8 @@ import { RowFilterMenu } from "../../../components/row-filter-menu";
 import { ActiveRowFilters } from "../../../components/active-row-filters";
 import { type EventFilter, applyEventFilters } from "../../../lib/event-filter";
 import { useEventFilters } from "../../../lib/use-event-filters";
+import { TimeRangeFilter } from "../../../components/time-range-filter";
+import { DEFAULT_TIME_RANGE, timeRangeColumnFilters, timeRangeFilterFn, type TimeRange } from "../../../lib/time-range";
 
 // The distinct error types (reasons) present in the data, in display order
 // (alphabetical). These are the checkboxes offered by the type filter.
@@ -85,6 +87,10 @@ const columns: ColumnDef<ClusterError>[] = [
         cell: (info) => formatAge(info.getValue<string>()),
         sortingFn: (a, b) =>
             new Date(a.original.lastSeen).getTime() - new Date(b.original.lastSeen).getTime(),
+        // Keeps a row only when its last-seen time falls inside the range chosen in
+        // the shared time-range control. "All time" installs no filter at all, so
+        // this never runs in that case.
+        filterFn: timeRangeFilterFn,
     },
     {
         accessorKey: "source",
@@ -166,6 +172,11 @@ export function ErrorsTable() {
 
     const [sorting, setSorting] = useState<SortingState>([]);
     const { search, setSearch, deferredSearch } = useSearchFilter();
+    // The time range the table is scoped to. Starts on the shared default (last 7
+    // days). Unlike the Events feed, this bites here: an error's `lastSeen` comes
+    // from the pod's start time for a problem-pod row, so a pod that has been broken
+    // for weeks is older than the default range and is hidden until the range widens.
+    const [timeRange, setTimeRange] = useState<TimeRange>(DEFAULT_TIME_RANGE);
 
     // The filterable columns the shared editor offers: the Reason value column, whose
     // options are the distinct reasons present in the loaded errors. An empty selection
@@ -185,6 +196,14 @@ export function ErrorsTable() {
         [all, rowFilters.filters],
     );
     const hiddenCount = all.length - visible.length;
+
+    // The time range is just another column filter (on `lastSeen`), so it composes
+    // with the reason filter, the search box and the row filters above, and the table's
+    // existing "no rows match" empty state covers a range that excludes everything.
+    const columnFilters = useMemo(
+        () => [...filter.columnFilters, ...timeRangeColumnFilters("lastSeen", timeRange)],
+        [filter.columnFilters, timeRange],
+    );
 
     // The table's columns are the display columns plus the trailing "..." actions column.
     // `addFilter` is stable and the loaded errors only change on a refetch, so the table is
@@ -210,7 +229,7 @@ export function ErrorsTable() {
         state: {
             sorting,
             globalFilter: deferredSearch,
-            columnFilters: filter.columnFilters,
+            columnFilters,
             columnOrder,
             columnVisibility,
         },
@@ -269,6 +288,11 @@ export function ErrorsTable() {
                     onDeselectAll={filter.onDeselectAll}
                     totalSelected={filter.totalSelected}
                     testIdPrefix="errors-filter"
+                />
+                <TimeRangeFilter
+                    range={timeRange}
+                    onChange={setTimeRange}
+                    testIdPrefix="errors-range"
                 />
                 <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
                 <Typography variant="body2" color="text.secondary" data-test-id="errors-count">
