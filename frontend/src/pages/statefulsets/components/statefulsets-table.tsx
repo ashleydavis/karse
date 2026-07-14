@@ -32,6 +32,7 @@ import { TableFilter } from "../../../components/table-filter";
 import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn } from "../../../lib/table-filter-state";
 import { useTableFilter } from "../../../lib/use-table-filter";
 import { LoadError } from "../../../components/load-error";
+import { ResourceRef } from "../../../components/resource-ref";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { LabelsCell } from "../../../components/labels-cell";
@@ -59,7 +60,17 @@ function formatAge(createdAt: string): string {
 // Column definitions for the stateful sets table.
 const columns: ColumnDef<StatefulSet>[] = [
     { accessorKey: "name", header: "Name" },
-    { accessorKey: "namespace", header: "Namespace" },
+    {
+        accessorKey: "namespace",
+        header: "Namespace",
+        // The stateful set's namespace links to its own detail page. The row navigates to
+        // the stateful set, so the link stops its click from bubbling up to the row.
+        cell: (info) => (
+            <span onClick={(e) => e.stopPropagation()}>
+                <ResourceRef kind="Namespace" name={info.getValue<string>()} testId="statefulset-row-namespace-link" />
+            </span>
+        ),
+    },
     { accessorKey: "ready", header: "Ready" },
     {
         id: "age",

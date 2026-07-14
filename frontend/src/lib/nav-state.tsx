@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useNavigate, useSearchParams, type To } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams, type To } from "react-router-dom";
 
 // Query-param keys that carry shareable UI state and must survive navigation
 // between pages so a copied link reproduces the same view.
@@ -32,28 +32,76 @@ function shareableSearch(
     return query === "" ? "" : `?${query}`;
 }
 
-// Returns a navigate function that preserves the shareable context/namespace
-// query params, so clicking through the app keeps the URL shareable. The optional
-// extraParams overlay further params on the target URL (e.g. tagging the origin
-// page with "from" so the destination's breadcrumb reflects where it came from).
-export function useShareableNavigate(): (pathname: string, extraParams?: Record<string, string>) => void {
+// Splits a navigation target that may carry its own query string (e.g. an origin's
+// "/nodes/node-cp?tab=pods") into its pathname and the params it pins. Those params
+// are then overlaid on the shareable ones, so a caller can navigate to a whole target
+// string and still have the context/namespace carried across. A target with no query
+// string yields no params and behaves exactly as a bare pathname.
+function splitTarget(target: string): { pathname: string; params: Record<string, string> } {
+    const [pathname, search] = target.split("?");
+    const params: Record<string, string> = {};
+    for (const [key, value] of new URLSearchParams(search ?? "")) {
+        params[key] = value;
+    }
+    return {
+        pathname,
+        params,
+    };
+}
+
+// Returns a navigate function that preserves the shareable context/namespace/tab
+// query params, so clicking through the app keeps the URL shareable. The target may
+// carry its own query string, whose params are pinned on top of the shareable ones.
+// The optional extraParams overlay further params on the target URL (e.g. tagging the
+// origin page with "from" so the destination's breadcrumb reflects where it came from).
+export function useShareableNavigate(): (target: string, extraParams?: Record<string, string>) => void {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     return useCallback(
-        (pathname: string, extraParams?: Record<string, string>) => {
-            navigate({ pathname, search: shareableSearch(searchParams, extraParams) });
+        (target: string, extraParams?: Record<string, string>) => {
+            const { pathname, params } = splitTarget(target);
+            navigate({
+                pathname,
+                search: shareableSearch(searchParams, {
+                    ...params,
+                    ...extraParams,
+                }),
+            });
         },
         [navigate, searchParams],
     );
 }
 
-// Returns a builder that turns a pathname into a react-router To value carrying
-// the shareable context/namespace query params, for use with <Link to=...>. The
-// optional extraParams overlay further params on the target URL.
-export function useShareableTo(): (pathname: string, extraParams?: Record<string, string>) => To {
+// Returns a builder that turns a target into a react-router To value carrying the
+// shareable context/namespace/tab query params, for use with <Link to=...>. As with
+// useShareableNavigate, the target may carry its own query string and the optional
+// extraParams overlay further params on the target URL.
+export function useShareableTo(): (target: string, extraParams?: Record<string, string>) => To {
     const [searchParams] = useSearchParams();
     return useCallback(
-        (pathname: string, extraParams?: Record<string, string>) => ({ pathname, search: shareableSearch(searchParams, extraParams) }),
+        (target: string, extraParams?: Record<string, string>) => {
+            const { pathname, params } = splitTarget(target);
+            return {
+                pathname,
+                search: shareableSearch(searchParams, {
+                    ...params,
+                    ...extraParams,
+                }),
+            };
+        },
         [searchParams],
     );
+}
+
+// Returns the "from" tag for the page currently being viewed: its pathname plus the
+// sub tab it has open, e.g. "/nodes/node-cp?tab=pods". Every link to another resource
+// tags its destination with this, so the destination's breadcrumb can show the path
+// the user actually took and link back to the exact view they left (see
+// `pathOriginCrumbs`). Only the tab is carried: context and namespace are shareable
+// params the destination keeps anyway, and "from" itself is never chained on.
+export function useOriginTag(): string {
+    const { pathname } = useLocation();
+    const [searchParams] = useSearchParams();
+    const tab = searchParams.get("tab");
+    return tab === null ? pathname : `${pathname}?tab=${tab}`;
 }

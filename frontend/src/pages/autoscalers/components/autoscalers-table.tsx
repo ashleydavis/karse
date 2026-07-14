@@ -79,7 +79,15 @@ function splitReference(reference: string): { kind: string; name: string } {
 // sort on the numeric percentage behind the bar rather than its display text.
 const columns: ColumnDef<HorizontalPodAutoscaler>[] = [
     { accessorKey: "name", header: "Name" },
-    { accessorKey: "namespace", header: "Namespace" },
+    {
+        accessorKey: "namespace",
+        header: "Namespace",
+        // The autoscaler's namespace links to its own detail page, like the scale-target
+        // reference beside it.
+        cell: (info) => (
+            <ResourceRef kind="Namespace" name={info.getValue<string>()} testId="autoscaler-row-namespace-link" />
+        ),
+    },
     {
         id: "reference",
         accessorKey: "reference",

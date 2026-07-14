@@ -76,10 +76,30 @@ Every inline mention of a concrete resource (in a detail field or a single table
 - Node detail page (`/nodes/<node>`), Pods sub-tab: each pod's **Namespace** cell is a link that navigates to that namespace; clicking it does NOT open the pod.
 - Error detail page (open an error from `/errors`): the **Object** field links to the related resource's detail page when it has one. Event detail page (open an event from `/events`): the **Object** field links to the involved resource's detail page.
 - Errors table (`/errors`) and events table (`/events`): each row's **Object** cell is a link. Click it and confirm it navigates to that resource's own detail page (e.g. `Pod/nginx-abc` opens `/pods/default/nginx-abc`), NOT to the error/event detail page the row itself opens (the cell link wins over the row click). Clicking anywhere else on the row still opens the error/event detail page.
+- List tables (`/pods`, `/deployments`, `/statefulsets`, `/daemonsets`, `/autoscalers`, `/errors`, `/events`, and the workloads table on `/cluster`): each row's **Namespace** cell is a link. Click it and confirm it opens that namespace (`/namespaces/<name>`), NOT the row's own resource. On `/pods` the **Node** cell is a link the same way, opening `/nodes/<node>`.
+- **All resources** (`/all-resources`): each namespaced row's **Namespace** cell is a link. Click it and confirm it opens that namespace. Watch the table for a few seconds first: it must sit completely still. (The table used to rebuild the rows it hands the table library on every render, which looped and re-mounted every row continuously — the link was there, but it was destroyed under the pointer before a click could land, so it could not be clicked at all. Both inputs are memoised now.) A cluster-scoped row (Kind `Node` or `Namespace`) has an empty Namespace cell with no link.
 - Graceful degradation: an object whose kind has no detail page (e.g. a ReplicaSet) shows as plain text, with no link and no navigation on click — on the errors/events tables and on the error/event detail pages alike.
 
 ### Light and dark mode
 Toggle the colour-mode control in the top bar and confirm every inline reference above still reads as a link (it uses the theme's link colour) in both light and dark mode.
+
+## Scenario D: The breadcrumb reflects the path taken to the resource
+
+Following a link to a resource shows, in the destination's breadcrumb, the page the link was followed from — not the destination's own fixed list-page trail. The same resource reached two different ways shows two different trails.
+
+**Fixture:** [_fixtures-kwok/16-detail-pages-and-logs](../_fixtures-kwok/16-detail-pages-and-logs/). Reuse the cluster set up in Scenario A.
+
+### What to check
+- **Via a node.** Open the node detail page (`/nodes/<node>`) and select its **Pods** tab. Click the `web` pod's row. The pod detail page opens, and the breadcrumb reads `Nodes > <node> > web` — the path you took — rather than the pod's own `Pods > default > web > Status` trail.
+- **The origin crumb returns you where you were.** On that pod page, click the `<node>` crumb. It returns to the node detail page **with its Pods tab still selected**, the exact view you left.
+- **The back button agrees with the breadcrumb.** Go back to the pod via the node's Pods tab, then click the pod page's **back** button. It returns to the same node Pods tab the origin crumb links to. The back button and the breadcrumb never point at different places.
+- **Via a namespace.** Open `/namespaces/default`, select its **Resources** tab, and click the `web` pod. The same pod now shows `Namespaces > default > web` — a different trail for a different path taken.
+- **Via the Pods list.** Open `/pods` and click the `web` pod. With no origin to show, the pod falls back to its own list trail: `Pods > default > web > Status`.
+- **Via the errors table.** Open `/errors` and click a row's **Object** cell that names a pod. The pod opens with the breadcrumb `Errors > <pod>`, and the `Errors` crumb returns to the errors table.
+- **Via the cluster page.** Open `/cluster` and click a workload row. The workload detail page shows `Cluster > <workload>`.
+
+### Light and dark mode
+Toggle the colour-mode control in the top bar and confirm the breadcrumb trail and its links render correctly in both modes.
 
 Teardown:
 

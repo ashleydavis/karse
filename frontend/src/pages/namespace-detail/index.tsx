@@ -20,7 +20,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useKubeContext } from "../../lib/kube-context";
-import { useShareableNavigate } from "../../lib/nav-state";
+import { useOriginTag, useShareableNavigate } from "../../lib/nav-state";
 import { fetchNamespaceDetail } from "../../lib/api-client";
 import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
@@ -62,6 +62,9 @@ export function NamespaceDetailPage() {
     const { name } = useParams<{ name: string }>();
     const { current } = useKubeContext();
     const navigate = useShareableNavigate();
+    // Tags each contained resource's link with this namespace, so its detail page's
+    // breadcrumb shows "Namespaces > <namespace> > <resource>" and links back here.
+    const from = useOriginTag();
     const [activeTab, setActiveTab] = useState<NamespaceDetailTab>("detail");
 
     const { data, error, isLoading, refetch } = useQuery({
@@ -224,7 +227,7 @@ export function NamespaceDetailPage() {
 
             {activeTab === "resources" && (
                 <Box data-test-id="namespace-panel-resources">
-                    <ResourcesTable resources={data.resources} onOpen={(path) => navigate(path)} />
+                    <ResourcesTable resources={data.resources} onOpen={(path) => navigate(path, { from })} />
                 </Box>
             )}
 

@@ -32,6 +32,7 @@ import { fetchPods, fetchClusterPerformance } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
 import { TableFilter } from "../../../components/table-filter";
+import { ResourceRef } from "../../../components/resource-ref";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn, type FilterSelection } from "../../../lib/table-filter-state";
@@ -170,6 +171,13 @@ function buildColumns(figures: PodFiguresMap, mode: ViewMode, format: ValueForma
         {
             accessorKey: "namespace",
             header: "Namespace",
+            // The pod's namespace links to its own detail page. The row navigates to the
+            // pod, so the link stops its click from bubbling up to the row.
+            cell: (info) => (
+                <span onClick={(e) => e.stopPropagation()}>
+                    <ResourceRef kind="Namespace" name={info.getValue<string>()} testId="pod-row-namespace-link" />
+                </span>
+            ),
         },
     );
 
@@ -202,6 +210,13 @@ function buildColumns(figures: PodFiguresMap, mode: ViewMode, format: ValueForma
         {
             accessorKey: "node",
             header: "Node",
+            // The node the pod runs on links to that node's detail page. An unscheduled
+            // pod has no node, so the reference degrades to plain text.
+            cell: (info) => (
+                <span onClick={(e) => e.stopPropagation()}>
+                    <ResourceRef kind="Node" name={info.getValue<string>()} testId="pod-row-node-link" />
+                </span>
+            ),
         },
         {
             // Pod CPU utilisation as an inline bar. The percentage base is the pod's own

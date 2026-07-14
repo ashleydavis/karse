@@ -23,7 +23,8 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import type { WorkloadUsage, ClusterResourceTotals } from "karse-types";
-import { useShareableNavigate } from "../../../lib/nav-state";
+import { useOriginTag, useShareableNavigate } from "../../../lib/nav-state";
+import { ResourceRef } from "../../../components/resource-ref";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { ResourceBarCell } from "../../../components/resource-utilization/resource-bar-cell";
@@ -129,6 +130,13 @@ function buildColumns(
         {
             accessorKey: "namespace",
             header: "Namespace",
+            // The workload's namespace links to its own detail page. The row navigates to
+            // the workload, so the link stops its click from bubbling up to the row.
+            cell: (info) => (
+                <span onClick={(e) => e.stopPropagation()}>
+                    <ResourceRef kind="Namespace" name={info.getValue<string>()} testId="cluster-workload-row-namespace-link" />
+                </span>
+            ),
         },
         {
             id: "cpu",
@@ -200,6 +208,9 @@ function WorkloadsTableInner({
 }) {
     const { mode, format } = useResourceUtilization();
     const navigate = useShareableNavigate();
+    // Tags each workload link with the cluster page, so the workload detail page's
+    // breadcrumb shows "Cluster > <workload>" and links back here.
+    const from = useOriginTag();
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
 
@@ -294,7 +305,7 @@ function WorkloadsTableInner({
                                 <TableRow
                                     key={row.id}
                                     data-test-id="workload-row"
-                                    onClick={path ? () => navigate(path) : undefined}
+                                    onClick={path ? () => navigate(path, { from }) : undefined}
                                     sx={tableRowSx(path !== null)}
                                 >
                                     {row.getVisibleCells().map((cell) => (

@@ -45,6 +45,21 @@ The left sidebar has collapsible navigation. Click the chevron at the bottom to 
 - **Pods**: list pods for the active context and namespace.
 - **Autoscalers**: the horizontal pod autoscalers (HPAs) for the active context and namespace, and how they are performing.
 
+### Following a resource to its detail page
+
+Every reference to a resource is a link to that resource's own detail page, so any resource is one click away wherever you see it mentioned:
+
+- **Table rows**: click a row to open the resource it names.
+- **Cells within a row**: a row's **Namespace**, **Node**, and **Object** cells link to that namespace, node, or referenced resource, rather than to the row's own target. Clicking one of those cells opens the resource it names; clicking anywhere else on the row opens the row's resource.
+- **Detail-page fields**: a pod's **Namespace** and **Node**, a workload's **Namespace**, a container's **Pod**, and the object an error or event refers to are all links.
+- A reference to something Karse has no detail page for (a ReplicaSet, a Service) is shown as plain text, not a broken link.
+
+### The breadcrumb shows how you got there
+
+The breadcrumb trail at the top of a detail page reflects the path you actually took, not a fixed trail. Open the `web` pod from a node's **Pods** tab and the trail reads `Nodes > node-worker > web`; open the same pod from its namespace and it reads `Namespaces > default > web`; open it from the **Pods** list and it reads `Pods > default > web > Status`.
+
+Clicking the origin crumb returns you to the exact view you left, including the sub tab that was open. The **back** button on a pod's detail page goes to the same place, so it never disagrees with the breadcrumb.
+
 While a page is fetching its data from the cluster, it shows a large, clearly visible loading spinner alone (no text) in place of the content. The spinner is replaced by the data once it loads, or by an error message if the request fails. This applies to every resource list page and detail page.
 
 If the cluster does not respond within about 15 seconds (for example because your internet or VPN is down), the spinner stops and an error is shown instead of spinning forever. The error includes the note "Make sure your internet or VPN is connected" and a **Retry** button so you can re-attempt the load once connectivity is back.

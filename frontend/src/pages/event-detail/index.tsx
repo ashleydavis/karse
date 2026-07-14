@@ -167,7 +167,15 @@ export function EventDetailPage() {
                     </Box>
                     <Field label="Source / Component" value={event.source === "" ? "-" : event.source} testId="event-field-source" />
                     <Field label="Count" value={event.count} testId="event-field-count" />
-                    <Field label="Namespace" value={event.namespace === "" ? "-" : event.namespace} testId="event-field-namespace" />
+                    <Field
+                        label="Namespace"
+                        // The namespace links to its own detail page, like the involved
+                        // object above. A cluster-scoped event has none, so it shows "-".
+                        value={event.namespace === ""
+                            ? "-"
+                            : <ResourceRef kind="Namespace" name={event.namespace} testId="event-namespace-link" />}
+                        testId="event-field-namespace"
+                    />
                     <Field label="Age" value={formatAge(event.lastSeen)} testId="event-field-age" />
                     <Field label="First seen" value={formatTimestamp(event.firstSeen)} testId="event-field-first-seen" />
                     <Field label="Last seen" value={formatTimestamp(event.lastSeen)} testId="event-field-last-seen" />

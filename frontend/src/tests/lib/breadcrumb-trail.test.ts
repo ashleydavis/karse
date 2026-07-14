@@ -1,4 +1,4 @@
-import { middleTruncate, collapseCrumbs, originCrumbs, performanceOrigin, tabLabel, POD_TAB_LABELS, CONTAINER_TAB_LABELS, FROM_ALL_RESOURCES, FROM_CLUSTER_PERFORMANCE, FROM_NODE_PERFORMANCE, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../../lib/breadcrumb-trail";
+import { middleTruncate, collapseCrumbs, originCrumbs, pathOriginCrumbs, performanceOrigin, resolveOrigin, tabLabel, POD_TAB_LABELS, CONTAINER_TAB_LABELS, FROM_ALL_RESOURCES, FROM_CLUSTER_PERFORMANCE, FROM_NODE_PERFORMANCE, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../../lib/breadcrumb-trail";
 import type { Crumb } from "../../lib/breadcrumb-trail";
 
 describe("middleTruncate", () => {
@@ -227,5 +227,142 @@ describe("performanceOrigin", () => {
 
     test("returns null when a node origin carries no node name", () => {
         expect(performanceOrigin(`${FROM_NODE_PERFORMANCE}:`)).toBeNull();
+    });
+});
+
+describe("pathOriginCrumbs", () => {
+    test("rebuilds a node origin as its list page and the node, linking back to the tab left", () => {
+        expect(pathOriginCrumbs("/nodes/node-cp?tab=pods")).toEqual([
+            { label: "Nodes", to: "/nodes" },
+            { label: "node-cp", to: "/nodes/node-cp?tab=pods" },
+        ]);
+    });
+
+    test("takes a namespaced origin's leaf from after the namespace segment", () => {
+        expect(pathOriginCrumbs("/deployments/default/web-deploy")).toEqual([
+            { label: "Deployments", to: "/deployments" },
+            { label: "web-deploy", to: "/deployments/default/web-deploy" },
+        ]);
+    });
+
+    test("rebuilds a namespace origin", () => {
+        expect(pathOriginCrumbs("/namespaces/default")).toEqual([
+            { label: "Namespaces", to: "/namespaces" },
+            { label: "default", to: "/namespaces/default" },
+        ]);
+    });
+
+    test("rebuilds a list-page origin as a single crumb", () => {
+        expect(pathOriginCrumbs("/errors")).toEqual([
+            { label: "Errors", to: "/errors" },
+        ]);
+        expect(pathOriginCrumbs("/cluster")).toEqual([
+            { label: "Cluster", to: "/cluster" },
+        ]);
+    });
+
+    test("keeps the pod between the list page and the container for a container origin", () => {
+        expect(pathOriginCrumbs("/pods/default/web/containers/nginx")).toEqual([
+            { label: "Pods", to: "/pods" },
+            { label: "web", to: "/pods/default/web" },
+            { label: "nginx", to: "/pods/default/web/containers/nginx" },
+        ]);
+    });
+
+    test("shows a generic leaf label for an origin whose route ends in an opaque id", () => {
+        expect(pathOriginCrumbs("/errors/3")).toEqual([
+            { label: "Errors", to: "/errors" },
+            { label: "Error", to: "/errors/3" },
+        ]);
+        expect(pathOriginCrumbs("/events/8f1c-uid")).toEqual([
+            { label: "Events", to: "/events" },
+            { label: "Event", to: "/events/8f1c-uid" },
+        ]);
+    });
+
+    test("middle-truncates a long origin resource name", () => {
+        const name = "a".repeat(MAX_NAME_LENGTH + 10);
+        const result = pathOriginCrumbs(`/nodes/${name}`);
+        expect(result![1].label).toBe(middleTruncate(name, MAX_NAME_LENGTH));
+        expect(result![1].label.length).toBeLessThanOrEqual(MAX_NAME_LENGTH);
+    });
+
+    test("returns null for a value that is not a page path", () => {
+        expect(pathOriginCrumbs(null)).toBeNull();
+        expect(pathOriginCrumbs(FROM_ALL_RESOURCES)).toBeNull();
+        expect(pathOriginCrumbs("")).toBeNull();
+    });
+
+    test("returns null for a root with no known label", () => {
+        expect(pathOriginCrumbs("/gizmos/thing")).toBeNull();
+    });
+
+    test("returns null when a namespaced origin is missing its resource name", () => {
+        expect(pathOriginCrumbs("/pods/default")).toBeNull();
+    });
+});
+
+describe("resolveOrigin", () => {
+    test("resolves a page-path origin to its own trail and back target", () => {
+        expect(resolveOrigin("/nodes/node-cp?tab=pods", "Pod")).toEqual({
+            to: "/nodes/node-cp?tab=pods",
+            label: "node-cp",
+            crumbs: [
+                { label: "Nodes", to: "/nodes" },
+                { label: "node-cp", to: "/nodes/node-cp?tab=pods" },
+            ],
+        });
+    });
+
+    test("resolves the All resources origin", () => {
+        expect(resolveOrigin(FROM_ALL_RESOURCES, "Deployment")).toEqual({
+            to: "/all-resources",
+            label: "All resources",
+            crumbs: [{ label: "All resources", to: "/all-resources" }],
+        });
+    });
+
+    test("resolves a Performance origin to the same target its breadcrumb links to", () => {
+        expect(resolveOrigin(`${FROM_NODE_PERFORMANCE}:node-cp`, "Pod")).toEqual({
+            to: "/nodes/node-cp?tab=performance",
+            label: "node-cp",
+            crumbs: [{ label: "node-cp", to: "/nodes/node-cp?tab=performance" }],
+        });
+    });
+
+    test("returns null when no origin was tagged", () => {
+        expect(resolveOrigin(null, "Pod")).toBeNull();
+    });
+});
+
+describe("originCrumbs from a page-path origin", () => {
+    test("shows the path taken to the resource, ending in the resource itself", () => {
+        expect(originCrumbs("/nodes/node-cp?tab=pods", "Pod", "web")).toEqual([
+            { label: "Nodes", to: "/nodes" },
+            { label: "node-cp", to: "/nodes/node-cp?tab=pods" },
+            { label: "web" },
+        ]);
+    });
+
+    test("gives the same resource a different trail for a different path taken", () => {
+        const viaNode = originCrumbs("/nodes/node-cp", "Pod", "web");
+        const viaNamespace = originCrumbs("/namespaces/default", "Pod", "web");
+        expect(viaNode).not.toEqual(viaNamespace);
+        expect(viaNamespace).toEqual([
+            { label: "Namespaces", to: "/namespaces" },
+            { label: "default", to: "/namespaces/default" },
+            { label: "web" },
+        ]);
+    });
+
+    test("builds a page-path origin trail without needing a kind", () => {
+        expect(originCrumbs("/errors", null, "web")).toEqual([
+            { label: "Errors", to: "/errors" },
+            { label: "web" },
+        ]);
+    });
+
+    test("returns null when the leaf resource name is missing", () => {
+        expect(originCrumbs("/nodes/node-cp", "Pod", null)).toBeNull();
     });
 });

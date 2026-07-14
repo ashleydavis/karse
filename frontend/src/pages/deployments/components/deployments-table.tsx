@@ -32,6 +32,7 @@ import { TableFilter } from "../../../components/table-filter";
 import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn } from "../../../lib/table-filter-state";
 import { useTableFilter } from "../../../lib/use-table-filter";
 import { LoadError } from "../../../components/load-error";
+import { ResourceRef } from "../../../components/resource-ref";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { LabelsCell } from "../../../components/labels-cell";
@@ -59,7 +60,17 @@ function formatAge(createdAt: string): string {
 // Column definitions for the deployments table.
 const columns: ColumnDef<Deployment>[] = [
     { accessorKey: "name", header: "Name" },
-    { accessorKey: "namespace", header: "Namespace" },
+    {
+        accessorKey: "namespace",
+        header: "Namespace",
+        // The deployment's namespace links to its own detail page. The row navigates to
+        // the deployment, so the link stops its click from bubbling up to the row.
+        cell: (info) => (
+            <span onClick={(e) => e.stopPropagation()}>
+                <ResourceRef kind="Namespace" name={info.getValue<string>()} testId="deployment-row-namespace-link" />
+            </span>
+        ),
+    },
     { accessorKey: "ready", header: "Ready" },
     { accessorKey: "upToDate", header: "Up-to-date" },
     { accessorKey: "available", header: "Available" },

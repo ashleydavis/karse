@@ -113,7 +113,17 @@ const columns: ColumnDef<ClusterError>[] = [
     { accessorKey: "reason", header: "Reason", filterFn: valueColumnFilterFn },
     { accessorKey: "message", header: "Message" },
     { accessorKey: "count", header: "Count" },
-    { accessorKey: "namespace", header: "Namespace" },
+    {
+        accessorKey: "namespace",
+        header: "Namespace",
+        // The error's namespace links to its own detail page. The row navigates to the
+        // error detail page, so the link stops its click from bubbling up to the row.
+        cell: (info) => (
+            <span onClick={(e) => e.stopPropagation()}>
+                <ResourceRef kind="Namespace" name={info.getValue<string>()} testId="error-row-namespace-link" />
+            </span>
+        ),
+    },
 ];
 
 // The trailing "..." column: a per-row menu that activates a hide or show-only filter for

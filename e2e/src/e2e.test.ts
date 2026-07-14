@@ -8544,4 +8544,198 @@ test.describe("karse e2e", () => {
             await page.goto("/cluster", { waitUntil: "networkidle" });
         });
     });
+
+    // ── Path-aware breadcrumbs ──────────────────────────────────────────────────
+    // A resource reached from another page shows the path the user actually took in
+    // its breadcrumb, not its own fixed list-page trail: the origin page tags every
+    // link it renders with its own location ("from"), and the destination rebuilds
+    // the origin's trail from that tag. The same resource therefore gets a different
+    // trail depending on how it was reached, and its back button returns to the same
+    // place the origin crumb links to.
+    test.describe("path-aware breadcrumbs", () => {
+        // The breadcrumb crumbs currently rendered in the nav bar, in order.
+        function crumbs() {
+            return page.locator("[data-test-id='breadcrumbs'] [data-test-id='breadcrumb-item']");
+        }
+
+        // A table row whose name cell is exactly this text, so "web" never also matches
+        // a "web-deploy-..." pod.
+        function rowNamed(testId: string, name: string) {
+            return page.locator(`[data-test-id='${testId}']`).filter({
+                has: page.locator("td", { hasText: new RegExp(`^${name}$`) }),
+            });
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+        });
+
+        test("a pod opened from a node's Pods tab tags the pod URL with that node as the origin", async () => {
+            await page.goto("/nodes/node-worker?tab=pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='node-pod-row']").first()).toBeVisible();
+            await rowNamed("node-pod-row", "web").click();
+            await expect(page).toHaveURL(/\/pods\/default\/web/);
+            // The origin is the node's Pods tab, url-encoded into the "from" param.
+            await expect(page).toHaveURL(/from=%2Fnodes%2Fnode-worker%3Ftab%3Dpods/);
+        });
+
+        test("a pod reached from a node shows the node in its breadcrumb", async () => {
+            // The trail is the path taken (Nodes > node-worker > web), not the pod's own
+            // Pods > default > web > Status trail.
+            await expect(crumbs()).toHaveText(["Nodes", "node-worker", "web"]);
+        });
+
+        test("the origin crumb links back to the node's Pods tab", async () => {
+            await crumbs().nth(1).click();
+            await expect(page).toHaveURL(/\/nodes\/node-worker/);
+            await expect(page).toHaveURL(/tab=pods/);
+            await expect(page.locator("[data-test-id='node-pod-row']").first()).toBeVisible();
+        });
+
+        test("the back button returns to the origin the breadcrumb names", async () => {
+            await page.goto("/pods/default/web?from=%2Fnodes%2Fnode-worker%3Ftab%3Dpods", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-detail-back']").click();
+            await expect(page).toHaveURL(/\/nodes\/node-worker/);
+            await expect(page).toHaveURL(/tab=pods/);
+        });
+
+        test("the same pod reached from the Pods list keeps its own list trail", async () => {
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']").first()).toBeVisible();
+            await rowNamed("pod-row", "web").click();
+            await expect(page).toHaveURL(/\/pods\/default\/web/);
+            // Same pod, different path taken, so a different trail: the Pods list tags no
+            // origin, so the pod falls back to its own list trail.
+            await expect(page).not.toHaveURL(/from=/);
+            await expect(crumbs()).toHaveText(["Pods", "default", "web", "Status"]);
+        });
+
+        test("the same pod reached from its namespace shows the namespace in its breadcrumb", async () => {
+            await page.goto("/namespaces/default", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='namespace-tab-resources']").click();
+            await expect(page.locator("[data-test-id='namespace-resource-row']").first()).toBeVisible();
+            await rowNamed("namespace-resource-row", "web").click();
+            await expect(page).toHaveURL(/\/pods\/default\/web/);
+            // A third path to the same pod, and a third trail.
+            await expect(crumbs()).toHaveText(["Namespaces", "default", "web"]);
+        });
+
+        test("a workload opened from the cluster page shows the cluster as its origin", async () => {
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='workload-row']").first().click();
+            await expect(crumbs().first()).toHaveText("Cluster");
+        });
+
+        test("a pod reached from an errors-table object link shows the Errors page as its origin", async () => {
+            // The Object cell links to the referenced resource (clickable-resource-rows-1);
+            // this ticket makes the resource it opens remember it was reached from Errors.
+            await page.route("**/api/errors*", async (route) => {
+                await route.fulfill({
+                    json: {
+                        errors: [
+                            {
+                                source: "Event",
+                                namespace: "default",
+                                objectKind: "Pod",
+                                objectName: "web",
+                                reason: "BackOff",
+                                message: "back-off restarting failed container",
+                                count: 1,
+                                firstSeen: "2024-01-01T00:00:00Z",
+                                lastSeen: "2024-01-01T00:00:00Z",
+                            },
+                        ],
+                    },
+                });
+            });
+            await page.goto("/errors", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='error-row-object-link']").first().click();
+            await expect(page).toHaveURL(/\/pods\/default\/web/);
+            await expect(crumbs()).toHaveText(["Errors", "web"]);
+            await page.unroute("**/api/errors*");
+        });
+    });
+
+    // ── Namespace and node cell links ───────────────────────────────────────────
+    // The audit for clickable-resource-rows-3 found the Namespace cell unlinked across
+    // the list tables, and the Node cell unlinked on the pods table, while the rest of
+    // the app already linked its references. These fill that gap: the cell link opens the
+    // resource it names, and wins over the row's own navigation.
+    test.describe("namespace and node cell links", () => {
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+        });
+
+        test("the pods table Namespace cell opens that namespace, not the pod", async () => {
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-row-namespace-link']").first().click();
+            await expect(page).toHaveURL(/\/namespaces\/\w+/);
+            await expect(page).not.toHaveURL(/\/pods\//);
+        });
+
+        test("the pods table Node cell opens that node, not the pod", async () => {
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-row-node-link']").first().click();
+            await expect(page).toHaveURL(/\/nodes\/node-/);
+            await expect(page).not.toHaveURL(/\/pods\//);
+        });
+
+        // The deployments / stateful sets / daemon sets tables carry the same Namespace cell.
+        // The e2e cluster seeds one pod-free object of each kind (see scripts/e2e-tests.sh)
+        // precisely so these links are exercised against real data, rather than trusted
+        // because the idiom looks identical to a table that does work.
+
+        test("the deployments table Namespace cell opens that namespace, not the deployment", async () => {
+            await page.goto("/deployments", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='deployment-row-namespace-link']").first().click();
+            await expect(page).toHaveURL(/\/namespaces\/default/);
+            await expect(page).not.toHaveURL(/\/deployments\//);
+        });
+
+        test("the stateful sets table Namespace cell opens that namespace, not the stateful set", async () => {
+            await page.goto("/statefulsets", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='statefulset-row-namespace-link']").first().click();
+            await expect(page).toHaveURL(/\/namespaces\/default/);
+            await expect(page).not.toHaveURL(/\/statefulsets\//);
+        });
+
+        test("the daemon sets table Namespace cell opens that namespace, not the daemon set", async () => {
+            await page.goto("/daemonsets", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='daemonset-row-namespace-link']").first().click();
+            await expect(page).toHaveURL(/\/namespaces\/default/);
+            await expect(page).not.toHaveURL(/\/daemonsets\//);
+        });
+
+        test("the cluster workloads table Namespace cell opens that namespace", async () => {
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='cluster-workload-row-namespace-link']").first().click();
+            await expect(page).toHaveURL(/\/namespaces\/\w+/);
+        });
+
+        test("the All resources table Namespace cell opens that namespace, not the resource", async () => {
+            // Only the namespaced rows render an anchor; a cluster-scoped row degrades to an
+            // empty span carrying the same test id, so select the link itself.
+            //
+            // This clicks the link for real. It used to assert the href instead, because the
+            // table handed TanStack freshly-built `data` and `columns` arrays on every render
+            // and looped, re-mounting the rows continuously so the link could never be clicked
+            // (not even by a user). Both are memoised now; a click is the only assertion that
+            // would catch that regression coming back.
+            await page.goto("/all-resources", { waitUntil: "networkidle" });
+            await page.locator("a[data-test-id='all-resources-row-namespace-link']").first().click();
+            await expect(page).toHaveURL(/\/namespaces\/\w+/);
+            await expect(page).not.toHaveURL(/\/all-resources/);
+        });
+
+        test("a cluster-scoped row in All resources shows no namespace link", async () => {
+            // Nodes and namespaces carry no namespace, so the cell degrades to blank text
+            // rather than rendering an empty link.
+            await page.goto("/all-resources", { waitUntil: "networkidle" });
+            const nodeRow = page.locator("[data-test-id='all-resource-row']").filter({
+                has: page.locator("td", { hasText: /^Node$/ }),
+            }).first();
+            await expect(nodeRow).toBeVisible();
+            await expect(nodeRow.locator("a[data-test-id='all-resources-row-namespace-link']")).toHaveCount(0);
+        });
+    });
 });

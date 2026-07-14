@@ -244,6 +244,81 @@ kubectl wait --for=condition=Ready --timeout=120s -n default pod/web pod/api
 kubectl wait --for=condition=Ready --timeout=120s -n jobs pod/worker
 kubectl wait --for=condition=Ready --timeout=120s -n infra pod/cache
 
+# One Deployment, StatefulSet and DaemonSet so those three list tables have a real row
+# to exercise (clickable-resource-rows-3 links their Namespace cell; without an object
+# the link was never tested against real data).
+#
+# Every one of them is deliberately pod-free, because kwokctl runs a real
+# kube-controller-manager: a Deployment with replicas would create a ReplicaSet and pods,
+# and kwok would run them, changing the pod counts and node/cluster usage the rest of the
+# suite asserts on. The Deployment and StatefulSet therefore scale to 0, and the DaemonSet
+# carries a nodeSelector that matches no node, so all three list (with a 0 ready count)
+# without adding a single pod to the cluster.
+apply_manifest "" <<'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop
+  namespace: default
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: shop
+  template:
+    metadata:
+      labels:
+        app: shop
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: shop
+        image: shop:latest
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: queue
+  namespace: default
+spec:
+  replicas: 0
+  serviceName: queue
+  selector:
+    matchLabels:
+      app: queue
+  template:
+    metadata:
+      labels:
+        app: queue
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: queue
+        image: queue:latest
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: agent
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: agent
+  template:
+    metadata:
+      labels:
+        app: agent
+    spec:
+      # Matches no node in the fixture, so the DaemonSet schedules no pods.
+      nodeSelector:
+        karse.test/no-such-node: "true"
+      automountServiceAccountToken: false
+      containers:
+      - name: agent
+        image: agent:latest
+EOF
+
 # ── Cluster 2 nodes ──────────────────────────────────────────────────────────
 echo "--- Populating cluster 2 ---"
 apply_manifest "kwok-$KWOK_CLUSTER_2" <<'EOF'

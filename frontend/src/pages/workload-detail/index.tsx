@@ -22,7 +22,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { WorkloadKind, KubeEvent } from "karse-types";
 import type { GuidedResourceKind } from "../../lib/guided-commands";
 import { useKubeContext } from "../../lib/kube-context";
-import { useShareableNavigate } from "../../lib/nav-state";
+import { useOriginTag, useShareableNavigate } from "../../lib/nav-state";
 import { fetchWorkloadDetail } from "../../lib/api-client";
 import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
@@ -90,6 +90,9 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
     const { namespace, name } = useParams<{ namespace: string; name: string }>();
     const { current } = useKubeContext();
     const navigate = useShareableNavigate();
+    // Tags each pod link with this workload's page, so the pod detail page's breadcrumb
+    // shows "Deployments > <workload> > <pod>" and links back to the workload.
+    const from = useOriginTag();
     const [activeTab, setActiveTab] = useState<WorkloadDetailTab>("detail");
 
     const { data, error, isLoading, refetch } = useQuery({
@@ -245,7 +248,7 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                                                 <TableRow
                                                     key={pod.namespace + "/" + pod.name}
                                                     data-test-id="workload-pod-row"
-                                                    onClick={() => navigate(`/pods/${pod.namespace}/${pod.name}`)}
+                                                    onClick={() => navigate(`/pods/${pod.namespace}/${pod.name}`, { from })}
                                                     sx={tableRowSx(true)}
                                                 >
                                                     <TableCell sx={{ fontFamily: "monospace" }}>{pod.name}</TableCell>

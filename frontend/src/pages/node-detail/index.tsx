@@ -29,7 +29,7 @@ import {
 } from "@tanstack/react-table";
 import type { NodeStatus, NodeCondition, KubeEvent, Pod } from "karse-types";
 import { useKubeContext } from "../../lib/kube-context";
-import { useShareableNavigate } from "../../lib/nav-state";
+import { useOriginTag, useShareableNavigate } from "../../lib/nav-state";
 import { fetchNodeDetail, fetchNodePerformance } from "../../lib/api-client";
 import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
@@ -203,6 +203,9 @@ function nodePodColumns(format: ValueFormat): ColumnDef<NodePodRow>[] {
 function NodePodsTable({ nodeName, pods, active }: { nodeName: string; pods: Pod[]; active: boolean }) {
     const { current } = useKubeContext();
     const navigate = useShareableNavigate();
+    // Tags each pod link with this node's Pods tab, so the pod detail page's breadcrumb
+    // shows "Nodes > <node> > <pod>" and links back to the tab the user came from.
+    const from = useOriginTag();
     const { mode, format } = useResourceUtilization();
     const [sorting, setSorting] = useState<SortingState>([]);
 
@@ -281,7 +284,7 @@ function NodePodsTable({ nodeName, pods, active }: { nodeName: string; pods: Pod
                         <TableRow
                             key={row.id}
                             data-test-id="node-pod-row"
-                            onClick={() => navigate(`/pods/${row.original.namespace}/${row.original.name}`)}
+                            onClick={() => navigate(`/pods/${row.original.namespace}/${row.original.name}`, { from })}
                             sx={tableRowSx(true)}
                         >
                             {row.getVisibleCells().map((cell) => (

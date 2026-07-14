@@ -163,7 +163,13 @@ export function ErrorDetailPage() {
                     </Box>
                     <Box data-test-id="error-detail-namespace">
                         <Typography variant="caption" color="text.secondary">Namespace</Typography>
-                        <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{item.namespace || "-"}</Typography>
+                        {/* The namespace links to its own detail page, like the related
+                            object above. A cluster-scoped error has none, so it shows "-". */}
+                        <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                            {item.namespace === ""
+                                ? "-"
+                                : <ResourceRef kind="Namespace" name={item.namespace} testId="error-detail-namespace-link" />}
+                        </Typography>
                     </Box>
                     <Box data-test-id="error-detail-count">
                         <Typography variant="caption" color="text.secondary">Count</Typography>

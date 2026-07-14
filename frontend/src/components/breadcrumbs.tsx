@@ -3,29 +3,10 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { collapseCrumbs, middleTruncate, originCrumbs, tabLabel, POD_TAB_LABELS, CONTAINER_TAB_LABELS, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../lib/breadcrumb-trail";
+import { collapseCrumbs, middleTruncate, originCrumbs, tabLabel, LIST_LABELS, POD_TAB_LABELS, CONTAINER_TAB_LABELS, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../lib/breadcrumb-trail";
 import type { Crumb } from "../lib/breadcrumb-trail";
 import { useKubeContext } from "../lib/kube-context";
 import { fetchEvents } from "../lib/api-client";
-
-// Maps a top-level list-page segment to its display label.
-const LIST_LABELS: Record<string, string> = {
-    cluster: "Cluster",
-    "all-resources": "All resources",
-    contexts: "Contexts",
-    nodes: "Nodes",
-    namespaces: "Namespaces",
-    pods: "Pods",
-    deployments: "Deployments",
-    statefulsets: "StatefulSets",
-    daemonsets: "DaemonSets",
-    autoscalers: "Autoscalers",
-    logs: "Logs",
-    events: "Events",
-    errors: "Errors",
-    about: "About",
-    config: "Config",
-};
 
 // Maps a detail route's list-page segment to the singular kind label shown in an
 // origin breadcrumb trail (e.g. "Pod nginx-abc"). Only the kinds the All resources

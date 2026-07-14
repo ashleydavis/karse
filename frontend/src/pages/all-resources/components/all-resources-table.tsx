@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
     useReactTable,
     getCoreRowModel,
@@ -33,6 +33,7 @@ import {
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
 import { TableFilter } from "../../../components/table-filter";
+import { ResourceRef } from "../../../components/resource-ref";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn } from "../../../lib/table-filter-state";
@@ -77,8 +78,15 @@ function buildColumns(): ColumnDef<AllResource>[] {
         {
             accessorKey: "namespace",
             header: "Namespace",
-            // Cluster-scoped kinds (Node, Namespace) have no namespace; show blank.
-            cell: (info) => info.getValue<string>() || "",
+            // The namespace links to its own detail page. The row navigates to the
+            // resource itself, so the link stops its click from bubbling up to the row.
+            // Cluster-scoped kinds (Node, Namespace) have no namespace, so the reference
+            // degrades to blank plain text.
+            cell: (info) => (
+                <span onClick={(e) => e.stopPropagation()}>
+                    <ResourceRef kind="Namespace" name={info.getValue<string>() || ""} testId="all-resources-row-namespace-link" />
+                </span>
+            ),
         },
         {
             accessorKey: "name",
@@ -156,17 +164,33 @@ export function AllResourcesTable() {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
 
-    const columns = buildColumns();
+    // TanStack's row model memoises on the identity of the `data` and `columns` arrays
+    // it is handed. Rebuilding either on every render re-runs the row model, which fires
+    // `_autoResetPageIndex()` → `onStateChange` → `setState` → another render → fresh
+    // arrays → a closed render loop that re-mounts every row continuously. That destroys
+    // each row (and the links inside it) faster than a user can click them. Memoising
+    // both keeps the identities stable, so the row model rebuilds only when the resource
+    // data genuinely changes.
+    const columns = useMemo(() => buildColumns(), []);
 
-    const allResources = aggregateResources({
-        pods: podsResult.data?.pods,
-        nodes: nodesResult.data?.nodes,
-        namespaces: namespacesResult.data?.namespaces,
-        deployments: deploymentsResult.data?.deployments,
-        statefulSets: statefulSetsResult.data?.statefulSets,
-        daemonSets: daemonSetsResult.data?.daemonSets,
-        horizontalPodAutoscalers: hpasResult.data?.horizontalPodAutoscalers,
-    });
+    const allResources = useMemo(
+        () => aggregateResources({
+            pods: podsResult.data?.pods,
+            nodes: nodesResult.data?.nodes,
+            namespaces: namespacesResult.data?.namespaces,
+            deployments: deploymentsResult.data?.deployments,
+            statefulSets: statefulSetsResult.data?.statefulSets,
+            daemonSets: daemonSetsResult.data?.daemonSets,
+            horizontalPodAutoscalers: hpasResult.data?.horizontalPodAutoscalers,
+        }),
+        // Each query's `data` keeps a stable identity between renders until that kind's
+        // list actually changes, so the aggregate is rebuilt exactly when it must be.
+        [
+            podsResult.data, nodesResult.data, namespacesResult.data,
+            deploymentsResult.data, statefulSetsResult.data, daemonSetsResult.data,
+            hpasResult.data,
+        ],
+    );
 
     // The filterable columns the shared editor offers: the Kind and Health value
     // columns plus one column per label key present across every loaded resource.
