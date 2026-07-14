@@ -5512,6 +5512,261 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Events page row filters (the per-row "..." menu) ───────────────────────
+
+    test.describe("events page row filters", () => {
+        // Four events chosen so every scope is distinguishable. Two BackOffs from the
+        // "web" service (its pods differ only by their generated suffixes, so both
+        // resolve to service default/web and share an extended hash), one identical
+        // BackOff from the "api" service (same details hash as the web pair, different
+        // service), and one unrelated FailedScheduling from web (same service, different
+        // details).
+        //
+        // The api pod's random suffix ("jmnbk") is all consonants and carries no digit,
+        // which is an ordinary shape: Kubernetes generates suffixes from an alphabet that
+        // is mostly consonants. It is here so the suite proves through the running app
+        // that such a pod still resolves to its service.
+        const ROW_FILTER_EVENTS = {
+            events: [
+                {
+                    uid: "rf-1",
+                    type: "Warning",
+                    reason: "BackOff",
+                    message: "Back-off restarting failed container app in pod web-7d9f8b6c5-x2k9p",
+                    count: 5,
+                    source: "kubelet",
+                    firstSeen: "2024-01-01T00:00:00Z",
+                    lastSeen: new Date().toISOString(),
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "web-7d9f8b6c5-x2k9p",
+                },
+                {
+                    uid: "rf-2",
+                    type: "Warning",
+                    reason: "BackOff",
+                    message: "Back-off restarting failed container app in pod web-7d9f8b6c5-q4m2t",
+                    count: 3,
+                    source: "kubelet",
+                    firstSeen: "2024-01-01T00:00:00Z",
+                    lastSeen: new Date().toISOString(),
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "web-7d9f8b6c5-q4m2t",
+                },
+                {
+                    uid: "rf-3",
+                    type: "Warning",
+                    reason: "BackOff",
+                    message: "Back-off restarting failed container app in pod api-6c4bdf295-jmnbk",
+                    count: 2,
+                    source: "kubelet",
+                    firstSeen: "2024-01-01T00:00:00Z",
+                    lastSeen: new Date().toISOString(),
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "api-6c4bdf295-jmnbk",
+                },
+                {
+                    uid: "rf-4",
+                    type: "Warning",
+                    reason: "FailedScheduling",
+                    message: "0/3 nodes are available: insufficient cpu",
+                    count: 1,
+                    source: "default-scheduler",
+                    firstSeen: "2024-01-01T00:00:00Z",
+                    lastSeen: new Date().toISOString(),
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "web-7d9f8b6c5-x2k9p",
+                },
+            ],
+        };
+
+        // Opens the "..." menu on the row matching every one of the given texts.
+        async function openRowMenu(...texts: string[]): Promise<void> {
+            let row = page.locator("[data-test-id='event-row']");
+            for (const text of texts) {
+                row = row.filter({ hasText: text });
+            }
+            await row.locator("[data-test-id='events-row-menu-button']").click();
+        }
+
+        // Clicks the reset control and waits for every event to come back.
+        async function resetFilters(): Promise<void> {
+            await page.locator("[data-test-id='events-reset-filters']").click();
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(4);
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/events*", async (route) => {
+                await route.fulfill({ json: ROW_FILTER_EVENTS });
+            });
+            await page.goto("/events", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='events-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/events*");
+            setContext(CLUSTER_1);
+        });
+
+        test("shows every event and no active-filter bar by default", async () => {
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(4);
+            await expect(page.locator("[data-test-id='events-count']")).toHaveText("4 of 4 events");
+            await expect(page.locator("[data-test-id='events-active-filters']")).toHaveCount(0);
+        });
+
+        test("every row has a ... menu offering the six filter actions", async () => {
+            await openRowMenu("BackOff", "x2k9p");
+            for (const action of ["hide-details", "hide-details-service", "hide-service", "only-details", "only-details-service", "only-service"]) {
+                await expect(page.locator(`[data-test-id='events-row-menu-${action}']`)).toBeVisible();
+            }
+            await page.keyboard.press("Escape");
+        });
+
+        test("each action states how many events it covers and the group it is keyed on", async () => {
+            // Nothing is hidden until the user can see what hiding it would take out.
+            await openRowMenu("BackOff", "x2k9p");
+            await expect(page.locator("[data-test-id='events-row-menu-coverage-hide-details']"))
+                .toHaveText('Matches 3 of 4 events: "BackOff: back-off restarting failed container app in pod <object>" from any service');
+            await expect(page.locator("[data-test-id='events-row-menu-coverage-hide-details-service']"))
+                .toHaveText('Matches 2 of 4 events: "BackOff: back-off restarting failed container app in pod <object>" from default/web');
+            await expect(page.locator("[data-test-id='events-row-menu-coverage-hide-service']"))
+                .toHaveText("Matches 3 of 4 events: everything from default/web");
+            await page.keyboard.press("Escape");
+        });
+
+        test("an all-consonant pod suffix still resolves to its service", async () => {
+            // "api-6c4bdf295-jmnbk" carries no digit in its random suffix. It must still
+            // resolve to the service default/api, or none of its events group with its
+            // siblings' and hiding its service hides only the one row.
+            await openRowMenu("BackOff", "jmnbk");
+            await expect(page.locator("[data-test-id='events-row-menu-coverage-hide-service']"))
+                .toHaveText("Matches 1 of 4 events: everything from default/api");
+            await page.locator("[data-test-id='events-row-menu-hide-service']").click();
+            await expect(page.locator("[data-test-id='events-filter-chip']"))
+                .toHaveText("Hide: everything from default/api");
+            await resetFilters();
+        });
+
+        test("hide all like this hides the like events of every service", async () => {
+            await openRowMenu("BackOff", "x2k9p");
+            await page.locator("[data-test-id='events-row-menu-hide-details']").click();
+            // The three BackOffs (both web pods and the api pod) go; FailedScheduling stays.
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "FailedScheduling" })).toHaveCount(1);
+            await resetFilters();
+        });
+
+        test("hiding is reflected in the count and the hidden indicator", async () => {
+            await openRowMenu("BackOff", "x2k9p");
+            await page.locator("[data-test-id='events-row-menu-hide-details']").click();
+            await expect(page.locator("[data-test-id='events-count']")).toHaveText("1 of 4 events");
+            await expect(page.locator("[data-test-id='events-active-filters']")).toBeVisible();
+            await expect(page.locator("[data-test-id='events-hidden-count']")).toHaveText("3 events hidden by filters");
+            await expect(page.locator("[data-test-id='events-filter-chip']")).toHaveCount(1);
+            await resetFilters();
+        });
+
+        test("the chip names the group being hidden, not just its reason", async () => {
+            // What was hidden has to stay legible on the page: a chip reading only "BackOff"
+            // would not say which BackOff, and a reason alone is not a group.
+            await openRowMenu("BackOff", "x2k9p");
+            await page.locator("[data-test-id='events-row-menu-hide-details']").click();
+            await expect(page.locator("[data-test-id='events-filter-chip']"))
+                .toHaveText("Hide (any service): BackOff: back-off restarting failed container…");
+            await resetFilters();
+        });
+
+        test("hide all like this for this service hides only that service's like events", async () => {
+            await openRowMenu("BackOff", "x2k9p");
+            await page.locator("[data-test-id='events-row-menu-hide-details-service']").click();
+            // Both web BackOffs go; the api BackOff and web's FailedScheduling stay.
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "jmnbk" })).toHaveCount(1);
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "FailedScheduling" })).toHaveCount(1);
+            await resetFilters();
+        });
+
+        test("hide all from this service hides every event of that service", async () => {
+            await openRowMenu("BackOff", "x2k9p");
+            await page.locator("[data-test-id='events-row-menu-hide-service']").click();
+            // Every web event goes (both BackOffs and the FailedScheduling); only api stays.
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "jmnbk" })).toHaveCount(1);
+            await expect(page.locator("[data-test-id='events-hidden-count']")).toHaveText("3 events hidden by filters");
+            await resetFilters();
+        });
+
+        test("show only ones like this keeps the like events of every service", async () => {
+            await openRowMenu("BackOff", "x2k9p");
+            await page.locator("[data-test-id='events-row-menu-only-details']").click();
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "FailedScheduling" })).toHaveCount(0);
+            await resetFilters();
+        });
+
+        test("show only ones like this for this service keeps just that service's like events", async () => {
+            await openRowMenu("BackOff", "x2k9p");
+            await page.locator("[data-test-id='events-row-menu-only-details-service']").click();
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "jmnbk" })).toHaveCount(0);
+            await resetFilters();
+        });
+
+        test("show only this service keeps every event of that service", async () => {
+            await openRowMenu("BackOff", "x2k9p");
+            await page.locator("[data-test-id='events-row-menu-only-service']").click();
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "jmnbk" })).toHaveCount(0);
+            await expect(page.locator("[data-test-id='event-row']").filter({ hasText: "FailedScheduling" })).toHaveCount(1);
+            await resetFilters();
+        });
+
+        test("two filters compose, and filtering everything out shows the no-match message", async () => {
+            await openRowMenu("BackOff", "x2k9p");
+            await page.locator("[data-test-id='events-row-menu-hide-details']").click();
+            await openRowMenu("FailedScheduling");
+            await page.locator("[data-test-id='events-row-menu-hide-details']").click();
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-events-match']")).toHaveText("No events match the current filters.");
+            await expect(page.locator("[data-test-id='events-count']")).toHaveText("0 of 4 events");
+            await expect(page.locator("[data-test-id='events-filter-chip']")).toHaveCount(2);
+            await resetFilters();
+        });
+
+        test("reset clears the filters, the indicator, and the count", async () => {
+            await openRowMenu("BackOff", "x2k9p");
+            await page.locator("[data-test-id='events-row-menu-hide-service']").click();
+            await expect(page.locator("[data-test-id='events-active-filters']")).toBeVisible();
+            await page.locator("[data-test-id='events-reset-filters']").click();
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(4);
+            await expect(page.locator("[data-test-id='events-count']")).toHaveText("4 of 4 events");
+            await expect(page.locator("[data-test-id='events-active-filters']")).toHaveCount(0);
+        });
+
+        test("a chip removes just its own filter", async () => {
+            await openRowMenu("BackOff", "x2k9p");
+            await page.locator("[data-test-id='events-row-menu-hide-details']").click();
+            await openRowMenu("FailedScheduling");
+            await page.locator("[data-test-id='events-row-menu-hide-details']").click();
+            await expect(page.locator("[data-test-id='events-filter-chip']")).toHaveCount(2);
+
+            await page.locator("[data-test-id='events-filter-chip']").first().locator("svg").last().click();
+            await expect(page.locator("[data-test-id='events-filter-chip']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='event-row']")).toHaveCount(3);
+            await resetFilters();
+        });
+
+        test("using the ... menu does not navigate to the event detail page", async () => {
+            await openRowMenu("BackOff", "x2k9p");
+            await page.keyboard.press("Escape");
+            await expect(page).toHaveURL(/\/events(\?.*)?$/);
+        });
+    });
+
     // ── Errors page ───────────────────────────────────────────────────────────
 
     test.describe("errors page", () => {
@@ -6333,6 +6588,194 @@ test.describe("karse e2e", () => {
             await page.keyboard.press("Escape");
             await expect(page.locator("[data-test-id='error-row']")).toHaveCount(3);
             await expect(page.locator("[data-test-id='errors-filter-button']")).toHaveText("Filter: All");
+        });
+    });
+
+    // ── Errors page row filters (the per-row "..." menu) ───────────────────────
+
+    test.describe("errors page row filters", () => {
+        // Four errors chosen so every scope is distinguishable, mirroring the events
+        // fixture: two CrashLoopBackOffs from the "crasher" service (two of its pods),
+        // the same CrashLoopBackOff from the "puller" service (same details hash,
+        // different service), and an unrelated FailedScheduling from crasher.
+        //
+        // As on the events fixture, the puller pod's random suffix ("jmnbk") is all
+        // consonants and carries no digit — an ordinary shape, since Kubernetes generates
+        // suffixes from a mostly-consonant alphabet — so the suite proves such a pod still
+        // resolves to its service.
+        const ROW_FILTER_ERRORS = {
+            errors: [
+                {
+                    source: "Pod",
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "crasher-7d9f8b6c5-x2k9p",
+                    reason: "CrashLoopBackOff",
+                    message: "Back-off restarting failed container app in pod crasher-7d9f8b6c5-x2k9p",
+                    count: 5,
+                    firstSeen: "2024-01-01T00:00:00Z",
+                    lastSeen: new Date().toISOString(),
+                },
+                {
+                    source: "Pod",
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "crasher-7d9f8b6c5-q4m2t",
+                    reason: "CrashLoopBackOff",
+                    message: "Back-off restarting failed container app in pod crasher-7d9f8b6c5-q4m2t",
+                    count: 3,
+                    firstSeen: "2024-01-01T00:00:00Z",
+                    lastSeen: new Date().toISOString(),
+                },
+                {
+                    source: "Pod",
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "puller-6c4bdf295-jmnbk",
+                    reason: "CrashLoopBackOff",
+                    message: "Back-off restarting failed container app in pod puller-6c4bdf295-jmnbk",
+                    count: 2,
+                    firstSeen: "2024-01-01T00:00:00Z",
+                    lastSeen: new Date().toISOString(),
+                },
+                {
+                    source: "Event",
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "crasher-7d9f8b6c5-x2k9p",
+                    reason: "FailedScheduling",
+                    message: "0/3 nodes are available: insufficient cpu",
+                    count: 1,
+                    firstSeen: "2024-01-01T00:00:00Z",
+                    lastSeen: new Date().toISOString(),
+                },
+            ],
+        };
+
+        // Opens the "..." menu on the row matching every one of the given texts.
+        async function openRowMenu(...texts: string[]): Promise<void> {
+            let row = page.locator("[data-test-id='error-row']");
+            for (const text of texts) {
+                row = row.filter({ hasText: text });
+            }
+            await row.locator("[data-test-id='errors-row-menu-button']").click();
+        }
+
+        // Clicks the reset control and waits for every error to come back.
+        async function resetFilters(): Promise<void> {
+            await page.locator("[data-test-id='errors-reset-filters']").click();
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(4);
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/errors*", async (route) => {
+                await route.fulfill({ json: ROW_FILTER_ERRORS });
+            });
+            await page.goto("/errors", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='errors-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/errors*");
+            setContext(CLUSTER_1);
+        });
+
+        test("shows every error and no active-filter bar by default", async () => {
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(4);
+            await expect(page.locator("[data-test-id='errors-count']")).toHaveText("4 of 4 errors");
+            await expect(page.locator("[data-test-id='errors-active-filters']")).toHaveCount(0);
+        });
+
+        test("every row has a ... menu offering the six filter actions", async () => {
+            await openRowMenu("CrashLoopBackOff", "x2k9p");
+            for (const action of ["hide-details", "hide-details-service", "hide-service", "only-details", "only-details-service", "only-service"]) {
+                await expect(page.locator(`[data-test-id='errors-row-menu-${action}']`)).toBeVisible();
+            }
+            await page.keyboard.press("Escape");
+        });
+
+        test("each action states how many errors it covers and the group it is keyed on", async () => {
+            await openRowMenu("CrashLoopBackOff", "x2k9p");
+            await expect(page.locator("[data-test-id='errors-row-menu-coverage-hide-details']"))
+                .toHaveText('Matches 3 of 4 errors: "CrashLoopBackOff: back-off restarting failed container app in pod <object>" from any service');
+            await expect(page.locator("[data-test-id='errors-row-menu-coverage-hide-service']"))
+                .toHaveText("Matches 3 of 4 errors: everything from default/crasher");
+            await page.keyboard.press("Escape");
+        });
+
+        test("an all-consonant pod suffix still resolves to its service", async () => {
+            await openRowMenu("CrashLoopBackOff", "jmnbk");
+            await expect(page.locator("[data-test-id='errors-row-menu-coverage-hide-service']"))
+                .toHaveText("Matches 1 of 4 errors: everything from default/puller");
+            await page.locator("[data-test-id='errors-row-menu-hide-service']").click();
+            await expect(page.locator("[data-test-id='errors-filter-chip']"))
+                .toHaveText("Hide: everything from default/puller");
+            await resetFilters();
+        });
+
+        test("the chip names the group being hidden, not just its reason", async () => {
+            await openRowMenu("CrashLoopBackOff", "x2k9p");
+            await page.locator("[data-test-id='errors-row-menu-hide-details']").click();
+            await expect(page.locator("[data-test-id='errors-filter-chip']"))
+                .toHaveText("Hide (any service): CrashLoopBackOff: back-off restarting failed…");
+            await resetFilters();
+        });
+
+        test("hide all like this hides the like errors of every service", async () => {
+            await openRowMenu("CrashLoopBackOff", "x2k9p");
+            await page.locator("[data-test-id='errors-row-menu-hide-details']").click();
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='error-row']").filter({ hasText: "FailedScheduling" })).toHaveCount(1);
+            await expect(page.locator("[data-test-id='errors-count']")).toHaveText("1 of 4 errors");
+            await expect(page.locator("[data-test-id='errors-hidden-count']")).toHaveText("3 errors hidden by filters");
+            await resetFilters();
+        });
+
+        test("hide all like this for this service hides only that service's like errors", async () => {
+            await openRowMenu("CrashLoopBackOff", "x2k9p");
+            await page.locator("[data-test-id='errors-row-menu-hide-details-service']").click();
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='error-row']").filter({ hasText: "jmnbk" })).toHaveCount(1);
+            await resetFilters();
+        });
+
+        test("hide all from this service hides every error of that service", async () => {
+            await openRowMenu("CrashLoopBackOff", "x2k9p");
+            await page.locator("[data-test-id='errors-row-menu-hide-service']").click();
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='error-row']").filter({ hasText: "jmnbk" })).toHaveCount(1);
+            await resetFilters();
+        });
+
+        test("show only ones like this keeps the like errors of every service", async () => {
+            await openRowMenu("CrashLoopBackOff", "x2k9p");
+            await page.locator("[data-test-id='errors-row-menu-only-details']").click();
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='error-row']").filter({ hasText: "FailedScheduling" })).toHaveCount(0);
+            await resetFilters();
+        });
+
+        test("show only this service keeps every error of that service", async () => {
+            await openRowMenu("CrashLoopBackOff", "x2k9p");
+            await page.locator("[data-test-id='errors-row-menu-only-service']").click();
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='error-row']").filter({ hasText: "jmnbk" })).toHaveCount(0);
+            await resetFilters();
+        });
+
+        test("filtering everything out shows the no-match message, and reset restores it", async () => {
+            await openRowMenu("CrashLoopBackOff", "x2k9p");
+            await page.locator("[data-test-id='errors-row-menu-hide-details']").click();
+            await openRowMenu("FailedScheduling");
+            await page.locator("[data-test-id='errors-row-menu-hide-details']").click();
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-errors-match']")).toHaveText("No errors match the current filters.");
+            await expect(page.locator("[data-test-id='errors-count']")).toHaveText("0 of 4 errors");
+
+            await page.locator("[data-test-id='errors-reset-filters']").click();
+            await expect(page.locator("[data-test-id='error-row']")).toHaveCount(4);
+            await expect(page.locator("[data-test-id='errors-active-filters']")).toHaveCount(0);
         });
     });
 

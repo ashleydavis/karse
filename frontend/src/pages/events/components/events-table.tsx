@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
     useReactTable,
     getCoreRowModel,
@@ -37,6 +37,10 @@ import { ColumnConfigButton } from "../../../components/column-config-modal";
 import { useShareableNavigate } from "../../../lib/nav-state";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { ResourceRef } from "../../../components/resource-ref";
+import { RowFilterMenu } from "../../../components/row-filter-menu";
+import { ActiveRowFilters } from "../../../components/active-row-filters";
+import { type EventFilter, applyEventFilters } from "../../../lib/event-filter";
+import { useEventFilters } from "../../../lib/use-event-filters";
 
 // Every selectable event type, in display order. Drives the type column in the
 // shared filter editor.
@@ -134,6 +138,28 @@ const columns: ColumnDef<ClusterEvent>[] = [
     { accessorKey: "namespace", header: "Namespace" },
 ];
 
+// The trailing "..." column: a per-row menu that activates a hide or show-only filter for
+// events like that row's. It is not sortable and not hideable, so it always stays at the
+// end of the row and out of the column-configuration modal. It is handed every loaded
+// event (`all`, before any filtering) so each action can say how many events it covers.
+function actionsColumn(addFilter: (filter: EventFilter) => void, all: ClusterEvent[]): ColumnDef<ClusterEvent> {
+    return {
+        id: "actions",
+        header: "",
+        enableHiding: false,
+        enableSorting: false,
+        cell: ({ row }) => (
+            <RowFilterMenu
+                item={row.original}
+                items={all}
+                noun="events"
+                onAddFilter={addFilter}
+                testIdPrefix="events"
+            />
+        ),
+    };
+}
+
 // Sortable, filterable table of Kubernetes events for the active context.
 // When a namespace is selected it scopes the query; otherwise shows events across
 // all namespaces. Warnings are sorted to the top when sorting by type.
@@ -159,11 +185,30 @@ export function EventsTable() {
     ];
     const filter = useTableFilter(filterableColumns);
 
-    const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("events", columns);
+    // The row filters activated from the "..." menu (hide / show-only, by details hash,
+    // extended hash, or service). They are applied to the events before the table sees
+    // them, so a hidden event is out of the rows and out of the count alike.
+    const rowFilters = useEventFilters();
+    const all = data?.events ?? [];
+    const visible = useMemo(
+        () => applyEventFilters(all, rowFilters.filters),
+        [all, rowFilters.filters],
+    );
+    const hiddenCount = all.length - visible.length;
+
+    // The table's columns are the display columns plus the trailing "..." actions column.
+    // `addFilter` is stable and the loaded events only change on a refetch, so the table is
+    // not rebuilt on every render.
+    const tableColumns = useMemo(
+        () => [...columns, actionsColumn(rowFilters.addFilter, all)],
+        [rowFilters.addFilter, all],
+    );
+
+    const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("events", tableColumns);
 
     const table = useReactTable({
-        data: data?.events ?? [],
-        columns,
+        data: visible,
+        columns: tableColumns,
         state: {
             sorting,
             globalFilter,
@@ -188,7 +233,6 @@ export function EventsTable() {
     }
 
     const rows = table.getRowModel().rows;
-    const all = data?.events ?? [];
 
     // Renders the appropriate sort direction icon for a column header.
     function SortIcon({ columnId }: { columnId: string }) {
@@ -229,7 +273,18 @@ export function EventsTable() {
                     testIdPrefix="events-filter"
                 />
                 <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
+                <Typography variant="body2" color="text.secondary" data-test-id="events-count">
+                    {rows.length} of {all.length} events
+                </Typography>
             </div>
+            <ActiveRowFilters
+                filters={rowFilters.filters}
+                hiddenCount={hiddenCount}
+                noun="events"
+                onRemove={rowFilters.removeFilter}
+                onReset={rowFilters.reset}
+                testIdPrefix="events"
+            />
             <TableContainer component={Paper} data-test-id="events-table">
                 <Table size="small">
                     <TableHead>
@@ -256,15 +311,17 @@ export function EventsTable() {
                     <TableBody>
                         {rows.length === 0 && all.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={columns.length}>
+                                <TableCell colSpan={tableColumns.length}>
                                     <Typography color="text.secondary" data-test-id="no-events-empty">No events.</Typography>
                                 </TableCell>
                             </TableRow>
                         )}
                         {rows.length === 0 && all.length > 0 && (
                             <TableRow>
-                                <TableCell colSpan={columns.length}>
-                                    <Typography color="text.secondary" data-test-id="no-events-match">No events match the search.</Typography>
+                                <TableCell colSpan={tableColumns.length}>
+                                    <Typography color="text.secondary" data-test-id="no-events-match">
+                                        {rowFilters.filters.length > 0 ? "No events match the current filters." : "No events match the search."}
+                                    </Typography>
                                 </TableCell>
                             </TableRow>
                         )}

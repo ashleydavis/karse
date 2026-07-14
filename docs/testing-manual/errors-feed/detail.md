@@ -39,6 +39,28 @@ A cluster seeded with one error condition from each source the Errors page surfa
 - **Sort**: click the Source header and confirm the table re-sorts.
 - **Reason filter**: the shared "Filter: All" dropdown sits beside the search box. Open it; under the **Reason** heading it lists the error types present (`FailedScheduling` and `ImagePullBackOff`), each with a checkbox, all unchecked by default and both rows visible. Check `ImagePullBackOff` and confirm only the problem-pod row remains and the button reads "Filter: 1 selected". Check `FailedScheduling` too and confirm both rows return ("Filter: 2 selected"). Click "Clear" and confirm the selection clears, the button reads "Filter: All" again, and both rows are shown.
 
+### Row filtering (the "..." menu)
+
+The fixture seeds a `noisy` namespace holding exactly four Warning events (which the Errors page surfaces as errors): the same `BackOff` on two pods of the `web` deployment (`web-7d9f8b6c5-x2k9p`, `web-7d9f8b6c5-q4m2t`) and on one pod of the `api` deployment (`api-6c4bdf295-jmnbk`), plus an unrelated `FailedScheduling` on a `web` pod. So `web` and `api` report *like* errors, and `web` reports two different kinds.
+
+**Select the `noisy` namespace** in Karse before these checks, so the table holds just those four errors and the counts below match.
+
+- **Count**: with no row filter active, the count beside the Filter dropdown reads "4 of 4 errors" and there is no filter bar above the table.
+- **The menu**: each row ends with a "..." button. Click the one on a `web` `BackOff` row. A menu opens with six actions under two headings: **Hide** (all like this / all like this, for this service / all from this service) and **Show only** (ones like this / ones like this, for this service / this service). Press Escape: the menu closes and you have *not* navigated to the error detail page.
+- **Each action says what it covers**: on the `web-7d9f8b6c5-x2k9p` `BackOff` row, read the second line under each action. **Hide all like this** reads `Matches 3 of 4 errors: "BackOff: back-off restarting failed container app in pod <object>" from any service`, and **Hide all from this service** reads `Matches 3 of 4 errors: everything from noisy/web`. Nothing can be hidden without the menu first saying how much it takes out and what the group is.
+- **A pod whose suffix has no digit still resolves to its service**: open the menu on the `api-6c4bdf295-jmnbk` row (its random suffix is all consonants — an ordinary shape, since Kubernetes builds suffixes from a mostly-consonant alphabet). **Hide all from this service** must read `everything from noisy/api`, *not* `everything from noisy/api-6c4bdf295-jmnbk`.
+- **Hide all like this**: on a `web` `BackOff` row, choose **Hide all like this**. Every `BackOff` disappears — both `web` pods *and* the `api` pod, because they are like errors (same reason, same message once the pod name is masked out). The `FailedScheduling` error stays.
+- **Hidden indicator and count**: a bar appears above the table reading "3 errors hidden by filters", with a chip for the filter (`Hide (any service): BackOff: back-off restarting failed container…`, its full text on the chip's tooltip) and a **Reset filters** button. The count reads "1 of 4 errors". The chip must name the *group* — the reason and the message — not just the reason.
+- **Reset**: click **Reset filters**. The bar disappears, every error returns, and the count reads "4 of 4 errors".
+- **Hide all like this, for this service**: on a `web` `BackOff` row, choose it. Only the two `web` `BackOff` errors go; the `api` `BackOff` remains (like, but a different service), as does `web`'s `FailedScheduling`. Reset.
+- **Hide all from this service**: on a `web` row, choose it. Every `web` error goes; only the `api` error remains. Reset.
+- **Show only ones like this**: on a `web` `BackOff` row, choose it. Only the three `BackOff` errors show. Reset.
+- **Show only ones like this, for this service**: only the two `web` `BackOff` errors show. Reset.
+- **Show only this service**: only `web`'s three errors show. Reset.
+- **Filters accumulate**: hide the `BackOff` errors, then use the `FailedScheduling` row's menu to hide those too. The bar shows two chips, the table shows "No errors match the current filters.", and the count reads "0 of 4 errors".
+- **Removing one filter**: click the X on one chip. Just that filter is dropped; the other stays active.
+- **Reset restores everything**: click **Reset filters**. All four errors return and the bar disappears.
+
 ### Error detail drill-down
 - **Row click**: hover an error row and confirm the cursor becomes a pointer and the row highlights (the same affordance as other resource tables). Click the `ImagePullBackOff` row and confirm the URL changes to `/errors/<n>` and an error detail page opens.
 - **Breadcrumb**: the breadcrumb trail reads "Errors > Error"; clicking "Errors" returns to the list.

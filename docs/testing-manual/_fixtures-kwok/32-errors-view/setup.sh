@@ -107,4 +107,92 @@ firstTimestamp: "2024-01-01T00:00:05Z"
 lastTimestamp: "2024-01-01T00:05:00Z"
 EOF
 
+
+# The "noisy" namespace seeds the row-filter ("..." menu) checks: the SAME BackOff
+# reported by two pods of the `web` deployment and by one pod of the `api` deployment
+# (so `web` and `api` report *like* events), plus an unrelated FailedScheduling on a
+# `web` pod. Selecting the `noisy` namespace in Karse shows exactly these four.
+kubectl create namespace noisy 2>/dev/null || true
+
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: Event
+metadata:
+  name: web-x2k9p.backoff
+  namespace: noisy
+involvedObject:
+  apiVersion: v1
+  kind: Pod
+  name: web-7d9f8b6c5-x2k9p
+  namespace: noisy
+reason: BackOff
+message: Back-off restarting failed container app in pod web-7d9f8b6c5-x2k9p
+type: Warning
+count: 5
+source:
+  component: kubelet
+  host: fake-node-1
+firstTimestamp: "2024-01-01T00:00:00Z"
+lastTimestamp: "2024-01-01T00:20:00Z"
+---
+apiVersion: v1
+kind: Event
+metadata:
+  name: web-q4m2t.backoff
+  namespace: noisy
+involvedObject:
+  apiVersion: v1
+  kind: Pod
+  name: web-7d9f8b6c5-q4m2t
+  namespace: noisy
+reason: BackOff
+message: Back-off restarting failed container app in pod web-7d9f8b6c5-q4m2t
+type: Warning
+count: 3
+source:
+  component: kubelet
+  host: fake-node-1
+firstTimestamp: "2024-01-01T00:00:00Z"
+lastTimestamp: "2024-01-01T00:19:00Z"
+---
+apiVersion: v1
+kind: Event
+metadata:
+  name: api-jmnbk.backoff
+  namespace: noisy
+involvedObject:
+  apiVersion: v1
+  kind: Pod
+  name: api-6c4bdf295-jmnbk
+  namespace: noisy
+reason: BackOff
+message: Back-off restarting failed container app in pod api-6c4bdf295-jmnbk
+type: Warning
+count: 2
+source:
+  component: kubelet
+  host: fake-node-1
+firstTimestamp: "2024-01-01T00:00:00Z"
+lastTimestamp: "2024-01-01T00:18:00Z"
+---
+apiVersion: v1
+kind: Event
+metadata:
+  name: web-x2k9p.failedscheduling
+  namespace: noisy
+involvedObject:
+  apiVersion: v1
+  kind: Pod
+  name: web-7d9f8b6c5-x2k9p
+  namespace: noisy
+reason: FailedScheduling
+message: "0/3 nodes are available: insufficient cpu"
+type: Warning
+count: 1
+source:
+  component: default-scheduler
+firstTimestamp: "2024-01-01T00:00:00Z"
+lastTimestamp: "2024-01-01T00:17:00Z"
+EOF
+
 echo "Cluster ready. Select the 'kwok-karse-test' context in Karse."

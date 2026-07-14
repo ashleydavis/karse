@@ -241,6 +241,47 @@ This is per detail page and per resource: it shows the labels of the one resourc
 
 Click a pod row to open its detail page (`/pods/:namespace/:name`), with tabs for Status, Containers, Init Containers (when present), Labels, Logs, Commands, and YAML.
 
+## Events and Errors pages (`/events`, `/errors`)
+
+The Events page lists the cluster's Kubernetes events; the Errors page lists its error conditions (Warning events plus pods in a problem state). Both are sortable and searchable, and both have the shared **Filter** dropdown described in [Column filtering](#column-filtering) (event Type on Events, Reason on Errors).
+
+### Taming a noisy feed (the "..." row menu)
+
+A busy cluster reports the same few events and errors over and over. To cut through it, each row ends with a **"..."** button. It opens a menu of six actions — three that hide, three that show only:
+
+| Action | What it matches |
+|---|---|
+| **Hide all like this** / **Show only ones like this** | every event/error *like* this one, from **any** service |
+| **Hide all like this, for this service** / **Show only ones like this, for this service** | every one like this, from **this service only** |
+| **Hide all from this service** / **Show only this service** | **everything** from this service, whatever it says |
+
+#### What counts as "like this"
+
+Two items are "like" one another when they share a **reason** and a **message**, with the parts of the message that say *where* it happened taken out and the parts that say *what* happened left in.
+
+- Taken out: the object's name, the namespace, the name of any other object Kubernetes named (so a replicaset's "Created pod: web-7d9f8b6c5-x2k9p" groups with the same event for its other pods), pod UIDs, and IP addresses. The same failure on two different pods, or in two different services, is one kind of problem.
+- Left in: **every other number**. "Container exited with code 1" and "Container exited with code 137" (an out-of-memory kill) are *not* alike, and neither is a 404 probe failure and a 500. Hiding one never hides the other.
+
+A **service** is the workload an item came from: the object's name with the suffixes Kubernetes adds taken back off, so `web-7d9f8b6c5-x2k9p` (a pod), `web-7d9f8b6c5` (its replicaset), and `web` (its deployment) are all the service `web`. This works for objects Kubernetes named itself — pods of a deployment, daemonset, job or statefulset, and their replicasets and jobs. An object named some other way (a pod you made by hand, or one an operator named its own way) is treated as a service of its own, under its full name; it is never merged into someone else's.
+
+Grouping errs on the side of hiding **less** than you asked rather than more. If it cannot be sure two items are alike, it leaves them apart: you may have to hide two groups instead of one, but you will never lose something you did not mean to hide.
+
+#### Seeing what you are about to hide
+
+Every action in the "..." menu tells you what it covers **before** you click it: how many of the loaded events (or errors) it takes in, and the group it is keyed on — the reason plus the normalised message, or the service for a whole-service action. So "Hide all like this" might read:
+
+> Matches 3 of 4 events: "BackOff: back-off restarting failed container app in pod &lt;object&gt;" from any service
+
+Filters build up as you add them. While a "show only" filter is active, an item has to match one of them to appear; a "hide" filter then removes anything it matches, so hiding always wins.
+
+And once a filter is on, you can still see what it is doing:
+
+- The count beside the Filter dropdown reads "N of M events" (or errors) — how many are shown out of the total, so hidden items are reflected in the count.
+- While any row filter is active, a bar above the table says how many items are hidden and shows one chip per active filter. Each chip names the service the filter reaches and the group it hides, so nothing is hidden by an unlabelled filter; hover a chip for the whole of it. Click a chip's X to drop just that filter.
+- **Reset filters** on that bar clears every row filter and brings the full list back.
+
+The filters last for the session only; they are not saved, and they do not change the **Errors** stat tile on the cluster home page (a cluster-wide count from the server).
+
 ## Container detail page (`/pods/:namespace/:name/containers/:container`)
 
 On a pod's detail page, open the **Containers** (or **Init Containers**) tab and click a container row to drill into that single container. The container detail page has four tabs:

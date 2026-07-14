@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
     useReactTable,
     getCoreRowModel,
@@ -38,6 +38,10 @@ import { ColumnConfigButton } from "../../../components/column-config-modal";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { ResourceRef } from "../../../components/resource-ref";
 import { formatAge, errorsGlobalFilter } from "../../../lib/errors-search";
+import { RowFilterMenu } from "../../../components/row-filter-menu";
+import { ActiveRowFilters } from "../../../components/active-row-filters";
+import { type EventFilter, applyEventFilters } from "../../../lib/event-filter";
+import { useEventFilters } from "../../../lib/use-event-filters";
 
 // The distinct error types (reasons) present in the data, in display order
 // (alphabetical). These are the checkboxes offered by the type filter.
@@ -112,6 +116,28 @@ const columns: ColumnDef<ClusterError>[] = [
     { accessorKey: "namespace", header: "Namespace" },
 ];
 
+// The trailing "..." column: a per-row menu that activates a hide or show-only filter for
+// errors like that row's. It is not sortable and not hideable, so it always stays at the
+// end of the row and out of the column-configuration modal. It is handed every loaded
+// error (`all`, before any filtering) so each action can say how many errors it covers.
+function actionsColumn(addFilter: (filter: EventFilter) => void, all: ClusterError[]): ColumnDef<ClusterError> {
+    return {
+        id: "actions",
+        header: "",
+        enableHiding: false,
+        enableSorting: false,
+        cell: ({ row }) => (
+            <RowFilterMenu
+                item={row.original}
+                items={all}
+                noun="errors"
+                onAddFilter={addFilter}
+                testIdPrefix="errors"
+            />
+        ),
+    };
+}
+
 // Sortable, filterable table of error conditions occurring in the cluster for the
 // active context. Combines Warning events and problem pods returned by GET /api/errors.
 // When a namespace is selected it scopes the query; otherwise shows errors across
@@ -138,11 +164,30 @@ export function ErrorsTable() {
     ];
     const filter = useTableFilter(filterableColumns);
 
-    const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("errors", columns);
+    // The row filters activated from the "..." menu (hide / show-only, by details hash,
+    // extended hash, or service). They are applied to the errors before the table sees
+    // them, so a hidden error is out of the rows and out of the count alike.
+    const rowFilters = useEventFilters();
+    const all = data?.errors ?? [];
+    const visible = useMemo(
+        () => applyEventFilters(all, rowFilters.filters),
+        [all, rowFilters.filters],
+    );
+    const hiddenCount = all.length - visible.length;
+
+    // The table's columns are the display columns plus the trailing "..." actions column.
+    // `addFilter` is stable and the loaded errors only change on a refetch, so the table is
+    // not rebuilt on every render.
+    const tableColumns = useMemo(
+        () => [...columns, actionsColumn(rowFilters.addFilter, all)],
+        [rowFilters.addFilter, all],
+    );
+
+    const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("errors", tableColumns);
 
     const table = useReactTable({
-        data: data?.errors ?? [],
-        columns,
+        data: visible,
+        columns: tableColumns,
         state: {
             sorting,
             globalFilter,
@@ -167,7 +212,6 @@ export function ErrorsTable() {
     }
 
     const rows = table.getRowModel().rows;
-    const all = data?.errors ?? [];
 
     // Renders the appropriate sort direction icon for a column header.
     function SortIcon({ columnId }: { columnId: string }) {
@@ -208,7 +252,18 @@ export function ErrorsTable() {
                     testIdPrefix="errors-filter"
                 />
                 <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
+                <Typography variant="body2" color="text.secondary" data-test-id="errors-count">
+                    {rows.length} of {all.length} errors
+                </Typography>
             </div>
+            <ActiveRowFilters
+                filters={rowFilters.filters}
+                hiddenCount={hiddenCount}
+                noun="errors"
+                onRemove={rowFilters.removeFilter}
+                onReset={rowFilters.reset}
+                testIdPrefix="errors"
+            />
             <TableContainer component={Paper} data-test-id="errors-table">
                 <Table size="small">
                     <TableHead>
@@ -235,15 +290,17 @@ export function ErrorsTable() {
                     <TableBody>
                         {rows.length === 0 && all.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={columns.length}>
+                                <TableCell colSpan={tableColumns.length}>
                                     <Typography color="text.secondary" data-test-id="no-errors-empty">No errors.</Typography>
                                 </TableCell>
                             </TableRow>
                         )}
                         {rows.length === 0 && all.length > 0 && (
                             <TableRow>
-                                <TableCell colSpan={columns.length}>
-                                    <Typography color="text.secondary" data-test-id="no-errors-match">No errors match the search.</Typography>
+                                <TableCell colSpan={tableColumns.length}>
+                                    <Typography color="text.secondary" data-test-id="no-errors-match">
+                                        {rowFilters.filters.length > 0 ? "No errors match the current filters." : "No errors match the search."}
+                                    </Typography>
                                 </TableCell>
                             </TableRow>
                         )}
