@@ -2,7 +2,7 @@
 
 ## Automated
 
-<!-- All items broken into tickets via pb:todo:break (see state/tickets/todo/). -->
+- The search input to search a table should have a clear button next to it.
 
 ## Me
 
