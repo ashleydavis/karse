@@ -748,6 +748,24 @@ test.describe("karse e2e", () => {
             const events = await responsePromise;
             expect(events.status()).toBe(200);
         });
+
+        // A refresh that returns identical data must still visibly acknowledge the click:
+        // the button shows an in-progress spinner state, then a brief "done" state. Without
+        // this feedback a working refresh is indistinguishable from a dead button (the
+        // original developer complaint). Assert on the button's data-refresh-state, not on
+        // any data change, since a refetch of unchanged data renders nothing new.
+        test("clicking refresh gives visible feedback and settles to a done state", async () => {
+            setContext(CLUSTER_1);
+            await navigateTo();
+            await waitForStatTiles();
+            const button = page.locator("[data-test-id='refresh-button']");
+            await expect(button).toHaveAttribute("data-refresh-state", "idle");
+            await button.click();
+            // The button must acknowledge the click by reaching the transient "done" state.
+            await expect(button).toHaveAttribute("data-refresh-state", "done");
+            // and then return to idle so a later click is possible.
+            await expect(button).toHaveAttribute("data-refresh-state", "idle");
+        });
     });
 
     // ── Config page (cluster-data cache) ───────────────────────────────────────

@@ -60,6 +60,15 @@ Refresh invalidates all client-side queries, so it must re-fetch whatever page y
 - Confirm the click issues **both** a `POST /api/cache/clear` **and** a fresh `GET /api/pods` — not the clear on its own. A refetch that returns identical data looks like nothing happened, so watch the request, not the table.
 - Repeat on **Deployments**, **Events**, and a detail page (e.g. a pod's detail view, including its Performance tab), confirming each issues its own `GET /api/…` on the click.
 
+## Scenario: The refresh button visibly acknowledges a click
+
+A refetch that returns identical data renders nothing new, so the button must show it is working; otherwise a healthy refresh is indistinguishable from a dead button.
+
+### What to check
+- On any page (e.g. Cluster), click the refresh (circular arrows) button.
+- Confirm the button acknowledges the click: while the refetch is in flight the icon spins and the button is disabled, and on completion it briefly shows a check (hovering reads "Refreshed") before returning to the plain circular-arrows icon.
+- Confirm this holds in both light and dark mode.
+
 ## Scenario: Read-only cross-check
 
 ### What to check

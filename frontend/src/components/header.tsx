@@ -24,6 +24,12 @@ export function Header() {
     const [copied, setCopied] = useState(false);
     const [contextPickerOpen, setContextPickerOpen] = useState(false);
     const [namespacePickerOpen, setNamespacePickerOpen] = useState(false);
+    // Refresh feedback: "refreshing" while the refetch is in flight (spinning icon,
+    // button disabled), then "done" briefly (a check) so a click is unmistakably
+    // acknowledged even when the refetched data is identical. Without this a working
+    // refresh that returns the same data is indistinguishable from a dead button.
+    const [refreshing, setRefreshing] = useState(false);
+    const [justRefreshed, setJustRefreshed] = useState(false);
 
     // Keyboard shortcuts to open the pickers, anchored to their header buttons.
     useEffect(() => {
@@ -51,20 +57,38 @@ export function Header() {
         : "Timestamps: local time. Click to show age";
 
     async function handleRefresh(): Promise<void> {
-        // Empty the on-disk cluster-data cache first so the invalidated queries below
-        // re-fetch fresh kubectl data rather than re-reading a still-fresh cache entry.
-        await clearCache();
-        // Invalidate every query, with no key filter. Refresh means "re-read everything on
-        // this page", and only the unfiltered call can honour that: a filtered invalidation
-        // has to name the keys it reaches, and any such list silently misses every page whose
-        // key is not on it (the previous ["contexts"], ["cluster"], ["namespaces"] list reached
-        // 3 of the app's 19 root keys, so Pods, Deployments, Events and the detail pages issued
-        // no request at all). Naming keys here is the defect, so do not reintroduce a list: a
-        // page added tomorrow must be refreshed without touching this file. The one non-cluster
-        // key, ["cache-config"], is swept up too; re-reading the staleness threshold the server
-        // already holds is cheap and harmless, and excluding it would mean naming keys again.
-        await qc.invalidateQueries();
+        // Guard against re-entry; the button is disabled while refreshing, but a rapid
+        // second trigger (e.g. keyboard) must not stack refreshes.
+        if (refreshing) return;
+        setRefreshing(true);
+        try {
+            // Empty the on-disk cluster-data cache first so the invalidated queries below
+            // re-fetch fresh kubectl data rather than re-reading a still-fresh cache entry.
+            await clearCache();
+            // Invalidate every query, with no key filter. Refresh means "re-read everything on
+            // this page", and only the unfiltered call can honour that: a filtered invalidation
+            // has to name the keys it reaches, and any such list silently misses every page whose
+            // key is not on it (the previous ["contexts"], ["cluster"], ["namespaces"] list reached
+            // 3 of the app's 19 root keys, so Pods, Deployments, Events and the detail pages issued
+            // no request at all). Naming keys here is the defect, so do not reintroduce a list: a
+            // page added tomorrow must be refreshed without touching this file. The one non-cluster
+            // key, ["cache-config"], is swept up too; re-reading the staleness threshold the server
+            // already holds is cheap and harmless, and excluding it would mean naming keys again.
+            // invalidateQueries resolves once the active page's queries have refetched, so the
+            // spinner below stays up for the real duration of the refresh.
+            await qc.invalidateQueries();
+        } finally {
+            setRefreshing(false);
+            // Briefly show a completed state so a click is acknowledged even when the data
+            // came back identical. Mirrors the share button's transient check.
+            setJustRefreshed(true);
+            window.setTimeout(() => setJustRefreshed(false), 1500);
+        }
     }
+
+    const refreshIcon = refreshing ? faRotate : justRefreshed ? faCheck : faRotate;
+    const refreshState = refreshing ? "refreshing" : justRefreshed ? "done" : "idle";
+    const refreshTitle = refreshing ? "Refreshing…" : justRefreshed ? "Refreshed" : "Refresh";
 
     // Copy the current page URL (page, resource, context, and namespace) to the clipboard so it can be shared.
     async function handleShare(): Promise<void> {
@@ -153,10 +177,19 @@ export function Header() {
                             <FontAwesomeIcon icon={copied ? faCheck : faShareNodes} />
                         </IconButton>
                     </Tooltip>
-                    <Tooltip title="Refresh">
-                        <IconButton size="small" onClick={handleRefresh} disabled={isLoading} aria-label="refresh">
-                            <FontAwesomeIcon icon={faRotate} />
-                        </IconButton>
+                    <Tooltip title={refreshTitle}>
+                        <span>
+                            <IconButton
+                                size="small"
+                                onClick={handleRefresh}
+                                disabled={isLoading || refreshing}
+                                aria-label="refresh"
+                                data-test-id="refresh-button"
+                                data-refresh-state={refreshState}
+                            >
+                                <FontAwesomeIcon icon={refreshIcon} spin={refreshing} />
+                            </IconButton>
+                        </span>
                     </Tooltip>
                 </Toolbar>
             </AppBar>

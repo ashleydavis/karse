@@ -80,7 +80,7 @@ The header bar has two quick-picker buttons:
 - **Context picker** (link icon, `Ctrl+K`): opens a searchable list of contexts. Click a row to switch the active context for the tab.
 - **Namespace picker** (layers icon, `Ctrl+Shift+K`): opens a searchable list of namespaces for the active context. Click "All namespaces" to clear the namespace selection, or click a namespace name to scope all views to that namespace.
 
-The header also has a dropdown showing the current context and a **Refresh** button (circular-arrows icon) that empties the on-disk cluster-data cache and re-fetches all data fresh from the cluster. See the Config page below for the cache.
+The header also has a dropdown showing the current context and a **Refresh** button (circular-arrows icon) that empties the on-disk cluster-data cache and re-fetches all data fresh from the cluster. While it is working the icon spins, and it shows a brief check when done, so you can tell a refresh happened even when the data comes back unchanged. See the Config page below for the cache.
 
 ### Page help: where this data comes from
 

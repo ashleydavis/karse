@@ -17,6 +17,7 @@ Backed by: `backend/src/kubectl/cache.ts` (the cache store and config), `backend
 - The cache directory is `KARSE_CACHE_DIR` (default `../cache`, which resolves to the repo-root `cache/` given the backend's `backend/` cwd). It holds one JSON file per cached query plus a single `config.json` holding the threshold.
 - Clicking the navbar refresh button empties the cache (deletes every cached entry, preserving the threshold) and then re-fetches, so the next request returns fresh `kubectl` data.
 - Refresh re-fetches **every** view, on whatever page it is clicked: it invalidates all client-side queries rather than a named subset, so each page currently on screen (Cluster, Nodes, Pods, Deployments, StatefulSets, DaemonSets, Events, Errors, All resources, the detail pages, and the performance panels) issues its own fresh request. This is a requirement, not an implementation detail: a page added later must be refreshed without anyone remembering to register its query key.
+- The refresh button gives visible feedback so a click is unmistakably acknowledged even when the refetched data is identical: while the refetch is in flight the icon spins and the button is disabled (in-progress), and on completion it briefly shows a check (a "Refreshed" confirmation) before returning to its resting state. Without this a working refresh that returns unchanged data is indistinguishable from a dead button.
 
 ## API
 
@@ -32,6 +33,7 @@ Backed by: `backend/src/kubectl/cache.ts` (the cache store and config), `backend
 - [x] The staleness threshold is configurable from a config page in the UI and persisted.
 - [x] The navbar refresh button empties the local cache (then re-fetches).
 - [x] Refresh re-fetches on every page that shows cluster data, not a fixed subset of them.
+- [x] The refresh button visibly acknowledges a click: a spinning, disabled in-progress state while refetching and a brief completion confirmation, so a refresh returning identical data is not mistaken for a dead button.
 - [x] The read-only invariant is preserved: only read output is cached, never a cluster write, and write commands bypass the cache.
 - [x] A failed read is not cached.
 
