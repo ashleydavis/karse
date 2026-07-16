@@ -65,8 +65,9 @@ Refresh invalidates all client-side queries, so it must re-fetch whatever page y
 A refetch that returns identical data renders nothing new, so the button must show it is working; otherwise a healthy refresh is indistinguishable from a dead button.
 
 ### What to check
-- On any page (e.g. Cluster), click the refresh (circular arrows) button.
-- Confirm the button acknowledges the click: while the refetch is in flight the icon spins and the button is disabled, and on completion it briefly shows a check (hovering reads "Refreshed") before returning to the plain circular-arrows icon.
+- On the **Cluster** page (the one that used to look dead), click the refresh (circular arrows) button, then repeat on a resource page (e.g. Pods).
+- Confirm the button acknowledges the click: while the refetch is in flight the icon spins and the button is disabled and a bottom toast reads "Refreshing…", and on completion it briefly shows a check (hovering reads "Refreshed") and a "Refreshed" toast before returning to the plain circular-arrows icon.
+- Confirm the acknowledgement always completes and never sticks in the spinning/disabled state — in particular on the Cluster page, and on a cluster with no Metrics API available.
 - Confirm this holds in both light and dark mode.
 
 ## Scenario: Read-only cross-check

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { AppBar, Toolbar, IconButton, Alert, Tooltip, Box, Menu, MenuItem, ListItemIcon, ListItemText, Chip } from "@mui/material";
+import { AppBar, Toolbar, IconButton, Alert, Tooltip, Box, Menu, MenuItem, ListItemIcon, ListItemText, Chip, Snackbar } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLink, faLayerGroup, faSun, faMoon, faCircleHalfStroke, faCheck, faShareNodes, faRotate, faClockRotateLeft, faCalendarDays } from "@fortawesome/free-solid-svg-icons";
 import { useQueryClient } from "@tanstack/react-query";
@@ -8,6 +8,7 @@ import { useKubeNamespace } from "../lib/kube-namespace";
 import { useConfig } from "../lib/config";
 import { nextTimestampMode } from "../lib/timestamps";
 import { clearCache } from "../lib/api-client";
+import { runRefresh } from "../lib/refresh-feedback";
 import { ContextPicker } from "./context-picker";
 import { ContextQuickPicker } from "./context-quick-picker";
 import { NamespaceQuickPicker } from "./namespace-quick-picker";
@@ -25,9 +26,11 @@ export function Header() {
     const [contextPickerOpen, setContextPickerOpen] = useState(false);
     const [namespacePickerOpen, setNamespacePickerOpen] = useState(false);
     // Refresh feedback: "refreshing" while the refetch is in flight (spinning icon,
-    // button disabled), then "done" briefly (a check) so a click is unmistakably
-    // acknowledged even when the refetched data is identical. Without this a working
-    // refresh that returns the same data is indistinguishable from a dead button.
+    // button disabled, "Refreshing…" toast), then "done" briefly (a check plus a
+    // "Refreshed" toast) so a click is unmistakably acknowledged even when the refetched
+    // data is identical. Without this a working refresh that returns the same data is
+    // indistinguishable from a dead button. The lifecycle is driven by runRefresh, which
+    // deliberately does not gate this feedback on the query invalidation resolving.
     const [refreshing, setRefreshing] = useState(false);
     const [justRefreshed, setJustRefreshed] = useState(false);
 
@@ -60,30 +63,26 @@ export function Header() {
         // Guard against re-entry; the button is disabled while refreshing, but a rapid
         // second trigger (e.g. keyboard) must not stack refreshes.
         if (refreshing) return;
-        setRefreshing(true);
-        try {
-            // Empty the on-disk cluster-data cache first so the invalidated queries below
-            // re-fetch fresh kubectl data rather than re-reading a still-fresh cache entry.
-            await clearCache();
-            // Invalidate every query, with no key filter. Refresh means "re-read everything on
-            // this page", and only the unfiltered call can honour that: a filtered invalidation
-            // has to name the keys it reaches, and any such list silently misses every page whose
-            // key is not on it (the previous ["contexts"], ["cluster"], ["namespaces"] list reached
-            // 3 of the app's 19 root keys, so Pods, Deployments, Events and the detail pages issued
-            // no request at all). Naming keys here is the defect, so do not reintroduce a list: a
-            // page added tomorrow must be refreshed without touching this file. The one non-cluster
-            // key, ["cache-config"], is swept up too; re-reading the staleness threshold the server
-            // already holds is cheap and harmless, and excluding it would mean naming keys again.
-            // invalidateQueries resolves once the active page's queries have refetched, so the
-            // spinner below stays up for the real duration of the refresh.
-            await qc.invalidateQueries();
-        } finally {
-            setRefreshing(false);
-            // Briefly show a completed state so a click is acknowledged even when the data
-            // came back identical. Mirrors the share button's transient check.
-            setJustRefreshed(true);
-            window.setTimeout(() => setJustRefreshed(false), 1500);
-        }
+        // runRefresh empties the on-disk cluster-data cache, then invalidates every query with
+        // no key filter so every page currently on screen refetches. Refresh means "re-read
+        // everything on this page"; only the unfiltered invalidation honours that, and naming
+        // keys was the original defect (the old ["contexts"], ["cluster"], ["namespaces"] list
+        // reached 3 of the app's 19 root keys, so Pods, Deployments, Events and the detail pages
+        // issued no request at all). A page added tomorrow must be refreshed without touching
+        // this file. The one non-cluster key, ["cache-config"], is swept up too; re-reading the
+        // staleness threshold is cheap and harmless, and excluding it would mean naming keys
+        // again. The visible feedback (spinner/disabled/toast, then a check) is driven by
+        // runRefresh on a clock and is NOT gated on the invalidation resolving — that promise
+        // awaits background refetches that can hang, which would pin the button in the refreshing
+        // state forever (the "refresh looks dead" report on the Cluster page).
+        await runRefresh({
+            clearCache,
+            invalidate: () => qc.invalidateQueries(),
+            onRefreshing: setRefreshing,
+            onJustRefreshed: setJustRefreshed,
+            schedule: (fn, ms) => window.setTimeout(fn, ms),
+            now: () => Date.now(),
+        });
     }
 
     const refreshIcon = refreshing ? faRotate : justRefreshed ? faCheck : faRotate;
@@ -193,6 +192,16 @@ export function Header() {
                     </Tooltip>
                 </Toolbar>
             </AppBar>
+            {/* Prominent, unmissable acknowledgement of a refresh: a small header icon that
+                swaps for a fraction of a second is easy to miss, so a bottom toast confirms the
+                click even when the refetched data is identical. Open while refreshing or during
+                the transient completion window. */}
+            <Snackbar
+                open={refreshing || justRefreshed}
+                message={refreshing ? "Refreshing…" : "Refreshed"}
+                anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+                data-test-id="refresh-snackbar"
+            />
             {error !== null && (
                 <Alert severity="error" sx={{ borderRadius: 0 }}>
                     {error.message}

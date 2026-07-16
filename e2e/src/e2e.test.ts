@@ -766,6 +766,33 @@ test.describe("karse e2e", () => {
             // and then return to idle so a later click is possible.
             await expect(button).toHaveAttribute("data-refresh-state", "idle");
         });
+
+        // The acknowledgement must reach the completed state on the Cluster page too, and must
+        // not hang there. The feedback used to be gated on qc.invalidateQueries() resolving,
+        // whose promise awaits background refetches (the shared cluster-performance query) that
+        // can stay pending, pinning the button in "refreshing" forever — reported as a dead
+        // refresh button on the Cluster page specifically. Assert it settles to idle.
+        test("refresh feedback settles (does not hang) on the cluster page", async () => {
+            setContext(CLUSTER_1);
+            await navigateTo();
+            await waitForStatTiles();
+            const button = page.locator("[data-test-id='refresh-button']");
+            await button.click();
+            await expect(button).toHaveAttribute("data-refresh-state", "done");
+            await expect(button).toHaveAttribute("data-refresh-state", "idle");
+        });
+
+        // A small header icon swapping for a fraction of a second is easy to miss, so a refresh
+        // also raises a prominent bottom toast. Assert the toast appears and names the action.
+        test("clicking refresh raises a prominent 'Refreshed' toast", async () => {
+            setContext(CLUSTER_1);
+            await navigateTo();
+            await waitForStatTiles();
+            await page.locator("[data-test-id='refresh-button']").click();
+            const snackbar = page.locator("[data-test-id='refresh-snackbar']");
+            await expect(snackbar).toBeVisible();
+            await expect(snackbar).toContainText(/Refreshing|Refreshed/);
+        });
     });
 
     // ── Config page (cluster-data cache) ───────────────────────────────────────
