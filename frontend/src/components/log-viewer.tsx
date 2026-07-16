@@ -9,6 +9,8 @@ import {
     FormControl,
     InputLabel,
     Button,
+    IconButton,
+    Tooltip,
     Alert,
     AlertTitle,
     Chip,
@@ -497,22 +499,26 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
                         Bottom also re-engages auto-follow (see jumpTo), so it locks the
                         view to the end rather than scrolling there once. */}
                     <Box sx={{ ml: "auto", display: "flex", gap: 1 }}>
-                        <Button
-                            variant="outlined"
-                            onClick={() => jumpTo("top")}
-                            data-test-id={`${testIdPrefix}-jump-top`}
-                            startIcon={<FontAwesomeIcon icon={faAnglesUp} />}
-                        >
-                            Top
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            onClick={() => jumpTo("bottom")}
-                            data-test-id={`${testIdPrefix}-jump-bottom`}
-                            startIcon={<FontAwesomeIcon icon={faAnglesDown} />}
-                        >
-                            Bottom
-                        </Button>
+                        <Tooltip title="Jump to top">
+                            <IconButton
+                                size="small"
+                                onClick={() => jumpTo("top")}
+                                data-test-id={`${testIdPrefix}-jump-top`}
+                                aria-label="Jump to top"
+                            >
+                                <FontAwesomeIcon icon={faAnglesUp} />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Jump to bottom">
+                            <IconButton
+                                size="small"
+                                onClick={() => jumpTo("bottom")}
+                                data-test-id={`${testIdPrefix}-jump-bottom`}
+                                aria-label="Jump to bottom"
+                            >
+                                <FontAwesomeIcon icon={faAnglesDown} />
+                            </IconButton>
+                        </Tooltip>
                     </Box>
                 </Paper>
             )}
