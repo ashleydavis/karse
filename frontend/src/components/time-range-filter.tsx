@@ -103,6 +103,10 @@ export function TimeRangeFilter({ range, onChange, testIdPrefix }: TimeRangeFilt
                         control={<Radio size="small" data-test-id={`${testIdPrefix}-all`} />}
                         label="All time"
                         onChange={() => onChange(ALL_TIME_RANGE)}
+                        // Drop MUI's default -11px left margin so this radio lines up on
+                        // its left with the "Last" radio, whose margin the enclosing Stack
+                        // already resets to 0. Both radios then sit at the group's padding.
+                        sx={{ ml: 0 }}
                     />
                     <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                         <FormControlLabel
@@ -110,6 +114,9 @@ export function TimeRangeFilter({ range, onChange, testIdPrefix }: TimeRangeFilt
                             control={<Radio size="small" data-test-id={`${testIdPrefix}-last`} />}
                             label="Last"
                             onChange={() => applyLast(countText, unit)}
+                            // Match the "All time" radio's left edge (see its note); explicit
+                            // so the alignment does not silently depend on Stack's margin reset.
+                            sx={{ ml: 0 }}
                         />
                         <TextField
                             size="small"
