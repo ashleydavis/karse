@@ -3,6 +3,7 @@
 ## Automated
 
 - The search input to search a table should have a clear button next to it.
+- Elements of the UI that the user will want to copy (like pod name, node name, and many others) should have a copy button next to them to make them easy to copy. If the names have two versions (e.g. full path, relative path) then there should be a menu button that allows them to choose which path to copy to the clipboard.
 
 ## Me
 
