@@ -73,8 +73,9 @@ export function Header() {
         // staleness threshold is cheap and harmless, and excluding it would mean naming keys
         // again. The visible feedback (spinner/disabled/toast, then a check) is driven by
         // runRefresh on a clock and is NOT gated on the invalidation resolving — that promise
-        // awaits background refetches that can hang, which would pin the button in the refreshing
-        // state forever (the "refresh looks dead" report on the Cluster page).
+        // awaits every active refetch, which pinned the button in the refreshing state until the
+        // slowest one returned (up to the 15s load timeout on a cluster with no Metrics API):
+        // the "refresh looks dead" report on the Cluster page.
         await runRefresh({
             clearCache,
             invalidate: () => qc.invalidateQueries(),

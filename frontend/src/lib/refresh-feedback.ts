@@ -38,14 +38,16 @@ const DEFAULT_DONE_MS = 1500;
 // Drives one refresh: show the in-progress state, clear the server cache, fire the query
 // invalidation, then acknowledge completion and return to rest.
 //
-// The invalidation promise is fired but NOT awaited. qc.invalidateQueries() only resolves
-// once every active query it restarts has settled, and those background refetches can stay
-// pending indefinitely or be cancelled — most visibly the cluster-performance query that the
-// Cluster and resource pages share. Awaiting it pinned the button in the refreshing state
-// forever on whichever page hit a non-settling refetch, so the "done" acknowledgement never
-// fired and the button never re-enabled: the "refresh looks completely dead" report. The
-// refetch requests still go out; we simply do not hold the button's feedback hostage to their
-// completion. The feedback timing is therefore driven by the clock, not by the network.
+// The invalidation promise is fired but NOT awaited. qc.invalidateQueries() only resolves once
+// every active query it restarts has settled, so awaiting it holds the acknowledgement hostage
+// to the slowest refetch on the page — most visibly the cluster-performance query that the
+// Cluster and resource pages share, which on a cluster with no Metrics API does not come back
+// promptly and aborts only at the axios load timeout (LOAD_TIMEOUT_MS, 15s). Awaiting it pinned
+// the button in the refreshing state for that whole window, so the "done" acknowledgement and
+// the re-enable arrived some 15 seconds after the click, long after the user had concluded the
+// button was dead: the "refresh looks completely dead" report. The refetch requests still go out;
+// we simply do not gate the button's feedback on their completion. The feedback timing is
+// therefore driven by the clock, not by the network.
 export async function runRefresh(deps: RefreshFeedbackDeps): Promise<void>
 {
     const minVisibleMs = deps.minVisibleMs ?? DEFAULT_MIN_VISIBLE_MS;

@@ -767,19 +767,46 @@ test.describe("karse e2e", () => {
             await expect(button).toHaveAttribute("data-refresh-state", "idle");
         });
 
-        // The acknowledgement must reach the completed state on the Cluster page too, and must
-        // not hang there. The feedback used to be gated on qc.invalidateQueries() resolving,
-        // whose promise awaits background refetches (the shared cluster-performance query) that
-        // can stay pending, pinning the button in "refreshing" forever — reported as a dead
-        // refresh button on the Cluster page specifically. Assert it settles to idle.
-        test("refresh feedback settles (does not hang) on the cluster page", async () => {
+        // The acknowledgement must be prompt even while a refetch is still outstanding. The
+        // feedback used to be gated on qc.invalidateQueries() resolving, and that promise only
+        // resolves once every active refetch it restarts has settled. On a cluster with no
+        // Metrics API the shared ["cluster-performance"] request does not come back promptly —
+        // it aborts only at the axios load timeout (LOAD_TIMEOUT_MS, 15s) — so the button sat
+        // pinned in "refreshing" for that long and only acknowledged the click once the network
+        // gave up: the dead refresh button reported on the Cluster page.
+        //
+        // That condition cannot come from the backend here, because scripts/e2e-tests.sh runs it
+        // with KARSE_FAKE_METRICS=1 and performance always settles at once. An earlier version of
+        // this test merely clicked refresh on the Cluster page and asserted it settled, which
+        // passed against the hanging code and so guarded nothing. Hang the refetch at the network
+        // layer instead, after the initial load, so the refresh's own performance request is the
+        // one left outstanding — the real failing condition.
+        //
+        // The assertion is the fix's actual contract: the feedback is driven by the clock (~400ms),
+        // not by the network. The window below is far above that and far below the 15s the gated
+        // version needs, so this fails against the await and passes against the fix.
+        test("refresh feedback completes promptly while a refetch is still outstanding", async () => {
             setContext(CLUSTER_1);
             await navigateTo();
             await waitForStatTiles();
-            const button = page.locator("[data-test-id='refresh-button']");
-            await button.click();
-            await expect(button).toHaveAttribute("data-refresh-state", "done");
-            await expect(button).toHaveAttribute("data-refresh-state", "idle");
+            // Registered only now, so the initial page load completes normally and it is the
+            // refresh-triggered refetch that is left outstanding.
+            await page.route("**/api/cluster/performance**", () => {
+                // Deliberately never fulfilled: this is the refetch that does not come back.
+            });
+            try {
+                const button = page.locator("[data-test-id='refresh-button']");
+                await expect(button).toHaveAttribute("data-refresh-state", "idle");
+                await button.click();
+                // Gated on invalidateQueries() resolving, "done" cannot arrive until the hung
+                // request aborts at 15s. Driven by the clock, it arrives in ~400ms.
+                await expect(button).toHaveAttribute("data-refresh-state", "done", { timeout: 8000 });
+                await expect(button).toHaveAttribute("data-refresh-state", "idle");
+            }
+            finally {
+                // Release the route so the outstanding request cannot leak into later tests.
+                await page.unroute("**/api/cluster/performance**");
+            }
         });
 
         // A small header icon swapping for a fraction of a second is easy to miss, so a refresh
