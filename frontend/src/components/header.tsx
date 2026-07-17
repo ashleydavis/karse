@@ -63,7 +63,9 @@ export function Header() {
     async function handleRefresh(): Promise<void> {
         // Guard against re-entry; the button is disabled while refreshing, but a rapid
         // second trigger (e.g. keyboard) must not stack refreshes.
-        if (refreshing) return;
+        if (refreshing) {
+            return;
+        }
         // runRefresh empties the on-disk cluster-data cache, then reloads the client-side
         // queries. Refresh means "re-read everything on this page": reloadQueries resets the
         // page queries so the page empties and visibly reloads behind its spinner rather than
