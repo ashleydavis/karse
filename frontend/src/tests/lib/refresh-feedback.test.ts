@@ -5,13 +5,13 @@ import { runRefresh, type RefreshFeedbackDeps } from "../../lib/refresh-feedback
 type Recorder = {
     refreshing: boolean[];
     justRefreshed: boolean[];
-    invalidateCalls: number;
+    reloadCalls: number;
     clearCacheCalls: number;
 };
 
 // Builds a deps object with fakes: a controllable clock, a scheduler that runs callbacks
 // immediately (time is simulated by the clock, not by real timers), and recorders. The
-// caller can override any field (e.g. a never-resolving invalidate).
+// caller can override any field (e.g. a never-resolving reload).
 function makeDeps(over: Partial<RefreshFeedbackDeps>, rec: Recorder): RefreshFeedbackDeps
 {
     let clock = 0;
@@ -20,9 +20,9 @@ function makeDeps(over: Partial<RefreshFeedbackDeps>, rec: Recorder): RefreshFee
         {
             rec.clearCacheCalls += 1;
         },
-        invalidate: async () =>
+        reload: async () =>
         {
-            rec.invalidateCalls += 1;
+            rec.reloadCalls += 1;
         },
         onRefreshing: (v) =>
         {
@@ -49,7 +49,7 @@ function newRecorder(): Recorder
     return {
         refreshing: [],
         justRefreshed: [],
-        invalidateCalls: 0,
+        reloadCalls: 0,
         clearCacheCalls: 0,
     };
 }
@@ -66,7 +66,7 @@ describe("runRefresh", () =>
         expect(rec.justRefreshed).toEqual([false, true, false]);
     });
 
-    test("clears the server cache, then fires the query invalidation", async () =>
+    test("clears the server cache, then fires the page reload", async () =>
     {
         const rec = newRecorder();
         const order: string[] = [];
@@ -75,40 +75,41 @@ describe("runRefresh", () =>
             {
                 order.push("clear");
             },
-            invalidate: async () =>
+            reload: async () =>
             {
-                order.push("invalidate");
+                order.push("reload");
                 return undefined;
             },
         }, rec));
-        expect(order).toEqual(["clear", "invalidate"]);
+        expect(order).toEqual(["clear", "reload"]);
     });
 
     // The regression this ticket exists for: the feedback lifecycle must NOT be gated on the
-    // query invalidation resolving. invalidateQueries() awaits background refetches that can
-    // stay pending forever (the shared cluster-performance query), which previously pinned the
-    // button in the refreshing state and never acknowledged the click. If someone reintroduces
-    // `await invalidate()`, this test hangs and the suite times out.
-    test("still acknowledges completion when invalidation never resolves", async () =>
+    // page reload resolving. The reload awaits every background refetch it restarts, and on a
+    // cluster with no Metrics API the shared cluster-performance query only aborts at the 15s
+    // load timeout, which pinned the button in the refreshing state for that whole window and
+    // read as a dead button. If someone reintroduces `await reload()`, this test hangs and the
+    // suite times out.
+    test("still acknowledges completion when the reload never resolves", async () =>
     {
         const rec = newRecorder();
         const neverResolves = new Promise<void>(() => {});
         await runRefresh(makeDeps({
-            invalidate: () =>
+            reload: () =>
             {
-                rec.invalidateCalls += 1;
+                rec.reloadCalls += 1;
                 return neverResolves;
             },
         }, rec));
-        // The refetch was still fired...
-        expect(rec.invalidateCalls).toBe(1);
+        // The reload was still fired...
+        expect(rec.reloadCalls).toBe(1);
         // ...and the button reached the completion state and returned to rest regardless.
         expect(rec.refreshing).toContain(false);
         expect(rec.justRefreshed).toContain(true);
         expect(rec.justRefreshed[rec.justRefreshed.length - 1]).toBe(false);
     });
 
-    test("still fires the refetch and acknowledges even if clearing the cache fails", async () =>
+    test("still fires the reload and acknowledges even if clearing the cache fails", async () =>
     {
         const rec = newRecorder();
         await runRefresh(makeDeps({
@@ -117,7 +118,7 @@ describe("runRefresh", () =>
                 throw new Error("cache clear failed");
             },
         }, rec));
-        expect(rec.invalidateCalls).toBe(1);
+        expect(rec.reloadCalls).toBe(1);
         expect(rec.justRefreshed).toContain(true);
     });
 

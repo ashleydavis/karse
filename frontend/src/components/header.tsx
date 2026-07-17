@@ -9,6 +9,7 @@ import { useConfig } from "../lib/config";
 import { nextTimestampMode } from "../lib/timestamps";
 import { clearCache } from "../lib/api-client";
 import { runRefresh } from "../lib/refresh-feedback";
+import { reloadQueries } from "../lib/reload-queries";
 import { ContextPicker } from "./context-picker";
 import { ContextQuickPicker } from "./context-quick-picker";
 import { NamespaceQuickPicker } from "./namespace-quick-picker";
@@ -25,12 +26,12 @@ export function Header() {
     const [copied, setCopied] = useState(false);
     const [contextPickerOpen, setContextPickerOpen] = useState(false);
     const [namespacePickerOpen, setNamespacePickerOpen] = useState(false);
-    // Refresh feedback: "refreshing" while the refetch is in flight (spinning icon,
-    // button disabled, "Refreshing…" toast), then "done" briefly (a check plus a
-    // "Refreshed" toast) so a click is unmistakably acknowledged even when the refetched
-    // data is identical. Without this a working refresh that returns the same data is
-    // indistinguishable from a dead button. The lifecycle is driven by runRefresh, which
-    // deliberately does not gate this feedback on the query invalidation resolving.
+    // Refresh feedback: "refreshing" briefly on click (spinning icon, button disabled,
+    // "Refreshing…" toast), then "done" briefly (a check plus a "Refreshed" toast) so a click
+    // is unmistakably acknowledged. This is the navbar's own acknowledgement and is separate
+    // from the page emptying and reloading behind its spinner (see reloadQueries). The
+    // lifecycle is driven by runRefresh on a clock, which deliberately does not gate this
+    // feedback on the page reload resolving.
     const [refreshing, setRefreshing] = useState(false);
     const [justRefreshed, setJustRefreshed] = useState(false);
 
@@ -63,22 +64,21 @@ export function Header() {
         // Guard against re-entry; the button is disabled while refreshing, but a rapid
         // second trigger (e.g. keyboard) must not stack refreshes.
         if (refreshing) return;
-        // runRefresh empties the on-disk cluster-data cache, then invalidates every query with
-        // no key filter so every page currently on screen refetches. Refresh means "re-read
-        // everything on this page"; only the unfiltered invalidation honours that, and naming
-        // keys was the original defect (the old ["contexts"], ["cluster"], ["namespaces"] list
-        // reached 3 of the app's 19 root keys, so Pods, Deployments, Events and the detail pages
-        // issued no request at all). A page added tomorrow must be refreshed without touching
-        // this file. The one non-cluster key, ["cache-config"], is swept up too; re-reading the
-        // staleness threshold is cheap and harmless, and excluding it would mean naming keys
-        // again. The visible feedback (spinner/disabled/toast, then a check) is driven by
-        // runRefresh on a clock and is NOT gated on the invalidation resolving — that promise
-        // awaits every active refetch, which pinned the button in the refreshing state until the
-        // slowest one returned (up to the 15s load timeout on a cluster with no Metrics API):
-        // the "refresh looks dead" report on the Cluster page.
+        // runRefresh empties the on-disk cluster-data cache, then reloads the client-side
+        // queries. Refresh means "re-read everything on this page": reloadQueries resets the
+        // page queries so the page empties and visibly reloads behind its spinner rather than
+        // silently swapping rows in, and it selects them by excluding the shell keys rather than
+        // naming them — naming keys was the original defect (the old ["contexts"], ["cluster"],
+        // ["namespaces"] list reached 3 of the app's 19 root keys, so Pods, Deployments, Events
+        // and the detail pages issued no request at all). A page added tomorrow must be refreshed
+        // without touching this file. The visible feedback (spinner/disabled/toast, then a check)
+        // is driven by runRefresh on a clock and is NOT gated on the reload resolving — that
+        // promise awaits every active refetch, which pinned the button in the refreshing state
+        // until the slowest one returned (up to the 15s load timeout on a cluster with no Metrics
+        // API): the "refresh looks dead" report on the Cluster page.
         await runRefresh({
             clearCache,
-            invalidate: () => qc.invalidateQueries(),
+            reload: () => reloadQueries(qc),
             onRefreshing: setRefreshing,
             onJustRefreshed: setJustRefreshed,
             schedule: (fn, ms) => window.setTimeout(fn, ms),

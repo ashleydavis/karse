@@ -820,6 +820,56 @@ test.describe("karse e2e", () => {
             await expect(snackbar).toBeVisible();
             await expect(snackbar).toContainText(/Refreshing|Refreshed/);
         });
+
+        // A refresh must read as a genuine reload of the page's own content, not just a navbar
+        // acknowledgement. Merely invalidating a query refetches it while retaining its data, so
+        // the list stays rendered untouched and the rows swap in silently once the new data
+        // lands — when the data is identical nothing on the page changes at all. The page must
+        // empty and show its own spinner while it reloads. The refetch is held open so the
+        // loading state is observable rather than a sub-frame flash; against a background
+        // refetch the rows never leave the screen and these assertions fail.
+        test("clicking refresh empties the pods list and shows its loading spinner", async () => {
+            setContext(CLUSTER_1);
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']").first()).toBeVisible();
+            // Registered only now, so the initial load completes normally and it is the
+            // refresh's own pods refetch that is held open.
+            await page.route("**/api/pods**", async (route) => {
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+                await route.continue();
+            });
+            try {
+                await page.locator("[aria-label='refresh']").click();
+                // The page emptied: its rows are gone and its own spinner is on screen.
+                await expect(page.locator("[data-test-id='loading-indicator']")).toBeVisible();
+                await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(0);
+                // ...and the list reloads once the data lands.
+                await expect(page.locator("[data-test-id='pod-row']").first()).toBeVisible({ timeout: 15_000 });
+            }
+            finally {
+                await page.unroute("**/api/pods**");
+            }
+        });
+
+        // The same reload behaviour is required on the detail pages, not only the lists.
+        test("clicking refresh empties the pod detail page and shows its loading spinner", async () => {
+            setContext(CLUSTER_1);
+            await page.goto("/pods/default/web", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-detail-tabs']")).toBeVisible();
+            await page.route("**/api/pods/**", async (route) => {
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+                await route.continue();
+            });
+            try {
+                await page.locator("[aria-label='refresh']").click();
+                await expect(page.locator("[data-test-id='loading-indicator']")).toBeVisible();
+                await expect(page.locator("[data-test-id='pod-detail-tabs']")).toHaveCount(0);
+                await expect(page.locator("[data-test-id='pod-detail-tabs']")).toBeVisible({ timeout: 15_000 });
+            }
+            finally {
+                await page.unroute("**/api/pods/**");
+            }
+        });
     });
 
     // ── Config page (cluster-data cache) ───────────────────────────────────────

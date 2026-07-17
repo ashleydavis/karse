@@ -52,7 +52,7 @@ Then open the frontend at `http://127.0.0.1:5173`. Then run the fixture's `setup
 
 ## Scenario: Refresh re-fetches on every page, not just Cluster and Nodes
 
-Refresh invalidates all client-side queries, so it must re-fetch whatever page you are on. Check it away from the Cluster and Nodes views, which are the ones that always worked.
+Refresh reloads all client-side queries, so it must re-fetch whatever page you are on. Check it away from the Cluster and Nodes views, which are the ones that always worked.
 
 ### What to check
 - With a large threshold set, open the **Pods** page. Open the browser devtools Network tab and clear it.
@@ -68,6 +68,19 @@ A refetch that returns identical data renders nothing new, so the button must sh
 - On the **Cluster** page (the one that used to look dead), click the refresh (circular arrows) button, then repeat on a resource page (e.g. Pods).
 - Confirm the button acknowledges the click: while the refetch is in flight the icon spins and the button is disabled and a bottom toast reads "Refreshing…", and on completion it briefly shows a check (hovering reads "Refreshed") and a "Refreshed" toast before returning to the plain circular-arrows icon.
 - Confirm the acknowledgement always completes and never sticks in the spinning/disabled state — in particular on the Cluster page, and on a cluster with no Metrics API available.
+- Confirm this holds in both light and dark mode.
+
+## Scenario: Refresh visibly reloads the page's own content
+
+The navbar acknowledgement alone is not enough: a refresh must read as a genuine reload of what the page renders. A background refetch would leave the list on screen and swap the rows in silently, so a refresh returning identical data would change nothing at all.
+
+### What to check
+- Open the **Pods** page and wait for the rows.
+- Click the refresh (circular arrows) button in the navbar.
+- Confirm the pods list **clears** and the page's large centred spinner appears in its place, then the list reloads. The page must not simply sit there rendering the old rows.
+- Repeat on a **detail** page (e.g. a pod's detail view): its content must clear to the same spinner and then reload.
+- Confirm the navbar's own "Refreshing…"/"Refreshed" acknowledgement still completes promptly and does not wait for the page's data to arrive — the two are independent.
+- Confirm the context dropdown in the navbar does **not** blank while the page reloads; it re-reads without emptying.
 - Confirm this holds in both light and dark mode.
 
 ## Scenario: Read-only cross-check
