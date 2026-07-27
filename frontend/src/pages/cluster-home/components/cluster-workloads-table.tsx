@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import {
     useReactTable,
     getCoreRowModel,
@@ -221,9 +221,7 @@ function WorkloadsTableInner({
     const [sorting, setSorting] = useState<SortingState>([]);
     const { search, setSearch, deferredSearch } = useSearchFilter();
 
-    // Memoised so every row keeps the same cells across a render, and the memoised rows below
-    // can skip re-rendering when only the search text has changed.
-    const columns = useMemo(() => buildColumns(mode, format, totals), [mode, format, totals]);
+    const columns = buildColumns(mode, format, totals);
     const openWorkload = useCallback((workload: WorkloadUsage) => {
         const path = detailPathFor(workload);
         if (path !== null)
@@ -236,6 +234,11 @@ function WorkloadsTableInner({
         data: workloads,
         columns,
         state: { sorting, globalFilter: deferredSearch },
+        // No pagination row model is installed (every matching row is rendered, bounded only by
+        // DataTableRows' render limit), so the page index is meaningless here. TanStack would
+        // otherwise reset it whenever a row model is rebuilt, and since the row-model inputs are
+        // rebuilt on every render that reset would write table state, re-render, and loop.
+        autoResetPageIndex: false,
         onSortingChange: setSorting,
         onGlobalFilterChange: setSearch,
         getCoreRowModel: getCoreRowModel(),

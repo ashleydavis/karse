@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useMemo, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode } from "react";
 import { useMediaQuery } from "@mui/material";
 import type { TimestampMode } from "./timestamps";
 
@@ -53,7 +53,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     const resolvedColorMode: "light" | "dark" =
         config.colorMode === "system" ? (prefersDark ? "dark" : "light") : config.colorMode;
 
-    const value = useMemo<ConfigContextValue>(() => ({
+    const value: ConfigContextValue = {
         config,
         resolvedColorMode,
         setColorMode: (mode) => {
@@ -68,7 +68,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
             setConfig(next);
             saveConfig(next);
         },
-    }), [config, resolvedColorMode]);
+    };
 
     return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>;
 }

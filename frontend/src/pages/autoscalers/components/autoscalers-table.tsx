@@ -179,6 +179,11 @@ export function AutoscalersTable() {
         },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
+        // No pagination row model is installed (every matching row is rendered, bounded only by
+        // DataTableRows' render limit), so the page index is meaningless here. TanStack would
+        // otherwise reset it whenever a row model is rebuilt, and since the row-model inputs are
+        // rebuilt on every render that reset would write table state, re-render, and loop.
+        autoResetPageIndex: false,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),

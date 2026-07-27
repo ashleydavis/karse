@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { ColumnFiltersState } from "@tanstack/react-table";
 import {
     type FilterableColumn,
@@ -32,20 +32,14 @@ export type TableFilterBinding = {
 // afterwards the selection belongs to the user, who sees it in the filter editor
 // and can clear it like any other. Defaults to no selection (the filter is off).
 //
-// Callers typically rebuild the `columns` array on every render (it is derived
-// from freshly-fetched data), so the memo keys on the columns' content rather than
-// their array identity. This keeps `columnFilters` stable across renders, which
-// matters because an unstable column-filter identity would make TanStack re-render
-// the table on every parent render and detach its rows mid-interaction.
+// `columnFilters` is derived on every render. Its array identity therefore changes each
+// time, which makes TanStack rebuild its filtered row model on every render; the tables
+// that consume it pass `autoResetPageIndex: false` so that rebuild cannot feed back into
+// table state and start a render loop.
 export function useTableFilter(columns: FilterableColumn[], initialSelection: FilterSelection = {}): TableFilterBinding {
     const [selection, setSelection] = useState<FilterSelection>(initialSelection);
 
-    const columnsKey = JSON.stringify(columns);
-    const columnFilters = useMemo(
-        () => buildColumnFilters(columns, selection),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [columnsKey, selection],
-    );
+    const columnFilters = buildColumnFilters(columns, selection);
 
     function onToggle(columnId: string, value: string): void {
         setSelection((prev) => toggleSelection(prev, columnId, value));

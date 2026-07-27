@@ -230,10 +230,17 @@ State that lives above the pages (currently the selected kubectl context) is own
 Every table with a search box shares two pieces, and a new table should use both:
 
 - `lib/use-search-filter.ts` — the search state. Bind the `TextField` to `search` (so the typed text appears immediately) and the table's `globalFilter` to `deferredSearch` (so React re-filters and re-renders the rows at a lower priority, and abandons that render when the next character arrives, instead of re-rendering the whole table once per keystroke).
-- `components/data-table-row.tsx` — the shared, memoised row plus `DataTableRows`, the shared row list. A row whose data has not changed skips its re-render, so a keystroke no longer re-creates and re-styles every cell of every surviving row. Pass a stable `onOpen` (a `useCallback`) — a fresh closure per render defeats the memo.
-  `DataTableRows` also bounds how many rows reach the DOM, at `ROW_RENDER_LIMIT` (100), and renders a "Show more" row while any are held back. That bound, not the memo and not the deferred filter value, is what keeps typing responsive on a long list: the per-keystroke cost is proportional to the number of rows rendered and to nothing else (measured at ~174 ms per key with 1500 rows rendered against ~23 ms with 100). Because it lives here, every table gets it; do not render a table's row model directly.
+- `components/data-table-row.tsx` — the shared row (`DataTableRow`) plus `DataTableRows`, the shared row list. Every row re-renders whenever its table does; there is no memoisation anywhere in the frontend, by decision (see **No memoisation** below).
+  `DataTableRows` bounds how many rows reach the DOM, at `ROW_RENDER_LIMIT` (100), and renders a "Show more" row while any are held back. That bound, not the deferred filter value, is what keeps typing responsive on a long list: the per-keystroke cost is proportional to the number of rows rendered and to nothing else (measured at ~174 ms per key with 1500 rows rendered against ~23 ms with 100). Because it lives here, every table gets it; do not render a table's row model directly.
 
-For the memo to bail out, a row's cells must keep their identity across renders, and cells are derived from the columns. **A table's `columns` array must therefore be stable**: build it at module level, or wrap the `buildColumns(...)` call in a `useMemo` keyed on what it reads. The same goes for any object passed into the table's `state` (e.g. a `columnVisibility` object built with a spread). Rebuilding the columns in the render body gives every row new cells on every render and silently reintroduces the whole-table re-render this shares out.
+### No memoisation
+
+**The frontend uses no `useMemo` and no `React.memo`.** Neither appears anywhere under `frontend/src`, and neither may be reintroduced. The judgement behind this: they add dependency arrays that go stale or get mis-specified, they hide where a value is actually recomputed, and they cost more to maintain than they buy. `useCallback` is unaffected and is still used.
+
+Two consequences a new table has to respect:
+
+- **Every table passes `autoResetPageIndex: false` to `useReactTable`.** Columns, row data, and the objects in `state` are all rebuilt in the render body now, so TanStack rebuilds its row models on every render. Each rebuild calls the library's auto-reset of the page index, which writes table state, which re-renders, which rebuilds the row models again: a closed render loop that re-mounts every row continuously and leaves no cell control on screen long enough to be clicked. None of these tables paginate (there is no pagination row model; `DataTableRows` bounds the rendered rows instead), so the page index carries no meaning and switching its auto-reset off costs nothing.
+- **Rebuilding the columns each render re-mounts each cell's subtree**, because TanStack's `flexRender` renders a function cell renderer as a component type. Keep any state a cell owns (an open modal, a menu anchor) inside a component the cell renders, and do not rely on a cell's own React state surviving a re-render of its table.
 
 ### Routing
 

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
     useReactTable,
@@ -348,19 +348,15 @@ function PodsTableInner() {
     const [sorting, setSorting] = useState<SortingState>([]);
     const { search, setSearch, deferredSearch } = useSearchFilter();
 
-    // The figures map and the columns it builds are memoised because the column definitions are
-    // what identify a row's cells: rebuilding them on every render would give every row new cells
-    // and defeat the row memoisation below, so a keystroke would re-render the whole table again.
-    const figuresMap = useMemo(() => buildPodFiguresMap(performance?.pods ?? []), [performance]);
-    const columns = useMemo(() => buildColumns(figuresMap, mode, format), [figuresMap, mode, format]);
+    const figuresMap = buildPodFiguresMap(performance?.pods ?? []);
+    const columns = buildColumns(figuresMap, mode, format);
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("pods", columns);
 
-    // Health is a filter-only column and is never shown, but the object saying so must keep its
-    // identity across renders, or TanStack rebuilds every row's visible-cell list each render.
-    const visibility = useMemo(() => ({
+    // Health is a filter-only column and is never shown.
+    const visibility = {
         ...columnVisibility,
         health: false,
-    }), [columnVisibility]);
+    };
 
     const openPod = useCallback((pod: Pod) => {
         navigate(`/pods/${pod.namespace}/${pod.name}`);
@@ -368,18 +364,15 @@ function PodsTableInner() {
 
     // The filterable columns the shared editor offers: the Status (phase) and
     // Health value columns plus one column per label key present on the loaded pods.
-    // Memoised on the data: collecting the label columns walks every pod, and doing that on every
-    // render would put the whole list back on the keystroke path.
     const allPods = data?.pods ?? [];
-    const filterableColumns: FilterableColumn[] = useMemo(() => [
+    const filterableColumns: FilterableColumn[] = [
         { columnId: "phase", label: "Status", options: ALL_PHASES, kind: "value" },
         { columnId: "health", label: "Health", options: HEALTH_FILTER_OPTIONS, kind: "value" },
         ...collectLabelColumns(allPods),
-    ], [allPods]);
+    ];
     const filter = useTableFilter(filterableColumns, initialPhaseSelection(searchParams.get("phase")));
 
-    // The stats header sums the whole list too, so it is memoised for the same reason.
-    const stats = useMemo(() => computePodStats(allPods), [allPods]);
+    const stats = computePodStats(allPods);
 
     const table = useReactTable({
         data: data?.pods ?? [],
@@ -391,6 +384,11 @@ function PodsTableInner() {
             columnOrder,
             columnVisibility: visibility,
         },
+        // No pagination row model is installed (every matching row is rendered, bounded only by
+        // DataTableRows' render limit), so the page index is meaningless here. TanStack would
+        // otherwise reset it whenever a row model is rebuilt, and since the row-model inputs are
+        // rebuilt on every render that reset would write table state, re-render, and loop.
+        autoResetPageIndex: false,
         onSortingChange: setSorting,
         onGlobalFilterChange: setSearch,
         getCoreRowModel: getCoreRowModel(),

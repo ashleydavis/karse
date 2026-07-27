@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import {
     Box,
@@ -201,30 +201,32 @@ function NodePodsTable({ nodeName, pods, active }: { nodeName: string; pods: Pod
         enabled: active && current !== null,
     });
 
-    // Join each pod with its resolved CPU/Memory figures for the active mode/format.
-    // Memoised on the pods, the Performance snapshot, and the toggle state so the array's
-    // identity changes only when those change — which is what makes the table re-derive the
-    // resource cells once the lazy Performance fetch resolves or a toggle flips (TanStack
-    // caches the row model by data identity).
-    const rows: NodePodRow[] = useMemo(() => {
-        const resources: PodResourceMap = buildNodePodResourceMap(performance?.pods ?? []);
-        const allocatable = performance?.node.allocatable ?? { cpuMillicores: null, memoryBytes: null };
-        return pods.map((pod) => {
-            const r = podResourceFor(resources, pod.namespace, pod.name);
-            return {
-                ...pod,
-                cpu: nodeMetricFigure(r.usage, r.requests, allocatable, "cpu", mode, format),
-                memory: nodeMetricFigure(r.usage, r.requests, allocatable, "memory", mode, format),
-            };
-        });
-    }, [pods, performance, mode, format]);
+    // Join each pod with its resolved CPU/Memory figures for the active mode/format. Rebuilt on
+    // every render, so the resource cells always reflect the current Performance snapshot and
+    // toggle state; `autoResetPageIndex: false` below keeps the resulting row-model rebuild from
+    // writing table state and looping.
+    const resources: PodResourceMap = buildNodePodResourceMap(performance?.pods ?? []);
+    const allocatable = performance?.node.allocatable ?? { cpuMillicores: null, memoryBytes: null };
+    const rows: NodePodRow[] = pods.map((pod) => {
+        const r = podResourceFor(resources, pod.namespace, pod.name);
+        return {
+            ...pod,
+            cpu: nodeMetricFigure(r.usage, r.requests, allocatable, "cpu", mode, format),
+            memory: nodeMetricFigure(r.usage, r.requests, allocatable, "memory", mode, format),
+        };
+    });
 
-    const columns = useMemo(() => nodePodColumns(format), [format]);
+    const columns = nodePodColumns(format);
 
     const table = useReactTable({
         data: rows,
         columns,
         state: { sorting },
+        // No pagination row model is installed (every matching row is rendered, bounded only by
+        // DataTableRows' render limit), so the page index is meaningless here. TanStack would
+        // otherwise reset it whenever a row model is rebuilt, and since the row-model inputs are
+        // rebuilt on every render that reset would write table state, re-render, and loop.
+        autoResetPageIndex: false,
         onSortingChange: setSorting,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),

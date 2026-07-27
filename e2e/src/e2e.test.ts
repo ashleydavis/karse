@@ -10061,8 +10061,9 @@ test.describe("karse e2e", () => {
             // This clicks the link for real. It used to assert the href instead, because the
             // table handed TanStack freshly-built `data` and `columns` arrays on every render
             // and looped, re-mounting the rows continuously so the link could never be clicked
-            // (not even by a user). Both are memoised now; a click is the only assertion that
-            // would catch that regression coming back.
+            // (not even by a user). The table still rebuilds both arrays every render; what
+            // breaks the loop now is `autoResetPageIndex: false`. A click is the only assertion
+            // that would catch that regression coming back.
             await page.goto("/all-resources", { waitUntil: "networkidle" });
             await page.locator("a[data-test-id='all-resources-row-namespace-link']").first().click();
             await expect(page).toHaveURL(/\/namespaces\/\w+/);

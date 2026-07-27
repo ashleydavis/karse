@@ -12,9 +12,9 @@ export type EventFiltersBinding = {
 
 // Hook owning a feed's active row filters. The list starts empty (no filtering) and a
 // filter is added by the row menu, dropped one at a time from its chip, or cleared all
-// at once by the reset control. The callbacks are stable across renders, so the caller
-// can memoise the column definitions that close over them without rebuilding the table
-// on every render.
+// at once by the reset control. The callbacks are stable across renders, so a column
+// definition that closes over one keeps calling the same function even though the
+// caller rebuilds its column definitions on every render.
 export function useEventFilters(): EventFiltersBinding {
     const [filters, setFilters] = useState<EventFilter[]>([]);
 

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import {
     useReactTable,
     getCoreRowModel,
@@ -157,36 +157,20 @@ export function AllResourcesTable() {
     const { search, setSearch, deferredSearch } = useSearchFilter();
 
     // TanStack's row model memoises on the identity of the `data` and `columns` arrays
-    // it is handed. Rebuilding either on every render re-runs the row model, which fires
-    // `_autoResetPageIndex()` → `onStateChange` → `setState` → another render → fresh
-    // arrays → a closed render loop that re-mounts every row continuously. That destroys
-    // each row (and the links inside it) faster than a user can click them. Memoising
-    // both keeps the identities stable, so the row model rebuilds only when the resource
-    // data genuinely changes.
-    //
-    // Stable identities are also what let the memoised rows below skip re-rendering: a row's
-    // cells are derived from `columns`, so a rebuilt `columns` would defeat the memo and put
-    // the whole-table re-render back on every keystroke.
-    const columns = useMemo(() => buildColumns(), []);
+    // Both are rebuilt on every render. TanStack therefore re-runs its row model every render;
+    // `autoResetPageIndex: false` on the table below is what stops that rebuild writing table
+    // state and closing a render loop.
+    const columns = buildColumns();
 
-    const allResources = useMemo(
-        () => aggregateResources({
-            pods: podsResult.data?.pods,
-            nodes: nodesResult.data?.nodes,
-            namespaces: namespacesResult.data?.namespaces,
-            deployments: deploymentsResult.data?.deployments,
-            statefulSets: statefulSetsResult.data?.statefulSets,
-            daemonSets: daemonSetsResult.data?.daemonSets,
-            horizontalPodAutoscalers: hpasResult.data?.horizontalPodAutoscalers,
-        }),
-        // Each query's `data` keeps a stable identity between renders until that kind's
-        // list actually changes, so the aggregate is rebuilt exactly when it must be.
-        [
-            podsResult.data, nodesResult.data, namespacesResult.data,
-            deploymentsResult.data, statefulSetsResult.data, daemonSetsResult.data,
-            hpasResult.data,
-        ],
-    );
+    const allResources = aggregateResources({
+        pods: podsResult.data?.pods,
+        nodes: nodesResult.data?.nodes,
+        namespaces: namespacesResult.data?.namespaces,
+        deployments: deploymentsResult.data?.deployments,
+        statefulSets: statefulSetsResult.data?.statefulSets,
+        daemonSets: daemonSetsResult.data?.daemonSets,
+        horizontalPodAutoscalers: hpasResult.data?.horizontalPodAutoscalers,
+    });
 
     // The filterable columns the shared editor offers: the Kind and Health value
     // columns plus one column per label key present across every loaded resource.
@@ -215,6 +199,11 @@ export function AllResourcesTable() {
             columnFilters: filter.columnFilters,
             columnVisibility: { health: false },
         },
+        // No pagination row model is installed (every matching row is rendered, bounded only by
+        // DataTableRows' render limit), so the page index is meaningless here. TanStack would
+        // otherwise reset it whenever a row model is rebuilt, and since the row-model inputs are
+        // rebuilt on every render that reset would write table state, re-render, and loop.
+        autoResetPageIndex: false,
         onSortingChange: setSorting,
         onGlobalFilterChange: setSearch,
         getCoreRowModel: getCoreRowModel(),

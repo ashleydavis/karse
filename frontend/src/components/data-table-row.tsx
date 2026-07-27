@@ -1,14 +1,28 @@
-import { memo, useState } from "react";
+import { useState } from "react";
 import { TableRow, TableCell, Button, Typography } from "@mui/material";
-import { flexRender, type Column, type Row } from "@tanstack/react-table";
+import { flexRender, type Cell, type Column, type Row } from "@tanstack/react-table";
 import { tableRowSx } from "../lib/table-row-style";
 import { ACTIONS_COLUMN_ID, stickyActionsCellSx } from "../lib/sticky-actions";
-import { dataTableRowPropsEqual, type DataTableRowProps } from "../lib/data-table-row-memo";
+
+// The props of the shared table row.
+//
+// `cells` is the row's visible cells, snapshotted by the parent at render time, rather than
+// something the row reads from `row` itself, so the parent decides which cells a row shows.
+//
+// `cellSx` is the optional MUI sx applied to every cell of the row.
+export interface DataTableRowProps<TData> {
+    row: Row<TData>;
+    cells: Cell<TData, any>[];
+    testId: string;
+    clickable: boolean;
+    onOpen?: (original: TData) => void;
+    cellSx?: any;
+}
 
 // One data row of a table: the shared row markup every Karse table renders (the hover/cursor
 // style, the row test id, the optional click-through to a detail page, and one MUI cell per
 // visible column).
-function DataTableRowInner<TData>({ row, cells, testId, clickable, onOpen, cellSx }: DataTableRowProps<TData>) {
+export function DataTableRow<TData>({ row, cells, testId, clickable, onOpen, cellSx }: DataTableRowProps<TData>) {
     return (
         <TableRow
             data-test-id={testId}
@@ -27,19 +41,6 @@ function DataTableRowInner<TData>({ row, cells, testId, clickable, onOpen, cellS
     );
 }
 
-// The memoised row: typing changes the search text and the set of matching rows, but not the
-// rows themselves, so every row that survives the filter skips its render (and MUI skips
-// re-styling its cells) instead of being rebuilt from scratch.
-//
-// This saves real work, but it is not what makes typing responsive: measurement showed the
-// per-keystroke cost tracked the number of rows in the DOM and nothing else, and stayed just as
-// high with the search box disconnected from the table entirely. `ROW_RENDER_LIMIT` below is
-// what fixed that.
-//
-// `memo` erases the component's generic parameter, so its result is cast back to the generic
-// signature; there is no other way to keep a memoised component generic.
-export const DataTableRow = memo(DataTableRowInner, dataTableRowPropsEqual) as typeof DataTableRowInner;
-
 // How many rows a table puts in the DOM at once, and how many more each press of its "Show
 // more" control adds.
 //
@@ -50,18 +51,15 @@ export const DataTableRow = memo(DataTableRowInner, dataTableRowPropsEqual) as t
 // the expensive part.
 export const ROW_RENDER_LIMIT = 100;
 
-// The data rows of a table: the first `ROW_RENDER_LIMIT` rows of the current row model, as
-// memoised rows, followed by a "Show more" row while any row is still held back.
+// The data rows of a table: the first `ROW_RENDER_LIMIT` rows of the current row model,
+// followed by a "Show more" row while any row is still held back.
 //
 // `clickable` says whether the rows navigate on click; a table whose rows are conditionally
-// clickable (some resources have no detail page) passes `isClickable` instead, which must be a
-// stable function — a fresh closure per render would defeat the memo below.
+// clickable (some resources have no detail page) passes `isClickable` instead.
 interface DataTableRowsProps<TData> {
     rows: Row<TData>[];
-    // The columns the rows render (`table.getVisibleLeafColumns()`). The rows' cells are derived
-    // from them, and TanStack's row model does not change when they do, so this is what tells the
-    // memo below that a re-render is needed: a changed view-mode toggle, a fresh usage snapshot, a
-    // reordered or hidden column. Without it the rows would keep showing the old columns' values.
+    // The columns the rows render (`table.getVisibleLeafColumns()`), used to size the trailing
+    // "Show more" row's cell.
     visibleColumns: Column<TData, any>[];
     testId: string;
     clickable?: boolean;
@@ -70,7 +68,7 @@ interface DataTableRowsProps<TData> {
     cellSx?: any;
 }
 
-function DataTableRowsInner<TData>({ rows, visibleColumns, testId, clickable, isClickable, onOpen, cellSx }: DataTableRowsProps<TData>) {
+export function DataTableRows<TData>({ rows, visibleColumns, testId, clickable, isClickable, onOpen, cellSx }: DataTableRowsProps<TData>) {
     // How many of the current rows are allowed into the DOM. Raised a page at a time by the
     // "Show more" control below, so no matching row is ever out of reach: sorting, searching and
     // filtering all still run over every row, and the held-back rows are only unrendered.
@@ -110,12 +108,3 @@ function DataTableRowsInner<TData>({ rows, visibleColumns, testId, clickable, is
         </>
     );
 }
-
-// The memoised row list.
-//
-// A keystroke re-renders the table component, because the text in the search box is its state.
-// TanStack hands back the very same row model until the *deferred* search value catches up, so
-// this component's props are unchanged on that render and React skips the entire body: the row
-// list is not even walked. The rows are re-rendered only when the filter itself settles, and
-// then each surviving row skips its own render in turn (DataTableRow above).
-export const DataTableRows = memo(DataTableRowsInner) as typeof DataTableRowsInner;

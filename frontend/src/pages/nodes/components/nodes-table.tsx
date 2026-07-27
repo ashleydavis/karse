@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { useShareableNavigate } from "../../../lib/nav-state";
 import {
     useReactTable,
@@ -318,73 +318,39 @@ function NodesTableInner() {
     const [sorting, setSorting] = useState<SortingState>([]);
     const { search, setSearch, deferredSearch } = useSearchFilter();
 
-    const utilizationMap = useMemo(
-        () => buildNodeUtilizationMap(performance?.nodes ?? []),
-        [performance],
-    );
+    const utilizationMap = buildNodeUtilizationMap(performance?.nodes ?? []);
 
-    // Memoised so the column definitions (and so every `cell` renderer inside them) keep a
-    // stable identity across renders, changing only when the utilisation snapshot or the
-    // View/Value toggle actually changes. TanStack's flexRender renders a function cell
-    // renderer as a *component type*, so a fresh arrow on every render would make React
-    // unmount and remount each cell's subtree. That destroys any state a cell owns (the
-    // Labels cell's open modal) and detaches its DOM mid-interaction, so a control inside a
-    // cell — the labels "+N ..." chip — could never be clicked.
-    //
-    // The column definitions are also what identify a row's cells, so a stable `columns` is
-    // what lets the memoised rows below bail out: rebuilding it every render would give every
-    // row new cells and put the whole-table re-render back on every keystroke.
-    const columns = useMemo(
-        () => buildColumns(utilizationMap, mode, format),
-        [utilizationMap, mode, format],
-    );
+    const columns = buildColumns(utilizationMap, mode, format);
 
     // The filterable columns the shared editor offers: the Status and Health value
     // columns plus one column per label key present on the loaded nodes.
-    // Memoised on the data: collecting the label columns walks every node, and doing that on every
-    // render would put the whole list back on the keystroke path.
     const allNodes = data?.nodes ?? [];
-    const filterableColumns: FilterableColumn[] = useMemo(() => [
+    const filterableColumns: FilterableColumn[] = [
         { columnId: "status", label: "Status", options: ALL_STATUSES, kind: "value" },
         { columnId: "health", label: "Health", options: HEALTH_FILTER_OPTIONS, kind: "value" },
         ...collectLabelColumns(allNodes),
-    ], [allNodes]);
+    ];
     const filter = useTableFilter(filterableColumns);
 
-    // The stats header sums the whole list too, so it is memoised for the same reason.
-    const stats = useMemo(() => computeNodeStats(allNodes), [allNodes]);
+    const stats = computeNodeStats(allNodes);
 
     // The Roles column is hidden by default: on real single-distribution clusters
     // (e.g. docker-desktop) nodes carry no role labels, so it reads "<none>" and adds
     // little. The user can reveal it from the column config (drag it back to Visible).
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("nodes", columns, ["roles"]);
 
-    // TanStack memoises its row model (and each row's per-column value cache) on the `data`
-    // reference alone, not on `columns`. The CPU/Memory accessors close over the utilisation
-    // map and the View/Value toggles, so the row model has to be rebuilt when the cluster
-    // Performance snapshot lands or those columns keep serving the em-dash values computed
-    // before it arrived.
-    //
-    // This therefore hands TanStack a new array whenever the node list, the utilisation map or
-    // the view toggles change — and the SAME array on every other render. Spreading a fresh
-    // array inline on every render (as this once did) invalidates that memo continuously, and
-    // TanStack fires its auto-reset (`_autoResetPageIndex`) whenever the row-model memo re-runs.
-    // The reset sets table state, which re-renders, which spreads another new array: a
-    // self-sustaining render loop (~300 renders/sec) that rebuilt the table's DOM continuously
-    // and left no cell control on screen long enough to be clicked. The stable identity is also
-    // what makes typing cheap: a keystroke changes none of these inputs, so the same rows are
-    // reused instead of every one of them being rebuilt per keystroke.
-    const rowData = useMemo(
-        () => [...(data?.nodes ?? [])],
-        [data?.nodes, utilizationMap, mode, format],
-    );
+    // A fresh array every render, so TanStack rebuilds its row model every render and the
+    // CPU/Memory accessors are always re-read from the current utilisation map and View/Value
+    // toggles rather than from a per-row value cache filled before the Performance snapshot
+    // landed. `autoResetPageIndex: false` below is what stops that rebuild writing table state
+    // and looping.
+    const rowData = [...(data?.nodes ?? [])];
 
-    // Health is a filter-only column and is never shown, but the object saying so must keep its
-    // identity across renders, or TanStack rebuilds every row's visible-cell list each render.
-    const visibility = useMemo(() => ({
+    // Health is a filter-only column and is never shown.
+    const visibility = {
         ...columnVisibility,
         health: false,
-    }), [columnVisibility]);
+    };
 
     const openNode = useCallback((node: Node) => {
         navigate(`/nodes/${node.name}`);
@@ -394,6 +360,11 @@ function NodesTableInner() {
         data: rowData,
         columns,
         state: { sorting, globalFilter: deferredSearch, columnFilters: filter.columnFilters, columnOrder, columnVisibility: visibility },
+        // No pagination row model is installed (every matching row is rendered, bounded only by
+        // DataTableRows' render limit), so the page index is meaningless here. TanStack would
+        // otherwise reset it whenever a row model is rebuilt, and since the row-model inputs are
+        // rebuilt on every render that reset would write table state, re-render, and loop.
+        autoResetPageIndex: false,
         onSortingChange: setSorting,
         onGlobalFilterChange: setSearch,
         getCoreRowModel: getCoreRowModel(),

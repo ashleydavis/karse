@@ -1,4 +1,4 @@
-import { StrictMode, useMemo } from "react";
+import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -20,7 +20,7 @@ function Root() {
     const { resolvedColorMode } = useConfig();
     const dark = resolvedColorMode === "dark";
 
-    const theme = useMemo(() => createTheme({
+    const theme = createTheme({
         palette: {
             mode: resolvedColorMode,
             primary: {
@@ -102,7 +102,7 @@ function Root() {
                 },
             },
         },
-    }), [resolvedColorMode, dark]);
+    });
 
     return (
         <ThemeProvider theme={theme}>

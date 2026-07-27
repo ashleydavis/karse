@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import {
     useReactTable,
     getCoreRowModel,
@@ -194,27 +194,16 @@ export function EventsTable() {
     // them, so a hidden event is out of the rows and out of the count alike.
     const rowFilters = useEventFilters();
     const all = data?.events ?? [];
-    const visible = useMemo(
-        () => applyEventFilters(all, rowFilters.filters),
-        [all, rowFilters.filters],
-    );
+    const visible = applyEventFilters(all, rowFilters.filters);
     const hiddenCount = all.length - visible.length;
 
     // The time range is just another column filter (on `lastSeen`), so it composes
     // with the type filter, the search box and the row filters above, and the table's
     // existing "no rows match" empty state covers a range that excludes everything.
-    const columnFilters = useMemo(
-        () => [...filter.columnFilters, ...timeRangeColumnFilters("lastSeen", timeRange)],
-        [filter.columnFilters, timeRange],
-    );
+    const columnFilters = [...filter.columnFilters, ...timeRangeColumnFilters("lastSeen", timeRange)];
 
     // The table's columns are the display columns plus the trailing "..." actions column.
-    // `addFilter` is stable and the loaded events only change on a refetch, so the table is
-    // not rebuilt on every render.
-    const tableColumns = useMemo(
-        () => [...columns, actionsColumn(rowFilters.addFilter, all)],
-        [rowFilters.addFilter, all],
-    );
+    const tableColumns = [...columns, actionsColumn(rowFilters.addFilter, all)];
 
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("events", tableColumns);
 
@@ -232,6 +221,11 @@ export function EventsTable() {
             columnOrder,
             columnVisibility,
         },
+        // No pagination row model is installed (every matching row is rendered, bounded only by
+        // DataTableRows' render limit), so the page index is meaningless here. TanStack would
+        // otherwise reset it whenever a row model is rebuilt, and since the row-model inputs are
+        // rebuilt on every render that reset would write table state, re-render, and loop.
+        autoResetPageIndex: false,
         onSortingChange: setSorting,
         onGlobalFilterChange: setSearch,
         getCoreRowModel: getCoreRowModel(),

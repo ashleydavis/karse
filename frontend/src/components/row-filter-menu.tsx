@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { IconButton, Menu, MenuItem, ListItemText, ListSubheader, Divider } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEllipsis } from "@fortawesome/free-solid-svg-icons";
@@ -42,14 +42,11 @@ export function RowFilterMenu({ item, items, noun, onAddFilter, testIdPrefix }: 
 
     // Only worked out while the menu is open: counting each action's matches walks every
     // loaded item, and a closed menu on every row of a long feed must cost nothing.
-    const actions = useMemo(() => (open ? rowFilterActions(item) : []), [open, item]);
-    const coverage = useMemo(
-        () => actions.map((action) => ({
-            action,
-            matches: countMatchingItems(items, action),
-        })),
-        [actions, items],
-    );
+    const actions = open ? rowFilterActions(item) : [];
+    const coverage = actions.map((action) => ({
+        action,
+        matches: countMatchingItems(items, action),
+    }));
 
     function close(): void {
         setAnchorEl(null);
