@@ -16,15 +16,15 @@ import {
     TableCell,
     TableContainer,
     Paper,
-    TextField,
     Typography,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
+import { faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import type { NamespaceResource } from "karse-types";
 import { DataTableRows } from "../../../components/data-table-row";
 import { useSearchFilter } from "../../../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
+import { SearchBox } from "../../../components/search-box";
 
 // Searchable, sortable table of the resources contained in a namespace. Rows that
 // carry a detailPath navigate to that resource's own detail page on click.
@@ -80,19 +80,11 @@ export function ResourcesTable({
 
     return (
         <div className="flex flex-col gap-2">
-            <TextField
-                size="small"
+            <SearchBox
                 placeholder="Search resources..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                data-test-id="namespace-resources-filter"
-                slotProps={{
-                    input: {
-                        startAdornment: (
-                            <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                        ),
-                    },
-                }}
+                onChange={setSearch}
+                testId="namespace-resources-filter"
             />
             <TableContainer component={Paper} data-test-id="namespace-resources-table">
                 <Table size="small">

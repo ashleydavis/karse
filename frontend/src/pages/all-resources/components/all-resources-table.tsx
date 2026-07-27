@@ -16,11 +16,10 @@ import {
     TableCell,
     TableContainer,
     Paper,
-    TextField,
     Typography,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
+import { faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import { useQueries } from "@tanstack/react-query";
 import { useKubeContext } from "../../../lib/kube-context";
 import { useKubeNamespace } from "../../../lib/kube-namespace";
@@ -44,6 +43,7 @@ import { labelsToPairs } from "../../../components/labels-cell-pairs";
 import { HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
 import { aggregateResources, presentKinds, type AllResource } from "../../../lib/all-resources";
 import { Timestamp } from "../../../components/timestamp";
+import { SearchBox } from "../../../components/search-box";
 
 // Builds the column definitions for the All resources table: Kind, Namespace,
 // Name, Status, Age, Labels, plus a hidden Health column that backs the health
@@ -248,19 +248,11 @@ export function AllResourcesTable() {
     return (
         <div className="flex flex-col gap-2">
             <div className="flex flex-row gap-2 items-center">
-                <TextField
-                    size="small"
+                <SearchBox
                     placeholder="Search resources..."
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    data-test-id="all-resources-search"
-                    slotProps={{
-                        input: {
-                            startAdornment: (
-                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                            ),
-                        },
-                    }}
+                    onChange={setSearch}
+                    testId="all-resources-search"
                 />
                 <TableFilter
                     columns={filter.columns}

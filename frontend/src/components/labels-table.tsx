@@ -17,15 +17,15 @@ import {
     TableCell,
     TableContainer,
     Paper,
-    TextField,
     Typography,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
+import { faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import { DataTableRows } from "./data-table-row";
 import { useSearchFilter } from "../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../lib/fuzzy-filter";
 import { buildLabelRows, compareLabelRows, type LabelRow } from "../lib/label-rows";
+import { SearchBox } from "./search-box";
 
 // Adapts the pure compareLabelRows comparator to the shape Tanstack's sorting
 // expects, so the order the table renders on a header click is exactly the order
@@ -109,19 +109,11 @@ export function LabelsTable({ labels }: { labels: Record<string, string> | undef
 
     return (
         <div className="flex flex-col gap-2" data-test-id="labels-table-root">
-            <TextField
-                size="small"
+            <SearchBox
                 placeholder="Search labels..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                data-test-id="labels-filter"
-                slotProps={{
-                    input: {
-                        startAdornment: (
-                            <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                        ),
-                    },
-                }}
+                onChange={setSearch}
+                testId="labels-filter"
             />
             <TableContainer component={Paper} data-test-id="labels-table">
                 <Table size="small">

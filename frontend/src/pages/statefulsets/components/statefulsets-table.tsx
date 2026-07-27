@@ -16,11 +16,10 @@ import {
     TableCell,
     TableContainer,
     Paper,
-    TextField,
     Typography,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
+import { faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useShareableNavigate } from "../../../lib/nav-state";
 import type { StatefulSet } from "karse-types";
@@ -43,6 +42,7 @@ import { computeStatefulSetStats, statefulSetHealth, HEALTH_FILTER_OPTIONS } fro
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
 import { Timestamp } from "../../../components/timestamp";
+import { SearchBox } from "../../../components/search-box";
 
 // Column definitions for the stateful sets table.
 const columns: ColumnDef<StatefulSet>[] = [
@@ -169,19 +169,11 @@ export function StatefulSetsTable() {
         <div className="flex flex-col gap-2">
             <ResourceStatsHeader stats={stats} testIdPrefix="statefulsets" />
             <div className="flex flex-row gap-2 items-center">
-                <TextField
-                    size="small"
+                <SearchBox
                     placeholder="Search stateful sets..."
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    data-test-id="statefulsets-search"
-                    slotProps={{
-                        input: {
-                            startAdornment: (
-                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                            ),
-                        },
-                    }}
+                    onChange={setSearch}
+                    testId="statefulsets-search"
                 />
                 <TableFilter
                     columns={filter.columns}

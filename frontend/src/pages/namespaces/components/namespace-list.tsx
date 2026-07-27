@@ -17,12 +17,11 @@ import {
     TableContainer,
     Paper,
     Chip,
-    TextField,
     Typography,
     Button,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
+import { faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import type { Namespace } from "karse-types";
 import { DataTableRows } from "../../../components/data-table-row";
 import { useSearchFilter } from "../../../lib/use-search-filter";
@@ -35,6 +34,7 @@ import { labelsToPairs } from "../../../components/labels-cell-pairs";
 import { TableFilter } from "../../../components/table-filter";
 import { labelsColumnFilterFn, collectLabelColumns } from "../../../lib/table-filter-state";
 import { useTableFilter } from "../../../lib/use-table-filter";
+import { SearchBox } from "../../../components/search-box";
 
 type Props = {
     namespaces: Namespace[];
@@ -165,19 +165,11 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
     return (
         <div className="flex flex-col gap-2">
             <div className="flex flex-row gap-2 items-center">
-                <TextField
-                    size="small"
+                <SearchBox
                     placeholder="Search namespaces..."
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    data-test-id="namespaces-filter"
-                    slotProps={{
-                        input: {
-                            startAdornment: (
-                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                            ),
-                        },
-                    }}
+                    onChange={setSearch}
+                    testId="namespaces-filter"
                 />
                 <TableFilter
                     columns={filter.columns}

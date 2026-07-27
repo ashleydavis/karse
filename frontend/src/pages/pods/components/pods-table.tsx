@@ -18,11 +18,10 @@ import {
     TableContainer,
     Paper,
     Chip,
-    TextField,
     Typography,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleCheck, faCirclePause, faCircleQuestion, faCircleXmark, faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
+import { faCircleCheck, faCirclePause, faCircleQuestion, faCircleXmark, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { Pod, PodPhase } from "karse-types";
 import { useKubeContext } from "../../../lib/kube-context";
@@ -58,6 +57,7 @@ import { ResourceBarCell } from "../../../components/resource-utilization/resour
 import { StatusBadge } from "../../../components/resource-utilization/status-badge";
 import type { ViewMode, ValueFormat } from "../../../lib/resource-utilization";
 import { Timestamp } from "../../../components/timestamp";
+import { SearchBox } from "../../../components/search-box";
 
 // Renders a colored MUI Chip for a pod phase value.
 function PhaseChip({ phase }: { phase: PodPhase }) {
@@ -421,19 +421,11 @@ function PodsTableInner() {
         <div className="flex flex-col gap-2">
             <ResourceStatsHeader stats={stats} testIdPrefix="pods" />
             <div className="flex flex-row gap-2 items-center">
-                <TextField
-                    size="small"
+                <SearchBox
                     placeholder="Search pods..."
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    data-test-id="pods-search"
-                    slotProps={{
-                        input: {
-                            startAdornment: (
-                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                            ),
-                        },
-                    }}
+                    onChange={setSearch}
+                    testId="pods-search"
                 />
                 <TableFilter
                     columns={filter.columns}

@@ -18,18 +18,18 @@ import {
     Paper,
     Box,
     Chip,
-    TextField,
     Typography,
     Button,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
+import { faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import type { Context } from "karse-types";
 import { DataTableRows } from "../../../components/data-table-row";
 import { useSearchFilter } from "../../../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { ACTIONS_COLUMN_ID, stickyActionsHeaderSx } from "../../../lib/sticky-actions";
 import { addContextCommands, addContextHeading, addContextIntro } from "../lib/add-context-help";
+import { SearchBox } from "../../../components/search-box";
 
 type Props = {
     contexts: Context[];
@@ -119,19 +119,11 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
 
     return (
         <div className="flex flex-col gap-2">
-            <TextField
-                size="small"
+            <SearchBox
                 placeholder="Search contexts..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                data-test-id="contexts-search"
-                slotProps={{
-                    input: {
-                        startAdornment: (
-                            <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                        ),
-                    },
-                }}
+                onChange={setSearch}
+                testId="contexts-search"
             />
             <TableContainer component={Paper} data-test-id="contexts-table">
                 <Table size="small">

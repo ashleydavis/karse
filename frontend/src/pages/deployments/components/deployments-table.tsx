@@ -16,11 +16,10 @@ import {
     TableCell,
     TableContainer,
     Paper,
-    TextField,
     Typography,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
+import { faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useShareableNavigate } from "../../../lib/nav-state";
 import type { Deployment } from "karse-types";
@@ -43,6 +42,7 @@ import { computeDeploymentStats, deploymentHealth, HEALTH_FILTER_OPTIONS } from 
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
 import { Timestamp } from "../../../components/timestamp";
+import { SearchBox } from "../../../components/search-box";
 
 // Column definitions for the deployments table.
 const columns: ColumnDef<Deployment>[] = [
@@ -171,19 +171,11 @@ export function DeploymentsTable() {
         <div className="flex flex-col gap-2">
             <ResourceStatsHeader stats={stats} testIdPrefix="deployments" />
             <div className="flex flex-row gap-2 items-center">
-                <TextField
-                    size="small"
+                <SearchBox
                     placeholder="Search deployments..."
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    data-test-id="deployments-search"
-                    slotProps={{
-                        input: {
-                            startAdornment: (
-                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                            ),
-                        },
-                    }}
+                    onChange={setSearch}
+                    testId="deployments-search"
                 />
                 <TableFilter
                     columns={filter.columns}

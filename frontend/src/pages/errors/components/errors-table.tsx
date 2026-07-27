@@ -17,11 +17,10 @@ import {
     TableContainer,
     Paper,
     Chip,
-    TextField,
     Typography,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleExclamation, faTriangleExclamation, faSortUp, faSortDown, faSort, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
+import { faCircleExclamation, faTriangleExclamation, faSortUp, faSortDown, faSort } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { ClusterError } from "karse-types";
 import { useKubeContext } from "../../../lib/kube-context";
@@ -47,6 +46,7 @@ import { TimeRangeFilter } from "../../../components/time-range-filter";
 import { DEFAULT_TIME_RANGE, timeRangeColumnFilters, timeRangeFilterFn, type TimeRange } from "../../../lib/time-range";
 import { useTimestampFormat } from "../../../lib/use-timestamp-format";
 import { Timestamp } from "../../../components/timestamp";
+import { SearchBox } from "../../../components/search-box";
 
 // The distinct error types (reasons) present in the data, in display order
 // (alphabetical). These are the checkboxes offered by the type filter.
@@ -274,19 +274,11 @@ export function ErrorsTable() {
     return (
         <div className="flex flex-col gap-2">
             <div className="flex flex-row gap-2 items-center">
-                <TextField
-                    size="small"
+                <SearchBox
                     placeholder="Search errors..."
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    data-test-id="errors-search"
-                    slotProps={{
-                        input: {
-                            startAdornment: (
-                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                            ),
-                        },
-                    }}
+                    onChange={setSearch}
+                    testId="errors-search"
                 />
                 <TableFilter
                     columns={filter.columns}

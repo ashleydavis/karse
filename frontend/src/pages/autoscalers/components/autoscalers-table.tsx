@@ -16,11 +16,10 @@ import {
     TableCell,
     TableContainer,
     Paper,
-    TextField,
     Typography,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
+import { faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { HorizontalPodAutoscaler } from "karse-types";
 import { useKubeContext } from "../../../lib/kube-context";
@@ -41,6 +40,7 @@ import {
     replicaPercent, replicaLevel, formatReplicas,
 } from "../../../lib/autoscalers";
 import { Timestamp } from "../../../components/timestamp";
+import { SearchBox } from "../../../components/search-box";
 
 // Splits an HPA's scale target reference ("Deployment/web") into its kind and name so
 // the Reference cell can link to that workload's own detail page. Returns empty strings
@@ -208,19 +208,11 @@ export function AutoscalersTable() {
     return (
         <div className="flex flex-col gap-2">
             <div className="flex flex-row gap-2 items-center">
-                <TextField
-                    size="small"
+                <SearchBox
                     placeholder="Search autoscalers..."
                     value={globalFilter}
-                    onChange={(e) => setGlobalFilter(e.target.value)}
-                    data-test-id="autoscalers-search"
-                    slotProps={{
-                        input: {
-                            startAdornment: (
-                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                            ),
-                        },
-                    }}
+                    onChange={setGlobalFilter}
+                    testId="autoscalers-search"
                 />
                 <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
             </div>

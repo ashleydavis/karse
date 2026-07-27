@@ -445,6 +445,101 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Search-box clear button ────────────────────────────────────────────────
+
+    test.describe("search box clear button", () => {
+        // Three pods with two phases, so the clear button can be checked against both a
+        // narrowing search and an active column-filter selection.
+        const CLEAR_PODS = {
+            pods: [
+                { name: "nginx-deployment-abc", namespace: "default", phase: "Running", ready: "1/1", restarts: 0, node: "node-worker", createdAt: new Date().toISOString(), labels: {} },
+                { name: "redis-cache-xyz", namespace: "default", phase: "Running", ready: "1/1", restarts: 0, node: "node-worker", createdAt: new Date().toISOString(), labels: {} },
+                { name: "postgres-primary-0", namespace: "default", phase: "Pending", ready: "0/1", restarts: 0, node: "node-worker", createdAt: new Date().toISOString(), labels: {} },
+            ],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: CLEAR_PODS });
+            });
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(3);
+        });
+
+        test.afterAll(async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("");
+            await page.unroute("**/api/pods*");
+        });
+
+        test("the clear button is absent while the search box is empty", async () => {
+            await expect(page.locator("[data-test-id='pods-search'] input")).toHaveValue("");
+            await expect(page.locator("[data-test-id='pods-search-clear']")).toHaveCount(0);
+        });
+
+        test("typing narrows the rows and reveals the clear button", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("nginx");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("nginx-deployment-abc");
+            await expect(page.locator("[data-test-id='pods-search-clear']")).toBeVisible();
+        });
+
+        test("the clear button carries an accessible name", async () => {
+            await expect(page.locator("[data-test-id='pods-search-clear']")).toHaveAttribute("aria-label", "Clear search");
+        });
+
+        test("clicking clear empties the box, restores every row, and refocuses the input", async () => {
+            await page.locator("[data-test-id='pods-search-clear']").click();
+            await expect(page.locator("[data-test-id='pods-search'] input")).toHaveValue("");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='pods-search'] input")).toBeFocused();
+            // The button goes away again once there is nothing to clear.
+            await expect(page.locator("[data-test-id='pods-search-clear']")).toHaveCount(0);
+        });
+
+        test("clearing the search leaves an active column filter applied", async () => {
+            // Tick Status = Running, which alone selects two of the three pods.
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            await page.locator("[data-test-id='pods-filter-item-phase-Running']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
+            // Search on top of the filter narrows further.
+            await page.locator("[data-test-id='pods-search'] input").fill("nginx");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            // Clearing the search restores only the rows the filter alone selects.
+            await page.locator("[data-test-id='pods-search-clear']").click();
+            await expect(page.locator("[data-test-id='pods-search'] input")).toHaveValue("");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: 1 selected");
+            // Put the filter back to off for the tests that follow.
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            await page.locator("[data-test-id='pods-filter-deselect-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(3);
+        });
+
+        test("the shared clear button is on the nodes, deployments, events and errors tables too", async () => {
+            await page.unroute("**/api/pods*");
+            for (const [path, testId] of [
+                ["/nodes", "nodes-search"],
+                ["/deployments", "deployments-search"],
+                ["/events", "events-search"],
+                ["/errors", "errors-search"],
+            ]) {
+                await page.goto(path, { waitUntil: "networkidle" });
+                const input = page.locator(`[data-test-id='${testId}'] input`);
+                await expect(input).toBeVisible();
+                await expect(page.locator(`[data-test-id='${testId}-clear']`)).toHaveCount(0);
+                await input.fill("a");
+                await expect(page.locator(`[data-test-id='${testId}-clear']`)).toBeVisible();
+                await page.locator(`[data-test-id='${testId}-clear']`).click();
+                await expect(input).toHaveValue("");
+                await expect(input).toBeFocused();
+            }
+            await page.goto("/pods", { waitUntil: "networkidle" });
+        });
+    });
+
     // ── Resource-consumption columns (CPU / memory sort) ───────────────────────
 
     test.describe("pods table resource utilization", () => {

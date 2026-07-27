@@ -18,11 +18,10 @@ import {
     TableContainer,
     Paper,
     Chip,
-    TextField,
     Typography,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleCheck, faCircleQuestion, faCircleXmark, faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
+import { faCircleCheck, faCircleQuestion, faCircleXmark, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { Node, NodeStatus } from "karse-types";
 import { useKubeContext } from "../../../lib/kube-context";
@@ -67,6 +66,7 @@ import { ViewToggles } from "../../../components/resource-utilization/view-toggl
 import { StatusBadge } from "../../../components/resource-utilization/status-badge";
 import type { ViewMode } from "../../../lib/resource-utilization";
 import { Timestamp } from "../../../components/timestamp";
+import { SearchBox } from "../../../components/search-box";
 
 function StatusChip({ status }: { status: NodeStatus }) {
     if (status === "Ready") {
@@ -421,19 +421,11 @@ function NodesTableInner() {
             <ResourceStatsHeader stats={stats} testIdPrefix="nodes" />
             <div className="flex flex-row gap-2 items-center">
                 <ViewToggles />
-                <TextField
-                    size="small"
+                <SearchBox
                     placeholder="Search nodes..."
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    data-test-id="nodes-search"
-                    slotProps={{
-                        input: {
-                            startAdornment: (
-                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                            ),
-                        },
-                    }}
+                    onChange={setSearch}
+                    testId="nodes-search"
                 />
                 <TableFilter
                     columns={filter.columns}

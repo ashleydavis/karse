@@ -244,6 +244,8 @@ A Labels column shows each resource's labels as compact `key=value` chips (also 
 
 The search box matches across every column, not just the name. So you can also find resources by where they live: type a **node** name to keep the pods on that node, or a **namespace** to keep the resources in that namespace. Namespace search works on every namespaced table (pods, deployments, stateful sets, daemon sets, events, errors); node search applies to the pods table.
 
+Every search box has a **clear button** (a cross) at its right-hand end. It only shows once you have typed something. Click it to empty the box and bring back all the rows the search was hiding, in one go; the cursor stays in the box so you can type a new query straight away. It clears only the text you typed: any **Filter** selection you have made stays applied. Every resource table's search box works this way.
+
 ### Column filtering
 
 Every resource table has one shared **Filter** dropdown (filter icon) beside its search box. It can filter on any of the columns that table makes filterable: Status, Health, the error/event Type, and one group per label key present on the loaded rows. Each group is headed by the column name with one checkbox per distinct value. Tick values to narrow the table:

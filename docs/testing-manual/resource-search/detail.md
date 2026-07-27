@@ -42,6 +42,19 @@ Open the **Pods page** with **no namespace selected** (so all namespaces show). 
 - **No match**: type `zzzqqq`. No rows match and the "No pods match the search." message appears.
 - **Clearing**: delete the query and confirm all four pods reappear.
 
+### The clear button
+
+Still on the **Pods page** with the 29-fuzzy-search fixture loaded (no namespace selected, four pods showing):
+
+- **Hidden when empty**: with the search box empty, there is no cross at its right-hand end. The box shows only the magnifying glass on the left.
+- **Appears with text**: type `nginx`. The table narrows to `nginx-deployment-abc`, and a cross appears at the right-hand end of the box.
+- **Clears in one click**: click the cross. The box empties, all four pods come straight back, and the cross disappears again.
+- **Focus returns**: immediately after clicking the cross, type `redis` without clicking anywhere first. The characters go into the search box (focus was returned to it) and the table narrows to `redis-cache-xyz`. Clear it again.
+- **The column filter survives**: open the **Filter** button and tick **Status** → `Running`; the button reads `Filter: 1 selected`. Type `nginx` in the search box, so only `nginx-deployment-abc` remains, then click the cross. The search empties and the rows come back to the ones the Status filter alone selects (the running pods, not all four), and the button still reads `Filter: 1 selected`. Click **Filter** → **Clear** to switch the filter off again.
+- **Shared across tables**: repeat the type-then-click-the-cross check on the **Nodes**, **Deployments**, **Events** and **Errors** pages. The same cross appears and clears the box on each, because every table uses the one shared search box.
+
+Check this in both **light and dark mode**.
+
 ### Typing stays responsive on a big table
 
 Point Karse at a cluster with a few thousand pods (any real cluster, or a KWOK cluster seeded with a few thousand fake pods), open the **Pods page** with no namespace selected, and type a query such as `nginx-` into the search box at a normal typing speed.

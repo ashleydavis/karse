@@ -17,11 +17,10 @@ import {
     TableCell,
     TableContainer,
     Paper,
-    TextField,
     Typography,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMagnifyingGlass, faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
+import { faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import type { WorkloadUsage, ClusterResourceTotals } from "karse-types";
 import { useOriginTag, useShareableNavigate } from "../../../lib/nav-state";
 import { ResourceRef } from "../../../components/resource-ref";
@@ -44,6 +43,7 @@ import {
     type ViewMode,
     type ValueFormat,
 } from "../../../lib/resource-utilization";
+import { SearchBox } from "../../../components/search-box";
 
 // Maps a workload's kind (as the backend reports it: "Pod", "Deployment", "StatefulSet",
 // "DaemonSet") to its in-app detail route, or null when the kind has no detail page so the
@@ -266,20 +266,12 @@ function WorkloadsTableInner({
                 </Typography>
                 <ViewToggles />
             </Box>
-            <TextField
-                size="small"
+            <SearchBox
                 placeholder="Search workloads..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                data-test-id="workloads-search"
+                onChange={setSearch}
+                testId="workloads-search"
                 sx={{ maxWidth: 320 }}
-                slotProps={{
-                    input: {
-                        startAdornment: (
-                            <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                        ),
-                    },
-                }}
             />
             <TableContainer component={Paper} data-test-id="workloads-table">
                 <Table size="small">

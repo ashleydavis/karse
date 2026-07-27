@@ -17,11 +17,10 @@ import {
     TableContainer,
     Paper,
     Chip,
-    TextField,
     Typography,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleInfo, faMagnifyingGlass, faSort, faSortDown, faSortUp, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
+import { faCircleInfo, faSort, faSortDown, faSortUp, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { ClusterEvent } from "karse-types";
 import { useKubeContext } from "../../../lib/kube-context";
@@ -45,6 +44,7 @@ import { useSearchFilter } from "../../../lib/use-search-filter";
 import { TimeRangeFilter } from "../../../components/time-range-filter";
 import { DEFAULT_TIME_RANGE, timeRangeColumnFilters, timeRangeFilterFn, type TimeRange } from "../../../lib/time-range";
 import { Timestamp } from "../../../components/timestamp";
+import { SearchBox } from "../../../components/search-box";
 
 // Every selectable event type, in display order. Drives the type column in the
 // shared filter editor.
@@ -266,19 +266,11 @@ export function EventsTable() {
     return (
         <div className="flex flex-col gap-2">
             <div className="flex flex-row gap-2 items-center">
-                <TextField
-                    size="small"
+                <SearchBox
                     placeholder="Search events..."
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    data-test-id="events-search"
-                    slotProps={{
-                        input: {
-                            startAdornment: (
-                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ marginRight: 8 }} />
-                            ),
-                        },
-                    }}
+                    onChange={setSearch}
+                    testId="events-search"
                 />
                 <TableFilter
                     columns={filter.columns}
