@@ -540,6 +540,71 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Rendered-row bound on a long list ──────────────────────────────────────
+
+    test.describe("large table rendered-row bound", () => {
+        // 1500 pods, the size at which rendering every row made each keystroke in the search
+        // box cost ~173 ms of blocked main thread (resource-search-5). The list is mocked
+        // rather than seeded into the kwok cluster because a 1500-pod cluster would change
+        // every pod count the rest of this suite asserts on, and the bound being tested is a
+        // purely client-side rendering property.
+        const MANY_PODS = {
+            pods: Array.from({ length: 1500 }, (_unused, index) => ({
+                name: `pod-${String(index).padStart(4, "0")}`,
+                namespace: "default",
+                phase: "Running",
+                ready: "1/1",
+                restarts: 0,
+                node: "node-worker",
+                createdAt: new Date().toISOString(),
+                labels: {},
+            })),
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: MANY_PODS });
+            });
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']").first()).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+        });
+
+        test("renders only the first 100 of 1500 rows", async () => {
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(100);
+            await expect(page.locator("[data-test-id='pod-row-more-count']")).toHaveText("Showing 100 of 1500");
+        });
+
+        test("Show more renders the next 100 rows", async () => {
+            await page.locator("[data-test-id='pod-row-show-more']").click();
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(200);
+            await expect(page.locator("[data-test-id='pod-row-more-count']")).toHaveText("Showing 200 of 1500");
+        });
+
+        test("a search reaches a row that the bound was holding back", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("pod-1499");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("pod-1499");
+            await expect(page.locator("[data-test-id='pod-row-more']")).toHaveCount(0);
+        });
+
+        test("a non-matching query still shows the no-match row", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("zzzqqq");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-pods-match']")).toBeVisible();
+        });
+
+        test("clearing the query restores the bounded row set", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(200);
+            await expect(page.locator("[data-test-id='pod-row-more-count']")).toHaveText("Showing 200 of 1500");
+        });
+    });
+
     // ── Resource-consumption columns (CPU / memory sort) ───────────────────────
 
     test.describe("pods table resource utilization", () => {

@@ -172,3 +172,43 @@ Teardown:
 ```sh
 ./docs/testing-manual/_fixtures-kwok/33-labels-column/teardown.sh
 ```
+
+## Scenario: Rendered-row bound on a long list
+
+A namespace with far more pods than a table renders at once, so the 100-row bound, the **Show more** control and the typing responsiveness it buys are all observable.
+
+Teardown the labels fixture, then stand up the large-list fixture:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/33-labels-column/teardown.sh
+```
+
+**Fixture:** [_fixtures-kwok/36-large-pod-list](../_fixtures-kwok/36-large-pod-list/)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/36-large-pod-list/setup.sh
+```
+
+It stands up 1500 pods in the `bigpods` namespace (pass a different count as the first argument). Applying that many pods takes a minute or so. `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse.
+
+### What to check
+
+Open the **Pods page** and select the `bigpods` namespace.
+
+- **Bounded**: the table renders **100** pod rows, not 1500. Scroll to the bottom of the table.
+- **Affordance**: the last row of the table is a **SHOW MORE** button beside the text **Showing 100 of 1500**.
+- **Show more**: click **SHOW MORE**. The table grows to 200 rows and the text reads **Showing 200 of 1500**. Clicking again adds another 100.
+- **Typing stays responsive**: click into the **Search pods...** box and type a few characters at speed. Each character appears as it is typed with no visible stall. (Before this bound existed, the same 1500-pod list blocked the main thread for roughly 170 ms per keystroke; with the bound it is roughly 20 ms.)
+- **Nothing is unreachable**: type the full name of a pod that was not among the rendered rows (copy one from `kubectl get pods -n bigpods` past the first hundred). The table narrows to that one row, and the **SHOW MORE** row disappears because every matching row is now rendered.
+- **Sorting still spans the whole list**: click the **Name** header to sort descending. The first rendered row is the last name of the whole 1500, not the last of the 100 that were previously rendered.
+- **No match**: type `zzzqqq`. The table shows **No pods match the search.** and no **SHOW MORE** row.
+
+Check the bounded table and the **SHOW MORE** row in both **light and dark mode**.
+
+The typing measurement above is deliberately **not** asserted by the automated e2e suite. The suite runs several full stacks on one machine at once, so a wall-clock budget generous enough not to flake under that contention is too generous to tell the fixed behaviour (~20 ms per key) from the broken one (~170 ms per key). What the suite asserts instead is the deterministic invariant that actually encodes the fix: the number of rows rendered, the "Showing N of M" count, that **Show more** reveals the next page, and that a search still reaches a held-back row.
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/36-large-pod-list/teardown.sh
+```

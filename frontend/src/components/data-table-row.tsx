@@ -1,5 +1,5 @@
-import { memo } from "react";
-import { TableRow, TableCell } from "@mui/material";
+import { memo, useState } from "react";
+import { TableRow, TableCell, Button, Typography } from "@mui/material";
 import { flexRender, type Column, type Row } from "@tanstack/react-table";
 import { tableRowSx } from "../lib/table-row-style";
 import { ACTIONS_COLUMN_ID, stickyActionsCellSx } from "../lib/sticky-actions";
@@ -27,17 +27,31 @@ function DataTableRowInner<TData>({ row, cells, testId, clickable, onOpen, cellS
     );
 }
 
-// The memoised row, and the reason a search keystroke is cheap: typing changes the search text
-// and the set of matching rows, but not the rows themselves, so every row that survives the
-// filter skips its render (and MUI skips re-styling its cells) instead of being rebuilt from
-// scratch. Without this, each keystroke re-created and re-styled every cell of every surviving
-// row, which is what made typing take hundreds of milliseconds to seconds on a large list.
+// The memoised row: typing changes the search text and the set of matching rows, but not the
+// rows themselves, so every row that survives the filter skips its render (and MUI skips
+// re-styling its cells) instead of being rebuilt from scratch.
+//
+// This saves real work, but it is not what makes typing responsive: measurement showed the
+// per-keystroke cost tracked the number of rows in the DOM and nothing else, and stayed just as
+// high with the search box disconnected from the table entirely. `ROW_RENDER_LIMIT` below is
+// what fixed that.
 //
 // `memo` erases the component's generic parameter, so its result is cast back to the generic
 // signature; there is no other way to keep a memoised component generic.
 export const DataTableRow = memo(DataTableRowInner, dataTableRowPropsEqual) as typeof DataTableRowInner;
 
-// The data rows of a table: every row of the current row model, as memoised rows.
+// How many rows a table puts in the DOM at once, and how many more each press of its "Show
+// more" control adds.
+//
+// The cost of a keystroke in a search box is proportional to the number of rows rendered, and
+// to nothing else: the browser's style and layout work over the table's subtree is what blocks
+// the main thread, so a table that renders its whole row model gets slower the longer the list
+// is. Bounding the rendered set is what keeps typing responsive; the filtering itself was never
+// the expensive part.
+export const ROW_RENDER_LIMIT = 100;
+
+// The data rows of a table: the first `ROW_RENDER_LIMIT` rows of the current row model, as
+// memoised rows, followed by a "Show more" row while any row is still held back.
 //
 // `clickable` says whether the rows navigate on click; a table whose rows are conditionally
 // clickable (some resources have no detail page) passes `isClickable` instead, which must be a
@@ -56,10 +70,15 @@ interface DataTableRowsProps<TData> {
     cellSx?: any;
 }
 
-function DataTableRowsInner<TData>({ rows, testId, clickable, isClickable, onOpen, cellSx }: DataTableRowsProps<TData>) {
+function DataTableRowsInner<TData>({ rows, visibleColumns, testId, clickable, isClickable, onOpen, cellSx }: DataTableRowsProps<TData>) {
+    // How many of the current rows are allowed into the DOM. Raised a page at a time by the
+    // "Show more" control below, so no matching row is ever out of reach: sorting, searching and
+    // filtering all still run over every row, and the held-back rows are only unrendered.
+    const [renderLimit, setRenderLimit] = useState(ROW_RENDER_LIMIT);
+    const rendered = rows.slice(0, renderLimit);
     return (
         <>
-            {rows.map((row) => (
+            {rendered.map((row) => (
                 <DataTableRow
                     key={row.id}
                     row={row}
@@ -70,11 +89,29 @@ function DataTableRowsInner<TData>({ rows, testId, clickable, isClickable, onOpe
                     cellSx={cellSx}
                 />
             ))}
+            {rendered.length < rows.length && (
+                <TableRow data-test-id={`${testId}-more`}>
+                    <TableCell colSpan={visibleColumns.length}>
+                        <div className="flex flex-row gap-3 items-center">
+                            <Button
+                                size="small"
+                                onClick={() => setRenderLimit((limit) => limit + ROW_RENDER_LIMIT)}
+                                data-test-id={`${testId}-show-more`}
+                            >
+                                Show more
+                            </Button>
+                            <Typography variant="body2" color="text.secondary" data-test-id={`${testId}-more-count`}>
+                                Showing {rendered.length} of {rows.length}
+                            </Typography>
+                        </div>
+                    </TableCell>
+                </TableRow>
+            )}
         </>
     );
 }
 
-// The memoised row list, and the other half of what makes a search keystroke cheap.
+// The memoised row list.
 //
 // A keystroke re-renders the table component, because the text in the search box is its state.
 // TanStack hands back the very same row model until the *deferred* search value catches up, so

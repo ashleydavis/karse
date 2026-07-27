@@ -246,6 +246,12 @@ The search box matches across every column, not just the name. So you can also f
 
 Every search box has a **clear button** (a cross) at its right-hand end. It only shows once you have typed something. Click it to empty the box and bring back all the rows the search was hiding, in one go; the cursor stays in the box so you can type a new query straight away. It clears only the text you typed: any **Filter** selection you have made stays applied. Every resource table's search box works this way.
 
+### Long lists ("Show more")
+
+Every resource table shows at most **100 rows** at a time. On a bigger list the last row of the table is a **Show more** button beside a count reading, for example, "Showing 100 of 1500". Press it to add the next 100 rows.
+
+This is what keeps a table usable on a large cluster: putting a few thousand rows on the page makes every keystroke in the search box slow, because the browser has to lay the whole table out again. Nothing is hidden from you by it, though — the search box, the **Filter** dropdown and the column sort all still work over the whole list, so the rows you see are always the first 100 of the fully sorted, fully filtered result. To reach a row further down, narrow the search, sort the column that brings it to the top, or press **Show more**.
+
 ### Column filtering
 
 Every resource table has one shared **Filter** dropdown (filter icon) beside its search box. It can filter on any of the columns that table makes filterable: Status, Health, the error/event Type, and one group per label key present on the loaded rows. Each group is headed by the column name with one checkbox per distinct value. Tick values to narrow the table:
