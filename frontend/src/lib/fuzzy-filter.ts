@@ -1,11 +1,29 @@
 import { type FilterFn, type Row } from "@tanstack/react-table";
 
+// The most characters of the searched text that may be skipped between the first
+// and last character a query matches.
+//
+// Without a bound the subsequence match degenerates as soon as a cell value gets
+// long. The Labels column flattens every label to space-joined "key=value" text,
+// which is 25 characters on the short labels the test fixtures use but 285-345 on
+// a pod carrying the recommended Kubernetes label set plus the controller-added
+// ones any real Deployment/StatefulSet/DaemonSet pod has. Across a few hundred
+// characters nearly every short query can be found scattered somewhere in order,
+// so every row matched every query and the search box appeared to do nothing.
+//
+// Nine is the widest skip any intended match needs ("rs7d" matching
+// "replicaset-7d9f8"); ten leaves a character of headroom while still refusing a
+// query whose characters are strewn across a whole label set.
+const MAX_SKIPPED_CHARACTERS = 10;
+
 // Returns true when every meaningful character of `query` appears in `text` in
-// order (a subsequence match), allowing typo/gap-tolerant matching such as
-// "ngnx" or "ng-x" matching "nginx-deployment". Separator characters (anything
-// that is not a letter or digit, e.g. "-" or " ") are ignored in the query so
-// they act as gaps rather than literal characters to match. Matching is
-// case-insensitive.
+// order and close together (a bounded subsequence match), allowing typo/gap-
+// tolerant matching such as "ngnx" or "ng-x" matching "nginx-deployment".
+// Separator characters (anything that is not a letter or digit, e.g. "-" or " ")
+// are ignored in the query so they act as gaps rather than literal characters to
+// match. Matching is case-insensitive. The whole query must fall inside a window
+// of at most its own length plus MAX_SKIPPED_CHARACTERS, so characters strewn
+// across a long cell value do not count as a match.
 export function fuzzyMatch(text: string, query: string): boolean {
     const haystack = text.toLowerCase();
     const needle = query.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -13,17 +31,32 @@ export function fuzzyMatch(text: string, query: string): boolean {
     {
         return true;
     }
-    let position = 0;
-    for (const char of needle)
+    const windowSize = needle.length + MAX_SKIPPED_CHARACTERS;
+    // Try every position the query's first character occurs at. Scanning forward
+    // greedily from a fixed start consumes each needle character at the earliest
+    // position it can, so it reaches the end of the query as early as any match
+    // from that start could: if a match fits the window here, this finds it.
+    for (let start = 0; start < haystack.length; start++)
     {
-        const found = haystack.indexOf(char, position);
-        if (found === -1)
+        if (haystack[start] !== needle[0])
         {
-            return false;
+            continue;
         }
-        position = found + 1;
+        const end = Math.min(haystack.length, start + windowSize);
+        let matched = 0;
+        for (let position = start; position < end; position++)
+        {
+            if (haystack[position] === needle[matched])
+            {
+                matched++;
+                if (matched === needle.length)
+                {
+                    return true;
+                }
+            }
+        }
     }
-    return true;
+    return false;
 }
 
 // Collapses a single table cell value into a searchable string.

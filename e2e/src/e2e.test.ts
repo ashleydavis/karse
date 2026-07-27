@@ -751,6 +751,103 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Search over real-shaped labels ─────────────────────────────────────────
+
+    test.describe("search over real-cluster-shaped labels", () => {
+        // The same two pods as above, but carrying the label set a Deployment-,
+        // StatefulSet- or DaemonSet-managed pod carries on a real cluster: the
+        // recommended app.kubernetes.io/* keys plus the controller- and Helm-added
+        // ones. Joined into the Labels column's searchable "key=value" text those
+        // cells run past 250 characters, which is what made the unbounded
+        // subsequence match keep every row for every query. Mirrors the
+        // reallabels namespace of the 36-real-shaped-labels kwok fixture.
+        const REAL_LABEL_PODS = {
+            pods: [
+                {
+                    name: "nginx-deployment-abc",
+                    namespace: "default",
+                    phase: "Running",
+                    ready: "1/1",
+                    containerCount: 1,
+                    restarts: 0,
+                    node: "node-worker",
+                    createdAt: new Date().toISOString(),
+                    labels: {
+                        "app.kubernetes.io/component": "controller",
+                        "app.kubernetes.io/instance": "ingress-nginx",
+                        "app.kubernetes.io/managed-by": "Helm",
+                        "app.kubernetes.io/name": "ingress-nginx",
+                        "app.kubernetes.io/part-of": "ingress-nginx",
+                        "app.kubernetes.io/version": "1.9.4",
+                        "helm.sh/chart": "ingress-nginx-4.8.3",
+                        "pod-template-hash": "6b8f7c9d4f",
+                    },
+                },
+                {
+                    name: "postgres-primary-0",
+                    namespace: "default",
+                    phase: "Running",
+                    ready: "1/1",
+                    containerCount: 1,
+                    restarts: 0,
+                    node: "node-worker",
+                    createdAt: new Date().toISOString(),
+                    labels: {
+                        "app.kubernetes.io/component": "database",
+                        "app.kubernetes.io/instance": "postgres",
+                        "app.kubernetes.io/managed-by": "Helm",
+                        "app.kubernetes.io/name": "postgresql",
+                        "controller-revision-hash": "postgres-postgresql-77d9c8b64",
+                        "helm.sh/chart": "postgresql-13.2.24",
+                        "statefulset.kubernetes.io/pod-name": "postgres-postgresql-0",
+                    },
+                },
+            ],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: REAL_LABEL_PODS });
+            });
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
+        });
+
+        test.afterAll(async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("");
+            await page.unroute("**/api/pods*");
+        });
+
+        test("a query still narrows the table when every pod carries a long real-world label set", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("postgres");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("postgres-primary-0");
+        });
+
+        test("a query matching the other pod narrows to it alone", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("nginx");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("nginx-deployment-abc");
+        });
+
+        test("a label value only one pod carries narrows to that pod", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("pod-template-hash");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("nginx-deployment-abc");
+        });
+
+        test("a label value every pod carries still keeps every pod", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("managed-by=Helm");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
+        });
+
+        test("clearing the query restores both pods", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
+        });
+    });
+
     // ── Fuzzy search on the nodes table ────────────────────────────────────────
 
     test.describe("fuzzy search (nodes table)", () => {

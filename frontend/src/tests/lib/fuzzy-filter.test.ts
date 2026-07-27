@@ -1,5 +1,6 @@
 import type { Row } from "@tanstack/react-table";
 import { fuzzyMatch, fuzzyGlobalFilter } from "../../lib/fuzzy-filter";
+import { labelsToPairs } from "../../components/labels-cell-pairs";
 
 describe("fuzzyMatch", () => {
     test("matches an exact substring", () => {
@@ -226,5 +227,140 @@ describe("fuzzyGlobalFilter expanded criteria (labels, node, namespace)", () => 
     test("treats a resource with no labels (empty joined cell) as having nothing to match on", () => {
         const row = makeRow(["redis-cache-xyz", "default", "node-worker", ""]);
         expect(runFilter(row, "app=nginx")).toBe(false);
+    });
+});
+
+// A subsequence match with no bound on how far apart the matched characters may
+// sit degenerates once a cell gets long: nearly any short query can be found
+// scattered across a few hundred characters, so every row survives every query.
+// The rows below are the reproduction: four pods identical in every field except
+// their labels cell, which carries the standard Kubernetes / Helm recommended
+// label set plus the controller-added labels (pod-template-hash,
+// controller-revision-hash, statefulset.kubernetes.io/pod-name, helm.sh/chart,
+// service.istio.io/*) that any Deployment-, StatefulSet- or DaemonSet-managed pod
+// carries on a real cluster. Joined into the Labels column's searchable
+// "key=value" text those cells run to roughly 300 characters each, where the
+// unbounded match kept 4/4 rows for "redis", "postgres" and "cache".
+describe("fuzzyGlobalFilter over real-shaped label cells", () => {
+    const REAL_LABELS: Record<string, string>[] = [
+        {
+            "app.kubernetes.io/component": "controller",
+            "app.kubernetes.io/instance": "ingress-nginx",
+            "app.kubernetes.io/managed-by": "Helm",
+            "app.kubernetes.io/name": "ingress-nginx",
+            "app.kubernetes.io/part-of": "ingress-nginx",
+            "app.kubernetes.io/version": "1.9.4",
+            "helm.sh/chart": "ingress-nginx-4.8.3",
+            "pod-template-hash": "6b8f7c9d4f",
+        },
+        {
+            "app.kubernetes.io/instance": "prometheus",
+            "app.kubernetes.io/managed-by": "Helm",
+            "app.kubernetes.io/name": "prometheus-node-exporter",
+            "app.kubernetes.io/part-of": "prometheus",
+            "app.kubernetes.io/version": "1.7.0",
+            "controller-revision-hash": "5c74d8b9f7",
+            "helm.sh/chart": "prometheus-node-exporter-4.24.0",
+            "pod-template-generation": "3",
+        },
+        {
+            "app.kubernetes.io/component": "database",
+            "app.kubernetes.io/instance": "postgres",
+            "app.kubernetes.io/managed-by": "Helm",
+            "app.kubernetes.io/name": "postgresql",
+            "controller-revision-hash": "postgres-postgresql-77d9c8b64",
+            "helm.sh/chart": "postgresql-13.2.24",
+            "statefulset.kubernetes.io/pod-name": "postgres-postgresql-0",
+        },
+        {
+            "app.kubernetes.io/component": "web",
+            "app.kubernetes.io/instance": "shop",
+            "app.kubernetes.io/managed-by": "Helm",
+            "app.kubernetes.io/name": "storefront",
+            "app.kubernetes.io/version": "2.14.1",
+            "helm.sh/chart": "storefront-0.9.2",
+            "pod-template-hash": "84cd7f6b95",
+            "security.istio.io/tlsMode": "istio",
+            "service.istio.io/canonical-name": "storefront",
+            "service.istio.io/canonical-revision": "latest",
+        },
+    ];
+
+    const POD_NAMES = ["nginx-deployment-abc", "redis-cache-xyz", "postgres-primary-0", "frontend-web-123"];
+
+    // The cells the pods table's column definitions produce, in order: name,
+    // namespace, phase, ready, containers, restarts, node, then the joined labels
+    // cell. Only the labels cell differs between pods.
+    function podRows(): Row<unknown>[] {
+        return POD_NAMES.map((name, index) => makeRow([
+            name,
+            "default",
+            "Running",
+            "1/1",
+            1,
+            0,
+            "fake-node-1",
+            labelsToPairs(REAL_LABELS[index]).join(" "),
+        ]));
+    }
+
+    function survivors(query: string): string[] {
+        return podRows()
+            .map((row, index) => (runFilter(row, query) ? POD_NAMES[index] : null))
+            .filter((name): name is string => name !== null);
+    }
+
+    test("the label cells under test really are long enough to degenerate an unbounded match", () => {
+        for (const labels of REAL_LABELS) {
+            expect(labelsToPairs(labels).join(" ").length).toBeGreaterThan(250);
+        }
+    });
+
+    test("a query matching one pod's name keeps exactly that pod", () => {
+        expect(survivors("redis")).toEqual(["redis-cache-xyz"]);
+        expect(survivors("postgres")).toEqual(["postgres-primary-0"]);
+        expect(survivors("nginx")).toEqual(["nginx-deployment-abc"]);
+        expect(survivors("frontend")).toEqual(["frontend-web-123"]);
+    });
+
+    test("a query matching nothing keeps no pods", () => {
+        expect(survivors("zzzqqq")).toEqual([]);
+    });
+
+    test("a label value shared by every pod still keeps every pod", () => {
+        // Every pod carries app.kubernetes.io/managed-by=Helm, so label search must
+        // still return all four. The fix must not achieve its narrowing by
+        // dropping labels out of the search.
+        expect(survivors("Helm")).toEqual(POD_NAMES);
+    });
+
+    test("a label value carried by one pod keeps only that pod", () => {
+        // Only the fourth pod carries security.istio.io/tlsMode=istio.
+        expect(survivors("tlsMode")).toEqual(["frontend-web-123"]);
+    });
+
+    test("a full key=value pair from a real-shaped label set keeps only the pod carrying it", () => {
+        expect(survivors("app.kubernetes.io/instance=prometheus")).toEqual(["redis-cache-xyz"]);
+    });
+});
+
+// The bound the fix introduces, stated directly on fuzzyMatch.
+describe("fuzzyMatch bounded window", () => {
+    test("rejects a subsequence whose characters are scattered too far apart", () => {
+        // "abc" is a subsequence of this text, but 60 characters of filler sit
+        // between the letters, so it is not a plausible match for what was typed.
+        const scattered = `a${"x".repeat(30)}b${"x".repeat(30)}c`;
+        expect(scattered).toContain("a");
+        expect(fuzzyMatch(scattered, "abc")).toBe(false);
+    });
+
+    test("still accepts a subsequence whose characters sit close together", () => {
+        expect(fuzzyMatch("axbxc", "abc")).toBe(true);
+    });
+
+    test("finds a close match even when an earlier, too-scattered one exists first", () => {
+        // The leading "a" starts a match that runs past the bound; the matcher must
+        // keep looking and find the tight "abc" at the end rather than give up.
+        expect(fuzzyMatch(`a${"x".repeat(40)}abc`, "abc")).toBe(true);
     });
 });

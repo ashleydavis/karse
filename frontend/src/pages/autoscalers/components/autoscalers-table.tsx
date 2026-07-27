@@ -130,6 +130,10 @@ const columns: ColumnDef<HorizontalPodAutoscaler>[] = [
         id: "age",
         accessorKey: "createdAt",
         header: "Age",
+        // Excluded from the fuzzy search: this cell's value is the raw ISO timestamp,
+        // not the relative age the column renders, so searching it matches text the
+        // user cannot see (a query of digits matched every row through it).
+        enableGlobalFilter: false,
         cell: (info) => <Timestamp value={info.getValue<string>()} />,
         sortingFn: (a, b) =>
             new Date(a.original.createdAt).getTime() - new Date(b.original.createdAt).getTime(),

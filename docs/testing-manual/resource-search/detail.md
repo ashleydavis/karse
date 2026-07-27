@@ -108,10 +108,39 @@ Use a table/column with many distinct values, e.g. the Pods page with a namespac
 
 Check this in both **light and dark mode**.
 
-Teardown the fuzzy-search fixture, then stand up the labels fixture below:
+### Search on real-cluster label shapes
+
+Teardown the fuzzy-search fixture, then stand up the real-shaped-labels fixture:
 
 ```sh
 ./docs/testing-manual/_fixtures-kwok/29-fuzzy-search/teardown.sh
+```
+
+**Fixture:** [_fixtures-kwok/36-real-shaped-labels](../_fixtures-kwok/36-real-shaped-labels/)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/36-real-shaped-labels/setup.sh
+```
+
+It builds two namespaces holding the same pods under the same names, differing only in the labels they carry: `shortlabels` gives each pod two short labels (the shape every other fixture uses), `reallabels` gives each pod the recommended Kubernetes label set plus the controller- and Helm-added labels a real cluster carries, which is about 300 characters of searchable `key=value` text per pod.
+
+#### What to check
+
+- On **Pods** with the `reallabels` namespace selected, type `redis` in the search box. The table narrows to the `redis-*` pods only. It must **not** keep every row: before the match was bounded, characters of the query could be found scattered across the long label text of every pod, so nothing was filtered out.
+- Select the `shortlabels` namespace and type `redis` again. The same `redis-*` pods survive, so the label shape no longer changes the result.
+- Back on `reallabels`, type `managed-by=Helm` (a label every pod carries). Every row stays: label search still works and the narrowing is not achieved by dropping labels out of the search.
+- Type `istio` (part of `security.istio.io/tlsMode=istio`, again on every pod). Every row stays.
+- Type `ngnx` on either namespace: the `ingress-nginx-*` pods still match, so the typo tolerance is intact.
+- Type a bare year such as `2026`. It must **not** keep every row through the Age column: the Age column is excluded from the search because its underlying value is the raw ISO timestamp rather than the relative age shown.
+- Repeat on **Deployments**, **Stateful sets** and **Daemon sets** with `reallabels` selected (three of each, all carrying real-shaped labels): typing `postgresql` narrows each table to one row.
+- On **Nodes**, type `xlarge`: only the `ip-10-0-2-12...` node (the `m5.xlarge` one) stays.
+
+Check this in both **light and dark mode**.
+
+Teardown the real-shaped-labels fixture, then stand up the labels fixture below:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/36-real-shaped-labels/teardown.sh
 ```
 
 **Fixture:** [_fixtures-kwok/33-labels-column](../_fixtures-kwok/33-labels-column/)
