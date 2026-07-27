@@ -10,6 +10,7 @@ import { nextTimestampMode } from "../lib/timestamps";
 import { clearCache } from "../lib/api-client";
 import { runRefresh } from "../lib/refresh-feedback";
 import { reloadQueries } from "../lib/reload-queries";
+import { copyToClipboard } from "../lib/clipboard";
 import { ContextPicker } from "./context-picker";
 import { ContextQuickPicker } from "./context-quick-picker";
 import { NamespaceQuickPicker } from "./namespace-quick-picker";
@@ -94,7 +95,7 @@ export function Header() {
 
     // Copy the current page URL (page, resource, context, and namespace) to the clipboard so it can be shared.
     async function handleShare(): Promise<void> {
-        await navigator.clipboard.writeText(window.location.href);
+        await copyToClipboard(window.location.href);
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1500);
     }

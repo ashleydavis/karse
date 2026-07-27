@@ -3156,6 +3156,163 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Copy buttons on the pod detail page ─────────────────────────────────────
+
+    test.describe("pod detail copy buttons", () => {
+        const FAKE_POD_DETAIL = {
+            name: "nginx-abc",
+            namespace: "default",
+            phase: "Running",
+            node: "node-worker",
+            podIP: "10.0.0.1",
+            createdAt: new Date().toISOString(),
+            labels: { app: "nginx" },
+            containers: [
+                {
+                    name: "nginx",
+                    image: "nginx:1.27.4",
+                    ready: true,
+                    restarts: 0,
+                    state: "Running",
+                    stateReason: "",
+                },
+            ],
+            initContainers: [
+                {
+                    name: "init-setup",
+                    image: "busybox:1.36",
+                    ready: true,
+                    restarts: 0,
+                    state: "Terminated",
+                    stateReason: "Completed",
+                },
+            ],
+            events: [],
+        };
+
+        // A pod still being scheduled: no node and no pod IP, so both fields render the
+        // "-" placeholder and neither may offer a copy button.
+        const FAKE_POD_DETAIL_NO_IP = {
+            name: "pending-pod",
+            namespace: "default",
+            phase: "Pending",
+            node: "",
+            podIP: "",
+            createdAt: new Date().toISOString(),
+            labels: {},
+            containers: [
+                {
+                    name: "app",
+                    image: "app:2.1.0",
+                    ready: false,
+                    restarts: 0,
+                    state: "Waiting",
+                    stateReason: "ContainerCreating",
+                },
+            ],
+            initContainers: [],
+            events: [],
+        };
+
+        // Reads the clipboard back through the page. Needs clipboard-read permission
+        // (granted below) and a focused page, which bringToFront guarantees.
+        async function readClipboard(): Promise<string> {
+            return page.evaluate(() => navigator.clipboard.readText());
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            // Reading and writing the clipboard from the page needs explicit permission.
+            await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+            await page.bringToFront();
+            await page.route("**/api/pods/default/nginx-abc*", async (route) => {
+                await route.fulfill({ json: FAKE_POD_DETAIL });
+            });
+            await page.route("**/api/pods/default/pending-pod*", async (route) => {
+                await route.fulfill({ json: FAKE_POD_DETAIL_NO_IP });
+            });
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods/default/nginx-abc*");
+            await page.unroute("**/api/pods/default/pending-pod*");
+        });
+
+        test("copies the pod name from the page heading", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-detail-name-copy']").click();
+            expect(await readClipboard()).toBe("nginx-abc");
+        });
+
+        test("copies the namespace", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-detail-namespace-copy']").click();
+            expect(await readClipboard()).toBe("default");
+        });
+
+        test("copies the node name", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-detail-node-copy']").click();
+            expect(await readClipboard()).toBe("node-worker");
+        });
+
+        test("copies the Pod IP", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-detail-pod-ip-copy']").click();
+            expect(await readClipboard()).toBe("10.0.0.1");
+        });
+
+        test("copies a container image from the Containers tab", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-containers']").click();
+            await expect(page.locator("[data-test-id='pod-panel-containers']")).toBeVisible();
+            await page.locator("[data-test-id='pod-panel-containers'] [data-test-id='container-image-copy']").first().click();
+            expect(await readClipboard()).toBe("nginx:1.27.4");
+        });
+
+        test("copies an init container image from the Init Containers tab", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-init-containers']").click();
+            await expect(page.locator("[data-test-id='pod-panel-init-containers']")).toBeVisible();
+            await page.locator("[data-test-id='pod-panel-init-containers'] [data-test-id='container-image-copy']").first().click();
+            expect(await readClipboard()).toBe("busybox:1.36");
+        });
+
+        test("shows the copied confirmation after a click", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            const button = page.locator("[data-test-id='pod-detail-name-copy']");
+            // At rest the button shows the copy icon.
+            await expect(button.locator("svg[data-icon='copy']")).toBeVisible();
+            await button.click();
+            // After the click it flips to a tick as the confirmation.
+            await expect(button.locator("svg[data-icon='check']")).toBeVisible();
+        });
+
+        test("a pod with no Pod IP shows no copy button on that field", async () => {
+            await page.goto("/pods/default/pending-pod", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-panel-detail']")).toBeVisible();
+            // The placeholder is shown and there is nothing to copy on those two fields.
+            await expect(page.locator("[data-test-id='pod-detail-pod-ip-copy']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='pod-detail-node-copy']")).toHaveCount(0);
+            // The fields that do have values still carry their copy buttons.
+            await expect(page.locator("[data-test-id='pod-detail-namespace-copy']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pod-detail-name-copy']")).toBeVisible();
+        });
+
+        test("copying from a clickable container row does not navigate to the row's page", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-containers']").click();
+            await expect(page.locator("[data-test-id='pod-panel-containers']")).toBeVisible();
+            const urlBefore = page.url();
+            await page.locator("[data-test-id='pod-panel-containers'] [data-test-id='container-image-copy']").first().click();
+            expect(await readClipboard()).toBe("nginx:1.27.4");
+            // The row's own click handler would have opened the container detail page.
+            expect(page.url()).toBe(urlBefore);
+            await expect(page.locator("[data-test-id='pod-panel-containers']")).toBeVisible();
+        });
+    });
+
     // ── Container detail page ───────────────────────────────────────────────────
 
     test.describe("container detail page", () => {

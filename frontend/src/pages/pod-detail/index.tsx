@@ -29,6 +29,7 @@ import { LabelsTab } from "../../components/labels-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { ResourceRef } from "../../components/resource-ref";
+import { CopyButton } from "../../components/copy-button";
 import { PodContainersPanel, PodInitContainersPanel } from "./components/pod-containers-panel";
 import { LogViewer } from "../../components/log-viewer";
 import { PodPerformanceTab } from "../../components/performance/pod-performance-tab";
@@ -66,6 +67,36 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
         );
     }
     return <Chip label="Normal" color="default" size="small" />;
+}
+
+// One label/value pair in the pod's Details grid. `value` is a ReactNode because Age
+// renders as a <Timestamp>, which shows an age or a local time per the app-wide mode.
+// `copy` is the exact text the field's copy button puts on the clipboard, and is empty
+// for a field with nothing worth pasting: an absent value showing the "-" placeholder,
+// or the Age, which is a rendered duration rather than an identifier. A field with an
+// empty `copy` renders no copy button, so the user can never copy a dash.
+type PodDetailField = {
+    label: string;
+    value: ReactNode;
+    copy: string;
+    copyLabel: string;
+    copyTestId: string;
+};
+
+// Renders one label/value pair of the pod's Details grid, with a copy button beside
+// the value whenever there is something pasteable there.
+function PodDetailFieldCell({ field }: { field: PodDetailField }) {
+    return (
+        <Box>
+            <Typography variant="caption" color="text.secondary">{field.label}</Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minHeight: 30 }}>
+                <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{field.value}</Typography>
+                {field.copy !== "" && (
+                    <CopyButton text={field.copy} label={field.copyLabel} testId={field.copyTestId} />
+                )}
+            </Box>
+        </Box>
+    );
 }
 
 // The set of tabs available on the pod detail page.
@@ -141,11 +172,38 @@ export function PodDetailPage() {
     // height; only the Logs panel claims the leftover space (see below).
     const logsTabActive = effectiveTab === "logs";
 
-    // The Details grid's label/value pairs. The values are ReactNodes because Age is
-    // a <Timestamp>, which renders as an age or a local time per the app-wide mode.
-    const detailFields: [string, ReactNode][] = [
-        ["Pod IP", data.podIP || "-"],
-        ["Age", <Timestamp value={data.createdAt} />],
+    // The Details grid's label/value pairs, in display order.
+    const detailFields: PodDetailField[] = [
+        {
+            label: "Namespace",
+            value: <ResourceRef kind="Namespace" name={data.namespace} testId="pod-detail-namespace-link" />,
+            copy: data.namespace,
+            copyLabel: "namespace",
+            copyTestId: "pod-detail-namespace-copy",
+        },
+        {
+            label: "Node",
+            value: data.node
+                ? <ResourceRef kind="Node" name={data.node} testId="pod-detail-node-link" />
+                : "-",
+            copy: data.node,
+            copyLabel: "node name",
+            copyTestId: "pod-detail-node-copy",
+        },
+        {
+            label: "Pod IP",
+            value: data.podIP || "-",
+            copy: data.podIP,
+            copyLabel: "pod IP",
+            copyTestId: "pod-detail-pod-ip-copy",
+        },
+        {
+            label: "Age",
+            value: <Timestamp value={data.createdAt} />,
+            copy: "",
+            copyLabel: "",
+            copyTestId: "",
+        },
     ];
 
     return (
@@ -159,6 +217,7 @@ export function PodDetailPage() {
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
                     {data.name}
                 </Typography>
+                <CopyButton text={data.name} label="pod name" testId="pod-detail-name-copy" />
                 <PhaseChip phase={data.phase} />
                 <Box sx={{ flexGrow: 1 }} />
             </Box>
@@ -191,25 +250,8 @@ export function PodDetailPage() {
                     <Paper variant="outlined" sx={{ p: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Details</Typography>
                         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 1.5 }}>
-                            <Box>
-                                <Typography variant="caption" color="text.secondary">Namespace</Typography>
-                                <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
-                                    <ResourceRef kind="Namespace" name={data.namespace} testId="pod-detail-namespace-link" />
-                                </Typography>
-                            </Box>
-                            <Box>
-                                <Typography variant="caption" color="text.secondary">Node</Typography>
-                                <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
-                                    {data.node
-                                        ? <ResourceRef kind="Node" name={data.node} testId="pod-detail-node-link" />
-                                        : "-"}
-                                </Typography>
-                            </Box>
-                            {detailFields.map(([label, value]) => (
-                                <Box key={label}>
-                                    <Typography variant="caption" color="text.secondary">{label}</Typography>
-                                    <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{value}</Typography>
-                                </Box>
+                            {detailFields.map((field) => (
+                                <PodDetailFieldCell key={field.label} field={field} />
                             ))}
                         </Box>
                     </Paper>

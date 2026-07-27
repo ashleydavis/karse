@@ -8,7 +8,7 @@ Start the app first. From the repo root run:
 bun run dev
 ```
 
-Then open the frontend at `http://127.0.0.1:5173`. The log viewer on this page is specified and tested under [log-viewer](../log-viewer/detail.md). Each fixture stands up a `karse-test` KWOK cluster; select the `kwok-karse-test` context in Karse. Tear each one down with the Teardown step at the end of this doc.
+Then open the frontend at `http://127.0.0.1:5173`. The log viewer on this page is specified and tested under [log-viewer](../log-viewer/detail.md), and the page's copy buttons under [copy-button](../copy-button/detail.md). Each fixture stands up a `karse-test` KWOK cluster; select the `kwok-karse-test` context in Karse. Tear each one down with the Teardown step at the end of this doc.
 
 ## Scenario A: Pod detail page (single multi-container pod)
 

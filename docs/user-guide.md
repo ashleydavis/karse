@@ -104,6 +104,19 @@ One click switches every timestamp in the app at once, and the choice is remembe
 
 Two fields are deliberately left alone: **First seen** and **Last seen** on the event and error detail pages always show the absolute local time with the age in parentheses, because reporting the absolute time is what they are for.
 
+### Copy buttons
+
+Karse is read-only, so what you usually want next is the value itself, pasted into a terminal. Values worth pasting have a small **copy button** beside them. Click it and the value goes straight to your clipboard; the icon flips to a tick for a moment to confirm, then reverts.
+
+- On a **pod's detail page**: beside the pod name in the heading, beside the Namespace, Node, and Pod IP on the Status tab, and beside each container's image on the Containers and Init Containers tabs.
+- On the **Commands** tab and in the page help panel: beside each suggested `kubectl` command.
+- On the **YAML** tab: at the top-right of the YAML panel, copying the whole document.
+- In the **header**: the share button copies the current page's URL.
+
+Two details worth knowing. Copying from a table row does **not** open that row's detail page, so you can grab an image name without leaving the page. And a field showing a `-` placeholder (an unscheduled pod has no node and no IP) has no copy button at all, so you can never end up with a dash on the clipboard.
+
+Copy buttons are on the pod detail page today. The rest of the app's pasteable values, and a menu for values with more than one useful form (a name qualified by its namespace, a label as key, value, or `key=value`), are still to come.
+
 ## Contexts page (`/contexts`)
 
 A table of all kubeconfig contexts. Each row shows the context name, cluster, user, and default namespace.

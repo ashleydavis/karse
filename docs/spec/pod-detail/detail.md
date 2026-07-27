@@ -15,6 +15,7 @@ Backed by: `GET /api/pods/:namespace/:name`, `backend/src/routes/pod-detail-rout
 - The Status tab carries a **Node resources** panel: an indicator of the node resources the pod is consuming, as a **percentage of the node** for **CPU and memory only** (pod usage ÷ node allocatable, the percentage as the primary value, with the `usage / capacity` figures as small secondary text). It reuses the shared `PodNodeShare` component (see `performance-tabs`), lazy-fetched while the Status tab is active. Disk and network are not shown (the Metrics API reports no pod disk/network usage); the percentage degrades to `—` when there is no live usage or no node base.
 - The pod's own labels are shown on a Labels tab as a searchable, sortable Key / Value table (see `labels-tab`), not inline on the Status tab.
 - Each row in the Containers and Init Containers tables is clickable and drills down to that container's detail page (see `container-detail`).
+- The page's pasteable values each carry a copy button (see `copy-button`): the pod name in the heading, and the Namespace, Node, and Pod IP fields on the Status tab, plus each container's image in the Containers and Init Containers tables. Age has none (a rendered duration, not an identifier), and a field showing the `-` placeholder has none either.
 - The active tab is stored in the `tab` query param (so the view is shareable), and the breadcrumb trail's trailing crumb reflects it: `Pods > <namespace> > <name> > <tab label>`. Every tab has its own crumb label (Status, Containers, Init Containers, Labels, Performance, Logs, Commands, YAML).
 
 ## Acceptance Criteria
@@ -26,6 +27,7 @@ Backed by: `GET /api/pods/:namespace/:name`, `backend/src/routes/pod-detail-rout
 - [x] The page offers guided commands and a raw-YAML view for the pod.
 - [x] The breadcrumb's trailing crumb reflects the active tab (its own label per tab), not a fixed "Status".
 - [x] The Status tab shows a Node resources panel: the pod's percentage of the node for CPU and memory only (no disk/network), the percentage as the primary value.
+- [x] The pod name, namespace, node, Pod IP, and each container image have a copy button; Age and placeholder values do not.
 
 ## Open Questions
 
