@@ -173,13 +173,17 @@ metadata:
     service.istio.io/canonical-revision: "latest"
 spec:
   replicas: 0
+  # Selects on a key no standalone fixture pod carries. Selecting on the real-shaped
+  # app.kubernetes.io/name would make these 0-replica workloads adopt the pods of the
+  # same app and delete them, so the namespace's pod count would drift downwards while
+  # the fixture is up and the two namespaces would stop holding equal counts.
   selector:
     matchLabels:
-      app.kubernetes.io/name: ${app}
+      karse.test/workload: ${app}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ${app}
+        karse.test/workload: ${app}
     spec:
       automountServiceAccountToken: false
       containers:
@@ -205,13 +209,17 @@ metadata:
 spec:
   replicas: 0
   serviceName: ${app}
+  # Selects on a key no standalone fixture pod carries. Selecting on the real-shaped
+  # app.kubernetes.io/name would make these 0-replica workloads adopt the pods of the
+  # same app and delete them, so the namespace's pod count would drift downwards while
+  # the fixture is up and the two namespaces would stop holding equal counts.
   selector:
     matchLabels:
-      app.kubernetes.io/name: ${app}
+      karse.test/workload: ${app}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ${app}
+        karse.test/workload: ${app}
     spec:
       automountServiceAccountToken: false
       containers:
@@ -235,13 +243,17 @@ metadata:
     service.istio.io/canonical-name: "${app}"
     service.istio.io/canonical-revision: "latest"
 spec:
+  # Selects on a key no standalone fixture pod carries. Selecting on the real-shaped
+  # app.kubernetes.io/name would make these 0-replica workloads adopt the pods of the
+  # same app and delete them, so the namespace's pod count would drift downwards while
+  # the fixture is up and the two namespaces would stop holding equal counts.
   selector:
     matchLabels:
-      app.kubernetes.io/name: ${app}
+      karse.test/workload: ${app}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ${app}
+        karse.test/workload: ${app}
     spec:
       # Matches no node in the fixture, so the DaemonSet schedules no pods.
       nodeSelector:
@@ -250,6 +262,40 @@ spec:
       containers:
       - name: ${app}
         image: ${app}:latest
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ${app}
+  namespace: reallabels
+  labels:
+    app.kubernetes.io/component: "autoscaler"
+    app.kubernetes.io/instance: "${app}"
+    app.kubernetes.io/managed-by: "Helm"
+    app.kubernetes.io/name: "${app}"
+    app.kubernetes.io/part-of: "${app}"
+    app.kubernetes.io/version: "2.14.1"
+    helm.sh/chart: "${app}-0.9.2"
+    security.istio.io/tlsMode: "istio"
+    service.istio.io/canonical-name: "${app}"
+    service.istio.io/canonical-revision: "latest"
+spec:
+  # Targets the 0-replica Deployment above. A HorizontalPodAutoscaler leaves a
+  # target scaled to 0 alone, so this adds rows to the autoscalers table without
+  # creating pods and changing the counts the two namespaces hold equal.
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ${app}
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
 ---
 EOF
 done

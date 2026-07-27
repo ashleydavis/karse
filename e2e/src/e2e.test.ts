@@ -842,6 +842,28 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);
         });
 
+        // The Age column's searchable value is the raw ISO creation timestamp
+        // ("2026-07-27T02:24:42Z"), not the relative age the column renders, so a
+        // query of digits used to match every row through text the user cannot
+        // see. The year of the mocked creation timestamp appears nowhere in either
+        // pod's visible text, so with the Age column out of the search it matches
+        // nothing.
+        test("a digit query that only occurs in the hidden creation timestamp keeps no rows", async () => {
+            const createdYear = REAL_LABEL_PODS.pods[0].createdAt.slice(0, 4);
+            await page.locator("[data-test-id='pods-search'] input").fill(createdYear);
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-pods-match']")).toBeVisible();
+        });
+
+        // The counterpart: digits are still searched everywhere the user can see
+        // them, so excluding Age has not made digit queries useless. "1.9.4" is the
+        // app.kubernetes.io/version label value only the nginx pod carries.
+        test("a digit query matching visible cell text still narrows to that pod", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("1.9.4");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("nginx-deployment-abc");
+        });
+
         test("clearing the query restores both pods", async () => {
             await page.locator("[data-test-id='pods-search'] input").fill("");
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(2);

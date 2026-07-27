@@ -131,9 +131,12 @@ It builds two namespaces holding the same pods under the same names, differing o
 - Back on `reallabels`, type `managed-by=Helm` (a label every pod carries). Every row stays: label search still works and the narrowing is not achieved by dropping labels out of the search.
 - Type `istio` (part of `security.istio.io/tlsMode=istio`, again on every pod). Every row stays.
 - Type `ngnx` on either namespace: the `ingress-nginx-*` pods still match, so the typo tolerance is intact.
-- Type a bare year such as `2026`. It must **not** keep every row through the Age column: the Age column is excluded from the search because its underlying value is the raw ISO timestamp rather than the relative age shown.
-- Repeat on **Deployments**, **Stateful sets** and **Daemon sets** with `reallabels` selected (three of each, all carrying real-shaped labels): typing `postgresql` narrows each table to one row.
-- On **Nodes**, type `xlarge`: only the `ip-10-0-2-12...` node (the `m5.xlarge` one) stays.
+- Type the current year (`2026`, or whatever year you stand the fixture up in). Every row disappears and the no-match message shows. It must **not** keep every row through the Age column: the Age column is excluded from the search because its underlying value is the raw ISO timestamp rather than the relative age shown, and the year appears nowhere the user can see it.
+- Type `1.7.0` (an `app.kubernetes.io/version` label value some pods carry). Those pods stay, so digits are still searched wherever they are visible.
+- Repeat on **Deployments**, **Stateful sets** and **Daemon sets** with `reallabels` selected (three of each, all carrying real-shaped labels): typing `postgresql` narrows each table to one row, and typing the current year empties the table.
+- Repeat on **Autoscalers** with `reallabels` selected (three, one per deployment): `postgresql` narrows it to one row and the current year empties it.
+- On **All resources** with `reallabels` selected, typing `postgresql` narrows it to the `postgresql` rows, and typing the current year empties it.
+- On **Nodes**, type `xlarge`: only the `ip-10-0-2-12...` node (the `m5.xlarge` one) stays. Typing the current year empties the table.
 
 Check this in both **light and dark mode**.
 
