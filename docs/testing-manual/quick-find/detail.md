@@ -33,6 +33,8 @@ Two KWOK clusters run simultaneously so the context picker has more than one ent
 - **Keyboard shortcuts**: Ctrl+K opens the context dropdown, Ctrl+Shift+K opens the namespace dropdown, and Escape closes either.
 - **Click-away closes the picker**: clicking outside the open dropdown closes it.
 - **Arrow points at the trigger**: each open dropdown shows a small arrow (the built-in MUI Tooltip arrow) between the trigger button and the dropdown body, visually pointing back up at the button that opened it. No hand-rolled CSS beak.
+- **Hover hint on each trigger**: rest the pointer on the link icon and confirm the browser shows the hint `Context picker (Ctrl+K)`; rest it on the layer-group icon and confirm it shows `Namespace picker (Ctrl+Shift+K)`.
+- **Console stays clean**: open the browser devtools console before loading the page, then load any page and open and close both pickers (by click and by keyboard shortcut). The console must show no "MUI: You have provided a title prop to the child of Tooltip" errors, and no other new errors or warnings. The pickers render their dropdown inside a MUI Tooltip, so a trigger button carrying its own `title` makes MUI log that error on every render of the header.
 - **Border visible in both modes**: the dropdown panel (and its arrow) has a clear border so its edges stay visible in dark mode, where the panel shares the nav bar's background colour. Switch the app to dark mode, open each picker, and confirm the panel edges and arrow are clearly visible against the nav bar behind them.
 
 Teardown:

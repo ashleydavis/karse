@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type ConsoleMessage } from "@playwright/test";
 import { execSync } from "node:child_process";
 
 // Cluster context names injected by scripts/e2e-tests.sh
@@ -1577,6 +1577,86 @@ test.describe("karse e2e", () => {
             await closePicker();
         });
 
+    });
+
+    // ── Quick-picker console output ───────────────────────────────────────────
+
+    // The quick-pickers use a MUI Tooltip as their dropdown container, so their trigger
+    // button must not carry a `title` of its own: MUI logs an error on every render when
+    // it does, which flooded the console. The trigger keeps its native hover hint, so
+    // these tests check both the clean console and the surviving hint.
+    test.describe("quick-picker console output", () => {
+        // The MUI error logged when a Tooltip's child carries its own `title` prop.
+        const TOOLTIP_TITLE_WARNING = "You have provided a `title` prop to the child of <Tooltip />";
+
+        // Every console message text seen since the listener was attached.
+        const messages: string[] = [];
+
+        // Records one console message so the assertions below can inspect the whole run.
+        function recordMessage(message: ConsoleMessage): void {
+            messages.push(message.text());
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            page.on("console", recordMessage);
+            // Listener attached before navigating, so the first render of the header is captured.
+            await navigateTo();
+            await expect(page.locator("[aria-label='context picker']")).toBeVisible();
+        });
+
+        test.afterAll(() => {
+            page.off("console", recordMessage);
+        });
+
+        test("loading a page logs no Tooltip title warning", async () => {
+            expect(messages.filter((m) => m.includes(TOOLTIP_TITLE_WARNING))).toEqual([]);
+        });
+
+        test("the context picker button keeps its hover hint and accessible name", async () => {
+            const button = page.locator("[aria-label='context picker']");
+            await expect(button).toHaveAttribute("title", "Context picker (Ctrl+K)");
+            await expect(button).toHaveAttribute("aria-label", "context picker");
+        });
+
+        test("the namespace picker button keeps its hover hint and accessible name", async () => {
+            const button = page.locator("[aria-label='namespace picker']");
+            await expect(button).toHaveAttribute("title", "Namespace picker (Ctrl+Shift+K)");
+            await expect(button).toHaveAttribute("aria-label", "namespace picker");
+        });
+
+        test("both pickers still open on click and on their keyboard shortcut", async () => {
+            const contextDropdown = page.locator("[data-test-id='context-quick-picker-dropdown']");
+            const namespaceDropdown = page.locator("[data-test-id='namespace-quick-picker-dropdown']");
+
+            await page.locator("[aria-label='context picker']").click();
+            await expect(contextDropdown).toBeVisible();
+            await page.keyboard.press("Escape");
+            await expect(contextDropdown).not.toBeVisible();
+
+            await page.keyboard.press("Control+k");
+            await expect(contextDropdown).toBeVisible();
+            await page.keyboard.press("Escape");
+            await expect(contextDropdown).not.toBeVisible();
+
+            await page.locator("[aria-label='namespace picker']").click();
+            await expect(namespaceDropdown).toBeVisible();
+            await page.keyboard.press("Escape");
+            await expect(namespaceDropdown).not.toBeVisible();
+
+            await page.keyboard.press("Control+Shift+K");
+            await expect(namespaceDropdown).toBeVisible();
+            await page.keyboard.press("Escape");
+            await expect(namespaceDropdown).not.toBeVisible();
+        });
+
+        test("opening and closing both pickers logs no Tooltip title warning", async () => {
+            expect(messages.filter((m) => m.includes(TOOLTIP_TITLE_WARNING))).toEqual([]);
+        });
+
+        test("opening and closing both pickers logs no MUI error at all", async () => {
+            expect(messages.filter((m) => m.includes("MUI:"))).toEqual([]);
+        });
     });
 
     // ── Shareable URL state ─────────────────────────────────────────────────────

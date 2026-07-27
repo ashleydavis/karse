@@ -167,7 +167,12 @@ export function NamespaceQuickPicker({ open, onClose, children }: Props) {
                 },
             }}
         >
-            {children}
+            {/* The trigger is wrapped so the Tooltip's direct child never carries a `title`
+                of its own. MUI clones the child to manage its own title and logs
+                "You have provided a `title` prop to the child of <Tooltip />" on every
+                render when it already has one, which flooded the console. The wrapper keeps
+                the trigger's native hover hint (the keyboard shortcut) working. */}
+            <span style={{ display: "inline-flex" }}>{children}</span>
         </Tooltip>
     );
 }
