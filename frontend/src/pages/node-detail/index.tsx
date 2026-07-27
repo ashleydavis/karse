@@ -37,7 +37,7 @@ import { LabelsTab } from "../../components/labels-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { ResourceRef } from "../../components/resource-ref";
-import { CopyButton, CopyNameButton } from "../../components/copy-button";
+import { CopyButton, CopyNameButton, CopyNameCell } from "../../components/copy-button";
 import { NodePerformanceTab } from "../../components/performance/node-performance-tab";
 import { NodeResourceIndicator } from "../../components/performance/node-resource-indicator";
 import { tableRowSx } from "../../lib/table-row-style";
@@ -108,8 +108,15 @@ function nodePodColumns(format: ValueFormat): ColumnDef<NodePodRow>[] {
             accessorKey: "name",
             header: "Name",
             enableSorting: false,
+            // The pod name is a resource name, so it carries the two-form copy menu.
             cell: (info) => (
-                <span style={{ fontFamily: "monospace" }}>{info.getValue<string>()}</span>
+                <span style={{ fontFamily: "monospace" }}>
+                    <CopyNameCell
+                        segments={[info.row.original.namespace, info.row.original.name]}
+                        label="pod name"
+                        testId="node-pod-name-copy"
+                    />
+                </span>
             ),
         },
         {

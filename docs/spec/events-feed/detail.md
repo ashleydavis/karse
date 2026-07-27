@@ -8,7 +8,7 @@ Backed by: `GET /api/events`, `backend/src/routes/events-route.ts`, `backend/src
 
 ## Behaviour
 
-- The events table's Object column carries the two-form copy menu. See [copy-button](../copy-button/detail.md).
+- The events table's Object and Namespace columns carry the two-form copy menu, as does the event detail page's Namespace reference. See [copy-button](../copy-button/detail.md).
 
 - `GET /api/events?context=<ctx>&namespace=<ns?>` returns `{ events: ClusterEvent[] }`. `context` is required; `namespace` is optional (omit for all namespaces, `-A`). Returns 500 with kubectl's stderr on failure.
 - Each `ClusterEvent` has `uid` (metadata.uid; the stable identifier the detail route uses), `type` (Normal/Warning), `reason`, `message`, `count`, `source` (the reporting component, e.g. `kubelet`, from `source.component` falling back to `reportingComponent`; `""` when unknown), `firstSeen` (ISO; first occurrence, `""` when unknown), `lastSeen` (ISO; the UI computes age), `namespace`, `objectKind` (involvedObject.kind), and `objectName`. The richer `objectKind`/`objectName`/`namespace` fields let events from many resources be shown in one table.

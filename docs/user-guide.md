@@ -108,7 +108,7 @@ Two fields are deliberately left alone: **First seen** and **Last seen** on the 
 
 Karse is read-only, so what you usually want next is the value itself, pasted into a terminal. Values worth pasting have a small **copy button** beside them. Click it and the value goes straight to your clipboard; the icon flips to a tick for a moment to confirm, then reverts.
 
-**Two forms for a name.** A resource's name is worth copying two ways, so its control opens a small menu instead of copying straight away:
+**Two forms for a name.** A resource's name is worth copying two ways, so its control opens a small menu instead of copying straight away. You can tell the two controls apart without clicking: the menu control shows a **caret** next to the copy icon, and the plain one-click button does not:
 
 - **Short name**: the bare name, for example `nginx-abc`.
 - **Full path**: the whole path from the context down, for example `kwok-karse-test/default/nginx-abc`. A node or a namespace is cluster-scoped and has no namespace segment (`kwok-karse-test/node-1`), and a container extends its pod's path (`kwok-karse-test/default/nginx-abc/nginx`).
@@ -118,7 +118,8 @@ Each menu entry shows the exact text it will copy underneath it, so you pick by 
 Where you will find them:
 
 - On every **detail page**: beside the name in the heading, and beside the pasteable fields below it (namespace, node, Pod IP, image, roles, version, an event or error's object, reason and message).
-- In every **resource table**: in the Name column of pods, nodes, deployments, stateful sets, daemon sets, autoscalers, namespaces and all-resources, and in the Object column of the events and errors tables.
+- Beside **every other resource a page mentions**: wherever Karse names a resource it links to (a pod's namespace and node, a container's parent pod, a workload's namespace, an autoscaler's scale target, the pods listed on a node or a workload), that name carries the same menu. You never have to open a resource's own page just to copy its name.
+- In every **resource table**: in the Name column of pods, nodes, deployments, stateful sets, daemon sets, autoscalers, namespaces and all-resources, in the Object column of the events and errors tables, and in the Namespace and Node columns beside them.
 - On the **Commands** tab and in the page help panel: beside each suggested `kubectl` command.
 - On the **YAML** tab: at the top-right of the YAML panel, copying the whole document.
 - In the **header**: the share button copies the current page's URL.

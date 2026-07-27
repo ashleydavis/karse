@@ -35,7 +35,6 @@ import { LoadError } from "../../../components/load-error";
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
 import { ResourceRef } from "../../../components/resource-ref";
-import { CopyNameButton } from "../../../components/copy-button";
 import { DataTableRows } from "../../../components/data-table-row";
 import { useSearchFilter } from "../../../lib/use-search-filter";
 import { makeErrorsGlobalFilter } from "../../../lib/errors-search";
@@ -116,11 +115,8 @@ const columns: ColumnDef<ClusterError>[] = [
                     namespace={row.original.namespace}
                     label={getValue<string>()}
                     testId="error-row-object-link"
-                />
-                <CopyNameButton
-                    segments={[row.original.namespace, row.original.objectName]}
-                    label="object name"
-                    testId="error-row-object-copy"
+                    copyTestId="error-row-object-copy"
+                    copyLabel="object name"
                 />
             </span>
         ),

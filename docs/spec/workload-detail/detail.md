@@ -8,7 +8,7 @@ Backed by: `GET /api/:kind/:namespace/:name` (kind one of `deployments`, `statef
 
 ## Behaviour
 
-- The workload name in the heading and the Namespace field each carry the two-form copy menu. See [copy-button](../copy-button/detail.md).
+- The workload name in the heading and the Namespace field each carry the two-form copy menu, as do the Name and Node columns of the Pods tab's table. See [copy-button](../copy-button/detail.md).
 
 - The endpoint returns a `WorkloadDetail`: `kind`, `name`, `namespace`, `createdAt`, `labels`, `selector`, `stats[]`, `pods[]`, `events[]`. An unsupported kind throws. Returns 500 with kubectl's stderr when the workload read fails.
 - `stats` is a uniform list of labelled counters, computed per kind: deployments report Ready / Up-to-date / Available; stateful sets report Ready / Current / Updated; daemon sets report Desired / Current / Ready / Up-to-date / Available.

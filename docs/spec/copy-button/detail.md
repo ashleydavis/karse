@@ -47,29 +47,32 @@ Ruled out and not offered: kubectl-addressable forms (`pod/nginx-abc -n default`
 ### The menu variant
 
 - `CopyNameButton` takes the resource's path below the context as `segments` (a pod passes `[namespace, name]`, a node or namespace passes `[name]`, a container passes `[namespace, pod, container]`), plus the same `label` and `data-test-id` the plain button takes.
-- It renders the same icon button as the plain button. Clicking it opens a two-entry menu instead of copying immediately.
+- It renders a copy icon with a **caret** beside it, so it reads as a drop-down at a glance and is never mistaken for the plain one-click button. The caret is the only visual difference between the two controls, and it is what tells the user there is a choice of forms behind this one. Clicking it opens a two-entry menu instead of copying immediately.
 - Each entry is labelled by its form ("Short name", "Full path") and shows, in monospace beneath the label, the exact text choosing it will copy. The user picks by seeing the result rather than by decoding a label.
 - Choosing an entry copies that form and gives the same tick-and-tooltip confirmation the plain button gives.
 - Opening the menu, choosing an entry, and dismissing it all stop the click from reaching the surrounding element, so a menu inside a clickable table row never navigates to that row's detail page.
 - Each entry's `data-test-id` is the button's own with `-short` or `-long` appended.
-- `CopyNameCell` is the table form of the same control: the name text with `CopyNameButton` beside it, used in every resource list's Name column so the control sits in the same place everywhere. It is permanently visible, not hover-revealed, so it is reachable by keyboard and readable in a screenshot.
+- `CopyNameCell` is the table form of the same control: the name text with `CopyNameButton` beside it, used in every resource list's Name column so the control sits in the same place everywhere. It is permanently visible, not hover-revealed, so it is reachable by keyboard and readable in a screenshot. The name text is wrapped in its own element (`<data-test-id>-text`) so a click on the name is addressable: the row navigates when the name is clicked, while the control beside it swallows its own clicks.
+- **`ResourceRef` carries the menu itself.** Every inline reference to another resource anywhere in the app renders through `components/resource-ref.tsx`, and that component renders a `CopyNameButton` beside the reference. That is what makes the menu present on **every** resource the app names, in every table column and on every detail page, rather than only where a call site remembered to add one. The segments come from `resourceNameSegments` in `lib/resource-link.ts`, the single place that knows a Node or a Namespace is cluster-scoped and so has no namespace segment. A reference with an empty name renders its placeholder with no control.
 
 ### Which values get which control
 
-- **Menu** (resource names): pod, node, namespace, workload (deployment, stateful set, daemon set), autoscaler, container, and the object a resource table's Object column or an event/error detail page references.
+- **Menu** (resource names): pod, node, namespace, workload (deployment, stateful set, daemon set), autoscaler, container, and the object a resource table's Object column or an event/error detail page references. This holds in all three places a resource is named: a detail page's own title, every row of every resource table, and every other resource a detail page references.
 - **Plain button** (one form only): Pod IP, container image, node roles, node version, event reason and message, error reason and message, a command, a block of YAML, the shareable page link.
 
 ### Where it appears
 
 - **Pod detail page** (`/pods/:namespace/:name`): the copy menu beside the pod name in the heading and beside the Namespace and Node fields; the plain button beside Pod IP. The Age field has none: it is a rendered duration, not an identifier.
 - **Pod detail Containers and Init Containers tabs**: the copy menu in each row's Name cell, the plain button beside each container's image.
-- **Node detail page**: the copy menu beside the node name in the heading; plain buttons beside Roles and Version. A `<none>` roles placeholder has no button.
+- **Node detail page**: the copy menu beside the node name in the heading, and in the Name column of the Pods tab's table (plus each of those pods' Namespace reference); plain buttons beside Roles and Version. A `<none>` roles placeholder has no button.
 - **Namespace detail page**: the copy menu beside the namespace name in the heading.
 - **Container detail page**: the copy menu beside the container name in the heading, beside the parent Pod, and beside the Namespace; the plain button beside Image.
-- **Workload detail page** (deployment, stateful set, daemon set): the copy menu beside the workload name in the heading and beside the Namespace field.
+- **Workload detail page** (deployment, stateful set, daemon set): the copy menu beside the workload name in the heading, beside the Namespace field, and in the Name and Node columns of the Pods tab's table.
 - **Event detail page**: the copy menu beside the Object reference; plain buttons on Reason and on the Message panel.
 - **Error detail page**: the copy menu beside the Object reference; plain buttons on Reason and on the Message panel.
 - **Resource tables**: the copy menu in the Name column of pods, nodes, deployments, stateful sets, daemon sets, autoscalers, namespaces and all-resources, and in the Object column of the events and errors tables.
+- **Every resource a table references, not just its Name column**: the Namespace column of the pods, deployments, stateful sets, daemon sets, autoscalers, namespaces, events, errors and all-resources tables, the Node column of the pods table, and the autoscalers table's scale-target Reference. Each of these is a `ResourceRef`, so each carries the menu.
+- **Cluster page**: the copy menu in the Workload column of the workloads table and beside each row's Namespace.
 - **Commands tab and page help**: the existing per-command copy button on each command row.
 - **YAML sub tab**: the existing copy button at the top-right of the YAML panel, inset by the scrollbar width so it never overlaps (see [yaml-viewer](../yaml-viewer/detail.md)).
 - The header's shareable-link button copies through the same helper, but keeps its own share icon and wording.
@@ -89,6 +92,8 @@ Ruled out and not offered: kubectl-addressable forms (`pod/nginx-abc -n default`
 - [x] A resource name offers a two-entry menu, short name then full path, each entry showing the exact text it copies.
 - [x] A value that is not a resource name keeps the plain single-click button.
 - [x] The menu variant is part of the same shared component family as the plain button, and a menu inside a clickable row never navigates.
+- [x] The menu control is visibly a drop-down: it shows a caret the plain button does not have.
+- [x] Every resource the app names carries the menu, in all three places a resource appears: a detail page's title, every row of every resource table, and every other resource referenced from a detail page.
 
 ## Open Questions
 

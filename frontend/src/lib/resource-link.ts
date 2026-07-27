@@ -40,3 +40,26 @@ export function resourcePath(
             return null;
     }
 }
+
+// The kinds that carry no namespace, so a reference to one identifies it by name alone.
+const CLUSTER_SCOPED_KINDS = ["Node", "Namespace"];
+
+// The path segments below the kubeconfig context that identify a resource, ready to hand
+// to the copy menu (CopyNameButton / CopyNameCell) so it can build the short and long
+// forms. This is the single place that knows a Node or a Namespace has no namespace
+// segment, so every reference across the app derives the same path for the same resource.
+//
+// A namespaced kind gives [namespace, name] and a cluster-scoped one gives [name]. A
+// namespaced reference that arrived without a namespace falls back to [name] rather than
+// leaving an empty segment in the middle of the path.
+export function resourceNameSegments(
+    kind: string,
+    name: string,
+    namespace: string,
+): string[] {
+    if (CLUSTER_SCOPED_KINDS.includes(kind) || namespace === "")
+    {
+        return [name];
+    }
+    return [namespace, name];
+}

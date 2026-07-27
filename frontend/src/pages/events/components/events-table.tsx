@@ -35,7 +35,6 @@ import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
 import { useShareableNavigate } from "../../../lib/nav-state";
 import { ResourceRef } from "../../../components/resource-ref";
-import { CopyNameButton } from "../../../components/copy-button";
 import { RowFilterMenu } from "../../../components/row-filter-menu";
 import { ActiveRowFilters } from "../../../components/active-row-filters";
 import { type EventFilter, applyEventFilters } from "../../../lib/event-filter";
@@ -120,11 +119,8 @@ const columns: ColumnDef<ClusterEvent>[] = [
                     namespace={row.original.namespace}
                     label={getValue<string>()}
                     testId="event-row-object-link"
-                />
-                <CopyNameButton
-                    segments={[row.original.namespace, row.original.objectName]}
-                    label="object name"
-                    testId="event-row-object-copy"
+                    copyTestId="event-row-object-copy"
+                    copyLabel="object name"
                 />
             </span>
         ),

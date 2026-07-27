@@ -121,7 +121,8 @@ Any value that is a resource name offers two forms rather than copying immediate
 
 ### What to check
 
-- Open `/pods/default/web`. Click the copy control beside the `web` heading. It does **not** copy immediately: a menu opens with exactly two entries, in this order.
+- Open `/pods/default/web`. **Before clicking anything**, look at the control beside the `web` heading: it shows a copy icon with a small **caret** beside it, which is how a menu control is told apart from a plain one-click button. Compare it with the Pod IP's control in the Details card, which has the copy icon and **no** caret.
+- Click the copy control beside the `web` heading. It does **not** copy immediately: a menu opens with exactly two entries, in this order.
   - **Short name**, showing `web` beneath it.
   - **Full path**, showing `kwok-karse-test/default/web` beneath it (the context you selected, then the namespace, then the pod).
 - Click **Short name**. The menu closes, the icon flips to a tick, and pasting gives exactly `web`.
@@ -161,6 +162,9 @@ Every detail page and every resource table's name column carries a copy control.
 - **Workload detail** (click a deployment row): a copy menu beside the workload name in the heading and beside the Namespace field.
 - **Events and errors tables**: the Object column carries a copy menu beside the object reference. Copying must not open the event or error detail page.
 - **Event detail and error detail**: a copy menu beside the Object reference, and plain buttons on Reason and on the Message panel. Copy the message and confirm you get the full untruncated text.
+- **Every other resource a page references, not just its own name.** On `/pods` the Namespace and Node columns each carry the menu as well as the Name column; on `/pods/default/web` the Namespace and Node fields do; on the container detail page the Pod and Namespace fields do; on a workload detail page the Namespace field and the Name and Node columns of its Pods tab do; on `/nodes/fake-node-1` the Pods tab's Name and Namespace columns do; and on the Cluster page the Workload and Namespace columns do. Open one on each and confirm the Full path entry names the right resource.
+- **Cluster-scoped references have no empty segment.** Open the menu on the Node column of the pods table: the Full path reads `kwok-karse-test/fake-node-1`, not `kwok-karse-test//fake-node-1`.
+- **Clicking a name still navigates.** In a table, click the name text itself (not its copy control) and confirm the row's detail page opens. Then click the copy control on the same row and confirm the page does **not** change.
 - **Labels carry nothing**: confirm there is no copy control on a label chip in a table's Labels cell or in the labels modal.
 - **Light and dark**: switch the colour mode and confirm every control above stays legible and aligned.
 

@@ -18,7 +18,7 @@ import { fetchEvents } from "../../lib/api-client";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { ResourceRef } from "../../components/resource-ref";
-import { CopyButton, CopyNameButton } from "../../components/copy-button";
+import { CopyButton } from "../../components/copy-button";
 import { Timestamp } from "../../components/timestamp";
 import { formatAge, formatLocalTime, UNKNOWN_TIMESTAMP } from "../../lib/timestamps";
 
@@ -154,13 +154,10 @@ export function EventDetailPage() {
                                     namespace={event.namespace}
                                     label={objectLabel}
                                     testId="event-object-link"
+                                    copyTestId="event-object-copy"
+                                    copyLabel="object name"
                                 />
                             </Typography>
-                            <CopyNameButton
-                                segments={[event.namespace, event.objectName]}
-                                label="object name"
-                                testId="event-object-copy"
-                            />
                         </Box>
                     </Box>
                     <Field label="Source / Component" value={event.source === "" ? "-" : event.source} testId="event-field-source" />

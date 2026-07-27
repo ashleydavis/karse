@@ -76,16 +76,16 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
 // or the Age, which is a rendered duration rather than an identifier. A field with an
 // empty `copy` renders no copy button, so the user can never copy a dash.
 //
-// `segments` marks the field as a resource name: it is the resource's path below the
-// context, and the field gets the two-form copy menu instead of the plain button. A
-// field without it (a Pod IP) has one form and keeps the plain single-click button.
+// A field whose value is a resource name (the Namespace, the Node) renders it as a
+// ResourceRef, which carries the two-form copy menu itself, so those fields leave `copy`
+// empty and add no second control. `copy` is only for a single-form value like the Pod IP,
+// which keeps the plain one-click button.
 type PodDetailField = {
     label: string;
     value: ReactNode;
     copy: string;
     copyLabel: string;
     copyTestId: string;
-    segments?: string[];
 };
 
 // Renders one label/value pair of the pod's Details grid, with a copy control beside
@@ -97,10 +97,7 @@ function PodDetailFieldCell({ field }: { field: PodDetailField }) {
             <Typography variant="caption" color="text.secondary">{field.label}</Typography>
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minHeight: 30 }}>
                 <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{field.value}</Typography>
-                {field.copy !== "" && field.segments !== undefined && (
-                    <CopyNameButton segments={field.segments} label={field.copyLabel} testId={field.copyTestId} />
-                )}
-                {field.copy !== "" && field.segments === undefined && (
+                {field.copy !== "" && (
                     <CopyButton text={field.copy} label={field.copyLabel} testId={field.copyTestId} />
                 )}
             </Box>
@@ -185,21 +182,35 @@ export function PodDetailPage() {
     const detailFields: PodDetailField[] = [
         {
             label: "Namespace",
-            value: <ResourceRef kind="Namespace" name={data.namespace} testId="pod-detail-namespace-link" />,
-            copy: data.namespace,
-            copyLabel: "namespace",
-            copyTestId: "pod-detail-namespace-copy",
-            segments: [data.namespace],
+            value: (
+                <ResourceRef
+                    kind="Namespace"
+                    name={data.namespace}
+                    testId="pod-detail-namespace-link"
+                    copyTestId="pod-detail-namespace-copy"
+                    copyLabel="namespace"
+                />
+            ),
+            copy: "",
+            copyLabel: "",
+            copyTestId: "",
         },
         {
             label: "Node",
             value: data.node
-                ? <ResourceRef kind="Node" name={data.node} testId="pod-detail-node-link" />
+                ? (
+                    <ResourceRef
+                        kind="Node"
+                        name={data.node}
+                        testId="pod-detail-node-link"
+                        copyTestId="pod-detail-node-copy"
+                        copyLabel="node name"
+                    />
+                )
                 : "-",
-            copy: data.node,
-            copyLabel: "node name",
-            copyTestId: "pod-detail-node-copy",
-            segments: [data.node],
+            copy: "",
+            copyLabel: "",
+            copyTestId: "",
         },
         {
             label: "Pod IP",

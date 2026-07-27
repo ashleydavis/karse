@@ -30,7 +30,7 @@ import { LabelsTab } from "../../components/labels-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { ResourceRef } from "../../components/resource-ref";
-import { CopyNameButton } from "../../components/copy-button";
+import { CopyNameButton, CopyNameCell } from "../../components/copy-button";
 import { ResourceStatsHeader } from "../../components/resource-stats-header";
 import { computePodStats } from "../../lib/resource-stats";
 import { tableRowSx } from "../../lib/table-row-style";
@@ -147,13 +147,14 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                                 <Typography variant="caption" color="text.secondary">Namespace</Typography>
                                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minHeight: 30 }}>
                                     <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
-                                        <ResourceRef kind="Namespace" name={data.namespace} testId="workload-detail-namespace-link" />
+                                        <ResourceRef
+                                            kind="Namespace"
+                                            name={data.namespace}
+                                            testId="workload-detail-namespace-link"
+                                            copyTestId="workload-detail-namespace-copy"
+                                            copyLabel="namespace"
+                                        />
                                     </Typography>
-                                    <CopyNameButton
-                                        segments={[data.namespace]}
-                                        label="namespace"
-                                        testId="workload-detail-namespace-copy"
-                                    />
                                 </Box>
                             </Box>
                             {detailFields.map(([label, value]) => (
@@ -255,7 +256,13 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                                                     onClick={() => navigate(`/pods/${pod.namespace}/${pod.name}`, { from })}
                                                     sx={tableRowSx(true)}
                                                 >
-                                                    <TableCell sx={{ fontFamily: "monospace" }}>{pod.name}</TableCell>
+                                                    <TableCell sx={{ fontFamily: "monospace" }}>
+                                                        <CopyNameCell
+                                                            segments={[pod.namespace, pod.name]}
+                                                            label="pod name"
+                                                            testId="workload-pod-name-copy"
+                                                        />
+                                                    </TableCell>
                                                     <TableCell>{pod.phase}</TableCell>
                                                     <TableCell>{pod.ready}</TableCell>
                                                     <TableCell>{pod.restarts}</TableCell>

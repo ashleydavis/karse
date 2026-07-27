@@ -1510,8 +1510,10 @@ test.describe("karse e2e", () => {
         test("clicking a namespace row navigates to its detail page", async () => {
             await page.locator("[data-test-id='namespaces-filter'] input").fill("");
             const defaultRow = page.locator("[data-test-id='namespace-row']").filter({ hasText: /^default/ }).first();
-            // Click the Name cell (not an action button) to navigate to the detail page.
-            await defaultRow.locator("td:first-child").click();
+            // Click the name text itself to navigate. The Name cell also holds the copy
+            // menu, which swallows its own clicks, so the click has to land on the name
+            // rather than on the middle of the cell.
+            await defaultRow.locator("[data-test-id='namespace-row-name-copy-text']").click();
             await expect(page).toHaveURL(/\/namespaces\/default/);
             await expect(page.locator("[data-test-id='namespace-detail']")).toBeVisible();
             // Return to the list so later tests in this block start from /namespaces.
@@ -2651,7 +2653,15 @@ test.describe("karse e2e", () => {
             allocatable: { cpu: "3900m", memory: "7Gi", pods: "110" },
             addresses: [],
             labels: {},
-            pods: [],
+            pods: [
+                {
+                    name: "nginx-abc",
+                    namespace: "default",
+                    phase: "Running",
+                    ready: "1/1",
+                    restarts: 0,
+                },
+            ],
             events: [],
         };
 
@@ -3473,6 +3483,25 @@ test.describe("karse e2e", () => {
             await page.route("**/api/pods*", async (route) => { await route.fulfill({ json: FAKE_PODS }); });
             await page.route("**/api/cluster/nodes*", async (route) => { await route.fulfill({ json: FAKE_NODES }); });
             await page.route("**/api/nodes/node-worker*", async (route) => { await route.fulfill({ json: FAKE_NODE_DETAIL }); });
+            // The node's Pods tab joins data.pods with the node Performance snapshot, so
+            // that request needs its own route: the broad glob above does not cross the
+            // "/" into /performance, and answering it with the detail payload would leave
+            // the panel reading allocatable off an absent node. Registered afterwards so
+            // it wins for the /performance path.
+            await page.route("**/api/nodes/node-worker/performance*", async (route) => {
+                await route.fulfill({
+                    json: {
+                        metricsAvailable: true,
+                        node: {
+                            name: "node-worker",
+                            usage: { cpuMillicores: 1600, memoryBytes: 3 * 1024 * 1024 * 1024 },
+                            requests: { cpuMillicores: 2000, memoryBytes: 4 * 1024 * 1024 * 1024 },
+                            allocatable: { cpuMillicores: 4000, memoryBytes: 8 * 1024 * 1024 * 1024 },
+                        },
+                        pods: [],
+                    },
+                });
+            });
             await page.route("**/api/namespaces/team-a*", async (route) => { await route.fulfill({ json: FAKE_NAMESPACE_DETAIL }); });
             await page.route("**/api/errors*", async (route) => { await route.fulfill({ json: FAKE_ERRORS }); });
         });
@@ -3481,6 +3510,7 @@ test.describe("karse e2e", () => {
             await page.unroute("**/api/pods*");
             await page.unroute("**/api/cluster/nodes*");
             await page.unroute("**/api/nodes/node-worker*");
+            await page.unroute("**/api/nodes/node-worker/performance*");
             await page.unroute("**/api/namespaces/team-a*");
             await page.unroute("**/api/errors*");
             setContext(CLUSTER_1);
@@ -3611,6 +3641,47 @@ test.describe("karse e2e", () => {
             await page.locator("[data-test-id='error-row-object-copy-short']").click();
             expect(await readClipboard()).toBe("crasher-abc");
             expect(page.url()).toBe(urlBefore);
+        });
+
+        // A menu control must be tellable from a plain one-click button without
+        // clicking it, so the menu carries a caret and the plain button does not.
+        test("a copy menu shows a caret and a plain copy button does not", async () => {
+            await page.goto("/nodes/node-worker", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='node-panel-detail']")).toBeVisible();
+            await expect(page.locator("[data-test-id='node-detail-name-copy'] svg[data-icon='caret-down']")).toBeVisible();
+            await expect(page.locator("[data-test-id='node-detail-roles-copy'] svg[data-icon='caret-down']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='node-detail-version-copy'] svg[data-icon='caret-down']")).toHaveCount(0);
+        });
+
+        // Every resource referenced from a page, not just the page's own name, carries
+        // the menu. On the pods table that is the row's namespace and its node.
+        test("the pods table namespace and node references offer the copy menu", async () => {
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+            const urlBefore = page.url();
+            await page.locator("[data-test-id='pod-row-namespace-link-copy']").first().click();
+            await page.locator("[data-test-id='pod-row-namespace-link-copy-long']").click();
+            expect(await readClipboard()).toBe(`${CLUSTER_1}/default`);
+            await page.locator("[data-test-id='pod-row-node-link-copy']").first().click();
+            await page.locator("[data-test-id='pod-row-node-link-copy-long']").click();
+            expect(await readClipboard()).toBe(`${CLUSTER_1}/node-worker`);
+            expect(page.url()).toBe(urlBefore);
+        });
+
+        test("the deployments table namespace reference offers the copy menu", async () => {
+            await page.goto("/deployments", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='deployments-table']")).toBeVisible();
+            await page.locator("[data-test-id='deployment-row-namespace-link-copy']").first().click();
+            await page.locator("[data-test-id='deployment-row-namespace-link-copy-short']").click();
+            expect(await readClipboard()).toBe("default");
+        });
+
+        test("the workloads listed on the cluster page offer the copy menu", async () => {
+            await page.goto("/", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='workloads-table']")).toBeVisible();
+            await page.locator("[data-test-id='cluster-workload-row-name-copy']").first().click();
+            await page.locator("[data-test-id='cluster-workload-row-name-copy-long']").click();
+            expect(await readClipboard()).toContain(`${CLUSTER_1}/`);
         });
     });
 
@@ -3953,6 +4024,20 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='node-panel-pods']")).toBeVisible();
             await expect(page.locator("[data-test-id='node-pod-row']")).toHaveCount(3);
             await expect(page.locator("[data-test-id='node-pod-row'] td:first-child").first()).toHaveText("coredns-abc");
+        });
+
+        // Every resource named on a detail page carries the two-form copy menu, and the
+        // pods listed on a node are resource names like any other. The menu's entries show
+        // the exact text each form copies, so asserting on them proves both forms without
+        // needing clipboard permission in this block.
+        test("each pod listed on the Pods tab carries the two-form copy menu", async () => {
+            await page.locator("[data-test-id='node-tab-pods']").click();
+            await expect(page.locator("[data-test-id='node-panel-pods']")).toBeVisible();
+            await expect(page.locator("[data-test-id='node-pod-name-copy']")).toHaveCount(3);
+            await page.locator("[data-test-id='node-pod-name-copy']").first().click();
+            await expect(page.locator("[data-test-id='node-pod-name-copy-short']")).toContainText("coredns-abc");
+            await expect(page.locator("[data-test-id='node-pod-name-copy-long']")).toContainText(`${CLUSTER_1}/kube-system/coredns-abc`);
+            await page.keyboard.press("Escape");
         });
 
         test("the pods table shows each pod's cpu and memory as a node-share bar percentage", async () => {

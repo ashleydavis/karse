@@ -8,7 +8,7 @@ Backed by: `GET /api/errors`, `backend/src/routes/errors-route.ts`, `backend/src
 
 ## Behaviour
 
-- The errors table's Object column, and the error detail page's Object reference, carry the two-form copy menu; the detail page's Reason and Message panel carry a plain copy button. See [copy-button](../copy-button/detail.md).
+- The errors table's Object and Namespace columns, and the error detail page's Object and Namespace references, carry the two-form copy menu; the detail page's Reason and Message panel carry a plain copy button. See [copy-button](../copy-button/detail.md).
 
 - `GET /api/errors?context=<ctx>&namespace=<ns?>` returns `{ errors: ClusterError[] }`. `context` is required; `namespace` is optional (omit for all namespaces, `-A`).
 - The adapter runs two parallel reads: `get events --field-selector=type=Warning` and `get pods`. A failure of either returns 500 with kubectl's stderr.

@@ -33,7 +33,7 @@ Other common types (ReplicaSet, Job, CronJob, Service, Ingress, ConfigMap, Secre
 
 ## Behaviour
 
-- The Name column carries the two-form copy menu beside each resource name; a cluster-scoped kind has no namespace segment in its full path. See [copy-button](../copy-button/detail.md).
+- The Name column carries the two-form copy menu beside each resource name, and so does the Namespace column beside it; a cluster-scoped kind has no namespace segment in its full path. See [copy-button](../copy-button/detail.md).
 
 ### The table
 

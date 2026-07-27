@@ -24,6 +24,7 @@ import { faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons"
 import type { WorkloadUsage, ClusterResourceTotals } from "karse-types";
 import { useOriginTag, useShareableNavigate } from "../../../lib/nav-state";
 import { ResourceRef } from "../../../components/resource-ref";
+import { CopyNameCell } from "../../../components/copy-button";
 import { DataTableRows } from "../../../components/data-table-row";
 import { useSearchFilter } from "../../../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
@@ -128,7 +129,11 @@ function buildColumns(
             cell: (info) => (
                 <Box sx={{ display: "flex", flexDirection: "column" }}>
                     <Typography variant="body2" sx={{ fontWeight: 600 }} data-test-id="workload-name">
-                        {info.getValue<string>()}
+                        <CopyNameCell
+                            segments={[info.row.original.namespace, info.getValue<string>()]}
+                            label="workload name"
+                            testId="cluster-workload-row-name-copy"
+                        />
                     </Typography>
                     <Typography variant="caption" color="text.secondary">{info.row.original.kind}</Typography>
                 </Box>

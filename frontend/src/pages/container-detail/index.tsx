@@ -152,26 +152,29 @@ export function ContainerDetailPage() {
                                 <Typography variant="caption" color="text.secondary">Pod</Typography>
                                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minHeight: 30 }}>
                                     <Typography variant="body2" sx={{ fontFamily: "monospace", overflowWrap: "anywhere" }}>
-                                        <ResourceRef kind="Pod" name={data.name} namespace={data.namespace} testId="container-detail-pod-link" />
+                                        <ResourceRef
+                                            kind="Pod"
+                                            name={data.name}
+                                            namespace={data.namespace}
+                                            testId="container-detail-pod-link"
+                                            copyTestId="container-detail-pod-copy"
+                                            copyLabel="pod name"
+                                        />
                                     </Typography>
-                                    <CopyNameButton
-                                        segments={[data.namespace, data.name]}
-                                        label="pod name"
-                                        testId="container-detail-pod-copy"
-                                    />
                                 </Box>
                             </Box>
                             <Box>
                                 <Typography variant="caption" color="text.secondary">Namespace</Typography>
                                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minHeight: 30 }}>
                                     <Typography variant="body2" sx={{ fontFamily: "monospace", overflowWrap: "anywhere" }}>
-                                        <ResourceRef kind="Namespace" name={data.namespace} testId="container-detail-namespace-link" />
+                                        <ResourceRef
+                                            kind="Namespace"
+                                            name={data.namespace}
+                                            testId="container-detail-namespace-link"
+                                            copyTestId="container-detail-namespace-copy"
+                                            copyLabel="namespace"
+                                        />
                                     </Typography>
-                                    <CopyNameButton
-                                        segments={[data.namespace]}
-                                        label="namespace"
-                                        testId="container-detail-namespace-copy"
-                                    />
                                 </Box>
                             </Box>
                             <Box>

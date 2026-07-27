@@ -8,7 +8,7 @@ Backed by: `GET /api/cluster/nodes`, `backend/src/routes/cluster-route.ts`, `bac
 
 ## Behaviour
 
-- The Name column carries the two-form copy menu beside each node name; a node is cluster-scoped, so its full path has no namespace segment. See [copy-button](../copy-button/detail.md).
+- The Name column carries the two-form copy menu beside each node name, and every resource the table references carries one too; a node is cluster-scoped, so its full path has no namespace segment. See [copy-button](../copy-button/detail.md).
 
 - `GET /api/cluster/nodes` returns `{ nodes: Node[] }`. Each `Node` has `name`, `status` (`Ready` | `NotReady` | `Unknown`), `roles` (string array; empty means `<none>`), `version` (kubeletVersion), `createdAt` (ISO timestamp; the UI computes age), and `labels` (the node's `metadata.labels`, an empty object when none). Returns 500 with kubectl's stderr on failure.
 - Status is derived from the node's `Ready` condition; roles are parsed from `node-role.kubernetes.io/<role>` labels and sorted. Single-distribution clusters (e.g. docker-desktop) carry no role labels, so `roles` is empty and the column reads `<none>`; this is accurate, not a bug.

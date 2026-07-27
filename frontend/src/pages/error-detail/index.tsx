@@ -18,7 +18,7 @@ import { fetchErrors } from "../../lib/api-client";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { ResourceRef } from "../../components/resource-ref";
-import { CopyButton, CopyNameButton } from "../../components/copy-button";
+import { CopyButton } from "../../components/copy-button";
 import { Timestamp } from "../../components/timestamp";
 import { formatAge, formatLocalTime, UNKNOWN_TIMESTAMP } from "../../lib/timestamps";
 
@@ -138,13 +138,10 @@ export function ErrorDetailPage() {
                                     namespace={item.namespace}
                                     label={`${item.objectKind}/${item.objectName}`}
                                     testId="error-detail-object-link"
+                                    copyTestId="error-detail-object-copy"
+                                    copyLabel="object name"
                                 />
                             </Typography>
-                            <CopyNameButton
-                                segments={[item.namespace, item.objectName]}
-                                label="object name"
-                                testId="error-detail-object-copy"
-                            />
                         </Box>
                     </Box>
                     <Box data-test-id="error-detail-reason-field">

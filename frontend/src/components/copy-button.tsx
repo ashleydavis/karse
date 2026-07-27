@@ -3,7 +3,7 @@ import type { MouseEvent, ReactNode } from "react";
 import type { SxProps, Theme } from "@mui/material";
 import { IconButton, ListItemText, Menu, MenuItem, Tooltip, Typography } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck, faCopy } from "@fortawesome/free-solid-svg-icons";
+import { faCaretDown, faCheck, faCopy } from "@fortawesome/free-solid-svg-icons";
 import { copyToClipboard } from "../lib/clipboard";
 import { useKubeContext } from "../lib/kube-context";
 
@@ -108,6 +108,11 @@ export function resourceNameForms(context: string | null, segments: string[]): {
 // Each entry is labelled by its form and shows the exact text it will copy, so the user
 // picks by seeing the result rather than by decoding a label.
 //
+// It renders a copy icon with a caret beside it, so it reads as a drop-down at a glance
+// and is never mistaken for the plain one-click CopyButton. The caret is the only visual
+// difference between the two controls, and it is what tells the user there is a choice
+// of forms behind this one.
+//
 // Every click here (opening the menu, choosing an entry, dismissing it) is stopped from
 // reaching an ancestor, because these controls sit in clickable table rows that would
 // otherwise navigate to a detail page.
@@ -143,16 +148,18 @@ export function CopyNameButton({ segments, label, testId, sx }: {
 
     return (
         <>
-            <Tooltip title={copied ? "Copied" : "Copy name"}>
+            <Tooltip title={copied ? "Copied" : "Copy name: short or full path"}>
                 <span style={{ display: "inline-flex" }}>
                     <IconButton
                         size="small"
                         onClick={onOpen}
                         aria-label={`copy ${label}`}
+                        aria-haspopup="menu"
                         data-test-id={testId}
                         sx={sx}
                     >
                         <FontAwesomeIcon icon={copied ? faCheck : faCopy} />
+                        <FontAwesomeIcon icon={faCaretDown} style={{ marginLeft: 2, fontSize: "0.7em" }} />
                     </IconButton>
                 </span>
             </Tooltip>
@@ -208,6 +215,10 @@ function CopyFormItem({ form, text, testId, onChoose }: {
 //
 // `extra` is anything the table shows alongside the name (the namespace list's "active"
 // and "default" chips), rendered between the name and the copy control.
+//
+// The name itself is wrapped in its own element rather than left as a bare text node, so
+// a click on the name is addressable: the row navigates when the name is clicked, and the
+// copy control beside it swallows its own clicks, so the two need to be told apart.
 export function CopyNameCell({ segments, label, testId, extra }: {
     segments: string[];
     label: string;
@@ -216,7 +227,7 @@ export function CopyNameCell({ segments, label, testId, extra }: {
 }) {
     return (
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
-            {segments[segments.length - 1] ?? ""}
+            <span data-test-id={`${testId}-text`}>{segments[segments.length - 1] ?? ""}</span>
             {extra}
             <CopyNameButton segments={segments} label={label} testId={testId} />
         </span>

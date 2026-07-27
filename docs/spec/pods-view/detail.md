@@ -8,7 +8,7 @@ Backed by: `GET /api/pods`, `backend/src/routes/pods-route.ts`, `backend/src/kub
 
 ## Behaviour
 
-- The Name column carries the two-form copy menu beside each pod name. See [copy-button](../copy-button/detail.md).
+- The Name column carries the two-form copy menu beside each pod name, and so do the Namespace and Node columns beside it. See [copy-button](../copy-button/detail.md).
 
 - `GET /api/pods?context=<ctx>&namespace=<ns?>` returns `{ pods: Pod[] }`. `context` is required (400 if missing/blank); `namespace` is optional (omit or leave blank for all namespaces, which uses `-A`). Returns 500 with kubectl's stderr on failure.
 - Each `Pod` has `name`, `namespace`, `phase` (Running/Pending/Succeeded/Failed/Unknown), `ready` (e.g. "2/3"), `containerCount`, `restarts` (summed across containers and init containers), `createdAt`, `node`, and `labels` (the pod's `metadata.labels`, an empty object when none).
