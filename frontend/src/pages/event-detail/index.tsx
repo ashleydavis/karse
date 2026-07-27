@@ -18,6 +18,7 @@ import { fetchEvents } from "../../lib/api-client";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { ResourceRef } from "../../components/resource-ref";
+import { CopyButton, CopyNameButton } from "../../components/copy-button";
 import { Timestamp } from "../../components/timestamp";
 import { formatAge, formatLocalTime, UNKNOWN_TIMESTAMP } from "../../lib/timestamps";
 
@@ -136,18 +137,31 @@ export function EventDetailPage() {
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Details</Typography>
                 <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 1.5 }}>
                     <Field label="Type" value={event.type} testId="event-field-type" />
-                    <Field label="Reason" value={event.reason} testId="event-field-reason" />
+                    <Box data-test-id="event-field-reason">
+                        <Typography variant="caption" color="text.secondary">Reason</Typography>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minHeight: 30 }}>
+                            <Typography variant="body2" sx={{ fontFamily: "monospace", wordBreak: "break-word" }}>{event.reason}</Typography>
+                            <CopyButton text={event.reason} label="event reason" testId="event-reason-copy" />
+                        </Box>
+                    </Box>
                     <Box data-test-id="event-field-object">
                         <Typography variant="caption" color="text.secondary">Object</Typography>
-                        <Typography variant="body2" sx={{ fontFamily: "monospace", wordBreak: "break-word" }}>
-                            <ResourceRef
-                                kind={event.objectKind}
-                                name={event.objectName}
-                                namespace={event.namespace}
-                                label={objectLabel}
-                                testId="event-object-link"
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minHeight: 30 }}>
+                            <Typography variant="body2" sx={{ fontFamily: "monospace", wordBreak: "break-word" }}>
+                                <ResourceRef
+                                    kind={event.objectKind}
+                                    name={event.objectName}
+                                    namespace={event.namespace}
+                                    label={objectLabel}
+                                    testId="event-object-link"
+                                />
+                            </Typography>
+                            <CopyNameButton
+                                segments={[event.namespace, event.objectName]}
+                                label="object name"
+                                testId="event-object-copy"
                             />
-                        </Typography>
+                        </Box>
                     </Box>
                     <Field label="Source / Component" value={event.source === "" ? "-" : event.source} testId="event-field-source" />
                     <Field label="Count" value={event.count} testId="event-field-count" />
@@ -167,7 +181,10 @@ export function EventDetailPage() {
             </Paper>
 
             <Paper variant="outlined" sx={{ p: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Message</Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Message</Typography>
+                    <CopyButton text={event.message} label="event message" testId="event-message-copy" />
+                </Box>
                 <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }} data-test-id="event-field-message">
                     {event.message}
                 </Typography>

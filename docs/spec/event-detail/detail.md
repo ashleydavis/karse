@@ -8,6 +8,8 @@ Backed by: `GET /api/events` (reused; no new endpoint), `frontend/src/pages/even
 
 ## Behaviour
 
+- The Object reference carries the two-form copy menu, and Reason and the Message panel each carry a plain copy button. See [copy-button](../copy-button/detail.md).
+
 - Each events-table row is clickable and navigates to `/events/:uid`, where `uid` is the event's `metadata.uid`. The row click uses the shared `clickable-resource-rows` hover/cursor affordance.
 - The page fetches events cluster-wide (`GET /api/events` with no namespace scope) and selects the one whose `uid` matches the route param. Fetching cluster-wide means the event is found even when the Events page was scoped to a namespace.
 - The page shows every field the events table shows plus the source/component: type, reason, object (kind/name), source/component (the reporting component, e.g. `kubelet`), count, namespace, and age.

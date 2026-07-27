@@ -29,7 +29,7 @@ import { LabelsTab } from "../../components/labels-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { ResourceRef } from "../../components/resource-ref";
-import { CopyButton } from "../../components/copy-button";
+import { CopyButton, CopyNameButton } from "../../components/copy-button";
 import { PodContainersPanel, PodInitContainersPanel } from "./components/pod-containers-panel";
 import { LogViewer } from "../../components/log-viewer";
 import { PodPerformanceTab } from "../../components/performance/pod-performance-tab";
@@ -75,23 +75,32 @@ function EventTypeChip({ type }: { type: KubeEvent["type"] }) {
 // for a field with nothing worth pasting: an absent value showing the "-" placeholder,
 // or the Age, which is a rendered duration rather than an identifier. A field with an
 // empty `copy` renders no copy button, so the user can never copy a dash.
+//
+// `segments` marks the field as a resource name: it is the resource's path below the
+// context, and the field gets the two-form copy menu instead of the plain button. A
+// field without it (a Pod IP) has one form and keeps the plain single-click button.
 type PodDetailField = {
     label: string;
     value: ReactNode;
     copy: string;
     copyLabel: string;
     copyTestId: string;
+    segments?: string[];
 };
 
-// Renders one label/value pair of the pod's Details grid, with a copy button beside
-// the value whenever there is something pasteable there.
+// Renders one label/value pair of the pod's Details grid, with a copy control beside
+// the value whenever there is something pasteable there: the two-form menu for a
+// resource name, the plain button for everything else.
 function PodDetailFieldCell({ field }: { field: PodDetailField }) {
     return (
         <Box>
             <Typography variant="caption" color="text.secondary">{field.label}</Typography>
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minHeight: 30 }}>
                 <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{field.value}</Typography>
-                {field.copy !== "" && (
+                {field.copy !== "" && field.segments !== undefined && (
+                    <CopyNameButton segments={field.segments} label={field.copyLabel} testId={field.copyTestId} />
+                )}
+                {field.copy !== "" && field.segments === undefined && (
                     <CopyButton text={field.copy} label={field.copyLabel} testId={field.copyTestId} />
                 )}
             </Box>
@@ -180,6 +189,7 @@ export function PodDetailPage() {
             copy: data.namespace,
             copyLabel: "namespace",
             copyTestId: "pod-detail-namespace-copy",
+            segments: [data.namespace],
         },
         {
             label: "Node",
@@ -189,6 +199,7 @@ export function PodDetailPage() {
             copy: data.node,
             copyLabel: "node name",
             copyTestId: "pod-detail-node-copy",
+            segments: [data.node],
         },
         {
             label: "Pod IP",
@@ -217,7 +228,7 @@ export function PodDetailPage() {
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
                     {data.name}
                 </Typography>
-                <CopyButton text={data.name} label="pod name" testId="pod-detail-name-copy" />
+                <CopyNameButton segments={[data.namespace, data.name]} label="pod name" testId="pod-detail-name-copy" />
                 <PhaseChip phase={data.phase} />
                 <Box sx={{ flexGrow: 1 }} />
             </Box>

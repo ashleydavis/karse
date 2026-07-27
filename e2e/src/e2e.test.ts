@@ -3239,22 +3239,86 @@ test.describe("karse e2e", () => {
             await page.unroute("**/api/pods/default/pending-pod*");
         });
 
+        // Opens a copy menu and chooses one of its two entries, returning what landed
+        // on the clipboard. Every resource name in the app copies this way.
+        async function copyForm(testId: string, form: "short" | "long"): Promise<string> {
+            await page.locator(`[data-test-id='${testId}']`).click();
+            await page.locator(`[data-test-id='${testId}-${form}']`).click();
+            return readClipboard();
+        }
+
         test("copies the pod name from the page heading", async () => {
             await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            expect(await copyForm("pod-detail-name-copy", "short")).toBe("nginx-abc");
+        });
+
+        test("copies the pod's full path from the page heading", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            expect(await copyForm("pod-detail-name-copy", "long")).toBe(`${CLUSTER_1}/default/nginx-abc`);
+        });
+
+        test("the pod name menu lists both forms with the text each copies", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
             await page.locator("[data-test-id='pod-detail-name-copy']").click();
-            expect(await readClipboard()).toBe("nginx-abc");
+            await expect(page.locator("[data-test-id='pod-detail-name-copy-short']")).toContainText("nginx-abc");
+            await expect(page.locator("[data-test-id='pod-detail-name-copy-long']")).toContainText(`${CLUSTER_1}/default/nginx-abc`);
+            await page.keyboard.press("Escape");
         });
 
         test("copies the namespace", async () => {
             await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
-            await page.locator("[data-test-id='pod-detail-namespace-copy']").click();
-            expect(await readClipboard()).toBe("default");
+            expect(await copyForm("pod-detail-namespace-copy", "short")).toBe("default");
+        });
+
+        test("copies the namespace's full path, which has no namespace segment of its own", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            expect(await copyForm("pod-detail-namespace-copy", "long")).toBe(`${CLUSTER_1}/default`);
         });
 
         test("copies the node name", async () => {
             await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
-            await page.locator("[data-test-id='pod-detail-node-copy']").click();
-            expect(await readClipboard()).toBe("node-worker");
+            expect(await copyForm("pod-detail-node-copy", "short")).toBe("node-worker");
+        });
+
+        test("copies the node's full path, which is cluster-scoped", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            expect(await copyForm("pod-detail-node-copy", "long")).toBe(`${CLUSTER_1}/node-worker`);
+        });
+
+        test("the Pod IP is a plain button with no menu", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-detail-pod-ip-copy']").click();
+            // A plain button copies straight away and opens nothing.
+            expect(await readClipboard()).toBe("10.0.0.1");
+            await expect(page.locator("[data-test-id='pod-detail-pod-ip-copy-short']")).toHaveCount(0);
+        });
+
+        test("a container image is a plain button with no menu", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-containers']").click();
+            await expect(page.locator("[data-test-id='pod-panel-containers']")).toBeVisible();
+            await expect(page.locator("[data-test-id='container-image-copy-short']")).toHaveCount(0);
+        });
+
+        test("copies a container's full path from the Containers tab", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-containers']").click();
+            await expect(page.locator("[data-test-id='pod-panel-containers']")).toBeVisible();
+            await page.locator("[data-test-id='pod-panel-containers'] [data-test-id='container-row-name-copy']").first().click();
+            await page.locator("[data-test-id='container-row-name-copy-long']").click();
+            expect(await readClipboard()).toBe(`${CLUSTER_1}/default/nginx-abc/nginx`);
+        });
+
+        test("opening and dismissing a copy menu in a clickable row leaves the URL unchanged", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pod-tab-containers']").click();
+            await expect(page.locator("[data-test-id='pod-panel-containers']")).toBeVisible();
+            const urlBefore = page.url();
+            await page.locator("[data-test-id='pod-panel-containers'] [data-test-id='container-row-name-copy']").first().click();
+            await expect(page.locator("[data-test-id='container-row-name-copy-short']")).toBeVisible();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='container-row-name-copy-short']")).toHaveCount(0);
+            expect(page.url()).toBe(urlBefore);
         });
 
         test("copies the Pod IP", async () => {
@@ -3279,13 +3343,22 @@ test.describe("karse e2e", () => {
             expect(await readClipboard()).toBe("busybox:1.36");
         });
 
-        test("shows the copied confirmation after a click", async () => {
+        test("shows the copied confirmation after choosing a form", async () => {
             await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
             const button = page.locator("[data-test-id='pod-detail-name-copy']");
             // At rest the button shows the copy icon.
             await expect(button.locator("svg[data-icon='copy']")).toBeVisible();
             await button.click();
-            // After the click it flips to a tick as the confirmation.
+            await page.locator("[data-test-id='pod-detail-name-copy-short']").click();
+            // After the choice it flips to a tick as the confirmation.
+            await expect(button.locator("svg[data-icon='check']")).toBeVisible();
+        });
+
+        test("shows the copied confirmation after a plain button click", async () => {
+            await page.goto("/pods/default/nginx-abc", { waitUntil: "networkidle" });
+            const button = page.locator("[data-test-id='pod-detail-pod-ip-copy']");
+            await expect(button.locator("svg[data-icon='copy']")).toBeVisible();
+            await button.click();
             await expect(button.locator("svg[data-icon='check']")).toBeVisible();
         });
 
@@ -3310,6 +3383,234 @@ test.describe("karse e2e", () => {
             // The row's own click handler would have opened the container detail page.
             expect(page.url()).toBe(urlBefore);
             await expect(page.locator("[data-test-id='pod-panel-containers']")).toBeVisible();
+        });
+    });
+
+    // ── Copy controls across the app ────────────────────────────────────────────
+
+    test.describe("copy controls across the app", () => {
+        const FAKE_PODS = {
+            pods: [
+                {
+                    name: "nginx-abc",
+                    namespace: "default",
+                    phase: "Running",
+                    ready: "1/1",
+                    containerCount: 1,
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-worker",
+                },
+            ],
+        };
+
+        const FAKE_NODES = {
+            nodes: [
+                {
+                    name: "node-worker",
+                    status: "Ready",
+                    roles: ["worker"],
+                    version: "v1.29.0",
+                    createdAt: new Date().toISOString(),
+                    capacity: { cpu: "4", memory: "8Gi", pods: "110" },
+                    allocatable: { cpu: "3900m", memory: "7Gi", pods: "110" },
+                    labels: {},
+                },
+            ],
+        };
+
+        const FAKE_NODE_DETAIL = {
+            name: "node-worker",
+            status: "Ready",
+            roles: ["worker"],
+            version: "v1.29.0",
+            createdAt: new Date().toISOString(),
+            conditions: [],
+            capacity: { cpu: "4", memory: "8Gi", pods: "110" },
+            allocatable: { cpu: "3900m", memory: "7Gi", pods: "110" },
+            addresses: [{ type: "InternalIP", address: "192.168.1.9" }],
+            labels: {},
+            pods: [],
+            events: [],
+        };
+
+        const FAKE_NAMESPACE_DETAIL = {
+            name: "team-a",
+            phase: "Active",
+            createdAt: new Date().toISOString(),
+            labels: {},
+            annotations: {},
+            resources: [],
+            quotas: [],
+            limits: [],
+        };
+
+        const FAKE_ERRORS = {
+            errors: [
+                {
+                    source: "Pod",
+                    namespace: "default",
+                    objectKind: "Pod",
+                    objectName: "crasher-abc",
+                    reason: "CrashLoopBackOff",
+                    message: "back-off 5m0s restarting failed container",
+                    count: 1,
+                    firstSeen: "2024-01-01T00:00:00Z",
+                    lastSeen: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+                },
+            ],
+        };
+
+        // Reads the clipboard back through the page.
+        async function readClipboard(): Promise<string> {
+            return page.evaluate(() => navigator.clipboard.readText());
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+            await page.bringToFront();
+            await page.route("**/api/pods*", async (route) => { await route.fulfill({ json: FAKE_PODS }); });
+            await page.route("**/api/cluster/nodes*", async (route) => { await route.fulfill({ json: FAKE_NODES }); });
+            await page.route("**/api/nodes/node-worker*", async (route) => { await route.fulfill({ json: FAKE_NODE_DETAIL }); });
+            await page.route("**/api/namespaces/team-a*", async (route) => { await route.fulfill({ json: FAKE_NAMESPACE_DETAIL }); });
+            await page.route("**/api/errors*", async (route) => { await route.fulfill({ json: FAKE_ERRORS }); });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+            await page.unroute("**/api/cluster/nodes*");
+            await page.unroute("**/api/nodes/node-worker*");
+            await page.unroute("**/api/namespaces/team-a*");
+            await page.unroute("**/api/errors*");
+            setContext(CLUSTER_1);
+        });
+
+        test("the pods table name column offers both forms", async () => {
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+            await page.locator("[data-test-id='pod-row-name-copy']").first().click();
+            await expect(page.locator("[data-test-id='pod-row-name-copy-short']")).toContainText("nginx-abc");
+            await expect(page.locator("[data-test-id='pod-row-name-copy-long']")).toContainText(`${CLUSTER_1}/default/nginx-abc`);
+            await page.locator("[data-test-id='pod-row-name-copy-long']").click();
+            expect(await readClipboard()).toBe(`${CLUSTER_1}/default/nginx-abc`);
+        });
+
+        test("the pods table name column copies the short form", async () => {
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+            await page.locator("[data-test-id='pod-row-name-copy']").first().click();
+            await page.locator("[data-test-id='pod-row-name-copy-short']").click();
+            expect(await readClipboard()).toBe("nginx-abc");
+        });
+
+        test("copying from a clickable pods row does not navigate to the pod", async () => {
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+            const urlBefore = page.url();
+            await page.locator("[data-test-id='pod-row-name-copy']").first().click();
+            await page.locator("[data-test-id='pod-row-name-copy-short']").click();
+            expect(page.url()).toBe(urlBefore);
+            await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+        });
+
+        test("opening and dismissing a pods row copy menu leaves the URL unchanged", async () => {
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
+            const urlBefore = page.url();
+            await page.locator("[data-test-id='pod-row-name-copy']").first().click();
+            await expect(page.locator("[data-test-id='pod-row-name-copy-short']")).toBeVisible();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row-name-copy-short']")).toHaveCount(0);
+            expect(page.url()).toBe(urlBefore);
+        });
+
+        test("a cluster-scoped node name has no empty namespace segment in its full path", async () => {
+            await page.goto("/nodes", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='nodes-table']")).toBeVisible();
+            await page.locator("[data-test-id='node-row-name-copy']").first().click();
+            await expect(page.locator("[data-test-id='node-row-name-copy-long']")).toContainText(`${CLUSTER_1}/node-worker`);
+            await page.locator("[data-test-id='node-row-name-copy-long']").click();
+            expect(await readClipboard()).toBe(`${CLUSTER_1}/node-worker`);
+        });
+
+        test("the node detail page copies its name, roles and version", async () => {
+            await page.goto("/nodes/node-worker", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='node-panel-detail']")).toBeVisible();
+            await page.locator("[data-test-id='node-detail-name-copy']").click();
+            await page.locator("[data-test-id='node-detail-name-copy-long']").click();
+            expect(await readClipboard()).toBe(`${CLUSTER_1}/node-worker`);
+            await page.locator("[data-test-id='node-detail-roles-copy']").click();
+            expect(await readClipboard()).toBe("worker");
+            await page.locator("[data-test-id='node-detail-version-copy']").click();
+            expect(await readClipboard()).toBe("v1.29.0");
+        });
+
+        test("the node detail roles and version are plain buttons with no menu", async () => {
+            await page.goto("/nodes/node-worker", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='node-panel-detail']")).toBeVisible();
+            await expect(page.locator("[data-test-id='node-detail-roles-copy-short']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='node-detail-version-copy-short']")).toHaveCount(0);
+        });
+
+        test("the namespace detail page copies its name", async () => {
+            await page.goto("/namespaces/team-a", { waitUntil: "networkidle" });
+            await expect(page.getByRole("heading", { name: "team-a" })).toBeVisible();
+            await page.locator("[data-test-id='namespace-detail-name-copy']").click();
+            await page.locator("[data-test-id='namespace-detail-name-copy-long']").click();
+            expect(await readClipboard()).toBe(`${CLUSTER_1}/team-a`);
+        });
+
+        test("the container detail page copies its name, its pod and its image", async () => {
+            await page.route("**/api/pods/default/nginx-abc*", async (route) => {
+                await route.fulfill({
+                    json: {
+                        name: "nginx-abc",
+                        namespace: "default",
+                        phase: "Running",
+                        node: "node-worker",
+                        podIP: "10.0.0.1",
+                        createdAt: new Date().toISOString(),
+                        labels: {},
+                        containers: [{ name: "nginx", image: "nginx:1.27.4", ready: true, restarts: 0, state: "Running", stateReason: "" }],
+                        initContainers: [],
+                        events: [],
+                    },
+                });
+            });
+            await page.goto("/pods/default/nginx-abc/containers/nginx", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='container-panel-detail']")).toBeVisible();
+            await page.locator("[data-test-id='container-detail-name-copy']").click();
+            await page.locator("[data-test-id='container-detail-name-copy-long']").click();
+            expect(await readClipboard()).toBe(`${CLUSTER_1}/default/nginx-abc/nginx`);
+            await page.locator("[data-test-id='container-detail-pod-copy']").click();
+            await page.locator("[data-test-id='container-detail-pod-copy-short']").click();
+            expect(await readClipboard()).toBe("nginx-abc");
+            await page.locator("[data-test-id='container-detail-image-copy']").click();
+            expect(await readClipboard()).toBe("nginx:1.27.4");
+            await page.unroute("**/api/pods/default/nginx-abc*");
+        });
+
+        test("the error detail page copies its object, reason and message", async () => {
+            await page.goto("/errors/0", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='error-detail']")).toBeVisible();
+            await page.locator("[data-test-id='error-detail-object-copy']").click();
+            await page.locator("[data-test-id='error-detail-object-copy-long']").click();
+            expect(await readClipboard()).toBe(`${CLUSTER_1}/default/crasher-abc`);
+            await page.locator("[data-test-id='error-detail-reason-copy']").click();
+            expect(await readClipboard()).toBe("CrashLoopBackOff");
+            await page.locator("[data-test-id='error-detail-message-copy']").click();
+            expect(await readClipboard()).toBe("back-off 5m0s restarting failed container");
+        });
+
+        test("the errors table object column offers the copy menu", async () => {
+            await page.goto("/errors", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='errors-table']")).toBeVisible();
+            const urlBefore = page.url();
+            await page.locator("[data-test-id='error-row-object-copy']").first().click();
+            await page.locator("[data-test-id='error-row-object-copy-short']").click();
+            expect(await readClipboard()).toBe("crasher-abc");
+            expect(page.url()).toBe(urlBefore);
         });
     });
 

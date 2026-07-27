@@ -108,3 +108,64 @@ Teardown:
 ```sh
 ./docs/testing-manual/_fixtures-kwok/20-pod-detail-tabs/teardown.sh
 ```
+
+## Scenario D: The copy menu on a resource name
+
+Any value that is a resource name offers two forms rather than copying immediately. This scenario builds on Scenario A's cluster, so run that fixture first if you have torn it down.
+
+**Fixture:** [_fixtures-kwok/20-pod-detail-tabs](../_fixtures-kwok/20-pod-detail-tabs/)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/20-pod-detail-tabs/setup.sh
+```
+
+### What to check
+
+- Open `/pods/default/web`. Click the copy control beside the `web` heading. It does **not** copy immediately: a menu opens with exactly two entries, in this order.
+  - **Short name**, showing `web` beneath it.
+  - **Full path**, showing `kwok-karse-test/default/web` beneath it (the context you selected, then the namespace, then the pod).
+- Click **Short name**. The menu closes, the icon flips to a tick, and pasting gives exactly `web`.
+- Re-open the menu and click **Full path**. Pasting gives exactly `kwok-karse-test/default/web`.
+- Press `Escape` with the menu open. It closes and nothing is copied (paste still gives what you copied last).
+- **Namespace**: the Details card's Namespace field has the same menu. Its Full path is `kwok-karse-test/default`, with no trailing empty segment, because a namespace is cluster-scoped.
+- **Node**: the Node field's menu gives `fake-node-1` and `kwok-karse-test/fake-node-1`, again with no namespace segment.
+- **Pod IP has no menu**: click the Pod IP copy button. It copies straight away with no menu, because an IP has only one form.
+- **Container**: open the Containers tab. The Name cell of the `nginx` row has a copy menu. Its Full path is `kwok-karse-test/default/web/nginx`: a container extends its pod's path. The Image cell beside it is still a plain button with no menu.
+- **In a clickable row**: with the container copy menu open, confirm the container detail page has not opened and the URL is unchanged. Press `Escape`, then click **Short name** on a re-opened menu, and confirm you are still on the pod detail page.
+- **Light and dark**: switch the colour mode in the header. Confirm the open menu is legible in both modes and that the monospace path text under each entry is readable.
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/20-pod-detail-tabs/teardown.sh
+```
+
+## Scenario E: Copy controls across the rest of the app
+
+Every detail page and every resource table's name column carries a copy control. This scenario builds on Scenario A's cluster.
+
+**Fixture:** [_fixtures-kwok/20-pod-detail-tabs](../_fixtures-kwok/20-pod-detail-tabs/)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/20-pod-detail-tabs/setup.sh
+```
+
+### What to check
+
+- **Pods table** (`/pods`): each row's Name cell has a copy menu beside the name. Open it on the `web` row: `web` and `kwok-karse-test/default/web`. Choose either and confirm the pods list is still on screen and the URL is unchanged: the copy must not open the pod detail page.
+- **Nodes table** (`/nodes`): the same control on the Name column. `fake-node-1`'s Full path is `kwok-karse-test/fake-node-1`, with no empty namespace segment.
+- **Node detail** (`/nodes/fake-node-1`): a copy menu beside the node name in the heading. Roles and Version each have a plain button with no menu; copy each and paste to confirm the exact text. If Roles shows `<none>` there is no button on it.
+- **Namespace detail** (`/namespaces/default`): a copy menu beside the namespace name in the heading, giving `default` and `kwok-karse-test/default`.
+- **Container detail** (open `/pods/default/web`, Containers tab, click the `nginx` row): a copy menu beside the container name in the heading, one beside the Pod field, one beside the Namespace field, and a plain button beside Image.
+- **Deployments, stateful sets, daemon sets, autoscalers, namespaces and all-resources tables**: each has the same copy menu in its Name column.
+- **Workload detail** (click a deployment row): a copy menu beside the workload name in the heading and beside the Namespace field.
+- **Events and errors tables**: the Object column carries a copy menu beside the object reference. Copying must not open the event or error detail page.
+- **Event detail and error detail**: a copy menu beside the Object reference, and plain buttons on Reason and on the Message panel. Copy the message and confirm you get the full untruncated text.
+- **Labels carry nothing**: confirm there is no copy control on a label chip in a table's Labels cell or in the labels modal.
+- **Light and dark**: switch the colour mode and confirm every control above stays legible and aligned.
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/20-pod-detail-tabs/teardown.sh
+```

@@ -36,6 +36,7 @@ import { DataTableRows } from "../../../components/data-table-row";
 import { useSearchFilter } from "../../../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { LabelsCell } from "../../../components/labels-cell";
+import { CopyNameCell } from "../../../components/copy-button";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
 import { ResourceStatsHeader } from "../../../components/resource-stats-header";
 import { computeDaemonSetStats, daemonSetHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
@@ -46,7 +47,18 @@ import { SearchBox } from "../../../components/search-box";
 
 // Column definitions for the daemon sets table.
 const columns: ColumnDef<DaemonSet>[] = [
-    { accessorKey: "name", header: "Name" },
+    {
+        accessorKey: "name",
+        header: "Name",
+        // The name is a resource name, so it carries the two-form copy menu.
+        cell: (info) => (
+            <CopyNameCell
+                segments={[info.row.original.namespace, info.row.original.name]}
+                label="daemon set name"
+                testId="daemonset-row-name-copy"
+            />
+        ),
+    },
     {
         accessorKey: "namespace",
         header: "Namespace",

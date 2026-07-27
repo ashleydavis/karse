@@ -8,6 +8,8 @@ Backed by: `GET /api/daemonsets`, `backend/src/routes/workloads-route.ts`, `back
 
 ## Behaviour
 
+- The Name column carries the two-form copy menu beside each daemon set name. See [copy-button](../copy-button/detail.md).
+
 - `GET /api/daemonsets?context=<ctx>&namespace=<ns?>` returns `{ daemonSets: DaemonSet[] }`. `context` is required (400 if missing/blank); `namespace` is optional (omit for all namespaces, `-A`). Returns 500 with kubectl's stderr on failure.
 - Each `DaemonSet` has `name`, `namespace`, `desired` (desiredNumberScheduled), `current` (currentNumberScheduled), `ready` (numberReady), `upToDate` (updatedNumberScheduled), `available` (numberAvailable), `createdAt`, and `labels` (the daemon set's `metadata.labels`, an empty object when none).
 - A Labels column renders each daemon set's labels as compact `key=value` chips (a muted dash when none) and participates in the table's fuzzy search. It truncates to the first few chips with a `+N ...` control that opens a searchable labels modal (the shared Labels column behaviour, see `resource-search`).

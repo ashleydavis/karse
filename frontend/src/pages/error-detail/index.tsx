@@ -18,6 +18,7 @@ import { fetchErrors } from "../../lib/api-client";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { ResourceRef } from "../../components/resource-ref";
+import { CopyButton, CopyNameButton } from "../../components/copy-button";
 import { Timestamp } from "../../components/timestamp";
 import { formatAge, formatLocalTime, UNKNOWN_TIMESTAMP } from "../../lib/timestamps";
 
@@ -129,19 +130,29 @@ export function ErrorDetailPage() {
                     </Box>
                     <Box data-test-id="error-detail-object">
                         <Typography variant="caption" color="text.secondary">Object</Typography>
-                        <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
-                            <ResourceRef
-                                kind={item.objectKind}
-                                name={item.objectName}
-                                namespace={item.namespace}
-                                label={`${item.objectKind}/${item.objectName}`}
-                                testId="error-detail-object-link"
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minHeight: 30 }}>
+                            <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                                <ResourceRef
+                                    kind={item.objectKind}
+                                    name={item.objectName}
+                                    namespace={item.namespace}
+                                    label={`${item.objectKind}/${item.objectName}`}
+                                    testId="error-detail-object-link"
+                                />
+                            </Typography>
+                            <CopyNameButton
+                                segments={[item.namespace, item.objectName]}
+                                label="object name"
+                                testId="error-detail-object-copy"
                             />
-                        </Typography>
+                        </Box>
                     </Box>
                     <Box data-test-id="error-detail-reason-field">
                         <Typography variant="caption" color="text.secondary">Reason</Typography>
-                        <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{item.reason}</Typography>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minHeight: 30 }}>
+                            <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{item.reason}</Typography>
+                            <CopyButton text={item.reason} label="error reason" testId="error-detail-reason-copy" />
+                        </Box>
                     </Box>
                     <Box data-test-id="error-detail-namespace">
                         <Typography variant="caption" color="text.secondary">Namespace</Typography>
@@ -173,7 +184,10 @@ export function ErrorDetailPage() {
             </Paper>
 
             <Paper variant="outlined" sx={{ p: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Message</Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Message</Typography>
+                    <CopyButton text={item.message} label="error message" testId="error-detail-message-copy" />
+                </Box>
                 <Typography
                     variant="body2"
                     sx={{ fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word" }}

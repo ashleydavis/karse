@@ -35,6 +35,7 @@ import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
 import { useShareableNavigate } from "../../../lib/nav-state";
 import { ResourceRef } from "../../../components/resource-ref";
+import { CopyNameButton } from "../../../components/copy-button";
 import { RowFilterMenu } from "../../../components/row-filter-menu";
 import { ActiveRowFilters } from "../../../components/active-row-filters";
 import { type EventFilter, applyEventFilters } from "../../../lib/event-filter";
@@ -112,13 +113,18 @@ const columns: ColumnDef<ClusterEvent>[] = [
         // from bubbling up to the row. An involved object that cannot be resolved to
         // a detail page (a kind Karse has no page for) degrades to plain text.
         cell: ({ row, getValue }) => (
-            <span onClick={(e) => e.stopPropagation()}>
+            <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                 <ResourceRef
                     kind={row.original.objectKind}
                     name={row.original.objectName}
                     namespace={row.original.namespace}
                     label={getValue<string>()}
                     testId="event-row-object-link"
+                />
+                <CopyNameButton
+                    segments={[row.original.namespace, row.original.objectName]}
+                    label="object name"
+                    testId="event-row-object-copy"
                 />
             </span>
         ),

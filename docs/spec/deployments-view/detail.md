@@ -8,6 +8,8 @@ Backed by: `GET /api/deployments`, `backend/src/routes/workloads-route.ts`, `bac
 
 ## Behaviour
 
+- The Name column carries the two-form copy menu beside each deployment name. See [copy-button](../copy-button/detail.md).
+
 - `GET /api/deployments?context=<ctx>&namespace=<ns?>` returns `{ deployments: Deployment[] }`. `context` is required (400 if missing/blank); `namespace` is optional (omit for all namespaces, `-A`). Returns 500 with kubectl's stderr on failure.
 - Each `Deployment` has `name`, `namespace`, `ready` (e.g. "2/3", readyReplicas over spec replicas), `upToDate` (updatedReplicas), `available` (availableReplicas), `createdAt`, and `labels` (the deployment's `metadata.labels`, an empty object when none).
 - A Labels column renders each deployment's labels as compact `key=value` chips (a muted dash when none) and participates in the table's fuzzy search. It truncates to the first few chips with a `+N ...` control that opens a searchable labels modal (the shared Labels column behaviour, see `resource-search`).

@@ -35,6 +35,7 @@ import { LoadError } from "../../../components/load-error";
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
 import { ResourceRef } from "../../../components/resource-ref";
+import { CopyNameButton } from "../../../components/copy-button";
 import { DataTableRows } from "../../../components/data-table-row";
 import { useSearchFilter } from "../../../lib/use-search-filter";
 import { makeErrorsGlobalFilter } from "../../../lib/errors-search";
@@ -108,13 +109,18 @@ const columns: ColumnDef<ClusterError>[] = [
         // its click from bubbling up to the row. A reference that cannot be resolved
         // to a detail page (a kind Karse has no page for) degrades to plain text.
         cell: ({ row, getValue }) => (
-            <span onClick={(e) => e.stopPropagation()}>
+            <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                 <ResourceRef
                     kind={row.original.objectKind}
                     name={row.original.objectName}
                     namespace={row.original.namespace}
                     label={getValue<string>()}
                     testId="error-row-object-link"
+                />
+                <CopyNameButton
+                    segments={[row.original.namespace, row.original.objectName]}
+                    label="object name"
+                    testId="error-row-object-copy"
                 />
             </span>
         ),

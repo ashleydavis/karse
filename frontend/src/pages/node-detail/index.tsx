@@ -37,6 +37,7 @@ import { LabelsTab } from "../../components/labels-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { ResourceRef } from "../../components/resource-ref";
+import { CopyButton, CopyNameButton } from "../../components/copy-button";
 import { NodePerformanceTab } from "../../components/performance/node-performance-tab";
 import { NodeResourceIndicator } from "../../components/performance/node-resource-indicator";
 import { tableRowSx } from "../../lib/table-row-style";
@@ -336,10 +337,32 @@ export function NodeDetailPage() {
 
     // The Details grid's label/value pairs. The values are ReactNodes because Age is
     // a <Timestamp>, which renders as an age or a local time per the app-wide mode.
-    const detailFields: [string, ReactNode][] = [
-        ["Roles", data.roles.length > 0 ? data.roles.join(", ") : "<none>"],
-        ["Version", data.version],
-        ["Age", <Timestamp value={data.createdAt} />],
+    // The Details grid's label/value pairs, each with the exact text its copy button
+    // puts on the clipboard. None of these is a resource name, so they all take the
+    // plain single-click button. An empty copy text means no button at all, which is
+    // how the "<none>" roles placeholder and the rendered Age end up with none.
+    const detailFields: { label: string; value: ReactNode; copy: string; copyLabel: string; copyTestId: string }[] = [
+        {
+            label: "Roles",
+            value: data.roles.length > 0 ? data.roles.join(", ") : "<none>",
+            copy: data.roles.length > 0 ? data.roles.join(", ") : "",
+            copyLabel: "node roles",
+            copyTestId: "node-detail-roles-copy",
+        },
+        {
+            label: "Version",
+            value: data.version,
+            copy: data.version,
+            copyLabel: "node version",
+            copyTestId: "node-detail-version-copy",
+        },
+        {
+            label: "Age",
+            value: <Timestamp value={data.createdAt} />,
+            copy: "",
+            copyLabel: "",
+            copyTestId: "",
+        },
     ];
 
     return (
@@ -353,6 +376,7 @@ export function NodeDetailPage() {
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
                     {data.name}
                 </Typography>
+                <CopyNameButton segments={[data.name]} label="node name" testId="node-detail-name-copy" />
                 <StatusChip status={data.status} />
                 <Box sx={{ flexGrow: 1 }} />
             </Box>
@@ -378,10 +402,15 @@ export function NodeDetailPage() {
                     <Paper variant="outlined" sx={{ p: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Details</Typography>
                         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 1.5 }}>
-                            {detailFields.map(([label, value]) => (
-                                <Box key={label}>
-                                    <Typography variant="caption" color="text.secondary">{label}</Typography>
-                                    <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{value}</Typography>
+                            {detailFields.map((field) => (
+                                <Box key={field.label}>
+                                    <Typography variant="caption" color="text.secondary">{field.label}</Typography>
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minHeight: 30 }}>
+                                        <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{field.value}</Typography>
+                                        {field.copy !== "" && (
+                                            <CopyButton text={field.copy} label={field.copyLabel} testId={field.copyTestId} />
+                                        )}
+                                    </Box>
                                 </Box>
                             ))}
                         </Box>

@@ -35,6 +35,7 @@ import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn } from "../../../lib/table-filter-state";
 import { useTableFilter } from "../../../lib/use-table-filter";
 import { LabelsCell } from "../../../components/labels-cell";
+import { CopyNameCell } from "../../../components/copy-button";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
 import { ResourceStatsHeader } from "../../../components/resource-stats-header";
 import { computeNodeStats, nodeHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
@@ -128,6 +129,14 @@ function buildColumns(util: NodeUtilizationMap, mode: ViewMode, format: ValueFor
     {
         accessorKey: "name",
         header: "Name",
+        // A node is cluster-scoped, so its long form has no namespace segment.
+        cell: (info) => (
+            <CopyNameCell
+                segments={[info.row.original.name]}
+                label="node name"
+                testId="node-row-name-copy"
+            />
+        ),
     },
     {
         accessorKey: "status",

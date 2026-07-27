@@ -38,6 +38,7 @@ import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn, type FilterSelection } from "../../../lib/table-filter-state";
 import { useTableFilter } from "../../../lib/use-table-filter";
 import { LabelsCell } from "../../../components/labels-cell";
+import { CopyNameCell } from "../../../components/copy-button";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
 import { ResourceStatsHeader } from "../../../components/resource-stats-header";
 import { computePodStats, podHealth, HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
@@ -154,6 +155,14 @@ function buildColumns(figures: PodFiguresMap, mode: ViewMode, format: ValueForma
         {
             accessorKey: "name",
             header: "Name",
+            // The pod name is a resource name, so it carries the two-form copy menu.
+            cell: (info) => (
+                <CopyNameCell
+                    segments={[info.row.original.namespace, info.row.original.name]}
+                    label="pod name"
+                    testId="pod-row-name-copy"
+                />
+            ),
         },
         {
             accessorKey: "namespace",

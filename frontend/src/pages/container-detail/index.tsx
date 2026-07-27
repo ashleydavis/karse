@@ -21,6 +21,7 @@ import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { CommandsTab } from "../../components/commands-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { ResourceRef } from "../../components/resource-ref";
+import { CopyButton, CopyNameButton } from "../../components/copy-button";
 import { PodLogsPanel } from "../pod-detail/components/pod-logs-panel";
 
 // Renders a colored chip describing a container's current lifecycle state,
@@ -119,6 +120,11 @@ export function ContainerDetailPage() {
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
                     {found.name}
                 </Typography>
+                <CopyNameButton
+                    segments={[data.namespace, data.name, found.name]}
+                    label="container name"
+                    testId="container-detail-name-copy"
+                />
                 <ContainerStateChip state={found.state} reason={found.stateReason} />
                 {isInit && <Chip label="Init Container" size="small" variant="outlined" />}
                 <Box sx={{ flexGrow: 1 }} />
@@ -144,18 +150,38 @@ export function ContainerDetailPage() {
                         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 1.5 }}>
                             <Box>
                                 <Typography variant="caption" color="text.secondary">Pod</Typography>
-                                <Typography variant="body2" sx={{ fontFamily: "monospace", overflowWrap: "anywhere" }}>
-                                    <ResourceRef kind="Pod" name={data.name} namespace={data.namespace} testId="container-detail-pod-link" />
-                                </Typography>
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minHeight: 30 }}>
+                                    <Typography variant="body2" sx={{ fontFamily: "monospace", overflowWrap: "anywhere" }}>
+                                        <ResourceRef kind="Pod" name={data.name} namespace={data.namespace} testId="container-detail-pod-link" />
+                                    </Typography>
+                                    <CopyNameButton
+                                        segments={[data.namespace, data.name]}
+                                        label="pod name"
+                                        testId="container-detail-pod-copy"
+                                    />
+                                </Box>
                             </Box>
                             <Box>
                                 <Typography variant="caption" color="text.secondary">Namespace</Typography>
-                                <Typography variant="body2" sx={{ fontFamily: "monospace", overflowWrap: "anywhere" }}>
-                                    <ResourceRef kind="Namespace" name={data.namespace} testId="container-detail-namespace-link" />
-                                </Typography>
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minHeight: 30 }}>
+                                    <Typography variant="body2" sx={{ fontFamily: "monospace", overflowWrap: "anywhere" }}>
+                                        <ResourceRef kind="Namespace" name={data.namespace} testId="container-detail-namespace-link" />
+                                    </Typography>
+                                    <CopyNameButton
+                                        segments={[data.namespace]}
+                                        label="namespace"
+                                        testId="container-detail-namespace-copy"
+                                    />
+                                </Box>
+                            </Box>
+                            <Box>
+                                <Typography variant="caption" color="text.secondary">Image</Typography>
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minHeight: 30 }}>
+                                    <Typography variant="body2" sx={{ fontFamily: "monospace", overflowWrap: "anywhere" }}>{found.image}</Typography>
+                                    <CopyButton text={found.image} label="container image" testId="container-detail-image-copy" />
+                                </Box>
                             </Box>
                             {[
-                                ["Image", found.image],
                                 ["State", found.stateReason ? `${found.state}: ${found.stateReason}` : found.state],
                                 ["Ready", found.ready ? "Yes" : "No"],
                                 ["Restarts", String(found.restarts)],

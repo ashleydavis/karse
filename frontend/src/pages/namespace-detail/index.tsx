@@ -30,6 +30,7 @@ import { tableRowSx } from "../../lib/table-row-style";
 import { ResourcesTable } from "./components/resources-table";
 import { namespaceResourceCount } from "../../lib/namespace-resource-count";
 import { Timestamp } from "../../components/timestamp";
+import { CopyNameButton } from "../../components/copy-button";
 
 // Renders a colored chip for a namespace's lifecycle phase.
 function PhaseChip({ phase }: { phase: string }) {
@@ -76,7 +77,6 @@ export function NamespaceDetailPage() {
     // The Details grid's label/value pairs. The values are ReactNodes because Age is
     // a <Timestamp>, which renders as an age or a local time per the app-wide mode.
     const detailFields: [string, ReactNode][] = [
-        ["Name", data.name],
         ["Status", data.phase],
         ["Age", <Timestamp value={data.createdAt} />],
         ["Resources", `${podCount}`],
@@ -93,6 +93,7 @@ export function NamespaceDetailPage() {
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
                     {data.name}
                 </Typography>
+                <CopyNameButton segments={[data.name]} label="namespace name" testId="namespace-detail-name-copy" />
                 <PhaseChip phase={data.phase} />
                 <Box sx={{ flexGrow: 1 }} />
             </Box>

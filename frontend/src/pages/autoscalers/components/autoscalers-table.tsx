@@ -28,6 +28,7 @@ import { fetchHorizontalPodAutoscalers } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
 import { LabelsCell } from "../../../components/labels-cell";
+import { CopyNameCell } from "../../../components/copy-button";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
 import { ResourceRef } from "../../../components/resource-ref";
 import { ResourceBarCell } from "../../../components/resource-utilization/resource-bar-cell";
@@ -64,7 +65,18 @@ function splitReference(reference: string): { kind: string; name: string } {
 // so how hard an HPA is working, and how much room it has left, read at a glance. Both
 // sort on the numeric percentage behind the bar rather than its display text.
 const columns: ColumnDef<HorizontalPodAutoscaler>[] = [
-    { accessorKey: "name", header: "Name" },
+    {
+        accessorKey: "name",
+        header: "Name",
+        // The name is a resource name, so it carries the two-form copy menu.
+        cell: (info) => (
+            <CopyNameCell
+                segments={[info.row.original.namespace, info.row.original.name]}
+                label="autoscaler name"
+                testId="autoscaler-row-name-copy"
+            />
+        ),
+    },
     {
         accessorKey: "namespace",
         header: "Namespace",

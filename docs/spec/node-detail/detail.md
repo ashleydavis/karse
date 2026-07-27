@@ -8,6 +8,8 @@ Backed by: `GET /api/nodes/:name`, `backend/src/routes/node-detail-route.ts`, `b
 
 ## Behaviour
 
+- The node name in the heading carries the two-form copy menu, and the Roles and Version fields carry a plain copy button (a `<none>` roles placeholder has none). See [copy-button](../copy-button/detail.md).
+
 - `GET /api/nodes/:name` returns a `NodeDetail`: `name`, `status`, `roles`, `version`, `createdAt`, `conditions[]`, `capacity`, `allocatable`, `addresses[]`, `labels`, `pods[]`, `events[]`. Returns 500 with kubectl's stderr when the node read fails.
 - The adapter runs three parallel reads: `get node <name> -o json`, `get pods -A --field-selector=spec.nodeName=<name> -o json`, and `get events -A --field-selector=involvedObject.kind=Node,involvedObject.name=<name> -o json`.
 - Conditions carry `type`, `status` (True/False/Unknown), `message`, and `lastTransition`. Capacity and allocatable each carry `cpu`, `memory`, `pods`. Addresses carry `type` and `address`.

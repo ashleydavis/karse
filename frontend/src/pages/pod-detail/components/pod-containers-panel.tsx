@@ -13,7 +13,7 @@ import {
 import type { ContainerState, ContainerInfo } from "karse-types";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { useShareableNavigate } from "../../../lib/nav-state";
-import { CopyButton } from "../../../components/copy-button";
+import { CopyButton, CopyNameCell } from "../../../components/copy-button";
 
 // Renders a colored chip describing a container's current state.
 function ContainerStateChip({ state, reason }: { state: ContainerState; reason: string }) {
@@ -61,7 +61,13 @@ function ContainerTable({ containers, rowTestId, emptyMessage, namespace, podNam
                             sx={tableRowSx(true)}
                             onClick={() => navigate(`/pods/${namespace}/${podName}/containers/${c.name}`)}
                         >
-                            <TableCell sx={{ fontFamily: "monospace" }}>{c.name}</TableCell>
+                            <TableCell sx={{ fontFamily: "monospace" }}>
+                                <CopyNameCell
+                                    segments={[namespace, podName, c.name]}
+                                    label={`container name ${c.name}`}
+                                    testId="container-row-name-copy"
+                                />
+                            </TableCell>
                             <TableCell sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}>
                                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                                     {c.image}

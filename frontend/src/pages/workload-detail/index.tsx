@@ -30,6 +30,7 @@ import { LabelsTab } from "../../components/labels-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
 import { LoadError } from "../../components/load-error";
 import { ResourceRef } from "../../components/resource-ref";
+import { CopyNameButton } from "../../components/copy-button";
 import { ResourceStatsHeader } from "../../components/resource-stats-header";
 import { computePodStats } from "../../lib/resource-stats";
 import { tableRowSx } from "../../lib/table-row-style";
@@ -114,6 +115,11 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
                     {data.name}
                 </Typography>
+                <CopyNameButton
+                    segments={[data.namespace, data.name]}
+                    label="workload name"
+                    testId="workload-detail-name-copy"
+                />
                 <Chip label={KIND_LABEL[kind]} size="small" variant="outlined" />
                 <Box sx={{ flexGrow: 1 }} />
             </Box>
@@ -139,9 +145,16 @@ export function WorkloadDetailPage({ kind }: { kind: WorkloadKind }) {
                         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 1.5 }}>
                             <Box data-test-id="workload-stat">
                                 <Typography variant="caption" color="text.secondary">Namespace</Typography>
-                                <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
-                                    <ResourceRef kind="Namespace" name={data.namespace} testId="workload-detail-namespace-link" />
-                                </Typography>
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minHeight: 30 }}>
+                                    <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                                        <ResourceRef kind="Namespace" name={data.namespace} testId="workload-detail-namespace-link" />
+                                    </Typography>
+                                    <CopyNameButton
+                                        segments={[data.namespace]}
+                                        label="namespace"
+                                        testId="workload-detail-namespace-copy"
+                                    />
+                                </Box>
                             </Box>
                             {detailFields.map(([label, value]) => (
                                 <Box key={label} data-test-id="workload-stat">

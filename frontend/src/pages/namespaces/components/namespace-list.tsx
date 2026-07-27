@@ -30,6 +30,7 @@ import { ACTIONS_COLUMN_ID, stickyActionsHeaderSx } from "../../../lib/sticky-ac
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
 import { LabelsCell } from "../../../components/labels-cell";
+import { CopyNameCell } from "../../../components/copy-button";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
 import { TableFilter } from "../../../components/table-filter";
 import { labelsColumnFilterFn, collectLabelColumns } from "../../../lib/table-filter-state";
@@ -60,16 +61,24 @@ export function NamespaceList({ namespaces, active, terminalDefault, isLoading, 
         {
             accessorKey: "name",
             header: "Name",
+            // A namespace is cluster-scoped, so its long form has no namespace segment.
+            // The active/default chips ride along beside the name, before the copy menu.
             cell: (info) => (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                    {info.getValue<string>()}
-                    {info.row.original.name === active && (
-                        <Chip label="active" size="small" color="primary" />
-                    )}
-                    {info.row.original.name === terminalDefault && (
-                        <Chip label="default" size="small" />
-                    )}
-                </span>
+                <CopyNameCell
+                    segments={[info.row.original.name]}
+                    label="namespace name"
+                    testId="namespace-row-name-copy"
+                    extra={
+                        <>
+                            {info.row.original.name === active && (
+                                <Chip label="active" size="small" color="primary" />
+                            )}
+                            {info.row.original.name === terminalDefault && (
+                                <Chip label="default" size="small" />
+                            )}
+                        </>
+                    }
+                />
             ),
         },
         {

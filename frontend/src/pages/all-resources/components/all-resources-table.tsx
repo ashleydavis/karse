@@ -39,6 +39,7 @@ import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn } from "../../../lib/table-filter-state";
 import { useTableFilter } from "../../../lib/use-table-filter";
 import { LabelsCell } from "../../../components/labels-cell";
+import { CopyNameCell } from "../../../components/copy-button";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
 import { HEALTH_FILTER_OPTIONS } from "../../../lib/resource-stats";
 import { aggregateResources, presentKinds, type AllResource } from "../../../lib/all-resources";
@@ -79,6 +80,16 @@ function buildColumns(): ColumnDef<AllResource>[] {
         {
             accessorKey: "name",
             header: "Name",
+            // Every row here is a resource name, so it carries the two-form copy menu. A
+            // cluster-scoped kind (Node, Namespace) has a blank namespace, which drops out
+            // of the long form rather than leaving an empty path segment.
+            cell: (info) => (
+                <CopyNameCell
+                    segments={[info.row.original.namespace, info.row.original.name]}
+                    label="resource name"
+                    testId="all-resources-row-name-copy"
+                />
+            ),
         },
         {
             accessorKey: "status",

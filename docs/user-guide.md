@@ -108,14 +108,24 @@ Two fields are deliberately left alone: **First seen** and **Last seen** on the 
 
 Karse is read-only, so what you usually want next is the value itself, pasted into a terminal. Values worth pasting have a small **copy button** beside them. Click it and the value goes straight to your clipboard; the icon flips to a tick for a moment to confirm, then reverts.
 
-- On a **pod's detail page**: beside the pod name in the heading, beside the Namespace, Node, and Pod IP on the Status tab, and beside each container's image on the Containers and Init Containers tabs.
+**Two forms for a name.** A resource's name is worth copying two ways, so its control opens a small menu instead of copying straight away:
+
+- **Short name**: the bare name, for example `nginx-abc`.
+- **Full path**: the whole path from the context down, for example `kwok-karse-test/default/nginx-abc`. A node or a namespace is cluster-scoped and has no namespace segment (`kwok-karse-test/node-1`), and a container extends its pod's path (`kwok-karse-test/default/nginx-abc/nginx`).
+
+Each menu entry shows the exact text it will copy underneath it, so you pick by seeing the result. Anything that is not a name (a Pod IP, a container image, an event reason, a `kubectl` command) has one form and copies on a single click, with no menu to open.
+
+Where you will find them:
+
+- On every **detail page**: beside the name in the heading, and beside the pasteable fields below it (namespace, node, Pod IP, image, roles, version, an event or error's object, reason and message).
+- In every **resource table**: in the Name column of pods, nodes, deployments, stateful sets, daemon sets, autoscalers, namespaces and all-resources, and in the Object column of the events and errors tables.
 - On the **Commands** tab and in the page help panel: beside each suggested `kubectl` command.
 - On the **YAML** tab: at the top-right of the YAML panel, copying the whole document.
 - In the **header**: the share button copies the current page's URL.
 
-Two details worth knowing. Copying from a table row does **not** open that row's detail page, so you can grab an image name without leaving the page. And a field showing a `-` placeholder (an unscheduled pod has no node and no IP) has no copy button at all, so you can never end up with a dash on the clipboard.
+Two details worth knowing. Copying from a table row does **not** open that row's detail page, so you can grab a name without leaving the list. And a field showing a `-` placeholder (an unscheduled pod has no node and no IP) has no copy control at all, so you can never end up with a dash on the clipboard.
 
-Copy buttons are on the pod detail page today. The rest of the app's pasteable values, and a menu for values with more than one useful form (a name qualified by its namespace, a label as key, value, or `key=value`), are still to come.
+Label chips have no copy control.
 
 ## Contexts page (`/contexts`)
 

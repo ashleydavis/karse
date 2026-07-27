@@ -8,6 +8,8 @@ Backed by: `GET /api/namespaces/:name`, `backend/src/routes/namespace-detail-rou
 
 ## Behaviour
 
+- The namespace name in the heading carries the two-form copy menu; a namespace is cluster-scoped, so its full path has no namespace segment. See [copy-button](../copy-button/detail.md).
+
 - Namespace rows on `/namespaces` are clickable and navigate to `/namespaces/:name`. Clicking a row's action button (Set as active / Set as default) does not navigate; the button click is isolated from the row click.
 - `GET /api/namespaces/:name` returns a `NamespaceDetail`: `name`, `phase` (status.phase, e.g. "Active"/"Terminating"), `createdAt`, `labels`, `annotations`, `resources[]`, `quotas[]`, `limits[]`. Returns 500 with kubectl's stderr when the namespace read fails; returns 400 when the `context` query parameter is missing or empty.
 - The adapter runs seven parallel reads: the namespace itself, plus the pods, deployments, stateful sets, daemon sets, resource quotas, and limit ranges scoped to the namespace (`-n <name>`).

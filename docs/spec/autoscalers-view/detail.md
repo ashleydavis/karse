@@ -14,6 +14,8 @@ HPAs also remain in the All resources listing (see `all-resources`), which lists
 
 ## Behaviour
 
+- The Name column carries the two-form copy menu beside each autoscaler name. See [copy-button](../copy-button/detail.md).
+
 - `GET /api/horizontalpodautoscalers?context=<ctx>&namespace=<ns?>` returns `{ horizontalPodAutoscalers: HorizontalPodAutoscaler[] }`. `context` is required (400 if missing/blank); `namespace` is optional (omit for all namespaces, `-A`). Returns 500 with kubectl's stderr on failure.
 - Each `HorizontalPodAutoscaler` has `name`, `namespace`, `reference` (the scale target, e.g. `Deployment/web`), `minReplicas`, `maxReplicas`, `currentReplicas`, `desiredReplicas` (the replica count the HPA is driving the target towards), `targets` (the metric summary kubectl prints, e.g. `cpu: 40%/80%`, or `<none>`), `createdAt`, and `labels`.
 - Columns: **Name**, **Namespace**, **Reference**, **Targets**, **Replicas**, **Min**, **Max**, **Age**, **Labels**.

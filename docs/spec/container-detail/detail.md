@@ -10,6 +10,8 @@ Route: `/pods/:namespace/:name/containers/:container`, declared in `frontend/src
 
 ## Behaviour
 
+- The container name in the heading, the parent Pod field, and the Namespace field each carry the two-form copy menu, and Image carries a plain copy button. A container's full path extends its pod's. See [copy-button](../copy-button/detail.md).
+
 - A container row in the pod's Containers tab (and Init Containers tab) is clickable. Clicking it navigates to `/pods/:namespace/:name/containers/:container` for that container, preserving the shareable context/namespace query params.
 - The page fetches the parent pod via `fetchPodDetail` and finds the named container in either `containers[]` or `initContainers[]`. If no container with that name exists, the page shows an error.
 - The header shows the container name, a state chip (Running / Waiting / Terminated / Unknown, matching the pod's container table), an "Init Container" chip when the container is an init container, and a back arrow to the pod detail page.
