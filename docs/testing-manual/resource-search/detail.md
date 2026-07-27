@@ -183,10 +183,10 @@ Teardown the labels fixture, then stand up the large-list fixture:
 ./docs/testing-manual/_fixtures-kwok/33-labels-column/teardown.sh
 ```
 
-**Fixture:** [_fixtures-kwok/36-large-pod-list](../_fixtures-kwok/36-large-pod-list/)
+**Fixture:** [_fixtures-kwok/37-large-pod-list](../_fixtures-kwok/37-large-pod-list/)
 
 ```sh
-./docs/testing-manual/_fixtures-kwok/36-large-pod-list/setup.sh
+./docs/testing-manual/_fixtures-kwok/37-large-pod-list/setup.sh
 ```
 
 It stands up 1500 pods in the `bigpods` namespace (pass a different count as the first argument). Applying that many pods takes a minute or so. `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse.
@@ -210,5 +210,5 @@ The typing measurement above is deliberately **not** asserted by the automated e
 Teardown:
 
 ```sh
-./docs/testing-manual/_fixtures-kwok/36-large-pod-list/teardown.sh
+./docs/testing-manual/_fixtures-kwok/37-large-pod-list/teardown.sh
 ```

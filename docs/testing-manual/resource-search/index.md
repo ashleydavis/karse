@@ -6,6 +6,6 @@ Manual tests for in-table search (fuzzy/subsequence on most tables, plain substr
 
 ## Fixtures
 - [29-fuzzy-search](../_fixtures-kwok/29-fuzzy-search/)
-- [36-large-pod-list](../_fixtures-kwok/36-large-pod-list/)
+- [37-large-pod-list](../_fixtures-kwok/37-large-pod-list/)
 
 Column sorting and per-table search are also exercised in the nodes ([nodes-view](../nodes-view/detail.md)) and pods ([pods-view](../pods-view/detail.md)) scenarios.
