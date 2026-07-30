@@ -1,29 +1,32 @@
-import { useDeferredValue, useState, type Dispatch, type SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 
-// The state behind a table's search box.
+// How long typing must pause in the search box before the parent table
+// re-filters. Owned by `search-box.tsx` (the draft text lives there so keystrokes
+// do not re-render the row list); exported here so tests and docs can name the
+// same constant the box uses.
+export const SEARCH_DEBOUNCE_MS = 250;
+
+// The state behind a table's search filter.
 //
-// `search` is the text in the field. It updates on every keystroke, so the field is never
-// laggy or lossy: what the user types appears immediately.
-//
-// `deferredSearch` is the value the table filters by. React renders the filtered row list at
-// a lower priority and abandons that render as soon as another character arrives, so filtering
-// and re-rendering the whole table no longer happen synchronously once per character. It
-// settles on the same value as `search` the moment typing pauses, so the rows a query selects
-// are exactly the rows it selected before.
+// `search` / `deferredSearch` are the committed filter text the table filters by.
+// They update when `SearchBox` commits (after SEARCH_DEBOUNCE_MS of quiet typing,
+// or immediately on clear). The characters the user is mid-typing live inside
+// `SearchBox` as a local draft, so keystrokes stay snappy.
 export interface SearchFilter {
     search: string;
     setSearch: Dispatch<SetStateAction<string>>;
     deferredSearch: string;
 }
 
-// Shared search state for every table with a search box, so all of them behave identically:
-// bind the field to `search` and the table's `globalFilter` to `deferredSearch`.
+// Shared committed search state for every table with a search box. Bind the
+// `SearchBox` to `search` / `setSearch` and the table's `globalFilter` to
+// `deferredSearch` (the same committed value; the name is kept so every table
+// keeps the same wiring).
 export function useSearchFilter(): SearchFilter {
     const [search, setSearch] = useState("");
-    const deferredSearch = useDeferredValue(search);
     return {
         search,
         setSearch,
-        deferredSearch,
+        deferredSearch: search,
     };
 }

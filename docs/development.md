@@ -229,9 +229,9 @@ State that lives above the pages (currently the selected kubectl context) is own
 
 Every table with a search box shares two pieces, and a new table should use both:
 
-- `lib/use-search-filter.ts` — the search state. Bind the `TextField` to `search` (so the typed text appears immediately) and the table's `globalFilter` to `deferredSearch` (so React re-filters and re-renders the rows at a lower priority, and abandons that render when the next character arrives, instead of re-rendering the whole table once per keystroke).
+- `lib/use-search-filter.ts` — the committed search filter the table filters by. Bind the `SearchBox` to `search` / `setSearch` and the table's `globalFilter` to `deferredSearch` (the same committed value). The characters mid-typing live as a local draft inside `search-box.tsx` and commit after 250 ms of quiet typing (or immediately on clear), so keystrokes do not re-render the row list.
 - `components/data-table-row.tsx` — the shared row (`DataTableRow`) plus `DataTableRows`, the shared row list. Every row re-renders whenever its table does; there is no memoisation anywhere in the frontend, by decision (see **No memoisation** below).
-  `DataTableRows` bounds how many rows reach the DOM, at `ROW_RENDER_LIMIT` (100), and renders a "Show more" row while any are held back. That bound, not the deferred filter value, is what keeps typing responsive on a long list: the per-keystroke cost is proportional to the number of rows rendered and to nothing else (measured at ~174 ms per key with 1500 rows rendered against ~23 ms with 100). Because it lives here, every table gets it; do not render a table's row model directly.
+  `DataTableRows` bounds how many rows reach the DOM, at `ROW_RENDER_LIMIT` (100), and renders a "Show more" row while any are held back. That bound keeps each committed filter pass cheap on a long list: the cost is proportional to the number of rows rendered and to nothing else (measured at ~174 ms per key with 1500 rows rendered against ~23 ms with 100). Because it lives here, every table gets it; do not render a table's row model directly.
 
 ### No memoisation
 

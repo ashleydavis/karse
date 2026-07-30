@@ -8,6 +8,7 @@
 
 ## Later
 
+- Searches should be reflected in the URL so they are shareable.
 - Be great to organize clusters (contexts) by environment. So we can quickly see prod vs dev vs stg.
 - Be great to get a total overview.
     - How many clusters do we have?

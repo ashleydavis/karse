@@ -57,11 +57,13 @@ Check this in both **light and dark mode**.
 
 ### Typing stays responsive on a big table
 
+The search box updates its draft on every keystroke (only the field re-renders). The table waits **250 ms** after the last key before re-filtering (clearing the box applies immediately). On a large pod list the filter pass itself stays cheap because at most 100 rows are in the DOM.
+
 Point Karse at a cluster with a few thousand pods (any real cluster, or a KWOK cluster seeded with a few thousand fake pods), open the **Pods page** with no namespace selected, and type a query such as `nginx-` into the search box at a normal typing speed.
 
 - Every character appears in the box the moment it is typed. The box never lags behind the keyboard, never drops a character, and never reorders what was typed.
-- The page does not freeze while typing: scrolling, the sidebar and the other controls all stay usable, and the table settles on the filtered rows as soon as typing pauses.
-- Delete the query and confirm the full list comes straight back. The rows a query selects are the same as ever — only the table's responsiveness changed.
+- The table does not re-filter on every keystroke: rows update only after typing pauses for about 250 ms. The page does not freeze while typing: scrolling, the sidebar and the other controls all stay usable.
+- Delete the query and confirm the full list comes straight back (no 250 ms wait on clear). The rows a query selects are the same as ever — only when the table re-filters has changed.
 
 ### Search by label, node, and namespace
 On the same **Pods page** (no namespace selected):
@@ -127,6 +129,7 @@ It builds two namespaces holding the same pods under the same names, differing o
 #### What to check
 
 - On **Pods** with the `reallabels` namespace selected, type `redis` in the search box. The table narrows to the `redis-*` pods only. It must **not** keep every row: before the match was bounded, characters of the query could be found scattered across the long label text of every pod, so nothing was filtered out.
+- Still on `reallabels`, type `go-`. The table must narrow (or show no match if no pod name/namespace/label value contains that contiguous text). It must **not** keep every row through the `topology.kubernetes.io/region` label key: `go` is a subsequence of `region`, and that used to leave the table looking unchanged on real clusters. Evidence screenshots from a real cluster (before/after `go-`, light and dark) live under `docs/testing-manual/resource-search/evidence/go-search-fix/screenshots/`.
 - Select the `shortlabels` namespace and type `redis` again. The same `redis-*` pods survive, so the label shape no longer changes the result.
 - Back on `reallabels`, type `managed-by=Helm` (a label every pod carries). Every row stays: label search still works and the narrowing is not achieved by dropping labels out of the search.
 - Type `istio` (part of `security.istio.io/tlsMode=istio`, again on every pod). Every row stays.

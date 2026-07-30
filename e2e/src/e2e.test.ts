@@ -846,6 +846,9 @@ test.describe("karse e2e", () => {
                         "app.kubernetes.io/version": "1.9.4",
                         "helm.sh/chart": "ingress-nginx-4.8.3",
                         "pod-template-hash": "6b8f7c9d4f",
+                        // Present on nearly every pod on a real cluster; "go" is a
+                        // subsequence of "region", which used to keep every row for "go-".
+                        "topology.kubernetes.io/region": "us-east-2",
                     },
                 },
                 {
@@ -865,6 +868,7 @@ test.describe("karse e2e", () => {
                         "controller-revision-hash": "postgres-postgresql-77d9c8b64",
                         "helm.sh/chart": "postgresql-13.2.24",
                         "statefulset.kubernetes.io/pod-name": "postgres-postgresql-0",
+                        "topology.kubernetes.io/region": "us-east-2",
                     },
                 },
             ],
@@ -927,6 +931,17 @@ test.describe("karse e2e", () => {
             await page.locator("[data-test-id='pods-search'] input").fill("1.9.4");
             await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
             await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("nginx-deployment-abc");
+        });
+
+        // "go" is a subsequence of "region" inside topology.kubernetes.io/region,
+        // which both pods carry. A bounded subsequence match on the long Labels
+        // cell used to keep every row for "go-", so the search appeared to do
+        // nothing. Long cells require a contiguous substring, so neither pod
+        // survives.
+        test("a short query that only sits inside a topology region label key keeps no rows", async () => {
+            await page.locator("[data-test-id='pods-search'] input").fill("go-");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-pods-match']")).toBeVisible();
         });
 
         test("clearing the query restores both pods", async () => {
@@ -1437,6 +1452,8 @@ test.describe("karse e2e", () => {
             // namespace that always has pods), then open its detail page and
             // confirm the Details-tab Resources stat shows the same number.
             await page.locator("[data-test-id='namespaces-filter'] input").fill("kube-system");
+            // Wait for the 250 ms search debounce before reading the row.
+            await expect(page.locator("[data-test-id='namespace-row']").filter({ hasText: /^default/ })).toHaveCount(0);
             const row = page.locator("[data-test-id='namespace-row']")
                 .filter({ hasText: "kube-system" }).first();
             const listCount = (
@@ -1460,6 +1477,8 @@ test.describe("karse e2e", () => {
         // so it still excludes "default".
         test("filtering narrows the list to matching namespaces", async () => {
             await page.locator("[data-test-id='namespaces-filter'] input").fill("kube-system");
+            // Wait for the 250 ms search debounce before reading the rows.
+            await expect(page.locator("[data-test-id='namespace-row']").filter({ hasText: /^default/ })).toHaveCount(0);
             const names = await page.locator("[data-test-id='namespace-row'] td:first-child").allTextContents();
             expect(names.some((n) => n.includes("kube-system"))).toBe(true);
             expect(names.every((n) => n.toLowerCase().includes("kube-system"))).toBe(true);
@@ -3022,6 +3041,8 @@ test.describe("karse e2e", () => {
         test("commands tab search filters the command list", async () => {
             const before = await page.locator("[data-test-id='command-row']").count();
             await page.locator("[data-test-id='commands-search'] input").fill("delete");
+            // Wait for the 250 ms search debounce before counting rows.
+            await expect(page.locator("[data-test-id='command-text']").filter({ hasText: "kubectl describe pod" })).toHaveCount(0);
             const after = await page.locator("[data-test-id='command-row']").count();
             expect(after).toBeLessThan(before);
             const commands = await page.locator("[data-test-id='command-text']").allTextContents();
@@ -8895,15 +8916,15 @@ test.describe("karse e2e", () => {
             test("the labels modal is searchable by key and by value", async () => {
                 const search = modal().locator("[data-test-id='labels-filter'] input");
 
-                // Matching on a label key.
+                // Matching on a label key. Poll the pairs so we wait out the 250 ms
+                // search debounce (a bare toHaveCount(1) can succeed on a leftover
+                // previous filter state).
                 await search.fill("region");
-                await expect(modalRows()).toHaveCount(1);
-                expect(await modalPairs()).toEqual(["region=eu-west"]);
+                await expect.poll(async () => modalPairs()).toEqual(["region=eu-west"]);
 
                 // Matching on a label value.
                 await search.fill("backend");
-                await expect(modalRows()).toHaveCount(1);
-                expect(await modalPairs()).toEqual(["tier=backend"]);
+                await expect.poll(async () => modalPairs()).toEqual(["tier=backend"]);
 
                 // A query that matches nothing.
                 await search.fill("zzzznope");

@@ -132,7 +132,7 @@ describe("fuzzyGlobalFilter", () => {
         // { first: "foo", second: "bar" } collapses to "foo bar", so a
         // subsequence spanning both values within the same cell matches.
         const row = makeRow([{ first: "foo", second: "bar" }]);
-        expect(runFilter(row,"fb")).toBe(true);
+        expect(runFilter(row, "fbar")).toBe(true);
     });
 
     test("ignores null and undefined cell values", () => {
@@ -342,6 +342,32 @@ describe("fuzzyGlobalFilter over real-shaped label cells", () => {
     test("a full key=value pair from a real-shaped label set keeps only the pod carrying it", () => {
         expect(survivors("app.kubernetes.io/instance=prometheus")).toEqual(["redis-cache-xyz"]);
     });
+
+    test("a short query that is only a subsequence of a label key keeps no pods", () => {
+        // "go" is a subsequence of "region" inside topology.kubernetes.io/region,
+        // which every real-cluster pod often carries. Contiguous substring
+        // matching on the long Labels cell must refuse that, or every row stays.
+        const withRegion = podRows().map((_, index) => {
+            const labels = {
+                ...REAL_LABELS[index],
+                "topology.kubernetes.io/region": "us-east-2",
+            };
+            return makeRow([
+                POD_NAMES[index],
+                "default",
+                "Running",
+                "1/1",
+                1,
+                0,
+                "fake-node-1",
+                labelsToPairs(labels).join(" "),
+            ]);
+        });
+        const kept = withRegion
+            .map((row, index) => (runFilter(row, "go-") ? POD_NAMES[index] : null))
+            .filter((name): name is string => name !== null);
+        expect(kept).toEqual([]);
+    });
 });
 
 // The bound the fix introduces, stated directly on fuzzyMatch.
@@ -362,5 +388,58 @@ describe("fuzzyMatch bounded window", () => {
         // The leading "a" starts a match that runs past the bound; the matcher must
         // keep looking and find the tight "abc" at the end rather than give up.
         expect(fuzzyMatch(`a${"x".repeat(40)}abc`, "abc")).toBe(true);
+    });
+});
+
+// Short queries that are subsequences of ordinary Kubernetes label keys used to
+// match every pod on a real cluster via the long Labels cell, so typing "go-"
+// (or "otel") left the table looking unchanged. Long cells now require a
+// contiguous substring; typo-tolerant fuzzy matching stays on short cells only.
+describe("fuzzyMatch on long label cells", () => {
+    const REGION_LABEL = "topology.kubernetes.io/region=us-east-2";
+    const HASH_LABEL = "pod-template-hash=77cc897db6";
+    const JOINED_LABELS = [
+        "app.kubernetes.io/instance=admin-api",
+        "app.kubernetes.io/name=admin-api",
+        "app.kubernetes.io/managed-by=Helm",
+        HASH_LABEL,
+        REGION_LABEL,
+    ].join(" ");
+
+    test("a short query that only sits inside a label key does not match a long labels cell", () => {
+        expect(fuzzyMatch(REGION_LABEL, "go-")).toBe(false);
+        expect(fuzzyMatch(REGION_LABEL, "go")).toBe(false);
+        expect(fuzzyMatch(HASH_LABEL, "otel")).toBe(false);
+        expect(fuzzyMatch(JOINED_LABELS, "go-")).toBe(false);
+        expect(fuzzyMatch(JOINED_LABELS, "otel")).toBe(false);
+        // "go" is also a contiguous run inside "cost_category"; that must not
+        // keep every row when the user types "go-" or "go".
+        expect(fuzzyMatch("cost_category=fluentbit " + JOINED_LABELS, "go-")).toBe(false);
+        expect(fuzzyMatch("cost_category=fluentbit " + JOINED_LABELS, "go")).toBe(false);
+    });
+
+    test("a separator-tolerant label query still matches a long labels cell", () => {
+        expect(fuzzyMatch("app=nginx tier=frontend", "app nginx")).toBe(true);
+        expect(fuzzyMatch("app.kubernetes.io/managed-by=Helm", "managed-by=Helm")).toBe(true);
+    });
+
+    test("a contiguous name prefix still matches a short name cell", () => {
+        expect(fuzzyMatch("go-otel-5599559dcb-5xkwh", "go-")).toBe(true);
+        expect(fuzzyMatch("go-otel-5599559dcb-5xkwh", "go")).toBe(true);
+        expect(fuzzyMatch("go-otel-5599559dcb-5xkwh", "otel")).toBe(true);
+    });
+
+    test("typo-tolerant matching still works on a short resource name", () => {
+        expect(fuzzyMatch("nginx-deployment", "ngnx")).toBe(true);
+        expect(fuzzyMatch("nginx-deployment", "ng-x")).toBe(true);
+        expect(fuzzyMatch("replicaset-7d9f8", "rs7d")).toBe(true);
+    });
+
+    test("a two-character query does not fuzzy-match across unrelated name parts", () => {
+        // "go" is a subsequence of "nginx-deployment" (g in nginx, o in
+        // deployment) and of "gpu-operator"; contiguous matching must refuse both.
+        expect(fuzzyMatch("nginx-deployment", "go-")).toBe(false);
+        expect(fuzzyMatch("gpu-operator", "go-")).toBe(false);
+        expect(fuzzyMatch("phishing-protection", "go-")).toBe(false);
     });
 });
