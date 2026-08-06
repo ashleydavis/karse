@@ -5,7 +5,7 @@ import type {
     DeploymentsResponse, StatefulSetsResponse, DaemonSetsResponse,
     HorizontalPodAutoscalersResponse,
     WorkloadKind, WorkloadDetail, NamespaceDetail,
-    PodDetail, NodeDetail, YamlResourceType, YamlResponse,
+    PodDetail, NodeDetail, ResourceKindToken, ResourceDetail, YamlResponse,
     LogStreamLine, LogStreamStarted, EventsResponse, ErrorsResponse,
     ClusterPerformance, NodePerformance, ClusterSummary, MultiClusterTotals,
     PodPerformance, CacheConfigResponse, CacheClearResponse,
@@ -285,7 +285,7 @@ export async function fetchWorkloadDetail(context: string, kind: WorkloadKind, n
 // resources (nodes, namespaces) and supplied for namespaced ones.
 export async function fetchResourceYaml(
     context: string,
-    type: YamlResourceType,
+    type: ResourceKindToken,
     name: string,
     namespace?: string,
 ): Promise<YamlResponse> {
@@ -295,6 +295,30 @@ export async function fetchResourceYaml(
     }
     const response = await http.get<YamlResponse>(`/yaml/${type}/${name}`, { params });
     return response.data;
+}
+
+// Fetches the common metadata (kind, name, namespace, creation time, labels,
+// annotations) of a single resource of any readable kind. This is what the generic
+// detail page shows for a kind with no purpose-built page of its own. namespace is
+// omitted for cluster-scoped kinds and required for namespaced ones.
+// Returns null when the resource does not exist (the backend answers 404), because a
+// missing resource is an expected answer rather than a failed load: the page shows its
+// not-found state instead of a load error offering a retry that can never succeed.
+export async function fetchResourceDetail(
+    context: string,
+    type: ResourceKindToken,
+    name: string,
+    namespace?: string,
+): Promise<ResourceDetail | null> {
+    const params: Record<string, string> = { context };
+    if (namespace) {
+        params.namespace = namespace;
+    }
+    const response = await http.get<ResourceDetail>(`/resource/${type}/${name}`, {
+        params,
+        validateStatus: (status) => (status >= 200 && status < 300) || status === 404,
+    });
+    return response.status === 404 ? null : response.data;
 }
 
 // Callbacks for the multi-pod live log stream consumed via Server-Sent Events.

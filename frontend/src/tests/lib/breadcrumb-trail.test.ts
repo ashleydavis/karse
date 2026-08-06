@@ -300,6 +300,24 @@ describe("pathOriginCrumbs", () => {
     test("returns null when a namespaced origin is missing its resource name", () => {
         expect(pathOriginCrumbs("/pods/default")).toBeNull();
     });
+
+    test("rebuilds a namespaced generic detail origin as All resources and the resource", () => {
+        expect(pathOriginCrumbs("/resources/horizontalpodautoscalers/default/web-hpa")).toEqual([
+            { label: "All resources", to: "/all-resources" },
+            { label: "web-hpa", to: "/resources/horizontalpodautoscalers/default/web-hpa" },
+        ]);
+    });
+
+    test("rebuilds a cluster-scoped generic detail origin from its shorter path", () => {
+        expect(pathOriginCrumbs("/resources/storageclasses/standard")).toEqual([
+            { label: "All resources", to: "/all-resources" },
+            { label: "standard", to: "/resources/storageclasses/standard" },
+        ]);
+    });
+
+    test("returns null when a generic detail origin is missing its resource name", () => {
+        expect(pathOriginCrumbs("/resources/storageclasses")).toBeNull();
+    });
 });
 
 describe("resolveOrigin", () => {

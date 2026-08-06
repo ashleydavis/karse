@@ -53,7 +53,7 @@ Every reference to a resource is a link to that resource's own detail page, so a
 - **Table rows**: click a row to open the resource it names.
 - **Cells within a row**: a row's **Namespace**, **Node**, and **Object** cells link to that namespace, node, or referenced resource, rather than to the row's own target. Clicking one of those cells opens the resource it names; clicking anywhere else on the row opens the row's resource.
 - **Detail-page fields**: a pod's **Namespace** and **Node**, a workload's **Namespace**, a container's **Pod**, and the object an error or event refers to are all links.
-- A reference to something Karse has no detail page for (a ReplicaSet, a Service) is shown as plain text, not a broken link.
+- A reference to a kind with no page of its own (a ReplicaSet, a Service, an autoscaler) opens a generic detail page showing that resource's kind, namespace, age, labels, annotations and raw YAML.
 
 ### The breadcrumb shows how you got there
 

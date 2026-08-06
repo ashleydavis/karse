@@ -465,13 +465,95 @@ export type PodPerformance = {
 // Disk is deliberately excluded: the Metrics API does not report disk usage.
 export type PerformanceMetric = "cpu" | "memory";
 
-// The resource types whose raw YAML can be viewed in the dashboard.
-export type YamlResourceType =
-    "nodes" | "pods" | "deployments" | "daemonsets" | "statefulsets" | "namespaces";
+// The URL/API token identifying a resource kind Karse can read: the lowercase plural
+// name kubectl uses, e.g. "pods", "horizontalpodautoscalers". It appears in the
+// /api/yaml/:type/:name and /api/resource/:type/:name paths, and in the generic detail
+// route's own path (/resources/:type/...). Declared as an explicit union so a token that
+// is not in RESOURCE_KINDS cannot be written by mistake.
+export type ResourceKindToken =
+    // Kinds with their own purpose-built page in Karse.
+    "nodes" | "pods" | "deployments" | "daemonsets" | "statefulsets" | "namespaces"
+    // Workloads.
+    | "replicasets" | "replicationcontrollers" | "jobs" | "cronjobs"
+    // Networking.
+    | "services" | "endpoints" | "ingresses" | "networkpolicies"
+    // Configuration and identity.
+    | "configmaps" | "serviceaccounts"
+    // Storage.
+    | "persistentvolumeclaims" | "persistentvolumes" | "storageclasses"
+    // Scaling, scheduling, and quota policy.
+    | "horizontalpodautoscalers" | "poddisruptionbudgets" | "resourcequotas"
+    | "limitranges" | "priorityclasses"
+    // RBAC.
+    | "roles" | "rolebindings" | "clusterroles" | "clusterrolebindings";
+
+// One resource kind Karse is allowed to read: its singular display kind (what the UI
+// shows and what a resource reference names it by), the resource name handed to
+// "kubectl get", and whether the kind is namespaced.
+export type ResourceKindInfo = {
+    kind: string;
+    kubectlKind: string;
+    namespaced: boolean;
+};
+
+// Every resource kind Karse will read, keyed by its URL/API token. This is one table
+// shared by both sides on purpose: the backend uses it as the read whitelist that stops
+// an arbitrary caller-supplied kind reaching the kubectl argument list, and the frontend
+// uses it to decide which kinds a resource reference can link to and which carry a
+// namespace segment. Keeping it in one place is what stops the two disagreeing about a
+// kind's name or scope.
+//
+// Secrets are deliberately absent: Karse would be showing their contents verbatim, and
+// nothing in the dashboard needs them. Adding a kind here is what makes it readable, so
+// only add kinds the dashboard is meant to show.
+export const RESOURCE_KINDS: Record<ResourceKindToken, ResourceKindInfo> = {
+    nodes: { kind: "Node", kubectlKind: "node", namespaced: false },
+    pods: { kind: "Pod", kubectlKind: "pod", namespaced: true },
+    deployments: { kind: "Deployment", kubectlKind: "deployment", namespaced: true },
+    daemonsets: { kind: "DaemonSet", kubectlKind: "daemonset", namespaced: true },
+    statefulsets: { kind: "StatefulSet", kubectlKind: "statefulset", namespaced: true },
+    namespaces: { kind: "Namespace", kubectlKind: "namespace", namespaced: false },
+    replicasets: { kind: "ReplicaSet", kubectlKind: "replicaset", namespaced: true },
+    replicationcontrollers: { kind: "ReplicationController", kubectlKind: "replicationcontroller", namespaced: true },
+    jobs: { kind: "Job", kubectlKind: "job", namespaced: true },
+    cronjobs: { kind: "CronJob", kubectlKind: "cronjob", namespaced: true },
+    services: { kind: "Service", kubectlKind: "service", namespaced: true },
+    endpoints: { kind: "Endpoints", kubectlKind: "endpoints", namespaced: true },
+    ingresses: { kind: "Ingress", kubectlKind: "ingress", namespaced: true },
+    networkpolicies: { kind: "NetworkPolicy", kubectlKind: "networkpolicy", namespaced: true },
+    configmaps: { kind: "ConfigMap", kubectlKind: "configmap", namespaced: true },
+    serviceaccounts: { kind: "ServiceAccount", kubectlKind: "serviceaccount", namespaced: true },
+    persistentvolumeclaims: { kind: "PersistentVolumeClaim", kubectlKind: "persistentvolumeclaim", namespaced: true },
+    persistentvolumes: { kind: "PersistentVolume", kubectlKind: "persistentvolume", namespaced: false },
+    storageclasses: { kind: "StorageClass", kubectlKind: "storageclass", namespaced: false },
+    horizontalpodautoscalers: { kind: "HorizontalPodAutoscaler", kubectlKind: "horizontalpodautoscaler", namespaced: true },
+    poddisruptionbudgets: { kind: "PodDisruptionBudget", kubectlKind: "poddisruptionbudget", namespaced: true },
+    resourcequotas: { kind: "ResourceQuota", kubectlKind: "resourcequota", namespaced: true },
+    limitranges: { kind: "LimitRange", kubectlKind: "limitrange", namespaced: true },
+    priorityclasses: { kind: "PriorityClass", kubectlKind: "priorityclass", namespaced: false },
+    roles: { kind: "Role", kubectlKind: "role", namespaced: true },
+    rolebindings: { kind: "RoleBinding", kubectlKind: "rolebinding", namespaced: true },
+    clusterroles: { kind: "ClusterRole", kubectlKind: "clusterrole", namespaced: false },
+    clusterrolebindings: { kind: "ClusterRoleBinding", kubectlKind: "clusterrolebinding", namespaced: false },
+};
 
 // Response body for GET /api/yaml/:type/:name.
 export type YamlResponse = {
     yaml: string;
+};
+
+// Response body for GET /api/resource/:type/:name: the common metadata every Kubernetes
+// resource carries, whatever its kind. This is what the generic detail page renders for a
+// kind with no purpose-built page of its own. `namespace` is "" for a cluster-scoped kind,
+// and `createdAt` is the ISO creation timestamp the UI turns into an age.
+export type ResourceDetail = {
+    type: ResourceKindToken;
+    kind: string;
+    name: string;
+    namespace: string;
+    createdAt: string;
+    labels: Record<string, string>;
+    annotations: Record<string, string>;
 };
 
 // Cache configuration, returned by GET /api/cache/config and accepted (as a partial)

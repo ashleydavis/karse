@@ -24,7 +24,8 @@ import {
     listClusterErrors,
     getPodLogs,
     getResourceYaml,
-    isYamlResourceType,
+    getResourceDetail,
+    isResourceKindToken,
     streamPodLogs,
     getNodePerformance,
 } from "../../kubectl/kubectl-adapter";
@@ -2481,16 +2482,25 @@ describe("getPodLogs", () => {
     });
 });
 
-describe("isYamlResourceType", () => {
-    test("accepts every viewable resource type", () => {
+describe("isResourceKindToken", () => {
+    test("accepts every kind that has its own detail page", () => {
         for (const type of ["nodes", "pods", "deployments", "daemonsets", "statefulsets", "namespaces"]) {
-            expect(isYamlResourceType(type)).toBe(true);
+            expect(isResourceKindToken(type)).toBe(true);
+        }
+    });
+
+    test("accepts the generic kinds the widened whitelist added", () => {
+        for (const type of [
+            "horizontalpodautoscalers", "replicasets", "jobs", "cronjobs", "services",
+            "configmaps", "persistentvolumes", "storageclasses", "clusterroles",
+        ]) {
+            expect(isResourceKindToken(type)).toBe(true);
         }
     });
 
     test("rejects types outside the whitelist", () => {
-        for (const type of ["secrets", "configmaps", "", "Pod", "__proto__"]) {
-            expect(isYamlResourceType(type)).toBe(false);
+        for (const type of ["secrets", "", "Pod", "__proto__", "pods --all-namespaces", "delete"]) {
+            expect(isResourceKindToken(type)).toBe(false);
         }
     });
 });
@@ -2531,6 +2541,123 @@ describe("getResourceYaml", () => {
             "--context ctx -n default get pod ghost -o yaml": () => fail("NotFound"),
         });
         await expect(getResourceYaml("ctx", "pods", "ghost", "default")).rejects.toThrow("NotFound");
+    });
+});
+
+describe("getResourceDetail", () => {
+    // A realistically-shaped `kubectl get hpa -o json` payload: the metadata fields the
+    // generic detail page reads, plus the spec/status the page deliberately ignores.
+    const HPA_JSON = JSON.stringify({
+        apiVersion: "autoscaling/v2",
+        kind: "HorizontalPodAutoscaler",
+        metadata: {
+            name: "web-hpa",
+            namespace: "default",
+            creationTimestamp: "2024-05-01T10:00:00Z",
+            labels: {
+                app: "web",
+            },
+            annotations: {
+                "autoscaling.alpha.kubernetes.io/conditions": "[]",
+            },
+            uid: "6f0f1a2b-1111-2222-3333-444455556666",
+        },
+        spec: {
+            minReplicas: 1,
+            maxReplicas: 10,
+            scaleTargetRef: {
+                kind: "Deployment",
+                name: "web",
+            },
+        },
+        status: {
+            currentReplicas: 3,
+            desiredReplicas: 3,
+        },
+    });
+
+    test("returns the parsed metadata for a permitted namespaced kind", async () => {
+        setRunnerHandlers({
+            "--context ctx -n default get horizontalpodautoscaler web-hpa -o json": () => ok(HPA_JSON),
+        });
+        const detail = await getResourceDetail("ctx", "horizontalpodautoscalers", "web-hpa", "default");
+        expect(detail).toEqual({
+            type: "horizontalpodautoscalers",
+            kind: "HorizontalPodAutoscaler",
+            name: "web-hpa",
+            namespace: "default",
+            createdAt: "2024-05-01T10:00:00Z",
+            labels: {
+                app: "web",
+            },
+            annotations: {
+                "autoscaling.alpha.kubernetes.io/conditions": "[]",
+            },
+        });
+    });
+
+    test("issues only a read-only get, with the whitelisted kubectl kind", async () => {
+        setRunnerHandlers({
+            "--context ctx -n default get horizontalpodautoscaler web-hpa -o json": () => ok(HPA_JSON),
+        });
+        await getResourceDetail("ctx", "horizontalpodautoscalers", "web-hpa", "default");
+        expect(run).toHaveBeenCalledTimes(1);
+        expect(run).toHaveBeenCalledWith("kubectl", [
+            "--context", "ctx", "-n", "default",
+            "get", "horizontalpodautoscaler", "web-hpa", "-o", "json",
+        ]);
+    });
+
+    test("omits the namespace flag for a cluster-scoped kind", async () => {
+        setRunnerHandlers({
+            "--context ctx get storageclass standard -o json": () => ok(JSON.stringify({
+                kind: "StorageClass",
+                metadata: {
+                    name: "standard",
+                    creationTimestamp: "2024-01-02T03:04:05Z",
+                },
+            })),
+        });
+        const detail = await getResourceDetail("ctx", "storageclasses", "standard");
+        expect(detail).toEqual({
+            type: "storageclasses",
+            kind: "StorageClass",
+            name: "standard",
+            namespace: "",
+            createdAt: "2024-01-02T03:04:05Z",
+            labels: {},
+            annotations: {},
+        });
+    });
+
+    test("throws for an unpermitted kind without invoking kubectl", async () => {
+        await expect(getResourceDetail("ctx", "secrets", "my-secret", "default"))
+            .rejects.toThrow("unsupported resource type: secrets");
+        expect(run).not.toHaveBeenCalled();
+    });
+
+    test("returns null when the resource does not exist", async () => {
+        setRunnerHandlers({
+            "--context ctx -n default get horizontalpodautoscaler ghost -o json": () =>
+                fail('Error from server (NotFound): horizontalpodautoscalers.autoscaling "ghost" not found'),
+        });
+        expect(await getResourceDetail("ctx", "horizontalpodautoscalers", "ghost", "default")).toBeNull();
+    });
+
+    test("returns null when the cluster does not serve the kind at all", async () => {
+        setRunnerHandlers({
+            "--context ctx -n default get poddisruptionbudget pdb -o json": () =>
+                fail('error: the server doesn\'t have a resource type "poddisruptionbudgets"'),
+        });
+        expect(await getResourceDetail("ctx", "poddisruptionbudgets", "pdb", "default")).toBeNull();
+    });
+
+    test("throws on a real read failure rather than reporting not found", async () => {
+        setRunnerHandlers({
+            "--context ctx -n default get job batch -o json": () => fail("Unable to connect to the server"),
+        });
+        await expect(getResourceDetail("ctx", "jobs", "batch", "default"))
+            .rejects.toThrow("Unable to connect to the server");
     });
 });
 

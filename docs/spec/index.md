@@ -26,6 +26,7 @@ The spec is reverse-engineered from the shipped code and the prose docs (`docs/a
 | [autoscalers-view](./autoscalers-view/index.md) | Settled | Complete | Read-only autoscalers (HPA) table with metric-vs-target and replica bars. |
 | [workload-detail](./workload-detail/index.md) | Settled | Complete | Shared detail page for a deployment, stateful set, or daemon set. |
 | [clickable-resource-rows](./clickable-resource-rows/index.md) | Settled | Complete | Every resource table row links to that resource's detail page. |
+| [generic-detail](./generic-detail/index.md) | Settled | Complete | `/resources/:type/...` page for any kind with no purpose-built page: common metadata, labels, annotations, YAML. |
 | [log-viewer](./log-viewer/index.md) | Settled | Complete | Read-only pod/container log viewer with container + tail selectors and a live follow. |
 | [live-logs](./live-logs/index.md) | Settled | Complete | Multi-pod live log streaming on the Logs page (`/logs`) via `kubectl logs -f`. |
 | [events-feed](./events-feed/index.md) | Settled | Complete | Recent cluster events view, sorted newest-first. |

@@ -30,10 +30,10 @@ Backed by: the per-page table components under `frontend/src/pages/*/components/
   - Error detail page: the related object links to its detail page; Event detail page: the involved object links to its detail page (see `errors-feed`, `event-detail`).
   - Errors table and events table: each row's **Object** cell links to the referenced resource's detail page (see `errors-feed`, `events-feed`).
   - List tables: each row's **Namespace** cell links to `/namespaces/:name` on the pods, deployments, stateful sets, daemon sets, autoscalers, errors, events, cluster-workloads and All resources tables, and the pods table's **Node** cell links to `/nodes/:name`. A cluster-scoped row (Node, Namespace) has no namespace, so its cell degrades to plain text.
-- `resourcePath` maps `(kind, name, namespace)` to a route: namespaced kinds (Pod, Deployment, StatefulSet, DaemonSet) carry namespace + name; cluster-scoped kinds (Node, Namespace) carry name only.
+- `resourcePath` maps `(kind, name, namespace)` to a route: namespaced kinds carry namespace + name; cluster-scoped kinds carry name only.
 - An inline link inside a clickable row (e.g. the Node cell of a pod row) stops click propagation so it navigates to the referenced resource, not the row's own target.
-- A reference that cannot be resolved (empty name, an unsupported kind such as ReplicaSet / Job / Service, or a namespaced kind with no namespace) degrades gracefully to plain text rather than a broken link.
-- Every referenced resource type already has a detail page (Pod, Node, Namespace, Container, Deployment, StatefulSet, DaemonSet), so no new detail page was required.
+- A reference that cannot be resolved (empty name, a namespaced kind with no namespace, or a kind Karse will not read at all) degrades gracefully to plain text rather than a broken link.
+- A kind with no purpose-built detail page (ReplicaSet, Job, Service, HorizontalPodAutoscaler, PersistentVolume, ...) resolves to the generic detail page instead of returning no route, so those references are links too. See [generic-detail](../generic-detail/detail.md). A kind that does have its own page always resolves to that page: the generic route never shadows Pod, Node, Namespace, Deployment, StatefulSet or DaemonSet.
 
 ### Path-aware breadcrumbs
 
@@ -58,6 +58,7 @@ The breadcrumb trail on a resource's detail page reflects the path the user actu
 - [x] The Object cell of each errors-table and events-table row links to the referenced resource's detail page.
 - [x] Inline references on detail pages (a pod's node/namespace, a workload's namespace, a container's pod/namespace) link to the referenced resource.
 - [x] Namespaced references carry namespace + name; cluster-scoped references carry name only; an unresolvable reference degrades to plain text.
+- [x] A reference to a kind with no purpose-built page links to the generic detail page rather than degrading to plain text (see [generic-detail](../generic-detail/detail.md)).
 - [x] A resource's breadcrumb trail reflects the path taken to reach it: the same resource shows a different trail when reached from a different origin.
 - [x] The origin crumb links back to the exact view (sub tab included) the reference was followed from, and the pod detail back button returns to that same target.
 

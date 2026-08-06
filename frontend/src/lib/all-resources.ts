@@ -136,8 +136,8 @@ function daemonSetRow(daemonSet: DaemonSet): AllResource {
 
 // HPAs carry no Healthy/Error notion of their own in Karse's list shape, so they
 // are classified Other (no health checkbox) and counted toward the total only.
-// The status reads the metric summary (e.g. "cpu: 40%/80%"), and there is no HPA
-// detail page so the row has no detail route and degrades to plain text.
+// The status reads the metric summary (e.g. "cpu: 40%/80%"). There is no HPA-specific
+// detail page, so the row's route is the generic one `resourcePath` falls back to.
 function horizontalPodAutoscalerRow(hpa: HorizontalPodAutoscaler): AllResource {
     return {
         kind: "HorizontalPodAutoscaler",

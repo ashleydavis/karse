@@ -9,6 +9,7 @@ import { podDetailRouter } from "./routes/pod-detail-route";
 import { nodeDetailRouter } from "./routes/node-detail-route";
 import { workloadsRouter } from "./routes/workloads-route";
 import { yamlRouter } from "./routes/yaml-route";
+import { resourceRouter } from "./routes/resource-route";
 import { logsStreamRouter } from "./routes/logs-stream-route";
 import { eventsRouter } from "./routes/events-route";
 import { errorsRouter } from "./routes/errors-route";
@@ -34,6 +35,7 @@ export function createServer(): express.Express {
     app.use("/api", nodeDetailRouter);
     app.use("/api", workloadsRouter);
     app.use("/api", yamlRouter);
+    app.use("/api", resourceRouter);
     app.use("/api", logsStreamRouter);
     app.use("/api", eventsRouter);
     app.use("/api", errorsRouter);

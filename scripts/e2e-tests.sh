@@ -319,6 +319,55 @@ spec:
         image: agent:latest
 EOF
 
+# Two resources of kinds that have NO detail page of their own, so the generic detail page
+# has a real subject to render: a namespaced HorizontalPodAutoscaler and a cluster-scoped
+# PersistentVolume (the cluster-scoped route carries no namespace segment, which is the
+# part most easily got wrong).
+#
+# Both are inert. The autoscaler targets the 0-replica `shop` deployment above, and an
+# autoscaler does nothing to a target scaled to zero, so it creates no pods and leaves
+# every pod count the rest of the suite asserts on untouched. The volume is never claimed.
+apply_manifest "" <<'EOF'
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: shop-hpa
+  namespace: default
+  labels:
+    app: shop
+  annotations:
+    karse.test/purpose: generic detail page subject
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: shop
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: archive-pv
+  labels:
+    tier: storage
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /mnt/archive
+EOF
+
 # ── Cluster 2 nodes ──────────────────────────────────────────────────────────
 echo "--- Populating cluster 2 ---"
 apply_manifest "kwok-$KWOK_CLUSTER_2" <<'EOF'

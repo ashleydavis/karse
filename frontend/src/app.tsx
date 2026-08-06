@@ -19,6 +19,8 @@ import { PodDetailPage } from "./pages/pod-detail";
 import { ContainerDetailPage } from "./pages/container-detail";
 import { NodeDetailPage } from "./pages/node-detail";
 import { WorkloadDetailPage } from "./pages/workload-detail";
+import { ResourceDetailPage } from "./pages/resource-detail";
+import { GENERIC_DETAIL_ROOT } from "./lib/resource-link";
 import { LiveLogsPage } from "./pages/live-logs";
 import { AllResourcesPage } from "./pages/all-resources";
 import { AboutPage } from "./pages/about";
@@ -53,6 +55,15 @@ export function App() {
                 <Route path="daemonsets" element={<DaemonSetsPage />} />
                 <Route path="daemonsets/:namespace/:name" element={<WorkloadDetailPage kind="daemonsets" />} />
                 <Route path="autoscalers" element={<AutoscalersPage />} />
+                {/*
+                  The generic detail page, for a kind with no purpose-built page of its
+                  own. The cluster-scoped form carries no namespace segment, the
+                  namespaced form does; the routes above always win for the six kinds
+                  that have their own page, because resourcePath never builds a
+                  /resources/... path for them.
+                */}
+                <Route path={`${GENERIC_DETAIL_ROOT}/:type/:name`} element={<ResourceDetailPage />} />
+                <Route path={`${GENERIC_DETAIL_ROOT}/:type/:namespace/:name`} element={<ResourceDetailPage />} />
                 <Route path="events" element={<EventsPage />} />
                 <Route path="events/:uid" element={<EventDetailPage />} />
                 <Route path="logs" element={<LiveLogsPage />} />

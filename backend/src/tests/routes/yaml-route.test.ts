@@ -1,8 +1,9 @@
 jest.mock("../../kubectl/kubectl-adapter", () => ({
     getResourceYaml: jest.fn(),
-    // isYamlResourceType is exercised for real so the route's whitelist behaviour
+    getResourceDetail: jest.fn(),
+    // isResourceKindToken is exercised for real so the route's whitelist behaviour
     // matches the adapter; only getResourceYaml is stubbed.
-    isYamlResourceType: jest.requireActual("../../kubectl/kubectl-adapter").isYamlResourceType,
+    isResourceKindToken: jest.requireActual("../../kubectl/kubectl-adapter").isResourceKindToken,
     // The server mounts other routers too; stub their adapter functions so Express
     // route registration doesn't fail at import time.
     listPods: jest.fn(),

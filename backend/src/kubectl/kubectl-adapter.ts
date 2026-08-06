@@ -4,6 +4,7 @@ import {
     cacheKey, readCacheEntry, writeCacheEntry, readCacheConfig, isFresh,
 } from "./cache";
 import { parseCpuToMillicores, parseMemoryToBytes } from "./quantity";
+import { RESOURCE_KINDS } from "karse-types";
 import type {
     Context, NodeStatus, Node, ClusterOverview, Namespace, Pod, PodPhase,
     Deployment, StatefulSet, DaemonSet, HorizontalPodAutoscaler,
@@ -14,6 +15,7 @@ import type {
     ClusterPerformance, NodeUsage, PodUsage, ResourceUsage,
     ContainerUsage, NodePerformance, PodPerformance,
     ClusterResourceTotals, ClusterHealthSignals, WorkloadUsage,
+    ResourceKindToken, ResourceDetail,
 } from "karse-types";
 
 // Base directory for the rolling audit log; overridable via KARSE_LOGS_DIR.
@@ -1190,26 +1192,28 @@ export async function getPodLogs(
     return result.stdout;
 }
 
-// The set of resource types whose raw YAML the dashboard is allowed to fetch.
-// Maps the URL/UI type token to the kubectl resource kind passed to "get".
-// Only types the dashboard can already view are permitted, so callers cannot
-// coerce the read-only adapter into reading arbitrary cluster resources.
-const YAML_RESOURCE_KINDS: Record<string, string> = {
-    nodes: "node",
-    pods: "pod",
-    deployments: "deployment",
-    daemonsets: "daemonset",
-    statefulsets: "statefulset",
-    namespaces: "namespace",
-};
+// Whether the given token names a resource kind the dashboard is allowed to read.
+// RESOURCE_KINDS (karse-types) is the whitelist: a token that is not in it never reaches
+// the kubectl argument list, so a caller cannot coerce the read-only adapter into reading
+// an arbitrary cluster resource. Narrowing the string to a ResourceKindToken is what lets
+// every caller index the table without a cast.
+export function isResourceKindToken(type: string): type is ResourceKindToken {
+    return Object.prototype.hasOwnProperty.call(RESOURCE_KINDS, type);
+}
 
-// Whether the given resource type token is one we permit raw-YAML fetches for.
-export function isYamlResourceType(type: string): boolean {
-    return Object.prototype.hasOwnProperty.call(YAML_RESOURCE_KINDS, type);
+// Whether a failed kubectl read means "there is no such resource" rather than a real
+// failure. Covers both a missing object ("Error from server (NotFound)") and a kind the
+// cluster's API server does not serve at all, which kubectl reports as not having the
+// resource type. Callers turn this into a not-found response instead of a 500.
+function isNotFoundError(stderr: string): boolean {
+    return stderr.includes("NotFound")
+        || stderr.includes("not found")
+        || stderr.includes("doesn't have a resource type")
+        || stderr.includes("the server could not find the requested resource");
 }
 
 // Returns the raw YAML for a single resource via "kubectl get <kind> <name> -o yaml".
-// type must be one of the permitted YAML_RESOURCE_KINDS keys; passing anything else throws.
+// type must be one of the permitted RESOURCE_KINDS tokens; passing anything else throws.
 // namespace is required for namespaced resources and ignored for cluster-scoped ones
 // (nodes, namespaces); the route layer decides which to pass.
 export async function getResourceYaml(
@@ -1218,16 +1222,61 @@ export async function getResourceYaml(
     name: string,
     namespace?: string,
 ): Promise<string> {
-    const kind = YAML_RESOURCE_KINDS[type];
-    if (kind === undefined) {
+    if (!isResourceKindToken(type)) {
         throw new Error(`unsupported resource type: ${type}`);
     }
+    const { kubectlKind } = RESOURCE_KINDS[type];
     const nsArgs = namespace ? ["-n", namespace] : [];
-    const result = await kubectl(["--context", context, ...nsArgs, "get", kind, name, "-o", "yaml"]);
+    const result = await kubectl(["--context", context, ...nsArgs, "get", kubectlKind, name, "-o", "yaml"]);
     if (result.exitCode !== 0) {
         throw new Error(result.stderr);
     }
     return result.stdout;
+}
+
+// Returns the common metadata of a single resource of any permitted kind, via the
+// read-only "kubectl get <kind> <name> -o json". This is what backs the generic detail
+// page: the fields every Kubernetes object carries (kind, name, namespace, creation
+// timestamp, labels, annotations), with no kind-specific interpretation.
+//
+// type must be one of the permitted RESOURCE_KINDS tokens; passing anything else throws,
+// so the kind reaching the kubectl argument list is always one from the whitelist and
+// never a raw caller string. namespace is required for namespaced kinds and ignored for
+// cluster-scoped ones; the route layer decides which to pass.
+//
+// Returns null when the resource does not exist, or the cluster does not serve that kind
+// at all, so the caller can answer with a not-found rather than a server error.
+export async function getResourceDetail(
+    context: string,
+    type: string,
+    name: string,
+    namespace?: string,
+): Promise<ResourceDetail | null> {
+    if (!isResourceKindToken(type)) {
+        throw new Error(`unsupported resource type: ${type}`);
+    }
+    const info = RESOURCE_KINDS[type];
+    const nsArgs = namespace ? ["-n", namespace] : [];
+    const result = await kubectl(["--context", context, ...nsArgs, "get", info.kubectlKind, name, "-o", "json"]);
+    if (result.exitCode !== 0) {
+        if (isNotFoundError(result.stderr)) {
+            return null;
+        }
+        throw new Error(result.stderr);
+    }
+    const data = JSON.parse(result.stdout);
+    const metadata = data.metadata ?? {};
+    return {
+        type,
+        // Prefer the kind the cluster reports; fall back to the whitelist's display kind
+        // when the payload omits it, so the header always names something.
+        kind: typeof data.kind === "string" && data.kind !== "" ? data.kind : info.kind,
+        name: metadata.name ?? name,
+        namespace: metadata.namespace ?? "",
+        createdAt: metadata.creationTimestamp ?? "",
+        labels: metadata.labels ?? {},
+        annotations: metadata.annotations ?? {},
+    };
 }
 
 // Callbacks for a live (follow-mode) log stream from a single pod container.

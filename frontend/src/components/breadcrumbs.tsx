@@ -4,6 +4,7 @@ import { faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { collapseCrumbs, middleTruncate, originCrumbs, tabLabel, LIST_LABELS, POD_TAB_LABELS, CONTAINER_TAB_LABELS, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../lib/breadcrumb-trail";
+import { GENERIC_DETAIL_ROOT } from "../lib/resource-link";
 import type { Crumb } from "../lib/breadcrumb-trail";
 import { useKubeContext } from "../lib/kube-context";
 import { fetchEvents } from "../lib/api-client";
@@ -18,6 +19,10 @@ const ORIGIN_KIND_LABELS: Record<string, string> = {
     deployments: "Deployment",
     statefulsets: "StatefulSet",
     daemonsets: "DaemonSet",
+    // The generic detail route serves every other kind, so its entry names none of them
+    // in particular. The label is not shown in the trail (the leaf is the resource name);
+    // it exists so a generic page reached from All resources gets an origin trail at all.
+    [GENERIC_DETAIL_ROOT]: "Resource",
 };
 
 // Builds the breadcrumb trail from the current pathname, route params, and the
@@ -87,6 +92,17 @@ function buildCrumbs(
         return [
             { label: "Events", to: "/events" },
             { label: eventName !== null ? middleTruncate(eventName, MAX_NAME_LENGTH) : "Event" },
+        ];
+    }
+
+    // Generic detail: /resources/:type/(:namespace/):name -> All resources > <name>.
+    // The kind has no list page of its own, so the trail starts at All resources, which
+    // is also where the page's back button returns to.
+    if (root === GENERIC_DETAIL_ROOT && params.name)
+    {
+        return [
+            { label: "All resources", to: "/all-resources" },
+            { label: middleTruncate(params.name, MAX_NAME_LENGTH) },
         ];
     }
 

@@ -40,6 +40,7 @@ Single-test-cluster discipline (per `readme.md`): there is only ever ONE test cl
 | [autoscalers-view](./autoscalers-view/index.md) | Read-only autoscalers (HPA) table: performance bars, reference link. |
 | [workload-detail](./workload-detail/index.md) | Deployment / stateful set / daemon set detail pages. |
 | [clickable-resource-rows](./clickable-resource-rows/index.md) | Rows link to detail pages; consistent row hover. |
+| [generic-detail](./generic-detail/index.md) | Generic detail page for kinds with no page of their own: routes, tabs, precedence, not-found. |
 | [log-viewer](./log-viewer/index.md) | Pod/container log viewer and live follow. |
 | [live-logs](./live-logs/index.md) | Multi-pod live log streaming on the Logs page (`/logs`). |
 | [events-feed](./events-feed/index.md) | Recent cluster events view. |

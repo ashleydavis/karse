@@ -7780,13 +7780,17 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='error-detail']")).toHaveCount(0);
         });
 
-        test("an errors table object with no detail page renders as plain text", async () => {
+        test("an errors table object of a kind with no page of its own links to the generic page", async () => {
+            // A ReplicaSet has no purpose-built detail page, so before generic-detail-1 this
+            // cell was dead text. It now links to the generic detail route instead.
             await page.goto("/errors", { waitUntil: "networkidle" });
             const ref = page.locator("[data-test-id='error-row']")
                 .filter({ hasText: "FailedCreate" })
                 .locator("[data-test-id='error-row-object-link']");
             await expect(ref).toContainText("ReplicaSet/web-7d9");
-            await expect(ref).toHaveJSProperty("tagName", "SPAN");
+            await expect(ref).toHaveJSProperty("tagName", "A");
+            await ref.click();
+            await expect(page).toHaveURL(/\/resources\/replicasets\/default\/web-7d9/);
         });
 
         test("an events table row links its object to that pod's detail page", async () => {
@@ -7811,13 +7815,15 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='event-detail']")).toHaveCount(0);
         });
 
-        test("an events table object with no detail page renders as plain text", async () => {
+        test("an events table object of a kind with no page of its own links to the generic page", async () => {
             await page.goto("/events", { waitUntil: "networkidle" });
             const ref = page.locator("[data-test-id='event-row']")
                 .filter({ hasText: "FailedCreate" })
                 .locator("[data-test-id='event-row-object-link']");
             await expect(ref).toContainText("ReplicaSet/web-7d9");
-            await expect(ref).toHaveJSProperty("tagName", "SPAN");
+            await expect(ref).toHaveJSProperty("tagName", "A");
+            await ref.click();
+            await expect(page).toHaveURL(/\/resources\/replicasets\/default\/web-7d9/);
         });
     });
 
@@ -7853,8 +7859,8 @@ test.describe("karse e2e", () => {
                     lastSeen: new Date().toISOString(),
                 },
                 {
-                    // A ReplicaSet has no detail page in Karse, so its reference must
-                    // degrade to plain text rather than become a broken link.
+                    // A ReplicaSet has no purpose-built detail page in Karse, so its
+                    // reference resolves to the generic detail page.
                     source: "Event",
                     namespace: "default",
                     objectKind: "ReplicaSet",
@@ -7923,16 +7929,15 @@ test.describe("karse e2e", () => {
             await expect(page).toHaveURL(/\/pods\/default\/crasher-abc/);
         });
 
-        test("an unresolvable related object renders as plain text, not a broken link", async () => {
-            // The ReplicaSet error has no detail page; its object reference must be
-            // plain text (a span), not an anchor, and must not navigate on click.
+        test("a related object of a kind with no page of its own links to the generic page", async () => {
+            // The ReplicaSet error names a kind with no purpose-built page. Its object
+            // reference used to be plain text; it is now a link to the generic detail page.
             await page.locator("[data-test-id='error-row']").filter({ hasText: "FailedCreate" }).click();
             const ref = page.locator("[data-test-id='error-detail-object-link']");
             await expect(ref).toContainText("ReplicaSet/web-7d9");
-            await expect(ref).toHaveJSProperty("tagName", "SPAN");
+            await expect(ref).toHaveJSProperty("tagName", "A");
             await ref.click();
-            // Still on the same error detail page: no navigation happened.
-            await expect(page.locator("[data-test-id='error-detail']")).toBeVisible();
+            await expect(page).toHaveURL(/\/resources\/replicasets\/default\/web-7d9/);
         });
 
         test("back navigation returns to the errors list", async () => {
@@ -9371,6 +9376,13 @@ test.describe("karse e2e", () => {
             kind: "deployments", name: "web-deploy", namespace: "default", createdAt: new Date().toISOString(),
             labels: { app: "web" }, selector: { app: "web" }, stats: [{ label: "Ready", value: "1/1" }], pods: [], events: [],
         };
+        // The generic detail payload for the HPA row, which has no page of its own and so
+        // opens the generic detail page.
+        const FAKE_RESOURCE_DETAIL = {
+            type: "horizontalpodautoscalers", kind: "HorizontalPodAutoscaler", name: "web-hpa",
+            namespace: "default", createdAt: new Date().toISOString(),
+            labels: { app: "web" }, annotations: {},
+        };
 
         async function rows() {
             return page.locator("[data-test-id='all-resource-row']");
@@ -9394,6 +9406,7 @@ test.describe("karse e2e", () => {
             await page.route("**/api/statefulsets*", async (route) => { await route.fulfill({ json: FAKE_STATEFULSETS }); });
             await page.route("**/api/daemonsets*", async (route) => { await route.fulfill({ json: FAKE_DAEMONSETS }); });
             await page.route("**/api/horizontalpodautoscalers*", async (route) => { await route.fulfill({ json: FAKE_HPAS }); });
+            await page.route("**/api/resource/**", async (route) => { await route.fulfill({ json: FAKE_RESOURCE_DETAIL }); });
             await page.goto("/all-resources", { waitUntil: "networkidle" });
             await expect(page.locator("[data-test-id='all-resources-table']")).toBeVisible();
             await expect((await rows()).first()).toBeVisible();
@@ -9408,6 +9421,7 @@ test.describe("karse e2e", () => {
             await page.unroute("**/api/statefulsets*");
             await page.unroute("**/api/daemonsets*");
             await page.unroute("**/api/horizontalpodautoscalers*");
+            await page.unroute("**/api/resource/**");
             setContext(CLUSTER_1);
         });
 
@@ -9498,6 +9512,33 @@ test.describe("karse e2e", () => {
             await expect((await rows()).first()).toBeVisible();
         });
 
+        test("a row of a kind with no page of its own opens the generic detail page", async () => {
+            // The HorizontalPodAutoscaler row used to be dead text: no HPA detail page
+            // existed, so resourcePath returned null and the row was not clickable. It now
+            // falls back to the generic route and shows the resource there.
+            await page.locator("[data-test-id='all-resource-row']", { hasText: "web-hpa" }).click();
+            await expect(page).toHaveURL(/\/resources\/horizontalpodautoscalers\/default\/web-hpa/);
+            await expect(page.locator("[data-test-id='resource-detail']")).toBeVisible();
+            await expect(page.getByRole("heading", { name: "web-hpa" })).toBeVisible();
+            await expect(page.locator("[data-test-id='resource-detail-kind-chip']")).toHaveText("HorizontalPodAutoscaler");
+            // Return to the page for any later tests.
+            await page.goto("/all-resources", { waitUntil: "networkidle" });
+            await expect((await rows()).first()).toBeVisible();
+        });
+
+        test("a row of a kind that has its own page still opens that page, not the generic one", async () => {
+            // The precedence rule, exercised through the UI: a Pod has a purpose-built
+            // detail page, so its row must never resolve to /resources/... . Only the
+            // destination URL is asserted; the pod detail page's own data comes from the
+            // real backend, which this block does not route.
+            await page.locator("[data-test-id='all-resource-row']", { hasText: "nginx-pod" }).click();
+            await expect(page).toHaveURL(/\/pods\/default\/nginx-pod/);
+            await expect(page).not.toHaveURL(/\/resources\//);
+            // Return to the page for any later tests.
+            await page.goto("/all-resources", { waitUntil: "networkidle" });
+            await expect((await rows()).first()).toBeVisible();
+        });
+
         test("a row click tags the destination URL with the All resources origin", async () => {
             // Clicking a row navigates to the detail page and tags the URL with
             // from=all-resources, so the detail page can show the origin breadcrumb.
@@ -9550,6 +9591,88 @@ test.describe("karse e2e", () => {
             // Return to the page for any later tests.
             await page.goto("/all-resources", { waitUntil: "networkidle" });
             await expect((await rows()).first()).toBeVisible();
+        });
+    });
+
+    // ── Generic detail page (kinds with no page of their own) ───────────────────
+
+    test.describe("generic detail page", () => {
+        // Runs against the real kwok cluster, which the e2e fixture seeds with two
+        // resources of kinds Karse has no purpose-built page for: the namespaced
+        // HorizontalPodAutoscaler `shop-hpa` in `default`, and the cluster-scoped
+        // PersistentVolume `archive-pv`.
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+        });
+
+        test("shows a namespaced resource's name, kind and namespace", async () => {
+            await page.goto("/resources/horizontalpodautoscalers/default/shop-hpa", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='resource-detail']")).toBeVisible();
+            await expect(page.getByRole("heading", { name: "shop-hpa" })).toBeVisible();
+            await expect(page.locator("[data-test-id='resource-detail-kind-chip']")).toHaveText("HorizontalPodAutoscaler");
+            await expect(page.locator("[data-test-id='resource-stat'][data-stat='namespace']")).toContainText("default");
+            await expect(page.locator("[data-test-id='resource-stat'][data-stat='kind']")).toContainText("HorizontalPodAutoscaler");
+            await expect(page.locator("[data-test-id='resource-stat'][data-stat='age']")).toBeVisible();
+        });
+
+        test("shows the resource's annotations", async () => {
+            // Matched on the Key cell alone. kubectl apply also stores the whole manifest in
+            // the last-applied-configuration annotation, so a whole-row text match would hit
+            // that row too and count two.
+            await expect(page.locator("[data-test-id='resource-annotation-row'] td:first-child")
+                .filter({ hasText: "karse.test/purpose" })).toHaveCount(1);
+        });
+
+        test("the namespace links to the namespace detail page", async () => {
+            await page.locator("a[data-test-id='resource-detail-namespace-link']").click();
+            await expect(page).toHaveURL(/\/namespaces\/default/);
+            await page.goto("/resources/horizontalpodautoscalers/default/shop-hpa", { waitUntil: "networkidle" });
+        });
+
+        test("the Labels sub tab shows the resource's own labels", async () => {
+            await page.locator("[data-test-id='resource-tab-labels']").click();
+            await expect(page.locator("[data-test-id='resource-panel-labels']")).toBeVisible();
+            await expect(page.locator("[data-test-id='labels-tab']")).toContainText("app");
+            await expect(page.locator("[data-test-id='labels-tab']")).toContainText("shop");
+        });
+
+        test("the YAML sub tab shows the resource's raw yaml", async () => {
+            await page.locator("[data-test-id='resource-tab-yaml']").click();
+            await expect(page.locator("[data-test-id='resource-panel-yaml']")).toBeVisible();
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("kind: HorizontalPodAutoscaler");
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("name: shop-hpa");
+        });
+
+        test("the breadcrumb trail starts at All resources", async () => {
+            await page.goto("/resources/horizontalpodautoscalers/default/shop-hpa", { waitUntil: "networkidle" });
+            const crumbs = page.locator("[data-test-id='breadcrumbs'] [data-test-id='breadcrumb-item']");
+            await expect(crumbs).toHaveText(["All resources", "shop-hpa"]);
+            await crumbs.first().click();
+            await expect(page).toHaveURL(/\/all-resources/);
+        });
+
+        test("shows a cluster-scoped resource from a route with no namespace segment", async () => {
+            await page.goto("/resources/persistentvolumes/archive-pv", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='resource-detail']")).toBeVisible();
+            await expect(page.getByRole("heading", { name: "archive-pv" })).toBeVisible();
+            await expect(page.locator("[data-test-id='resource-detail-kind-chip']")).toHaveText("PersistentVolume");
+            // A cluster-scoped resource has no namespace, so the Details grid shows none.
+            await expect(page.locator("[data-test-id='resource-stat'][data-stat='namespace']")).toHaveCount(0);
+            await page.locator("[data-test-id='resource-tab-yaml']").click();
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("kind: PersistentVolume");
+        });
+
+        test("a resource that does not exist renders the not-found message", async () => {
+            await page.goto("/resources/horizontalpodautoscalers/default/no-such-hpa", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='resource-detail-not-found']")).toBeVisible();
+            await expect(page.locator("[data-test-id='resource-detail-not-found']")).toContainText("no-such-hpa");
+            await expect(page.locator("[data-test-id='resource-detail']")).toHaveCount(0);
+        });
+
+        test("a kind Karse will not read renders a readable message", async () => {
+            await page.goto("/resources/secrets/default/db-password", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='resource-detail-unsupported']")).toBeVisible();
+            await expect(page.locator("[data-test-id='resource-detail-unsupported']")).toContainText("secrets");
         });
     });
 

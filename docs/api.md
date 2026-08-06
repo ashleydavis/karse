@@ -475,6 +475,49 @@ When the Metrics API is unavailable, `metricsAvailable` is `false` and usage fie
 }
 ```
 
+## GET /api/yaml/:type/:name
+
+Returns the raw YAML of a single resource, from `kubectl get <kind> <name> -o yaml`. Backs the YAML sub tab on every resource detail page. See `docs/spec/yaml-viewer`.
+
+- **Path params**: `type` — the resource kind's token (a key of `RESOURCE_KINDS` in `packages/karse-types`, e.g. `pods`, `horizontalpodautoscalers`); `name` — the resource name.
+- **Request query**: `context` (required) — the kubeconfig context name. `namespace` (required for a namespaced kind, ignored for a cluster-scoped one).
+- **Response 200**: `YamlResponse` — `{ "yaml": string }`.
+- **Response 400**: `{ "error": "context query parameter is required" }`, or `{ "error": "unsupported resource type: <type>" }` when `type` is not whitelisted. Neither case runs kubectl.
+- **Response 500**: `{ "error": "<kubectl stderr>" }` when the read fails.
+
+```sh
+curl -fsS 'http://127.0.0.1:5172/api/yaml/pods/web?context=my-ctx&namespace=default'
+```
+
+## GET /api/resource/:type/:name
+
+Returns the common metadata of a single resource of any readable kind: what every Kubernetes object carries, with no kind-specific interpretation. Backs the generic detail page (`/resources/:type/...`), the page shown for a kind with no purpose-built page of its own. See `docs/spec/generic-detail`.
+
+The kind handed to kubectl always comes from the `RESOURCE_KINDS` whitelist; `type` is only ever a lookup key into it and is never interpolated into the kubectl argument list. The read is a single `kubectl get <kind> <name> -o json`.
+
+- **Path params**: `type` — the resource kind's token (a key of `RESOURCE_KINDS`); `name` — the resource name.
+- **Request query**: `context` (required) — the kubeconfig context name. `namespace` (required for a namespaced kind, ignored for a cluster-scoped one).
+- **Response 200**: `ResourceDetail` — `{ "type": string, "kind": string, "name": string, "namespace": string, "createdAt": string, "labels": Record<string,string>, "annotations": Record<string,string> }`. `namespace` is `""` for a cluster-scoped kind.
+- **Response 400**: `{ "error": "context query parameter is required" }`; `{ "error": "unsupported resource type: <type>" }` when `type` is not whitelisted; `{ "error": "namespace query parameter is required for <Kind>" }` when a namespaced kind is requested without one. None of these run kubectl.
+- **Response 404**: `{ "error": "<Kind> \"<name>\" was not found in this cluster" }` when the resource does not exist, or the cluster does not serve that kind at all.
+- **Response 500**: `{ "error": "<kubectl stderr>" }` on any other kubectl failure.
+
+```sh
+curl -fsS 'http://127.0.0.1:5172/api/resource/horizontalpodautoscalers/web-hpa?context=my-ctx&namespace=default'
+```
+
+```json
+{
+  "type": "horizontalpodautoscalers",
+  "kind": "HorizontalPodAutoscaler",
+  "name": "web-hpa",
+  "namespace": "default",
+  "createdAt": "2024-05-01T10:00:00Z",
+  "labels": { "app": "web" },
+  "annotations": { "karse.test/purpose": "generic detail page subject" }
+}
+```
+
 ## GET /api/cache/config
 
 Returns the on-disk cache configuration. `stalenessSeconds` is how long a cached read is served before Karse re-fetches it from the cluster; `0` disables the cache. See `docs/spec/cluster-cache`.

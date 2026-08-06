@@ -176,7 +176,7 @@ describe("aggregateResources", () => {
         expect(broken.health).toBe("Error");
     });
 
-    test("shows an HPA's metric summary as status, Other health, and no detail path", () => {
+    test("shows an HPA's metric summary as status, Other health, and the generic detail path", () => {
         const [row] = aggregateResources({ horizontalPodAutoscalers: [makeHpa("web-hpa", "cpu: 55%/80%")] });
         expect(row).toEqual({
             kind: "HorizontalPodAutoscaler",
@@ -185,8 +185,8 @@ describe("aggregateResources", () => {
             status: "cpu: 55%/80%",
             health: "Other",
             createdAt: "2024-06-01T00:00:00Z",
-            // HPAs have no detail page, so the row degrades to plain text.
-            detailPath: null,
+            // HPAs have no page of their own, so the row links to the generic detail page.
+            detailPath: "/resources/horizontalpodautoscalers/default/web-hpa",
             labels: { app: "web-hpa" },
         });
     });

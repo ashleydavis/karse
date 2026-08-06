@@ -480,6 +480,46 @@ if [[ "$HTTP_CODE" != "400" ]]; then
 fi
 echo "OK"
 
+echo "--- GET /api/yaml/horizontalpodautoscalers/:name (kind with no page of its own) ---"
+# The whitelist was widened past the six kinds with their own pages, so the YAML tab
+# on the generic detail page can fetch any kind the generic page shows.
+curl -fsS "$BASE/api/yaml/horizontalpodautoscalers/smoke-hpa?context=$CURRENT_CTX&namespace=default" \
+    | jq -r '.yaml' | grep -q "kind: HorizontalPodAutoscaler"
+echo "OK"
+
+echo "--- GET /api/resource/:type/:name (namespaced generic kind) ---"
+RESOURCE_RESP=$(curl -fsS "$BASE/api/resource/horizontalpodautoscalers/smoke-hpa?context=$CURRENT_CTX&namespace=default")
+echo "$RESOURCE_RESP" | jq -e '.kind == "HorizontalPodAutoscaler" and .name == "smoke-hpa" and .namespace == "default"' > /dev/null
+echo "$RESOURCE_RESP" | jq -e 'has("createdAt") and has("labels") and has("annotations")' > /dev/null
+echo "OK"
+
+echo "--- GET /api/resource/:type/:name (cluster-scoped kind) ---"
+if [[ -n "$FIRST_NODE" && "$FIRST_NODE" != "null" ]]; then
+    curl -fsS "$BASE/api/resource/nodes/$FIRST_NODE?context=$CURRENT_CTX" \
+        | jq -e '.kind == "Node" and .namespace == ""' > /dev/null
+    echo "OK"
+else
+    echo "SKIP (no nodes)"
+fi
+
+echo "--- GET /api/resource/secrets/:name (unpermitted kind rejected) ---"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+    "$BASE/api/resource/secrets/whatever?context=$CURRENT_CTX&namespace=default")
+if [[ "$HTTP_CODE" != "400" ]]; then
+    echo "Expected HTTP 400 for an unpermitted resource kind, got $HTTP_CODE" >&2
+    exit 1
+fi
+echo "OK"
+
+echo "--- GET /api/resource/:type/:name (missing resource reported as not found) ---"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+    "$BASE/api/resource/horizontalpodautoscalers/no-such-hpa?context=$CURRENT_CTX&namespace=default")
+if [[ "$HTTP_CODE" != "404" ]]; then
+    echo "Expected HTTP 404 for a resource that does not exist, got $HTTP_CODE" >&2
+    exit 1
+fi
+echo "OK"
+
 echo "--- GET /api/logs/stream (SSE multi-pod live logs) ---"
 # KARSE_FAKE_LOGS=1 is set, so each matched pod's stream emits a canned backlog and
 # then keeps following, emitting a fresh line every 100ms. The connection stays open

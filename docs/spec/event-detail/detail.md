@@ -15,7 +15,7 @@ Backed by: `GET /api/events` (reused; no new endpoint), `frontend/src/pages/even
 - The page shows every field the events table shows plus the source/component: type, reason, object (kind/name), source/component (the reporting component, e.g. `kubelet`), count, namespace, and age.
 - The page shows the **full, untruncated** event message (the table clips long messages; the detail page wraps them in full).
 - The page shows the **first-seen** and **last-seen** timestamps, each as an absolute local date-time with the relative age in parentheses.
-- The **object** field links to the involved resource's own detail page when Karse has one: Pod -> `/pods/:namespace/:name`, Node -> `/nodes/:name`, Namespace -> `/namespaces/:name`, Deployment / StatefulSet / DaemonSet -> `/<kind>/:namespace/:name`. Kinds with no detail page (e.g. ReplicaSet, Job) are shown as plain text. The route resolution is the shared `resourcePath` helper / `ResourceRef` component used by every inline resource reference (see `clickable-resource-rows`).
+- The **object** field links to the involved resource's own detail page when Karse has one: Pod -> `/pods/:namespace/:name`, Node -> `/nodes/:name`, Namespace -> `/namespaces/:name`, Deployment / StatefulSet / DaemonSet -> `/<kind>/:namespace/:name`. Kinds with no purpose-built page (e.g. ReplicaSet, Job) link to the generic detail page instead (see `generic-detail`), and only a reference Karse cannot resolve at all is shown as plain text. The route resolution is the shared `resourcePath` helper / `ResourceRef` component used by every inline resource reference (see `clickable-resource-rows`).
 - A back button (and the "Events" breadcrumb) return to the events list. The breadcrumb trail is `Events > <reason>`, where the trailing crumb is the event's own name (its `reason`, e.g. `Events > Scheduled`), mirroring how the other detail pages put the resource's name in the trailing crumb. The reason is resolved from the events data; until it loads, the trailing crumb falls back to the generic label `Event`.
 - If no event matches the `uid` (e.g. it has aged out of the cluster), the page shows a "not found" message with the back button rather than erroring.
 - While the events query is in flight the shared loading spinner is shown; a failed query shows the shared load-error with a retry.
@@ -26,7 +26,7 @@ Backed by: `GET /api/events` (reused; no new endpoint), `frontend/src/pages/even
 - [x] The detail page shows type, reason, object, message, source/component, count, and age.
 - [x] The detail page shows the full, untruncated message.
 - [x] The detail page shows the first-seen and last-seen timestamps.
-- [x] The object field links to the involved resource's detail page (Pod/Node/workload/namespace); unsupported kinds render as plain text.
+- [x] The object field links to the involved resource's detail page (its own page for Pod/Node/workload/namespace, the generic page for any other readable kind); an unresolvable reference renders as plain text.
 - [x] A back button and the "Events" breadcrumb return to the events list.
 
 ## Open Questions

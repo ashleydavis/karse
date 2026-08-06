@@ -2,6 +2,8 @@
 // second line or grows the nav-bar height: middle-truncation of long resource
 // names and collapsing of over-long trails. Kept UI-free so it is unit-testable.
 
+import { GENERIC_DETAIL_ROOT } from "./resource-link";
+
 // One entry in the breadcrumb trail; a missing "to" marks the current (non-linked) page.
 export type Crumb = {
     label: string;
@@ -111,6 +113,14 @@ export const LIST_LABELS: Record<string, string> = {
 // resource name (/pods/:namespace/:name). Every other detail route names the
 // resource directly (/nodes/:name), so the leaf sits one segment earlier.
 const NAMESPACED_ROOTS = ["pods", "deployments", "statefulsets", "daemonsets"];
+
+// The crumb standing in for the generic detail route's list page. GENERIC_DETAIL_ROOT is
+// not in LIST_LABELS because there is no /resources list page: the list a generic resource
+// is reached from, and returns to, is All resources.
+const GENERIC_LIST_CRUMB: Crumb = {
+    label: "All resources",
+    to: "/all-resources",
+};
 
 // The list-page segments whose detail route ends in an opaque id (an error's index,
 // an event's uid) rather than a resource name. Their origin crumb shows this generic
@@ -239,6 +249,23 @@ export function pathOriginCrumbs(from: string | null): Crumb[] | null {
     }
 
     const root = segments[0];
+
+    // A generic detail page as the origin. Its route varies in length with the kind's
+    // scope (/resources/:type/:name versus /resources/:type/:namespace/:name), so the leaf
+    // is the last segment rather than a fixed index, and its list page is All resources.
+    if (root === GENERIC_DETAIL_ROOT)
+    {
+        const genericLeaf = segments[segments.length - 1];
+        if (segments.length < 3 || genericLeaf === "")
+        {
+            return null;
+        }
+        return [
+            GENERIC_LIST_CRUMB,
+            { label: middleTruncate(genericLeaf, MAX_NAME_LENGTH), to: from },
+        ];
+    }
+
     const listLabel = LIST_LABELS[root];
     if (listLabel === undefined)
     {

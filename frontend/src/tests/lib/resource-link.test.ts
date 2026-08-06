@@ -1,4 +1,4 @@
-import { resourcePath } from "../../lib/resource-link";
+import { resolveResourceKind, resourceNameSegments, resourcePath } from "../../lib/resource-link";
 
 describe("resourcePath", () => {
     test("builds the pod route from namespace and name", () => {
@@ -39,9 +39,92 @@ describe("resourcePath", () => {
         expect(resourcePath("Node", "", "")).toBeNull();
     });
 
-    test("returns null for a kind that has no detail page", () => {
-        expect(resourcePath("ReplicaSet", "web-7d9", "default")).toBeNull();
-        expect(resourcePath("Job", "backup", "default")).toBeNull();
-        expect(resourcePath("Service", "web", "default")).toBeNull();
+    test("falls back to the generic route for a namespaced kind with no page of its own", () => {
+        expect(resourcePath("ReplicaSet", "web-7d9", "default")).toBe("/resources/replicasets/default/web-7d9");
+        expect(resourcePath("Job", "backup", "default")).toBe("/resources/jobs/default/backup");
+        expect(resourcePath("Service", "web", "default")).toBe("/resources/services/default/web");
+        expect(resourcePath("HorizontalPodAutoscaler", "web-hpa", "default"))
+            .toBe("/resources/horizontalpodautoscalers/default/web-hpa");
+    });
+
+    test("falls back to the generic route with no namespace segment for a cluster-scoped kind", () => {
+        expect(resourcePath("PersistentVolume", "pv-1", "")).toBe("/resources/persistentvolumes/pv-1");
+        expect(resourcePath("StorageClass", "standard", "")).toBe("/resources/storageclasses/standard");
+        expect(resourcePath("ClusterRole", "view", "")).toBe("/resources/clusterroles/view");
+    });
+
+    test("ignores any namespace passed for a cluster-scoped generic kind", () => {
+        expect(resourcePath("StorageClass", "standard", "default")).toBe("/resources/storageclasses/standard");
+    });
+
+    test("a kind with its own detail page never resolves to the generic route", () => {
+        // The precedence rule: the six purpose-built pages always win. Asserted here so it
+        // is a checked property rather than a consequence of the order two branches are
+        // written in.
+        const withOwnPage: [string, string, string][] = [
+            ["Pod", "nginx-abc", "default"],
+            ["Node", "node-worker", ""],
+            ["Namespace", "kube-system", ""],
+            ["Deployment", "web", "prod"],
+            ["StatefulSet", "db", "data"],
+            ["DaemonSet", "agent", "kube-system"],
+        ];
+        for (const [kind, name, namespace] of withOwnPage) {
+            const path = resourcePath(kind, name, namespace);
+            expect(path).not.toBeNull();
+            expect(path).not.toContain("/resources/");
+        }
+    });
+
+    test("returns null for a generic namespaced kind with no namespace", () => {
+        expect(resourcePath("ReplicaSet", "web-7d9", "")).toBeNull();
+        expect(resourcePath("HorizontalPodAutoscaler", "web-hpa", "")).toBeNull();
+    });
+
+    test("returns null for a generic kind with an empty name", () => {
+        expect(resourcePath("ReplicaSet", "", "default")).toBeNull();
+        expect(resourcePath("StorageClass", "", "")).toBeNull();
+    });
+
+    test("returns null for a kind Karse will not read at all", () => {
+        expect(resourcePath("Secret", "db-password", "default")).toBeNull();
+        expect(resourcePath("CustomWidget", "thing", "default")).toBeNull();
+    });
+});
+
+describe("resourceNameSegments", () => {
+    test("gives namespace and name for a namespaced kind", () => {
+        expect(resourceNameSegments("Pod", "nginx-abc", "default")).toEqual(["default", "nginx-abc"]);
+        expect(resourceNameSegments("HorizontalPodAutoscaler", "web-hpa", "default")).toEqual(["default", "web-hpa"]);
+    });
+
+    test("gives the name alone for a cluster-scoped kind, whatever namespace is passed", () => {
+        expect(resourceNameSegments("Node", "node-worker", "")).toEqual(["node-worker"]);
+        expect(resourceNameSegments("StorageClass", "standard", "default")).toEqual(["standard"]);
+    });
+
+    test("gives the name alone when a namespaced reference arrived without a namespace", () => {
+        expect(resourceNameSegments("Pod", "nginx-abc", "")).toEqual(["nginx-abc"]);
+        expect(resourceNameSegments("ReplicaSet", "web-7d9", "")).toEqual(["web-7d9"]);
+    });
+});
+
+describe("resolveResourceKind", () => {
+    test("resolves a permitted token to its kind and scope", () => {
+        expect(resolveResourceKind("horizontalpodautoscalers")).toEqual({
+            token: "horizontalpodautoscalers",
+            info: {
+                kind: "HorizontalPodAutoscaler",
+                kubectlKind: "horizontalpodautoscaler",
+                namespaced: true,
+            },
+        });
+        expect(resolveResourceKind("persistentvolumes")?.info.namespaced).toBe(false);
+    });
+
+    test("returns null for a token Karse will not read", () => {
+        expect(resolveResourceKind("secrets")).toBeNull();
+        expect(resolveResourceKind("")).toBeNull();
+        expect(resolveResourceKind("__proto__")).toBeNull();
     });
 });

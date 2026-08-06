@@ -2,8 +2,8 @@ import { Router } from "express";
 import * as kubectl from "../kubectl/kubectl-adapter";
 
 // Router handling GET /yaml/:type/:name, returning the raw YAML for a single resource.
-// Works generically for every viewable resource type (nodes, pods, deployments,
-// daemonsets, statefulsets, namespaces). The adapter enforces the allowed-type whitelist.
+// Works generically for every readable resource type (the RESOURCE_KINDS tokens in
+// karse-types). The adapter enforces the allowed-type whitelist.
 export const yamlRouter = Router();
 
 yamlRouter.get("/yaml/:type/:name", async (req, res) => {
@@ -13,7 +13,7 @@ yamlRouter.get("/yaml/:type/:name", async (req, res) => {
         return;
     }
     const { type, name } = req.params;
-    if (!kubectl.isYamlResourceType(type!)) {
+    if (!kubectl.isResourceKindToken(type!)) {
         res.status(400).json({ error: `unsupported resource type: ${type}` });
         return;
     }

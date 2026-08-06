@@ -21,7 +21,7 @@ Backed by:
   - `status`: a short human-readable summary per kind: pod phase, node status, "Active" for a namespace, the ready ratio (`x/y`) for deployments and stateful sets, `ready/desired` for daemon sets, and the metric summary (e.g. `cpu: 40%/80%`, or `<none>` when no metric status is available yet) for HPAs.
   - `health`: the derived `Healthy` / `Error` / `Other` classification, reusing the same per-kind classifiers as the resource-stats headers, so the health filter agrees with every other table. Namespaces and HPAs have no health notion and are `Other`.
   - `createdAt`: the ISO creation timestamp the UI turns into an age; namespaces carry none, so their age shows as `-`.
-  - `detailPath`: the in-app route to that resource's own detail page, resolved through the single `resourcePath` helper, or `null` when the kind has no detail page. HPAs have no detail page, so their rows always degrade to plain text.
+  - `detailPath`: the in-app route to that resource's detail page, resolved through the single `resourcePath` helper, or `null` when the reference cannot be resolved at all. A kind with no purpose-built page (an HPA) resolves to the generic detail page (see [generic-detail](../generic-detail/detail.md)), so its rows are clickable too.
   - `labels`: the resource's label map, for label search and filtering.
 - Rows are grouped by kind in a fixed display order; within a kind the source order is preserved. A kind whose list has not loaded contributes no rows, so the table assembles progressively, but the page shows the shared loading spinner until every kind's first load has settled. If any kind's query fails, the shared load-error panel is shown with a retry that refetches all kinds.
 
@@ -29,7 +29,7 @@ Backed by:
 
 The All resources page does not enumerate every type `kubectl api-resources` exposes; it lists the kinds Karse has chosen to surface. The supported set is: Pod, Node, Namespace, Deployment, StatefulSet, DaemonSet, and HorizontalPodAutoscaler.
 
-Other common types (ReplicaSet, Job, CronJob, Service, Ingress, ConfigMap, Secret, PersistentVolume, PersistentVolumeClaim, and the long tail of CRDs) are intentionally out of scope for now: Karse is a focused read-only dashboard, not a generic object browser, and most of these either duplicate information already shown via their owning workload or carry sensitive data (Secrets) that the read-only dashboard deliberately does not surface. They can be added later by following the same pattern HPA uses (a list adapter, a list endpoint, a `fetch*` client, an `AllResource` row mapper, and a `resourcePath` case if a detail page exists). HorizontalPodAutoscaler was added because it is a first-class scaling control with no other home in Karse; unlike a detailed kind it has no per-kind page, so it appears only here and its rows are non-clickable.
+Other common types (ReplicaSet, Job, CronJob, Service, Ingress, ConfigMap, Secret, PersistentVolume, PersistentVolumeClaim, and the long tail of CRDs) are intentionally out of scope for now: Karse is a focused read-only dashboard, not a generic object browser, and most of these either duplicate information already shown via their owning workload or carry sensitive data (Secrets) that the read-only dashboard deliberately does not surface. They can be added later by following the same pattern HPA uses (a list adapter, a list endpoint, a `fetch*` client and an `AllResource` row mapper; a `resourcePath` case is needed only for a kind that gains a purpose-built page, since every other readable kind already resolves to the generic detail page). HorizontalPodAutoscaler was added because it is a first-class scaling control with no other home in Karse; it has no per-kind page, so it appears only here, and its rows open the generic detail page.
 
 ## Behaviour
 
@@ -59,7 +59,7 @@ Other common types (ReplicaSet, Job, CronJob, Service, Ingress, ConfigMap, Secre
 
 ### Row navigation
 
-- Clicking a row navigates to that resource's own detail page, resolved through the shared `resourcePath` helper (`clickable-resource-rows`). The row carries the shared hover/cursor affordance only when it has a destination; a row for a kind with no detail page (an unresolvable reference) is non-clickable and degrades gracefully to plain text rather than a broken link.
+- Clicking a row navigates to that resource's detail page, resolved through the shared `resourcePath` helper (`clickable-resource-rows`): its own page where it has one, the generic detail page otherwise. The row carries the shared hover/cursor affordance only when it has a destination; a row whose reference cannot be resolved at all is non-clickable and degrades gracefully to plain text rather than a broken link.
 - The row click tags the destination URL with `from=all-resources` (via `useShareableNavigate`'s extra params, see `frontend/src/lib/nav-state.tsx`). The detail page's breadcrumb (`frontend/src/components/breadcrumbs.tsx`) reads that tag and shows the navigation path, the originating page followed by the specific resource name (no kind prefix), e.g. "All resources > web-deploy" (`originCrumbs` in `frontend/src/lib/breadcrumb-trail.ts`), instead of the page's own list-page trail. The "All resources" crumb links back to the page. The `from` tag describes only the immediate origin: it is dropped as soon as the user navigates on, so it never sticks to onward links.
 - The same `from=all-resources` tag keeps "All resources" selected in the left nav (`frontend/src/components/sidebar.tsx`) on the drilled-down detail page, rather than the resource's own list page (e.g. "Deployments"), so the highlighted nav item reflects where the navigation came from.
 
@@ -70,7 +70,7 @@ Other common types (ReplicaSet, Job, CronJob, Service, Ingress, ConfigMap, Secre
 - [x] The table is searchable, consistent with the existing resource tables.
 - [x] The table is sortable by clicking a column header.
 - [x] The table is filterable via the shared dropdown filter editor, including a Kind filter restricting to one or more kinds.
-- [x] Each row links to that resource's detail page, degrading gracefully for kinds without one (HPAs have no detail page and are non-clickable).
+- [x] Each row links to that resource's detail page: its own page where it has one, the generic detail page otherwise (an HPA row opens the generic page).
 - [x] The page is read-only, consistent with `read-only-invariant`.
 - [x] HorizontalPodAutoscalers appear on the page and are selectable in the Kind filter.
 - [x] The supported resource types are audited against what `kubectl` exposes; the supported set and the intentionally out-of-scope types are documented (see Resource type coverage).
