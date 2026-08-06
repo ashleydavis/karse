@@ -176,15 +176,51 @@ Teardown:
 ./docs/testing-manual/_fixtures-kwok/33-labels-column/teardown.sh
 ```
 
-## Scenario: Rendered-row bound on a long list
+## Scenario: Search text in the URL
 
-A namespace with far more pods than a table renders at once, so the 100-row bound, the **Show more** control and the typing responsiveness it buys are all observable.
+The committed search text is part of the page's URL, so a narrowed table is shareable and the browser back button restores it.
 
-Teardown the labels fixture, then stand up the large-list fixture:
+Teardown the labels fixture, then stand up the shareable-URL fixture:
 
 ```sh
 ./docs/testing-manual/_fixtures-kwok/33-labels-column/teardown.sh
 ```
+
+**Fixture:** [_fixtures-kwok/23-shareable-url-state](../_fixtures-kwok/23-shareable-url-state/)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/23-shareable-url-state/setup.sh
+```
+
+It stands up two clusters. Cluster 1 (`kwok-karse-test-1`) holds `web-pod` in `team-a`, `cache-pod` in `team-b`, and four pods in `team-c` (`api-server`, `api-worker`, `db-primary`, `db-replica`). Select the `kwok-karse-test-1` context in Karse.
+
+### What to check
+
+Open the **Pods page** with **no namespace selected**, so all six pods show.
+
+- **A committed search goes into the URL**: type `api` in the **Search pods...** box. The table narrows to `api-server` and `api-worker`, and about a quarter of a second later the address bar gains `?q=api`.
+- **The draft does not**: type slowly and watch the address bar. It does not change on each keystroke, only once you stop typing. (The box itself updates instantly.)
+- **Opening the link reproduces the view**: copy the URL, open a fresh tab and paste it. The pods list opens already narrowed to the two `api` pods, with `api` in the search box and the clear cross showing.
+- **Clearing removes the param**: click the cross. Every pod comes back and the `q=` param disappears from the URL entirely; no empty `?q=` is left behind.
+- **Back does not walk through every keystroke**: from the pods page with an empty box, type `db-primary`. Press the browser **back** button once. You leave the pods list altogether (back to whatever page you came from), rather than stepping back through `d`, `db`, `db-`, and so on.
+- **Back from a detail page restores the search**: type `api` again, then click the `api-worker` row to open its detail page. Press the browser **back** button. The pods list returns with `api` still in the search box **and still only two rows**, not the full list.
+- **It composes with context and namespace**: open the namespace picker (Ctrl+Shift+K) and select `team-c`, then switch context to cluster 2 and back to cluster 1 with the header dropdown. The URL carries `?context=`, `?namespace=` and `?q=` together, and the search text stays in the box the whole time.
+- **Two tables on one page keep separate searches**: go to **Namespaces**, click the `team-c` row, then the **Resources** tab. Type `Pod` in its search box: the URL gains `?q=Pod`. Switch to the **Labels** tab and type `name` in its search box: the URL gains `?labelsq=name` and keeps `q=Pod`. Switch back to **Resources**: its box still reads `Pod`.
+- **The labels modal stays out of the URL**: on the **Pods page**, find a pod whose Labels cell ends in a `+N ...` chip (the 33-labels-column fixture's `many-pod` is the clearest, or add labels to a `team-c` pod). Click the chip to open the labels modal and type in its search box. The listed labels narrow, but the URL does not change: the modal's search is transient dialog state, not part of the shareable view.
+
+Check the narrowed table and the restored-by-back table in both **light and dark mode**.
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/23-shareable-url-state/teardown.sh
+```
+
+## Scenario: Rendered-row bound on a long list
+
+A namespace with far more pods than a table renders at once, so the 100-row bound, the **Show more** control and the typing responsiveness it buys are all observable.
+
+With the previous scenario's fixture torn down, stand up the large-list fixture:
 
 **Fixture:** [_fixtures-kwok/37-large-pod-list](../_fixtures-kwok/37-large-pod-list/)
 

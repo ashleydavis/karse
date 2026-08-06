@@ -49,9 +49,20 @@ const LABEL_CELL_SX = {
 // detail page (labels-tab.tsx) and the labels modal opened from a truncated
 // Labels cell in any resource table (labels-modal.tsx). It takes a plain labels
 // map and knows nothing about which resource or surface opened it.
-export function LabelsTable({ labels }: { labels: Record<string, string> | undefined | null }) {
+//
+// `searchParamKey` is the URL query-param key the committed search text is stored
+// under, keeping it distinct from the param the page's main table uses. The modal
+// passes `null`: its search is transient dialog state, not part of the page's
+// shareable view.
+export function LabelsTable({
+    labels,
+    searchParamKey,
+}: {
+    labels: Record<string, string> | undefined | null;
+    searchParamKey: string | null;
+}) {
     const [sorting, setSorting] = useState<SortingState>([]);
-    const { search, setSearch, deferredSearch } = useSearchFilter();
+    const { search, setSearch, deferredSearch } = useSearchFilter(searchParamKey);
 
     const data = buildLabelRows(labels);
 

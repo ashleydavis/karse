@@ -25,6 +25,7 @@ The label data is already part of each list payload's `labels` field, so no back
 - The modal lists **every** label on that resource, one row per key/value pair, as a two-column Key / Value table. `buildLabelRows` sorts rows by key for a stable initial order.
 - The table is sortable: clicking the Key or Value column header cycles ascending / descending, with a sort-direction icon. `compareLabelRows` is the comparator, so a Key sort restores exactly the initial order.
 - The table is searchable: a text box fuzzy-filters the rows against both key and value (the same `fuzzyGlobalFilter` the resource tables use). A query that matches nothing shows "No labels match the search."
+- The modal's search is the one search in the app that is **not** written to the URL. It is transient state inside a dialog rather than part of the page's shareable view, so the modal is the sole caller that opts out of the URL-backed search (see **Search text in the URL** in [resource-search](../resource-search/detail.md)).
 - The modal is dismissible by the close button, the Escape key, and a click outside it (MUI's Dialog provides Escape dismissal and focus trapping). Dismissing it leaves the user on the list they opened it from; it never navigates.
 - A resource whose labels are all shown inline has no `+N ...` control, so no modal is reachable for it. A resource with no labels shows a muted dash in the cell.
 - One component serves every resource table with a Labels column. There is no per-resource variant.

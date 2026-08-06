@@ -23,7 +23,22 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/errors-search.t
 - Every resource table renders the same search box (`frontend/src/components/search-box.tsx`), which takes its placeholder as a prop so each table keeps its own wording ("Search pods...", "Search nodes...", ...). No table renders its own bespoke search field, so the box cannot drift apart between tables. The tables using it are pods, nodes, deployments, stateful sets, daemon sets, events, errors, autoscalers, all-resources, contexts, namespaces, the namespace-detail resources table, the cluster-home workloads table, and the labels table.
 - **Clearing the search.** The search box carries a clear button (a cross) at its right-hand end. It is hidden while the box is empty, so an empty box gains no dead control, and appears as soon as there is text in the box. Clicking it empties the box and restores every row the search had hidden, in one action, then returns keyboard focus to the input so the user can type a new query straight away. It clears only the free-text search: an active column-filter selection survives, and the rows shown afterwards are the rows those filters alone select. This is a different control from the column-filter editor's own "Clear", which empties the filter selection instead (see **The shared column-filter editor**).
 - Column headers sort the loaded rows.
+- **The committed search text lives in the URL** (see **Search text in the URL** below), so a narrowed table is shareable and the back button restores it.
 - Scope: this filters and sorts the rows already loaded for the current view. It is not a global search across resource kinds (a global all-resources browser and a cross-kind quick-find are on the roadmap; see `quick-find` and `docs/roadmap.md`).
+
+### Search text in the URL
+
+- A table's **committed** search text is held in the page's URL query string, under the key `q` for the page's main table. `useSearchFilter` reads and writes it, so every table that takes its search state from that hook gets the behaviour with no per-table wiring of its own.
+- Only the committed value reaches the URL. The per-keystroke draft stays inside `search-box.tsx`, so the URL changes once the 250 ms debounce fires (or at once on clear), not once per character.
+- Opening a URL that carries the param starts that table already filtered by it, with the text in the search box and the clear button showing. Copying the address bar (or pressing the navbar **Share** button) therefore sends a narrowed table, not an unfiltered list.
+- Clearing the search **deletes** the param rather than leaving an empty `?q=` behind.
+- Writes are history **replacements**, so a query leaves no trail of history entries to walk back through; the entry behind the list is still whatever page the list was opened from.
+- Because the list's own history entry carries the search, clicking a row into a detail page and pressing the browser **back** button returns to the list with the same text in the box and the same rows selected. Nothing else is needed to restore it: the state is read back off the URL on mount.
+- Each write is built from the params already on the URL, so `context`, `namespace` and `from` survive it, and switching context or namespace (which are written the same way) does not drop the search.
+- The search param is **not** carried onward by `useShareableNavigate` / `useShareableTo` (it is not one of the `SHAREABLE_PARAMS`), so a search on one page does not follow the user to the next one. It belongs to the history entry of the page it was typed on.
+- A route that renders more than one searchable table gives each box its own key, so the two cannot overwrite each other. Today that is the namespace detail page: its Resources tab uses `q` and its Labels tab uses `labelsq`.
+- The **labels modal** (opened from a truncated Labels cell) is excluded. Its search is transient state inside a dialog, not part of the page's shareable view, so it stays in component state. It is the one caller that passes `null` as the param key.
+- The column-filter selection and the sort column are not in the URL; only the free-text search is.
 
 ### Rendered-row bound
 
@@ -94,6 +109,14 @@ Backed by: `frontend/src/lib/fuzzy-filter.ts`, `frontend/src/lib/errors-search.t
 - [x] Selecting a label key's value(s) narrows the table to matching resources (OR within a key, AND across keys); the default empty selection shows everything.
 - [x] A "Clear" control clears every label selection and returns to showing everything.
 - [x] The label-filter dropdown and its column-filter wiring are shared across tables, with no per-table duplicate, and compose with the search box and the status filter.
+- [x] A committed search (after the 250 ms debounce, or immediately on clear) writes its text into the URL query string of the page's current route; the per-keystroke draft does not touch the URL.
+- [x] Opening a URL carrying the search param starts the table already filtered by it, with the text in the search box and the clear button visible.
+- [x] Clearing the search removes the param entirely, leaving no empty `?q=`.
+- [x] Search state is written with a history replace, so typing one query leaves no history entry per committed keystroke.
+- [x] From a narrowed table, clicking a row into a detail page and pressing the browser back button returns to the list with the same text in the search box and the same rows selected.
+- [x] The search param composes with `?context=`, `?namespace=` and `?from=` rather than replacing them; switching context or namespace does not drop the search.
+- [x] A route with more than one searchable table gives each box its own param key (namespace detail: `q` for the Resources tab, `labelsq` for the Labels tab), so the two cannot overwrite each other.
+- [x] Every page-level table that uses the shared search box gets this from the shared hook, with no per-table bespoke wiring; the labels modal is excluded because its search is transient dialog state.
 - [x] The shared Labels column keeps the row height fixed (only the first few chips inline) and exposes the rest behind a `+N ...` control that opens a searchable modal listing every label, while the table's fuzzy search still matches on all labels.
 
 ## Open Questions

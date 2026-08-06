@@ -36,6 +36,7 @@ import { ColumnConfigButton } from "../../../components/column-config-modal";
 import { useColumnConfig } from "../../../lib/column-config";
 import { tableRowSx } from "../../../lib/table-row-style";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
+import { useSearchFilter } from "../../../lib/use-search-filter";
 import {
     parseHpaTargets, metricPercent, metricLevel, formatHpaMetrics,
     replicaPercent, replicaLevel, formatReplicas,
@@ -176,7 +177,7 @@ export function AutoscalersTable() {
     });
 
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [globalFilter, setGlobalFilter] = useState("");
+    const { search, setSearch, deferredSearch } = useSearchFilter();
 
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("autoscalers", columns);
 
@@ -185,12 +186,12 @@ export function AutoscalersTable() {
         columns,
         state: {
             sorting,
-            globalFilter,
+            globalFilter: deferredSearch,
             columnOrder,
             columnVisibility,
         },
         onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
+        onGlobalFilterChange: setSearch,
         // No pagination row model is installed (every matching row is rendered, bounded only by
         // DataTableRows' render limit), so the page index is meaningless here. TanStack would
         // otherwise reset it whenever a row model is rebuilt, and since the row-model inputs are
@@ -231,8 +232,8 @@ export function AutoscalersTable() {
             <div className="flex flex-row gap-2 items-center">
                 <SearchBox
                     placeholder="Search autoscalers..."
-                    value={globalFilter}
-                    onChange={setGlobalFilter}
+                    value={search}
+                    onChange={setSearch}
                     testId="autoscalers-search"
                 />
                 <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />

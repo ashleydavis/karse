@@ -33,7 +33,8 @@ export function SearchBox({ placeholder, value, onChange, testId, sx }: SearchBo
     const [draft, setDraft] = useState(value);
 
     // Keep the draft aligned when the parent commits a new value (clear from
-    // outside, a future URL-driven search, and the debounce catching up).
+    // outside, a page opened on a URL that already carries a search, and the
+    // debounce catching up).
     useEffect(() => {
         setDraft(value);
     }, [value]);

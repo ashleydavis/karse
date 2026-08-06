@@ -65,7 +65,9 @@ export function LabelsModal({
                 </IconButton>
             </DialogTitle>
             <DialogContent>
-                <LabelsTable labels={labels} />
+                {/* searchParamKey={null}: the modal's search is transient state inside a
+                    dialog, not part of the page's shareable view, so it stays out of the URL. */}
+                <LabelsTable labels={labels} searchParamKey={null} />
             </DialogContent>
         </Dialog>
     );

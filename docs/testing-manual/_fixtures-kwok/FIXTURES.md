@@ -46,7 +46,7 @@ To tear down every test cluster at once (after running several fixtures, or to c
 | [20-pod-detail-tabs](20-pod-detail-tabs/) | One multi-container pod | pod-detail |
 | [21-pod-phase-filter](21-pod-phase-filter/) | Five pods, one per phase | pods-view |
 | [22-breadcrumbs](22-breadcrumbs/) | One node, one pod | cross-cutting |
-| [23-shareable-url-state](23-shareable-url-state/) | Two clusters, namespaced pods | cross-cutting |
+| [23-shareable-url-state](23-shareable-url-state/) | Two clusters, namespaced pods, a searchable `team-c` group | cross-cutting, resource-search |
 | [24-navbar-dropdown-pickers](24-navbar-dropdown-pickers/) | Two clusters, extra namespaces | quick-find |
 | [25-live-logs](25-live-logs/) | One node, three pods | live-logs |
 | [26-table-row-hover](26-table-row-hover/) | One node, one multi-container pod | clickable-resource-rows |

@@ -1,4 +1,4 @@
-import { test, expect, type Page, type ConsoleMessage } from "@playwright/test";
+import { test, expect, type Page, type ConsoleMessage, type Route } from "@playwright/test";
 import { execSync } from "node:child_process";
 
 // Cluster context names injected by scripts/e2e-tests.sh
@@ -2016,6 +2016,194 @@ test.describe("karse e2e", () => {
             await waitForNodeRows();
             const names = await getNodeNames();
             expect(names).toContain("node-alpha");
+        });
+    });
+
+    // ── Search text in the url ────────────────────────────────────────────────
+
+    test.describe("search text in the url", () => {
+        // Three pods whose names share no fuzzy match, so "redis" selects exactly one
+        // row and the narrowed count is unambiguous.
+        const URL_SEARCH_PODS = {
+            pods: [
+                { name: "nginx-abc", namespace: "default", phase: "Running", ready: "1/1", restarts: 0, node: "node-worker", createdAt: new Date().toISOString(), labels: {} },
+                { name: "redis-xyz", namespace: "default", phase: "Running", ready: "1/1", restarts: 0, node: "node-worker", createdAt: new Date().toISOString(), labels: {} },
+                { name: "postgres-0", namespace: "default", phase: "Running", ready: "1/1", restarts: 0, node: "node-worker", createdAt: new Date().toISOString(), labels: {} },
+            ],
+        };
+
+        // The detail page the narrowed list is clicked into, so the back button has a
+        // real forward navigation to come back from.
+        const REDIS_POD_DETAIL = {
+            name: "redis-xyz",
+            namespace: "default",
+            phase: "Running",
+            node: "node-worker",
+            podIP: "10.0.0.7",
+            createdAt: new Date().toISOString(),
+            labels: {},
+            containers: [],
+            initContainers: [],
+            events: [],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: URL_SEARCH_PODS });
+            });
+            // Registered after the list route so it wins for the detail request
+            // (Playwright matches the most recently added route first).
+            await page.route("**/api/pods/default/redis-xyz*", async (route) => {
+                await route.fulfill({ json: REDIS_POD_DETAIL });
+            });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods/default/redis-xyz*");
+            await page.unroute("**/api/pods*");
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+        });
+
+        test("typing a query narrows the pods table and writes it to the url", async () => {
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(3);
+            await page.locator("[data-test-id='pods-search'] input").fill("redis");
+            await expect(page).toHaveURL(/[?&]q=redis/);
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pod-row'] td:first-child")).toHaveText("redis-xyz");
+        });
+
+        test("opening a url carrying the search param renders the table already narrowed", async () => {
+            await page.goto("/pods?q=redis", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='pods-search'] input")).toHaveValue("redis");
+            await expect(page.locator("[data-test-id='pods-search-clear']")).toBeVisible();
+        });
+
+        test("clearing the search removes the param entirely and restores every row", async () => {
+            await page.goto("/pods?q=redis", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pods-search-clear']").click();
+            await expect(page).not.toHaveURL(/[?&]q=/);
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(3);
+        });
+
+        test("the search is written with a replace, so one back press leaves the list", async () => {
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pods-search'] input").fill("redis");
+            await expect(page).toHaveURL(/[?&]q=redis/);
+            // Each committed query replaced the entry rather than pushing one, so the
+            // single entry behind the list is the page it was opened from.
+            await page.goBack();
+            await expect(page).toHaveURL(/\/cluster/);
+        });
+
+        test("back from a detail page restores both the query text and the narrowed rows", async () => {
+            await page.goto("/pods?q=redis", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+            await page.locator("[data-test-id='pod-row']").first().click();
+            await expect(page).toHaveURL(/\/pods\/default\/redis-xyz/);
+            await page.goBack();
+            await expect(page).toHaveURL(/[?&]q=redis/);
+            await expect(page.locator("[data-test-id='pods-search'] input")).toHaveValue("redis");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(1);
+        });
+
+        test("the search param composes with the context and namespace params", async () => {
+            await page.goto(`/pods?context=${CLUSTER_1}&namespace=default`, { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='pods-search'] input").fill("redis");
+            await expect(page).toHaveURL(/[?&]q=redis/);
+            await expect(page).toHaveURL(new RegExp(`context=${CLUSTER_1}`));
+            await expect(page).toHaveURL(/namespace=default/);
+        });
+
+        test("two searchable tables on one route keep separate params", async () => {
+            const NAMESPACE_DETAIL = {
+                name: "team-b",
+                phase: "Active",
+                createdAt: new Date().toISOString(),
+                labels: {
+                    team: "beta",
+                    tier: "backend",
+                },
+                annotations: {},
+                resources: [
+                    { kind: "Pod", name: "web-abc", status: "Running", detailPath: "/pods/team-b/web-abc" },
+                    { kind: "Deployment", name: "web", status: "2/3 ready", detailPath: "/deployments/team-b/web" },
+                ],
+                quotas: [],
+                limits: [],
+            };
+            await page.route("**/api/namespaces/team-b*", async (route) => {
+                await route.fulfill({ json: NAMESPACE_DETAIL });
+            });
+            await page.goto("/namespaces/team-b", { waitUntil: "networkidle" });
+
+            // The Resources tab's box writes the default "q".
+            await page.locator("[data-test-id='namespace-tab-resources']").click();
+            await page.locator("[data-test-id='namespace-resources-filter'] input").fill("Deployment");
+            await expect(page).toHaveURL(/[?&]q=Deployment/);
+            await expect(page.locator("[data-test-id='namespace-resource-row']")).toHaveCount(1);
+
+            // The Labels tab's box writes its own key and leaves "q" alone.
+            await page.locator("[data-test-id='namespace-tab-labels']").click();
+            await page.locator("[data-test-id='labels-filter'] input").fill("tier");
+            await expect(page).toHaveURL(/[?&]labelsq=tier/);
+            await expect(page).toHaveURL(/[?&]q=Deployment/);
+            await expect(page.locator("[data-test-id='label-row']")).toHaveCount(1);
+
+            // Back on the Resources tab, its own search is untouched by the labels one.
+            await page.locator("[data-test-id='namespace-tab-resources']").click();
+            await expect(page.locator("[data-test-id='namespace-resources-filter'] input")).toHaveValue("Deployment");
+            await expect(page.locator("[data-test-id='namespace-resource-row']")).toHaveCount(1);
+
+            await page.unroute("**/api/namespaces/team-b*");
+        });
+
+        test("the labels modal's search stays out of the url", async () => {
+            const MANY_LABEL_PODS = {
+                pods: [
+                    {
+                        name: "many-pod",
+                        namespace: "default",
+                        phase: "Running",
+                        ready: "1/1",
+                        restarts: 0,
+                        node: "node-worker",
+                        createdAt: new Date().toISOString(),
+                        labels: {
+                            app: "many",
+                            env: "prod",
+                            region: "eu-west",
+                            tier: "backend",
+                            version: "1.2.3",
+                        },
+                    },
+                ],
+            };
+            // Added last, so it wins over the block's list route (handlers match LIFO).
+            // Kept in a named handler so unrouting it leaves the block's route in place.
+            const manyLabelsRoute = async (route: Route) => {
+                await route.fulfill({ json: MANY_LABEL_PODS });
+            };
+            await page.route("**/api/pods*", manyLabelsRoute);
+            await page.goto("/pods", { waitUntil: "networkidle" });
+
+            const modal = page.locator("[data-test-id='labels-modal']");
+            await page.locator("[data-test-id='pod-row']").first().locator("[data-test-id='labels-cell-more']").click();
+            await expect(modal).toBeVisible();
+            await expect(modal.locator("[data-test-id='label-row']")).toHaveCount(5);
+
+            // The modal's own search narrows its rows but writes nothing to the URL:
+            // it is transient dialog state, not part of the page's shareable view.
+            await modal.locator("[data-test-id='labels-filter'] input").fill("tier");
+            await expect(modal.locator("[data-test-id='label-row']")).toHaveCount(1);
+            await expect(page).not.toHaveURL(/[?&]q=/);
+            await expect(page).not.toHaveURL(/[?&]labelsq=/);
+
+            await modal.locator("[data-test-id='labels-modal-close']").click();
+            await page.unroute("**/api/pods*", manyLabelsRoute);
         });
     });
 

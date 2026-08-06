@@ -69,10 +69,11 @@ Every meaningful piece of UI state lives in the URL so a link can be copied and 
 - **Resource** is in the path on detail pages (`/nodes/<name>`, `/pods/<namespace>/<name>`).
 - **Context** is the `?context=<name>` query param.
 - **Namespace** is the `?namespace=<name>` query param (absent means "all namespaces").
+- **Table search** is the `?q=<text>` query param, holding the committed text of the page's search box (absent means no search). A route with a second searchable table gives it its own key: the namespace detail page's Labels tab uses `?labelsq=<text>`.
 
-Because all four are in the URL, the address bar is always a shareable link.
+Because all five are in the URL, the address bar is always a shareable link.
 
-Two KWOK clusters run simultaneously so context switching is observable. Cluster 1 (`kwok-karse-test-1`) has 2 nodes and pods `web-pod` (namespace `team-a`) and `cache-pod` (namespace `team-b`). Cluster 2 (`kwok-karse-test-2`) has 1 node (`fake-node-a`), so the data visibly differs after a switch.
+Two KWOK clusters run simultaneously so context switching is observable. Cluster 1 (`kwok-karse-test-1`) has 2 nodes and pods `web-pod` (namespace `team-a`), `cache-pod` (namespace `team-b`), and `api-server`, `api-worker`, `db-primary` and `db-replica` (namespace `team-c`, so a search visibly narrows the list). Cluster 2 (`kwok-karse-test-2`) has 1 node (`fake-node-a`), so the data visibly differs after a switch.
 
 **Fixture:** [_fixtures-kwok/23-shareable-url-state](../_fixtures-kwok/23-shareable-url-state/)
 
@@ -86,7 +87,7 @@ Two KWOK clusters run simultaneously so context switching is observable. Cluster
 3. Open a fresh browser tab (or a private/incognito window so nothing is cached) and paste the URL.
 4. Confirm the new tab opens on the identical view: same page, same context (same cluster data), same namespace selection, and the same resource if it was a detail page.
 
-The URL should already contain everything: the page and resource in the path, and `?context=`/`?namespace=` in the query string. Nothing about the view should depend on hidden in-memory state.
+The URL should already contain everything: the page and resource in the path, and `?context=`/`?namespace=`/`?q=` in the query string. Nothing about the view should depend on hidden in-memory state.
 
 ### Worked examples
 
@@ -105,6 +106,11 @@ The URL should already contain everything: the page and resource in the path, an
 1. Go to **Pods**, select namespace `team-b`. URL: `/pods?namespace=team-b`, list shows only `cache-pod`.
 2. Copy and open in a fresh tab: the pods list opens already scoped to `team-b`.
 
+#### Share a searched list view
+1. Go to **Pods** with no namespace selected, so all six of cluster 1's pods show. Type `api` in the **Search pods...** box. The table narrows to `api-server` and `api-worker`, and a moment later (after the 250 ms debounce) the URL gains `?q=api`.
+2. Copy that URL into a fresh tab: the pods list opens already narrowed to those two rows, with `api` in the search box and its clear cross showing.
+3. Click the cross. The URL drops the `q=` param entirely (no empty `?q=` is left) and every pod comes back.
+
 #### Share a view of a specific cluster
 1. On any page, switch context to cluster 2. URL gains `?context=kwok-karse-test-2`; the node count drops to cluster 2's single `fake-node-a`.
 2. Copy e.g. `/nodes?context=kwok-karse-test-2` into a fresh tab: it opens reading cluster 2 without touching your terminal's current context.
@@ -115,6 +121,11 @@ The URL should already contain everything: the page and resource in the path, an
 - **Every detail page is shareable**: node detail (`/nodes/fake-node-1`) and pod detail (`/pods/team-a/web-pod`) reopen on the exact resource.
 - **Context goes into the URL**: switching context (header dropdown or Ctrl+K) sets `?context=...`; the data updates to that cluster.
 - **Namespace goes into the URL**: selecting a namespace (Ctrl+Shift+K) sets `?namespace=...`; choosing "All namespaces" removes it.
+- **The table search goes into the URL**: typing in a table's search box sets `?q=...` once typing pauses (not once per keystroke); clearing the box removes the param. Reopening the URL restores the narrowed table and the text in the box.
+- **Back restores the search, not each keystroke**: from a narrowed pods list, click a row into pod detail and press the browser **back** button. The list returns with the same text in the box and the same narrowed rows. Pressing **back** again leaves the pods page altogether rather than stepping through each committed keystroke, because the search is written with a history replace.
+- **The search composes with the other params**: with a context and a namespace already in the URL, add a search. All three params sit in the URL together, and switching context or namespace afterwards keeps the search text in the box.
+- **Two searchable tables keep separate params**: on a namespace detail page, search on the **Resources** tab (`?q=`) and on the **Labels** tab (`?labelsq=`). Neither overwrites the other.
+- **The labels modal is not shareable state**: opening a truncated Labels cell's modal and searching in it narrows the modal's list but changes no param. That search is transient dialog state by design.
 - **Reload preserves state**: with params in the address bar, F5 keeps the same context, namespace, page, and resource (no reset to the terminal default).
 - **Params survive navigation**: with a context/namespace selected, click around the sidebar and into/out of detail pages. The query params stay attached the whole time.
 - **Backward compatible default**: open `/cluster` with no query params. The app falls back to the terminal's current context (cluster 1) and "all namespaces".

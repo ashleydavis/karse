@@ -17,6 +17,7 @@ The Key / Value table itself is shared with [labels-modal](../labels-modal/detai
 - Each resource detail page that carries labels has a "Labels" sub tab alongside its existing tabs (Status, Logs, Commands, YAML, and so on).
 - The Labels tab shows only that resource's own labels, one row per key/value pair, as a two-column Key / Value table. `buildLabelRows` sorts rows by key for a stable initial order.
 - The table is searchable: a text box fuzzy-filters the rows against both key and value (the same `fuzzyGlobalFilter` used by the resource tables). A query that matches nothing shows a "No labels match the search." message.
+- The tab's search text lives in the URL under `labelsq` (see **Search text in the URL** in [resource-search](../resource-search/detail.md)), not under the default `q`, because a detail page can render another searchable table on a sibling tab (the namespace detail page's Resources tab). The two boxes therefore never overwrite each other's param.
 - The table is sortable: clicking the Key or Value column header cycles ascending / descending, with a sort-direction icon, matching the other sortable tables.
 - A resource with no labels shows a "This resource has no labels." message instead of an empty table.
 - No shared or aggregated list-level Labels tab exists. The Labels tab is reachable only from a resource detail page and only ever shows that one resource's labels.
