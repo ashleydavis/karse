@@ -7,7 +7,7 @@ import type {
     WorkloadKind, WorkloadDetail, NamespaceDetail,
     PodDetail, NodeDetail, YamlResourceType, YamlResponse,
     LogStreamLine, LogStreamStarted, EventsResponse, ErrorsResponse,
-    ClusterPerformance, NodePerformance,
+    ClusterPerformance, NodePerformance, ClusterSummary, MultiClusterTotals,
     PodPerformance, CacheConfigResponse, CacheClearResponse,
 } from "karse-types";
 
@@ -345,6 +345,51 @@ export function openLogStream(
             const parsed = JSON.parse(data);
             callbacks.onError(parsed.message ?? "stream error");
         }
+    });
+
+    return () => {
+        source.close();
+    };
+}
+
+// Callbacks for the multi-cluster overview stream consumed via Server-Sent Events.
+// onCluster fires once per configured context, as that cluster's read lands; onTotals
+// fires once with the aggregate figures and coverage counts; onError carries a failure
+// to read the kubeconfig itself; onEnd fires when the stream has finished.
+export type ClusterOverviewCallbacks = {
+    onCluster: (summary: ClusterSummary) => void;
+    onTotals: (totals: MultiClusterTotals) => void;
+    onError: (message: string) => void;
+    onEnd: () => void;
+};
+
+// Opens the multi-cluster overview stream (GET /api/clusters/overview) and dispatches
+// each event to the callbacks, so the page can render each cluster's row as it arrives
+// instead of waiting on the slowest context. The connection is closed on the "end"
+// event, which stops EventSource reconnecting and re-running the whole fan-out.
+// Returns a function that closes the stream.
+export function openClusterOverviewStream(callbacks: ClusterOverviewCallbacks): () => void {
+    const source = new EventSource("/api/clusters/overview");
+
+    source.addEventListener("cluster", (e: MessageEvent) => {
+        callbacks.onCluster(JSON.parse(e.data));
+    });
+    source.addEventListener("totals", (e: MessageEvent) => {
+        callbacks.onTotals(JSON.parse(e.data));
+    });
+    source.addEventListener("error", (e: MessageEvent) => {
+        const data = e.data;
+        if (typeof data === "string" && data !== "") {
+            const parsed = JSON.parse(data);
+            callbacks.onError(parsed.message ?? "stream error");
+        }
+        else if (source.readyState === EventSource.CLOSED) {
+            callbacks.onError(loadErrorMessage(new Error("Cluster overview stream disconnected")));
+        }
+    });
+    source.addEventListener("end", () => {
+        source.close();
+        callbacks.onEnd();
     });
 
     return () => {

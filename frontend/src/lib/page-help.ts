@@ -52,6 +52,34 @@ function namespaceScope(namespace: string | null): string {
     return `The "${namespace}" namespace is selected, so the queries are scoped to it (-n ${namespace}).`;
 }
 
+// Help for the All clusters page. Its queries are not scoped to the selected context:
+// it lists every kubeconfig context and then runs the same node/pod/metrics reads the
+// cluster home page runs against each one, so the commands are shown per context.
+function allClustersHelp(): PageHelp {
+    return {
+        title: "All clusters",
+        source: "The overview lists every context in your kubeconfig, then reads each cluster's nodes, pods and metrics with the same read-only queries the Cluster page uses. The totals sum the absolute usage and capacity across the clusters that answered, so a large cluster weighs more than a small one.",
+        commands: [
+            {
+                label: "List every kubeconfig context",
+                command: "kubectl config view -o json",
+            },
+            {
+                label: "Nodes in one cluster (repeated per context)",
+                command: "kubectl --context <context> get nodes -o json",
+            },
+            {
+                label: "Pods in one cluster, for their requests (repeated per context)",
+                command: "kubectl --context <context> get pods -A -o json",
+            },
+            {
+                label: "Node metrics in one cluster (repeated per context)",
+                command: "kubectl --context <context> get --raw /apis/metrics.k8s.io/v1beta1/nodes",
+            },
+        ],
+    };
+}
+
 // Help for the cluster home page, built from the five queries the cluster overview runs.
 function clusterHelp(context: string | null): PageHelp {
     return {
@@ -430,6 +458,10 @@ export function buildPageHelp(pathname: string, selection: PageHelpSelection): P
     if (segments.length === 0 || first === "cluster")
     {
         return clusterHelp(context);
+    }
+    if (first === "clusters")
+    {
+        return allClustersHelp();
     }
     if (first === "all-resources")
     {

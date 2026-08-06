@@ -485,3 +485,32 @@ export type CacheConfigResponse = {
 export type CacheClearResponse = {
     cleared: true;
 };
+
+// One configured kubeconfig context's contribution to the multi-cluster overview:
+// its node count and its cluster-wide CPU/memory totals, or the reason it could not be
+// read. error is null on success and carries the failure reason otherwise; an errored
+// entry has a null nodeCount and all-null totals, so an unreadable cluster is shown as
+// unknown rather than empty.
+export type ClusterSummary = {
+    context: string;
+    cluster: string;
+    error: string | null;
+    nodeCount: number | null;
+    metricsAvailable: boolean;
+    totals: ClusterResourceTotals;
+};
+
+// The aggregate figures across every configured context, as streamed by
+// GET /api/clusters/overview. contextCount is every configured context; coveredCount is
+// how many of them the totals actually include and failedCount how many could not be
+// read, so a total over 3 of 5 clusters cannot be misread as covering all 5. The
+// utilisation totals are summed absolutes (usage, requests, allocatable) across the
+// covered clusters, never an average of their percentages.
+export type MultiClusterTotals = {
+    contextCount: number;
+    coveredCount: number;
+    failedCount: number;
+    nodeCount: number;
+    metricsAvailable: boolean;
+    totals: ClusterResourceTotals;
+};

@@ -39,6 +39,7 @@ Open http://localhost:5173.
 The left sidebar has collapsible navigation. Click the chevron at the bottom to collapse it to icons only; hover an icon to see a tooltip with the page name.
 
 - **Contexts**: manage kubeconfig contexts.
+- **All clusters**: a total across every configured context at once, and a per-cluster table.
 - **Cluster**: overview tiles and cluster stats.
 - **Nodes**: the node table for the active context.
 - **Namespaces**: list and select namespaces.
@@ -136,6 +137,29 @@ A table of all kubeconfig contexts. Each row shows the context name, cluster, us
 - **Set as default**: writes this context as the current context in your kubeconfig (`kubectl config use-context`).
 - **active** chip: this context is active in the current tab.
 - **default** chip: this context is the kubeconfig current context.
+
+## All clusters page (`/clusters`)
+
+Every other page in Karse shows one cluster: the one your active context points at. This page shows them all at once, so you can see how much you have and how hard it is working without switching context five times.
+
+At the top, **Across all clusters**:
+
+- **Clusters**: how many contexts your kubeconfig has.
+- **Nodes**: the total node count across them, captioned with how many clusters that total covers.
+- **CPU** and **Memory**: aggregate utilisation, with the same **Usage | Requests** and **% | Absolute** toggles the Cluster page uses. The percentage is worked out from summed absolute usage and summed absolute capacity, not by averaging the clusters' percentages, so a big cluster counts for more than a small one.
+
+Underneath the cards, a line states how many clusters the totals actually cover, for example `Totals cover 2 of 3 clusters (1 could not be read; see the Status column below).` If a cluster is unreachable you always know the total is short, and by how much.
+
+Below that, the **Clusters** table has one row per context, with its node count and its own CPU and memory bars, searchable and sortable like every other table. **Click a row to switch to that cluster**: it makes that context active and takes you to its cluster home page.
+
+Things you will see:
+
+- **A cluster that cannot be reached** (VPN down, expired credentials, a stale context) shows as a row whose **Status** cell names the reason, with dashes instead of figures. The other clusters still report normally.
+- **A cluster with no metrics server** is still counted, but its live usage is unknown, so the aggregate usage reads as a dash rather than a misleading `0%`. Switch to **Requests** to see figures that come from pod specs instead.
+- **Rows appear as each cluster answers**, with the loading spinner up until the last one is in, so a slow cluster does not hold everything back.
+- **An empty kubeconfig** shows the same add-a-context guidance the Contexts page shows.
+
+Reads go through the same cache as the rest of the app, so revisiting the page inside the staleness window (Config page) does not re-query every cluster.
 
 ## Cluster home page (`/`)
 

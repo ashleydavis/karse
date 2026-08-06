@@ -16,7 +16,6 @@ import {
     TableCell,
     TableContainer,
     Paper,
-    Box,
     Chip,
     Typography,
     Button,
@@ -28,7 +27,7 @@ import { DataTableRows } from "../../../components/data-table-row";
 import { useSearchFilter } from "../../../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { ACTIONS_COLUMN_ID, stickyActionsHeaderSx } from "../../../lib/sticky-actions";
-import { addContextCommands, addContextHeading, addContextIntro } from "../lib/add-context-help";
+import { NoContextsGuidance } from "../../../components/no-contexts-guidance";
 import { SearchBox } from "../../../components/search-box";
 
 type Props = {
@@ -157,41 +156,7 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
                         {rows.length === 0 && contexts.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={columns.length}>
-                                    <Box
-                                        data-test-id="no-contexts-empty"
-                                        sx={{ display: "flex", flexDirection: "column", gap: 1.5, py: 1 }}
-                                    >
-                                        <Typography color="text.secondary">
-                                            {addContextHeading}
-                                        </Typography>
-                                        <Typography color="text.secondary" variant="body2">
-                                            {addContextIntro}
-                                        </Typography>
-                                        {addContextCommands.map((cmd) => (
-                                            <Box key={cmd.label} sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                                    {cmd.label}
-                                                </Typography>
-                                                <Box
-                                                    component="code"
-                                                    data-test-id="add-context-command"
-                                                    sx={{
-                                                        fontFamily: "monospace",
-                                                        fontSize: "0.85rem",
-                                                        bgcolor: "action.hover",
-                                                        color: "text.primary",
-                                                        px: 1,
-                                                        py: 0.75,
-                                                        borderRadius: 1,
-                                                        whiteSpace: "pre-wrap",
-                                                        wordBreak: "break-all",
-                                                    }}
-                                                >
-                                                    {cmd.command}
-                                                </Box>
-                                            </Box>
-                                        ))}
-                                    </Box>
+                                    <NoContextsGuidance />
                                 </TableCell>
                             </TableRow>
                         )}

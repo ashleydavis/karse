@@ -261,6 +261,30 @@ echo "$PERF_RESP" | jq -e '.health.nodeCount == (.nodes | length)' > /dev/null
 echo "$PERF_RESP" | jq -e '(.workloads | type == "array") and (.workloads | all(has("kind") and has("name") and has("namespace") and (.usage | has("cpuMillicores")) and (.requests | has("cpuMillicores"))))' > /dev/null
 echo "OK"
 
+echo "--- GET /api/clusters/overview (multi-cluster overview stream) ---"
+# The aggregate endpoint is Server-Sent Events: one "cluster" event per configured
+# context as its read lands, then a "totals" event, then "end". The smoke kubeconfig
+# holds exactly this run's kwok cluster, so the stream covers one context.
+CLUSTERS_RESP=$(curl -fsS "$BASE/api/clusters/overview")
+echo "$CLUSTERS_RESP" | grep -q "^event: cluster$"
+echo "$CLUSTERS_RESP" | grep -q "^event: totals$"
+echo "$CLUSTERS_RESP" | grep -q "^event: end$"
+# The per-cluster event names the context and carries its node count and totals.
+CLUSTER_EVENT=$(echo "$CLUSTERS_RESP" | grep -A 1 "^event: cluster$" | grep "^data: " | head -n 1 | cut -c 7-)
+echo "$CLUSTER_EVENT" | jq -e --arg ctx "$CURRENT_CTX" '.context == $ctx' > /dev/null
+echo "$CLUSTER_EVENT" | jq -e '.error == null' > /dev/null
+echo "$CLUSTER_EVENT" | jq -e '.nodeCount >= 2' > /dev/null
+echo "$CLUSTER_EVENT" | jq -e '.totals.allocatable.cpuMillicores != null' > /dev/null
+# The totals event states its coverage (how many clusters the totals actually include)
+# alongside the summed node count and the summed absolute CPU/memory figures.
+TOTALS_EVENT=$(echo "$CLUSTERS_RESP" | grep -A 1 "^event: totals$" | grep "^data: " | head -n 1 | cut -c 7-)
+echo "$TOTALS_EVENT" | jq -e '.contextCount >= 1' > /dev/null
+echo "$TOTALS_EVENT" | jq -e '.coveredCount == .contextCount' > /dev/null
+echo "$TOTALS_EVENT" | jq -e '.failedCount == 0' > /dev/null
+echo "$TOTALS_EVENT" | jq -e '.nodeCount >= 2' > /dev/null
+echo "$TOTALS_EVENT" | jq -e '.totals.allocatable.cpuMillicores != null and .totals.requests.cpuMillicores != null' > /dev/null
+echo "OK"
+
 echo "--- GET /api/namespaces ---"
 curl -fsS "$BASE/api/namespaces?context=$CURRENT_CTX" \
     | jq -e 'has("namespaces") and (.namespaces | all(has("name") and has("resourceCount")))' \

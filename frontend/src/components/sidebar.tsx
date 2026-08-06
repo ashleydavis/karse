@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Box, Typography, List, ListItemButton, ListItemIcon, ListItemText, Divider, Tooltip, IconButton } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
-import { faLink, faDharmachakra, faServer, faLayerGroup, faCube, faCubes, faDatabase, faSitemap, faBell, faStream, faCircleExclamation, faList, faGear, faChevronLeft, faChevronRight, faCircleInfo, faGaugeHigh } from "@fortawesome/free-solid-svg-icons";
+import { faLink, faDharmachakra, faServer, faLayerGroup, faCube, faCubes, faDatabase, faSitemap, faBell, faStream, faCircleExclamation, faList, faGear, faChevronLeft, faChevronRight, faCircleInfo, faGaugeHigh, faGlobe } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useShareableTo } from "../lib/nav-state";
 import { FROM_ALL_RESOURCES } from "../lib/breadcrumb-trail";
@@ -11,6 +11,7 @@ import { TOP_BAR_HEIGHT } from "../lib/layout";
 const NAV_ITEMS = [
     { to: "/errors",       icon: faCircleExclamation, label: "Errors"   },
     { to: "/contexts",     icon: faLink,          label: "Contexts"     },
+    { to: "/clusters",     icon: faGlobe,         label: "All clusters" },
     { to: "/cluster",      icon: faDharmachakra,  label: "Cluster"      },
     { to: "/nodes",        icon: faServer,        label: "Nodes"        },
     { to: "/namespaces",   icon: faLayerGroup,    label: "Namespaces"   },

@@ -10,7 +10,7 @@ Karse currently ships the cluster home page, namespace scoping, the core workloa
 2. **Auto-refresh / polling controls**: configurable refresh intervals per view, with a pause toggle.
 3. **Audit log viewer**: surface the on-disk audit log in the UI so users can see what Karse has run.
 4. **Host-header allowlist / DNS-rebinding guard**: add an explicit Host-header allowlist to the backend so the one mutating route is not protected by CORS preflight alone (the accepted risk noted in `docs/security.md`).
-5. **Multi-cluster overview**: a landing page summarising every configured context at a glance.
+5. **Multi-cluster overview, grouped by environment**: the flat per-context overview now ships (see "Already shipped"); grouping it by environment (dev/staging/prod) still needs cluster environments to exist.
 6. **Density options**: a compact table density toggle. (Light/dark theming already ships via the color-mode setting; the density toggle does not.)
 
 ## Performance monitoring
@@ -49,6 +49,7 @@ Karse currently ships the cluster home page, namespace scoping, the core workloa
 - **All resources page**: a single "All resources" page (`/all-resources`) listing every resource across all kinds (pods, nodes, namespaces, deployments, stateful sets, daemon sets) in one combined, searchable, sortable, filterable table, with a Kind filter and clickable rows. See `docs/spec/all-resources/detail.md`.
 - **Autoscalers view**: an Autoscalers page (`/autoscalers`) listing the cluster's HPAs with their scale target, their current metric against its target, and their current/desired replicas against their min/max bounds, as sortable performance bars. See `docs/spec/autoscalers-view/detail.md`.
 - **Light/dark theming**: a color-mode setting (light, dark, or system) applied across the app.
+- **Multi-cluster overview**: an All clusters page (`/clusters`) summarising every configured kubeconfig context at a glance: the cluster count, the total node count, and aggregate CPU and memory utilisation, above a searchable, sortable per-cluster table whose rows link through to each cluster's home page. See `docs/spec/multi-cluster-overview/detail.md`.
 
 ## New items
 

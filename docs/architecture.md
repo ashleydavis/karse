@@ -48,8 +48,10 @@ graph TD
     srv["server.ts"]
     cr["contexts-route.ts\nGET /api/contexts\nPOST /api/contexts/current"]
     clr["cluster-route.ts\nGET /api/cluster/overview\nGET /api/cluster/nodes"]
+    mcr["multi-cluster-route.ts\nGET /api/clusters/overview (SSE)"]
     srv --> cr
     srv --> clr
+    srv --> mcr
 
     KA["kubectl-adapter.ts\nlistContexts · getCurrentContext\nsetCurrentContext · listNodes\ngetClusterOverview"]
 
@@ -97,6 +99,14 @@ Performance feature:
   single fetch per context).
 - `GET /api/nodes/:name/performance` — the one node's `usage` / `requests` / `allocatable` plus
   its pods' per-pod figures. Drives the node-detail utilisation cards and the per-node pods bars.
+- `GET /api/clusters/overview` — the multi-cluster overview (`kubectl/multi-cluster.ts`): a
+  Server-Sent Events stream that fans out over every kubeconfig context, calling the same
+  `getClusterPerformance` per context, and emits a `ClusterSummary` as each lands followed by the
+  aggregate `MultiClusterTotals`. The fan-out is bounded (4 contexts at a time) and each context
+  is capped by a 20s timeout, so a dead context cannot hold the page; every read goes through the
+  cluster cache, so it shares cached entries with the per-cluster pages. The aggregate sums
+  absolute usage and capacity across clusters and derives the percentage from those sums, so a
+  large cluster weighs more than a small one. See `docs/spec/multi-cluster-overview`.
 - `GET /api/pods/:namespace/:name/performance` — the one pod's summed `usage` / `requests` /
   `limits`. Drives the pod-detail resource panel.
 

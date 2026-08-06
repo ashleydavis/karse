@@ -13,6 +13,7 @@ import { logsStreamRouter } from "./routes/logs-stream-route";
 import { eventsRouter } from "./routes/events-route";
 import { errorsRouter } from "./routes/errors-route";
 import { cacheRouter } from "./routes/cache-route";
+import { multiClusterRouter } from "./routes/multi-cluster-route";
 
 // Builds and returns the configured Express application.
 // Applies JSON body parsing, mounts both API routers, and installs the
@@ -22,6 +23,7 @@ export function createServer(): express.Express {
     app.use(express.json());
     app.use("/api", contextsRouter);
     app.use("/api", clusterRouter);
+    app.use("/api", multiClusterRouter);
     // Namespace detail (GET /namespaces/:name) must come before the list router so
     // the parameterised detail route is matched before any later catch-all.
     app.use("/api", namespaceDetailRouter);

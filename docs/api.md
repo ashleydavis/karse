@@ -193,6 +193,41 @@ curl -fsS 'http://127.0.0.1:5172/api/cluster/performance?context=my-ctx'
 }
 ```
 
+## GET /api/clusters/overview
+
+Summarises **every** kubeconfig context at once (the All clusters page), rather than the single active one. Unlike every other endpoint here this is a **Server-Sent Events** stream, not a single JSON body: one event is emitted per context the moment its read lands, so the page can render each cluster's row without waiting on the slowest context.
+
+- **Request query**: none. Every configured context is covered.
+- **Response**: `Content-Type: text/event-stream`, with these named events, in this order:
+
+| Event | Data | When |
+|---|---|---|
+| `cluster` | `ClusterSummary` | Once per configured context, as its read lands. |
+| `totals` | `MultiClusterTotals` | Once, after every context has settled. |
+| `error` | `{ "message": string }` | The kubeconfig itself could not be read. |
+| `end` | `{}` | Always last. The response is then closed, so a client's `EventSource` must close on this event rather than reconnect. |
+
+```
+event: cluster
+data: {"context":"prod","cluster":"prod-cluster","error":null,"nodeCount":12,"metricsAvailable":true,"totals":{"usage":{"cpuMillicores":18400,"memoryBytes":51539607552},"requests":{"cpuMillicores":24000,"memoryBytes":68719476736},"allocatable":{"cpuMillicores":48000,"memoryBytes":103079215104}}}
+
+event: cluster
+data: {"context":"lab","cluster":"lab-cluster","error":"Unable to connect to the server: dial tcp 10.0.0.9:6443: i/o timeout","nodeCount":null,"metricsAvailable":false,"totals":{"usage":{"cpuMillicores":null,"memoryBytes":null},"requests":{"cpuMillicores":null,"memoryBytes":null},"allocatable":{"cpuMillicores":null,"memoryBytes":null}}}
+
+event: totals
+data: {"contextCount":2,"coveredCount":1,"failedCount":1,"nodeCount":12,"metricsAvailable":true,"totals":{"usage":{"cpuMillicores":18400,"memoryBytes":51539607552},"requests":{"cpuMillicores":24000,"memoryBytes":68719476736},"allocatable":{"cpuMillicores":48000,"memoryBytes":103079215104}}}
+
+event: end
+data: {}
+```
+
+Notes:
+
+- A context that cannot be read arrives as a `cluster` event whose `error` names the reason, with a `null` `nodeCount` and all-null totals. It never fails the stream and never contributes to the totals.
+- `contextCount` is every configured context; `coveredCount` is how many the totals actually include and `failedCount` how many could not be read, so a total over 3 of 5 clusters cannot be misread as covering all 5.
+- The totals are summed **absolutes** (`usage`, `requests`, `allocatable`) across the covered clusters, never an average of their percentages: capacity is what weighs a cluster. A `null` usage on any covered cluster makes the aggregate usage `null` (unknown), not smaller.
+- Each context's read is the same `getClusterPerformance` call `GET /api/cluster/performance` makes, so it shares the on-disk cluster cache. At most 4 contexts are queried at once and each is bounded by a 20s timeout.
+
 ## GET /api/namespaces
 
 Lists all namespaces in the cluster for the given context.

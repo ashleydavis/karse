@@ -10764,4 +10764,121 @@ test.describe("karse e2e", () => {
             await expect(eventTimes().first()).toHaveText("2h");
         });
     });
+    test.describe("multi-cluster overview", () => {
+        // The multi-cluster overview page (/clusters) summarises every configured
+        // kubeconfig context. The e2e kubeconfig holds exactly the two kwok clusters the
+        // runner creates: cluster 1 with three nodes (node-cp, node-worker, node-notready)
+        // and cluster 2 with two (node-alpha, node-beta), so five nodes across two clusters.
+        const CLUSTER_1_NODES = 3;
+        const CLUSTER_2_NODES = 2;
+        const TOTAL_NODES = CLUSTER_1_NODES + CLUSTER_2_NODES;
+
+        // Opens the page and blocks until the stream has finished (the loading indicator
+        // is gone) and the totals have rendered.
+        async function navigateToClusters(): Promise<void> {
+            await page.goto("/clusters", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='clusters-total-clusters']")).toBeVisible();
+            await expect(page.locator("[data-test-id='loading-indicator']")).toHaveCount(0);
+        }
+
+        // The row whose Context cell is exactly the given context name.
+        function rowFor(context: string) {
+            return page.locator("[data-test-id='cluster-row']").filter({
+                has: page.locator(`td:first-child:text-is("${context}")`),
+            });
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+        });
+
+        test.afterAll(async () => {
+            setContext(CLUSTER_1);
+        });
+
+        test("is reachable from the left nav", async () => {
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='sidebar-nav'] [aria-label='all clusters']").click();
+            await expect(page).toHaveURL(/\/clusters/);
+            await expect(page.locator("[data-test-id='clusters-page']")).toBeVisible();
+            await expect(page.locator("[data-test-id='breadcrumbs']")).toHaveText("All clusters");
+        });
+
+        test("lists every configured context with its own node count", async () => {
+            await navigateToClusters();
+            await expect(page.locator("[data-test-id='cluster-row']")).toHaveCount(2);
+            await expect(rowFor(CLUSTER_1)).toHaveCount(1);
+            await expect(rowFor(CLUSTER_2)).toHaveCount(1);
+            await expect(rowFor(CLUSTER_1).locator("[data-test-id='cluster-row-nodes']"))
+                .toHaveText(String(CLUSTER_1_NODES));
+            await expect(rowFor(CLUSTER_2).locator("[data-test-id='cluster-row-nodes']"))
+                .toHaveText(String(CLUSTER_2_NODES));
+        });
+
+        test("reports the cluster count and the summed node count", async () => {
+            await expect(page.locator("[data-test-id='clusters-total-clusters']")).toContainText("2");
+            await expect(page.locator("[data-test-id='clusters-total-nodes']")).toContainText(String(TOTAL_NODES));
+        });
+
+        test("states how many clusters the totals cover", async () => {
+            await expect(page.locator("[data-test-id='clusters-coverage']"))
+                .toHaveText("Totals cover 2 of 2 clusters.");
+        });
+
+        test("shows aggregate CPU and memory through the shared utilisation cards", async () => {
+            await expect(page.locator("[data-test-id='clusters-util-cpu']")).toBeVisible();
+            await expect(page.locator("[data-test-id='clusters-util-memory']")).toBeVisible();
+            // The kwok clusters have no metrics entry for every node, so the aggregate live
+            // usage is unknown. It must read as an em-dash, never as a fabricated 0%.
+            await expect(page.locator("[data-test-id='clusters-util-cpu']")).toContainText("—");
+            // The shared Usage/Requests and %/Absolute toggles drive the cards. Requests come
+            // from pod specs and node status, so they are real figures in either format.
+            await page.locator("[data-test-id='util-view-mode-requests']").click();
+            await expect(page.locator("[data-test-id='clusters-util-cpu']")).toContainText("%");
+            await page.locator("[data-test-id='util-value-format-absolute']").click();
+            await expect(page.locator("[data-test-id='clusters-util-cpu']")).toContainText("vCPU");
+            await page.locator("[data-test-id='util-value-format-percent']").click();
+            await page.locator("[data-test-id='util-view-mode-usage']").click();
+        });
+
+        test("searches the per-cluster table down to one row", async () => {
+            await page.locator("[data-test-id='clusters-search'] input").fill(CLUSTER_2);
+            await expect(page.locator("[data-test-id='cluster-row']")).toHaveCount(1);
+            await expect(rowFor(CLUSTER_2)).toHaveCount(1);
+            await page.locator("[data-test-id='clusters-search-clear']").click();
+            await expect(page.locator("[data-test-id='cluster-row']")).toHaveCount(2);
+        });
+
+        test("shows an unreachable context as an error row without blanking the totals", async () => {
+            // A kubeconfig entry pointing at a port nothing listens on: a real unreachable
+            // API server, without tearing down one of the kwok clusters.
+            execSync("kubectl config set-cluster karse-e2e-dead --server=https://127.0.0.1:1", { stdio: "ignore" });
+            execSync("kubectl config set-context karse-e2e-dead --cluster=karse-e2e-dead --user=karse-e2e-dead", { stdio: "ignore" });
+            try {
+                await navigateToClusters();
+                await expect(page.locator("[data-test-id='cluster-row']")).toHaveCount(3);
+                await expect(rowFor("karse-e2e-dead").locator("[data-test-id='cluster-row-error']")).toBeVisible();
+                // The remaining clusters still report, and the totals say what they cover.
+                await expect(rowFor(CLUSTER_1).locator("[data-test-id='cluster-row-nodes']"))
+                    .toHaveText(String(CLUSTER_1_NODES));
+                await expect(page.locator("[data-test-id='clusters-total-nodes']")).toContainText(String(TOTAL_NODES));
+                await expect(page.locator("[data-test-id='clusters-coverage']"))
+                    .toContainText("Totals cover 2 of 3 clusters");
+            }
+            finally {
+                execSync("kubectl config delete-context karse-e2e-dead", { stdio: "ignore" });
+                execSync("kubectl config delete-cluster karse-e2e-dead", { stdio: "ignore" });
+            }
+        });
+
+        test("clicking a cluster row makes that context active and opens its cluster home", async () => {
+            await navigateToClusters();
+            await rowFor(CLUSTER_2).click();
+            await expect(page).toHaveURL(new RegExp(`/cluster\\?context=${CLUSTER_2}`));
+            await waitForStatTiles();
+            // Cluster 2 has two nodes to cluster 1's three, so the node tile proves the
+            // landing page is reading cluster 2, not whichever context was active before.
+            await expect(page.locator("[data-test-id='stat-nodes']")).toContainText(String(CLUSTER_2_NODES));
+        });
+    });
 });

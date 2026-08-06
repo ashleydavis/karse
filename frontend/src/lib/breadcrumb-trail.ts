@@ -90,6 +90,7 @@ export function tabLabel(labels: Record<string, string>, tab: string | null): st
 // followed from), so a page is named the same way wherever it appears in a trail.
 export const LIST_LABELS: Record<string, string> = {
     cluster: "Cluster",
+    clusters: "All clusters",
     "all-resources": "All resources",
     contexts: "Contexts",
     nodes: "Nodes",

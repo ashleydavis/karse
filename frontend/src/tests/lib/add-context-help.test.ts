@@ -1,4 +1,4 @@
-import { addContextCommands, addContextHeading, addContextIntro } from "../../../pages/contexts/lib/add-context-help";
+import { addContextCommands, addContextHeading, addContextIntro } from "../../lib/add-context-help";
 
 describe("add-context-help", () => {
     test("provides the EKS command with placeholders", () => {

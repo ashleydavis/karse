@@ -1,6 +1,7 @@
 import { Route, Routes, Navigate, useLocation } from "react-router-dom";
 import { AppLayout } from "./components/app-layout";
 import { ClusterHomePage } from "./pages/cluster-home";
+import { ClustersPage } from "./pages/clusters";
 import { ContextsPage } from "./pages/contexts";
 import { NamespacesPage } from "./pages/namespaces";
 import { NamespaceDetailPage } from "./pages/namespace-detail";
@@ -35,6 +36,7 @@ export function App() {
             <Route path="/" element={<AppLayout />}>
                 <Route index element={<IndexRedirect />} />
                 <Route path="cluster" element={<ClusterHomePage />} />
+                <Route path="clusters" element={<ClustersPage />} />
                 <Route path="all-resources" element={<AllResourcesPage />} />
                 <Route path="contexts" element={<ContextsPage />} />
                 <Route path="nodes" element={<NodesPage />} />
