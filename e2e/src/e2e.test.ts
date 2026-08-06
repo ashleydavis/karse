@@ -1416,6 +1416,225 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Cluster environments ──────────────────────────────────────────────────
+
+    test.describe("cluster environments", () => {
+        // kwokctl names its contexts kwok-karse-e2e-<run>-N, which carries no environment
+        // token, so a kubeconfig whose names exercise the inference is not reproducible
+        // against the live clusters. The inference tests mock the contexts payload (the same
+        // approach the empty-state block uses); the labelling and persistence tests below run
+        // against the real kwok contexts through the real UI.
+        function fakeContext(name: string) {
+            return {
+                name,
+                cluster: `${name}-cluster`,
+                user: `${name}-user`,
+                namespace: null,
+            };
+        }
+
+        const INFERENCE_PAYLOAD = {
+            contexts: [
+                fakeContext("apollo"),
+                fakeContext("my-dev-box"),
+                fakeContext("prod-eu-1"),
+                fakeContext("devops-prod"),
+                fakeContext("qa-cluster"),
+                fakeContext("staging-1"),
+                fakeContext("minikube"),
+            ],
+            current: "prod-eu-1",
+        };
+
+        const ALL_UNASSIGNED_PAYLOAD = {
+            contexts: [fakeContext("apollo"), fakeContext("artemis"), fakeContext("hermes")],
+            current: "apollo",
+        };
+
+        // The environment group headings the contexts table renders, top to bottom.
+        async function groupHeadings(): Promise<string[]> {
+            return page
+                .locator("[data-test-id='contexts-table'] [data-test-id='context-environment-group-label']")
+                .allTextContents();
+        }
+
+        // The environment of the group heading a context's row currently sits under, read by
+        // walking the table body in DOM order. Returns null when the context has no row.
+        async function groupOf(contextName: string): Promise<string | null> {
+            return page.locator("[data-test-id='contexts-table'] tbody tr").evaluateAll((rows, name) => {
+                let heading: string | null = null;
+                for (const row of rows) {
+                    const environment = row.getAttribute("data-environment");
+                    if (environment !== null) {
+                        heading = environment;
+                        continue;
+                    }
+                    const cell = row.querySelector("td");
+                    if (cell !== null && (cell.textContent ?? "").includes(name)) {
+                        return heading;
+                    }
+                }
+                return null;
+            }, contextName);
+        }
+
+        // Pick an environment (or "auto") in a context row's environment selector.
+        async function labelContext(contextName: string, value: string): Promise<void> {
+            await page.locator(`[data-test-id='context-environment-select'][data-context='${contextName}']`).click();
+            await page.locator(`[data-value="${value}"]`).click();
+            await expect(page.locator(`[data-value="${value}"]`)).toHaveCount(0);
+        }
+
+        // The chip a context row shows for its environment.
+        function environmentChip(contextName: string) {
+            return page
+                .locator("[data-test-id='context-row']")
+                .filter({ hasText: contextName })
+                .locator("[data-test-id='context-environment-chip']");
+        }
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/contexts");
+            // Drop any label this block wrote so the later blocks see the untouched header
+            // and pickers. Removing just the one field leaves the other UI settings alone.
+            await page.evaluate(() => {
+                const raw = window.localStorage.getItem("karse-config");
+                if (raw === null) {
+                    return;
+                }
+                const config = JSON.parse(raw);
+                delete config.contextEnvironments;
+                window.localStorage.setItem("karse-config", JSON.stringify(config));
+            });
+            setContext(CLUSTER_1);
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+        });
+
+        test("groups the contexts page under environment headings inferred from the names", async () => {
+            await page.route("**/api/contexts", async (route) => {
+                await route.fulfill({ json: INFERENCE_PAYLOAD });
+            });
+            await page.goto("/contexts", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='context-row']")).toHaveCount(7);
+            // Production first, unassigned last, in the fixed order, not alphabetical.
+            expect(await groupHeadings()).toEqual([
+                "Production",
+                "Staging",
+                "Development",
+                "Test / QA",
+                "Local",
+                "Unassigned",
+            ]);
+        });
+
+        test("puts each context under the environment its name implies", async () => {
+            expect(await groupOf("prod-eu-1")).toBe("production");
+            expect(await groupOf("staging-1")).toBe("staging");
+            expect(await groupOf("my-dev-box")).toBe("development");
+            expect(await groupOf("qa-cluster")).toBe("test");
+            expect(await groupOf("minikube")).toBe("local");
+            expect(await groupOf("apollo")).toBe("unassigned");
+        });
+
+        test("matches tokens as name segments, so devops-prod is production", async () => {
+            expect(await groupOf("devops-prod")).toBe("production");
+        });
+
+        test("an inferred environment is shown as inferred, not as a hand-set label", async () => {
+            await expect(environmentChip("prod-eu-1")).toHaveAttribute("data-environment-source", "inferred");
+            await expect(environmentChip("prod-eu-1")).toHaveText("Production");
+        });
+
+        test("a kubeconfig matching no token puts every context under Unassigned", async () => {
+            await page.route("**/api/contexts", async (route) => {
+                await route.fulfill({ json: ALL_UNASSIGNED_PAYLOAD });
+            });
+            await page.goto("/contexts", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='context-row']")).toHaveCount(3);
+            expect(await groupHeadings()).toEqual(["Unassigned"]);
+            expect(await groupOf("apollo")).toBe("unassigned");
+            expect(await groupOf("artemis")).toBe("unassigned");
+            expect(await groupOf("hermes")).toBe("unassigned");
+        });
+
+        test("the real kwok contexts start under Unassigned", async () => {
+            await page.unroute("**/api/contexts");
+            setContext(CLUSTER_1);
+            await page.goto("/contexts", { waitUntil: "networkidle" });
+            expect(await groupHeadings()).toEqual(["Unassigned"]);
+            expect(await groupOf(CLUSTER_1)).toBe("unassigned");
+            expect(await groupOf(CLUSTER_2)).toBe("unassigned");
+        });
+
+        test("labelling a context moves it into that environment's group", async () => {
+            await labelContext(CLUSTER_1, "production");
+            expect(await groupHeadings()).toEqual(["Production", "Unassigned"]);
+            expect(await groupOf(CLUSTER_1)).toBe("production");
+            expect(await groupOf(CLUSTER_2)).toBe("unassigned");
+        });
+
+        test("a labelled context is shown as labelled rather than inferred", async () => {
+            await expect(environmentChip(CLUSTER_1)).toHaveAttribute("data-environment-source", "label");
+            await expect(environmentChip(CLUSTER_1)).toHaveText("Production");
+            await expect(environmentChip(CLUSTER_2)).toHaveAttribute("data-environment-source", "inferred");
+        });
+
+        test("labelling does not change the active context or the kubeconfig", async () => {
+            const activeRow = page.locator("[data-test-id='context-row']").filter({ hasText: CLUSTER_1 });
+            await expect(activeRow.locator(".MuiChip-root", { hasText: "active" })).toBeVisible();
+            const current = execSync("kubectl config current-context").toString().trim();
+            expect(current).toBe(CLUSTER_1);
+        });
+
+        test("the label survives a page reload", async () => {
+            await page.reload({ waitUntil: "networkidle" });
+            expect(await groupOf(CLUSTER_1)).toBe("production");
+            await expect(environmentChip(CLUSTER_1)).toHaveAttribute("data-environment-source", "label");
+        });
+
+        test("the header dropdown groups its entries the same way", async () => {
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await page.locator("[aria-haspopup='listbox']").click();
+            await expect(page.locator("[data-test-id='context-picker-group']")).toHaveText([
+                "Production",
+                "Unassigned",
+            ]);
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='context-picker-group']")).toHaveCount(0);
+        });
+
+        test("the Ctrl+K quick-picker groups its entries the same way", async () => {
+            await page.keyboard.press("Control+k");
+            await expect(page.locator("[data-test-id='context-quick-picker-dropdown']")).toBeVisible();
+            await expect(page.locator("[data-test-id='context-quick-picker-group']")).toHaveText([
+                "Production",
+                "Unassigned",
+            ]);
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='context-quick-picker-dropdown']")).not.toBeVisible();
+        });
+
+        test("the active context's environment is visible in the header without opening a picker", async () => {
+            const chip = page.locator("[data-test-id='header-environment-chip']");
+            await expect(chip).toBeVisible();
+            await expect(chip).toHaveText("Production");
+            await expect(chip).toHaveAttribute("data-environment-source", "label");
+        });
+
+        test("clearing the label returns the context to its inferred group", async () => {
+            await page.goto("/contexts", { waitUntil: "networkidle" });
+            await labelContext(CLUSTER_1, "auto");
+            expect(await groupHeadings()).toEqual(["Unassigned"]);
+            expect(await groupOf(CLUSTER_1)).toBe("unassigned");
+            await expect(environmentChip(CLUSTER_1)).toHaveAttribute("data-environment-source", "inferred");
+        });
+
+        test("the cleared label stays cleared across a reload", async () => {
+            await page.reload({ waitUntil: "networkidle" });
+            expect(await groupHeadings()).toEqual(["Unassigned"]);
+        });
+    });
+
     // ── Namespaces page ───────────────────────────────────────────────────────
 
     test.describe("namespaces page", () => {
@@ -1564,9 +1783,9 @@ test.describe("karse e2e", () => {
     test.describe("actions column stays reachable on a narrow window", () => {
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
-            // A window narrower than the contexts table (Name, Cluster, User, Default
-            // Namespace, Actions) so it overflows horizontally and the right-pinned actions
-            // column is actually exercised.
+            // A window narrower than the contexts table (Name, Environment, Cluster, User,
+            // Default Namespace, Actions) so it overflows horizontally and the right-pinned
+            // actions column is actually exercised.
             await page.setViewportSize({ width: 640, height: 800 });
             await page.goto("/contexts", { waitUntil: "networkidle" });
             await expect(page.locator("[data-test-id='context-row']").first()).toBeVisible();

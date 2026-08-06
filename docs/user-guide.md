@@ -78,10 +78,10 @@ Both selections start at the same value on first load. You can diverge them — 
 
 The header bar has two quick-picker buttons:
 
-- **Context picker** (link icon, `Ctrl+K`): opens a searchable list of contexts. Click a row to switch the active context for the tab.
+- **Context picker** (link icon, `Ctrl+K`): opens a searchable list of contexts, grouped by environment. Click a row to switch the active context for the tab.
 - **Namespace picker** (layers icon, `Ctrl+Shift+K`): opens a searchable list of namespaces for the active context. Click "All namespaces" to clear the namespace selection, or click a namespace name to scope all views to that namespace.
 
-The header also has a dropdown showing the current context and a **Refresh** button (circular-arrows icon) that empties the on-disk cluster-data cache and re-fetches all data fresh from the cluster. Clicking it clears the page you are on and reloads it: the list or detail you were looking at is replaced by a spinner and comes back with fresh data, so a refresh always looks like a real reload. The button acknowledges the click too — the icon spins and a "Refreshing…" toast appears at the bottom of the window, then a brief check and a "Refreshed" toast when done — so you can tell a refresh happened even when the data comes back unchanged. See the Config page below for the cache.
+The header also has a dropdown showing the current context (grouped by environment, with a chip beside it naming the active context's environment) and a **Refresh** button (circular-arrows icon) that empties the on-disk cluster-data cache and re-fetches all data fresh from the cluster. Clicking it clears the page you are on and reloads it: the list or detail you were looking at is replaced by a spinner and comes back with fresh data, so a refresh always looks like a real reload. The button acknowledges the click too — the icon spins and a "Refreshing…" toast appears at the bottom of the window, then a brief check and a "Refreshed" toast when done — so you can tell a refresh happened even when the data comes back unchanged. See the Config page below for the cache.
 
 ### Page help: where this data comes from
 
@@ -131,12 +131,22 @@ Label chips have no copy control.
 
 ## Contexts page (`/contexts`)
 
-A table of all kubeconfig contexts. Each row shows the context name, cluster, user, and default namespace.
+A table of all kubeconfig contexts, grouped by environment. Each row shows the context name, its environment, cluster, user, and default namespace.
 
 - **Set as active**: makes this context the active one in the current tab.
 - **Set as default**: writes this context as the current context in your kubeconfig (`kubectl config use-context`).
 - **active** chip: this context is active in the current tab.
 - **default** chip: this context is the kubeconfig current context.
+
+### Environments
+
+So you can tell production from development at a glance, every context is placed in an environment, and the table is split into a group per environment: **Production**, **Staging**, **Development**, **Test / QA**, **Local**, then **Unassigned**. That order is fixed, so production is always at the top and contexts Karse could not place are always at the bottom. The header dropdown and the `Ctrl+K` context picker group their entries the same way, and a chip beside the header dropdown always names the active context's environment, so it is obvious when what you are looking at is production.
+
+Karse works the environment out from the context name, matching the usual words as whole parts of the name: `prod` / `prd` / `production`, `stg` / `stage` / `staging`, `dev` / `develop` / `development`, `test` / `testing` / `qa`, and `local` / `localhost` / `minikube` / `kind`. Matching is case-insensitive and never matches inside a longer word, so `devops-prod` is Production (its `devops` part is not `dev`). A name mentioning two environments takes the riskier one, so `prod-test-eu` is Production. A name mentioning none is Unassigned.
+
+If the name gets it wrong, or your clusters are not named that way, set the environment yourself: each row's **Environment** column has a selector. Pick an environment to label that context, and the label wins over the name. Pick **Auto (from name)** to clear the label and go back to whatever the name implies. A chip you set by hand is drawn filled; one Karse worked out from the name is outlined, so you can always see which is which.
+
+Labels are yours, not the cluster's: they are stored in your browser alongside your colour mode and timestamp format, so they survive a reload and a restart of Karse, and nothing is ever written to your kubeconfig. A label is remembered against the context's name, so a context that disappears from your kubeconfig and later comes back still has it.
 
 ## All clusters page (`/clusters`)
 

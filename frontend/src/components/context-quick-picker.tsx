@@ -6,6 +6,7 @@ import {
     List,
     ListItemButton,
     ListItemText,
+    ListSubheader,
     Chip,
     Typography,
     Box,
@@ -14,6 +15,8 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
 import { useKubeContext } from "../lib/kube-context";
+import { useConfig } from "../lib/config";
+import { groupByEnvironment } from "../lib/cluster-environments";
 
 // Dropdown picker for switching kube contexts, anchored to the header button.
 type Props = {
@@ -26,6 +29,7 @@ type Props = {
 // using a MUI Tooltip so the dropdown gets a built-in arrow pointing at the button.
 export function ContextQuickPicker({ open, onClose, children }: Props) {
     const { contexts, current, switchTo } = useKubeContext();
+    const { config: { contextEnvironments } } = useConfig();
     const [query, setQuery] = useState("");
 
     useEffect(() => {
@@ -38,6 +42,12 @@ export function ContextQuickPicker({ open, onClose, children }: Props) {
     const filtered = contexts
         .filter((c) => c.name.toLowerCase().includes(q) || c.cluster.toLowerCase().includes(q))
         .sort((a, b) => a.name.localeCompare(b.name));
+
+    // The matching contexts under one subheading per environment, in the same fixed order the
+    // contexts page and the header dropdown use, resolved by the same module rather than a
+    // second copy of the rule. Filtering runs first, so a search that hides every context in
+    // an environment hides that environment's heading too.
+    const groups = groupByEnvironment(filtered, contextEnvironments);
 
     function handleSelect(name: string): void {
         switchTo(name);
@@ -73,19 +83,28 @@ export function ContextQuickPicker({ open, onClose, children }: Props) {
                         </Typography>
                     )}
                     <List dense disablePadding>
-                        {filtered.map((ctx) => (
-                            <ListItemButton
-                                key={ctx.name}
-                                selected={ctx.name === current}
-                                onClick={() => handleSelect(ctx.name)}
-                                data-test-id="context-quick-picker-row"
+                        {groups.flatMap((group) => [
+                            <ListSubheader
+                                key={`group-${group.environment}`}
+                                data-test-id="context-quick-picker-group"
+                                data-environment={group.environment}
                             >
-                                <ListItemText primary={ctx.name} secondary={ctx.cluster} />
-                                {ctx.name === current && (
-                                    <Chip label="active" size="small" color="primary" sx={{ ml: 1 }} />
-                                )}
-                            </ListItemButton>
-                        ))}
+                                {group.label}
+                            </ListSubheader>,
+                            ...group.items.map((ctx) => (
+                                <ListItemButton
+                                    key={ctx.name}
+                                    selected={ctx.name === current}
+                                    onClick={() => handleSelect(ctx.name)}
+                                    data-test-id="context-quick-picker-row"
+                                >
+                                    <ListItemText primary={ctx.name} secondary={ctx.cluster} />
+                                    {ctx.name === current && (
+                                        <Chip label="active" size="small" color="primary" sx={{ ml: 1 }} />
+                                    )}
+                                </ListItemButton>
+                            )),
+                        ])}
                     </List>
                 </Box>
             </Box>

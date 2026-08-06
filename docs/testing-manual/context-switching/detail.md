@@ -2,7 +2,7 @@
 
 Manual tests for context listing and switching. See the spec: [context-switching](../../spec/context-switching/detail.md).
 
-The dropdown-picker placement and keyboard shortcuts for the context picker are covered under [quick-find](../quick-find/detail.md). Tear each cluster down with the Teardown step at the end of this doc.
+The dropdown-picker placement and keyboard shortcuts for the context picker are covered under [quick-find](../quick-find/detail.md), and the grouping of the contexts page and both pickers by environment is covered under [cluster-environments](../cluster-environments/detail.md). Tear each cluster down with the Teardown step at the end of this doc.
 
 Start the app first. From the repo root run:
 

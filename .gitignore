@@ -14,3 +14,4 @@ cache/
 frontend/dist/
 .claude/permissions-debug.log
 .claude/permissions-log/
+fixtures-tmp/

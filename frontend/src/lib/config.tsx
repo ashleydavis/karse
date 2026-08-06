@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 import { useMediaQuery } from "@mui/material";
 import type { TimestampMode } from "./timestamps";
+import type { ClusterEnvironment, EnvironmentLabels } from "./cluster-environments";
 
 const STORAGE_KEY = "karse-config";
 
@@ -9,6 +10,9 @@ type ColorMode = "light" | "dark" | "system";
 type Config = {
     colorMode: ColorMode;
     timestampMode: TimestampMode;
+    // The developer's explicit environment labels, keyed by context name. A context with no
+    // entry here falls back to the environment inferred from its name.
+    contextEnvironments: EnvironmentLabels;
 };
 
 type ConfigContextValue = {
@@ -16,13 +20,17 @@ type ConfigContextValue = {
     resolvedColorMode: "light" | "dark";
     setColorMode: (mode: ColorMode) => void;
     setTimestampMode: (mode: TimestampMode) => void;
+    setContextEnvironment: (context: string, environment: ClusterEnvironment | null) => void;
 };
 
 // Timestamps default to "age" because that is how Karse has always shown them
 // (and how `kubectl get` shows them), so the default view is unchanged.
+//
+// No context is labelled by default, so every context starts on its inferred environment.
 const defaultConfig: Config = {
     colorMode: "system",
     timestampMode: "age",
+    contextEnvironments: {},
 };
 
 function loadConfig(): Config {
@@ -44,6 +52,7 @@ const ConfigContext = createContext<ConfigContextValue>({
     resolvedColorMode: "light",
     setColorMode: () => {},
     setTimestampMode: () => {},
+    setContextEnvironment: () => {},
 });
 
 export function ConfigProvider({ children }: { children: ReactNode }) {
@@ -65,6 +74,23 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         // survives navigation and a page reload.
         setTimestampMode: (mode) => {
             const next = { ...config, timestampMode: mode };
+            setConfig(next);
+            saveConfig(next);
+        },
+        // Labels a context with an environment, or clears the label when passed null so the
+        // context falls back to the environment inferred from its name. Stored in the same
+        // `karse-config` entry as the other UI settings, so a label survives a reload and an
+        // app restart. A cleared label is deleted rather than blanked, so nothing distinguishes
+        // "never labelled" from "label removed".
+        setContextEnvironment: (context, environment) => {
+            const contextEnvironments = { ...config.contextEnvironments };
+            if (environment === null) {
+                delete contextEnvironments[context];
+            }
+            else {
+                contextEnvironments[context] = environment;
+            }
+            const next = { ...config, contextEnvironments };
             setConfig(next);
             saveConfig(next);
         },

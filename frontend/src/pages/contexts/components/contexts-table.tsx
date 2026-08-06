@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
     useReactTable,
     getCoreRowModel,
@@ -19,6 +19,8 @@ import {
     Chip,
     Typography,
     Button,
+    Select,
+    MenuItem,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
@@ -29,6 +31,17 @@ import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { ACTIONS_COLUMN_ID, stickyActionsHeaderSx } from "../../../lib/sticky-actions";
 import { NoContextsGuidance } from "../../../components/no-contexts-guidance";
 import { SearchBox } from "../../../components/search-box";
+import { EnvironmentChip } from "../../../components/environment-chip";
+import { useConfig } from "../../../lib/config";
+import {
+    contextLabel,
+    environmentFromSelection,
+    groupByEnvironment,
+    resolveEnvironment,
+    AUTO_ENVIRONMENT_VALUE,
+    ENVIRONMENT_LABELS,
+    LABELLABLE_ENVIRONMENTS,
+} from "../../../lib/cluster-environments";
 
 type Props = {
     contexts: Context[];
@@ -41,6 +54,7 @@ type Props = {
 export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetDefault }: Props) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const { search, setSearch, deferredSearch } = useSearchFilter();
+    const { config: { contextEnvironments }, setContextEnvironment } = useConfig();
 
     const columns: ColumnDef<Context>[] = [
         {
@@ -57,6 +71,44 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
                     )}
                 </span>
             ),
+        },
+        {
+            // The environment the context resolves to, plus the control that labels it.
+            // The accessor returns the environment's heading so the column sorts and the
+            // page search matches on the environment the row actually shows.
+            id: "environment",
+            header: "Environment",
+            accessorFn: (context) => ENVIRONMENT_LABELS[resolveEnvironment(context.name, contextEnvironments).environment],
+            cell: (info) => {
+                const name = info.row.original.name;
+                const resolved = resolveEnvironment(name, contextEnvironments);
+                const label = contextLabel(name, contextEnvironments);
+                return (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                        <EnvironmentChip
+                            environment={resolved.environment}
+                            source={resolved.source}
+                            testId="context-environment-chip"
+                        />
+                        <Select
+                            size="small"
+                            value={label ?? AUTO_ENVIRONMENT_VALUE}
+                            onChange={(event) => setContextEnvironment(name, environmentFromSelection(event.target.value))}
+                            data-test-id="context-environment-select"
+                            data-context={name}
+                            inputProps={{ "aria-label": `environment for ${name}` }}
+                            sx={{ minWidth: 150 }}
+                        >
+                            <MenuItem value={AUTO_ENVIRONMENT_VALUE}>Auto (from name)</MenuItem>
+                            {LABELLABLE_ENVIRONMENTS.map((environment) => (
+                                <MenuItem key={environment} value={environment}>
+                                    {ENVIRONMENT_LABELS[environment]}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </span>
+                );
+            },
         },
         {
             accessorKey: "cluster",
@@ -112,6 +164,18 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
     });
 
     const rows = table.getRowModel().rows;
+
+    // The rows the table would render, partitioned into environment groups in the fixed
+    // ENVIRONMENT_ORDER (production first, unassigned last) rather than whatever order the
+    // kubeconfig or the current sort produced. Sorting and searching still run over the whole
+    // table first, so a group holds only the rows that survived them, in the sorted order.
+    const groups = groupByEnvironment(
+        rows.map((row) => ({
+            name: row.original.name,
+            row,
+        })),
+        contextEnvironments,
+    );
 
     function SortIcon({ columnId }: { columnId: string }) {
         const col = table.getColumn(columnId);
@@ -169,11 +233,42 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
                                 </TableCell>
                             </TableRow>
                         )}
-                        <DataTableRows
-                            rows={rows}
-                            visibleColumns={table.getVisibleLeafColumns()}
-                            testId="context-row"
-                        />
+                        {groups.map((group) => (
+                            <Fragment key={group.environment}>
+                                <TableRow
+                                    data-test-id="context-environment-group"
+                                    data-environment={group.environment}
+                                >
+                                    <TableCell
+                                        colSpan={table.getVisibleLeafColumns().length}
+                                        sx={{ bgcolor: "action.hover" }}
+                                    >
+                                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                            <Typography
+                                                component="span"
+                                                variant="subtitle2"
+                                                data-test-id="context-environment-group-label"
+                                            >
+                                                {group.label}
+                                            </Typography>
+                                            <Typography
+                                                component="span"
+                                                variant="body2"
+                                                color="text.secondary"
+                                                data-test-id="context-environment-group-count"
+                                            >
+                                                {group.items.length}
+                                            </Typography>
+                                        </span>
+                                    </TableCell>
+                                </TableRow>
+                                <DataTableRows
+                                    rows={group.items.map((item) => item.row)}
+                                    visibleColumns={table.getVisibleLeafColumns()}
+                                    testId="context-row"
+                                />
+                            </Fragment>
+                        ))}
                     </TableBody>
                 </Table>
             </TableContainer>

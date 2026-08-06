@@ -10,7 +10,7 @@ Backed by: `frontend/src/components/header.tsx`, `frontend/src/components/contex
 
 - The header has two quick-picker buttons. The context picker (link icon) opens on click or `Ctrl+K` (or `Cmd+K`); the namespace picker (layers icon) opens on click or `Ctrl+Shift+K`.
 - Each opens a dropdown anchored to its button, with an auto-focused search box. The search field is cleared each time the dropdown opens.
-- The context picker lists contexts filtered by name or cluster, sorted by name, marking the active one with a chip; selecting a row switches the tab's active context.
+- The context picker lists contexts filtered by name or cluster, sorted by name, marking the active one with a chip; selecting a row switches the tab's active context. Its rows are listed under one subheading per environment, applied after the filter, so a search that hides every context in an environment hides that subheading too (see [cluster-environments](../cluster-environments/detail.md)).
 - The namespace picker lists namespaces for the active context filtered by name, plus an "All namespaces" entry that clears the selection; it shows a loading state while fetching and prompts to select a context first when none is active.
 - Both pickers are keyboard-openable and dismissible by clicking outside.
 - Each trigger button shows a hover hint naming its keyboard shortcut ("Context picker (Ctrl+K)", "Namespace picker (Ctrl+Shift+K)") and carries an accessible name. The dropdown is rendered inside a MUI Tooltip, so the trigger is wrapped in a plain element: a Tooltip child carrying its own `title` makes MUI log an error on every render of the header.
