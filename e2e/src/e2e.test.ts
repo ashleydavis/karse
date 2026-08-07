@@ -1561,6 +1561,8 @@ test.describe("karse e2e", () => {
             await page.unroute("**/api/contexts");
             setContext(CLUSTER_1);
             await page.goto("/contexts", { waitUntil: "networkidle" });
+            // Settle on the rendered table before the plain reads below, which do not retry.
+            await expect(page.locator("[data-test-id='context-row']")).toHaveCount(2);
             expect(await groupHeadings()).toEqual(["Unassigned"]);
             expect(await groupOf(CLUSTER_1)).toBe("unassigned");
             expect(await groupOf(CLUSTER_2)).toBe("unassigned");
@@ -1588,6 +1590,8 @@ test.describe("karse e2e", () => {
 
         test("the label survives a page reload", async () => {
             await page.reload({ waitUntil: "networkidle" });
+            // Settle on the rendered table before the plain read below, which does not retry.
+            await expect(page.locator("[data-test-id='context-row']")).toHaveCount(2);
             expect(await groupOf(CLUSTER_1)).toBe("production");
             await expect(environmentChip(CLUSTER_1)).toHaveAttribute("data-environment-source", "label");
         });
