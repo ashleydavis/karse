@@ -292,6 +292,8 @@ A Labels column shows each resource's labels as compact `key=value` chips (also 
 
 The search box matches across every column, not just the name. So you can also find resources by where they live: type a **node** name to keep the pods on that node, or a **namespace** to keep the resources in that namespace. Namespace search works on every namespaced table (pods, deployments, stateful sets, daemon sets, events, errors); node search applies to the pods table.
 
+Your search goes into the page's address, so a narrowed table is shareable: once you stop typing, the URL gains `?q=<your text>` (a second search box on the same page, such as a detail page's Labels tab, uses its own key). Copy the address bar, or press the **Share** button in the header, and whoever opens it sees the same narrowed table with the text already in the box. Clearing the box removes the parameter again. It also means the browser **back** button works the way you expect: click a row into a detail page, press back, and the list returns still narrowed. (The labels modal's search is the exception: it is a dialog, so its search is not part of the page's address.)
+
 Every search box has a **clear button** (a cross) at its right-hand end. It only shows once you have typed something. Click it to empty the box and bring back all the rows the search was hiding, in one go; the cursor stays in the box so you can type a new query straight away. It clears only the text you typed: any **Filter** selection you have made stays applied. Every resource table's search box works this way.
 
 ### Long lists ("Show more")
