@@ -9669,10 +9669,23 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='resource-detail']")).toHaveCount(0);
         });
 
-        test("a kind Karse will not read renders a readable message", async () => {
-            await page.goto("/resources/secrets/default/db-password", { waitUntil: "networkidle" });
-            await expect(page.locator("[data-test-id='resource-detail-unsupported']")).toBeVisible();
-            await expect(page.locator("[data-test-id='resource-detail-unsupported']")).toContainText("secrets");
+        test("a kind Karse does not know about renders on the page like any other", async () => {
+            // A Lease is not one of the kinds Karse knows by name, so this is the case the
+            // page must not refuse: the cluster serves the resource, so the page shows it.
+            await page.goto("/resources/leases/default/shop-lease", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='resource-detail']")).toBeVisible();
+            await expect(page.getByRole("heading", { name: "shop-lease" })).toBeVisible();
+            await expect(page.locator("[data-test-id='resource-detail-kind-chip']")).toHaveText("Lease");
+            await expect(page.locator("[data-test-id='resource-stat'][data-stat='namespace']")).toContainText("default");
+            await expect(page.locator("[data-test-id='resource-stat'][data-stat='kind']")).toContainText("Lease");
+        });
+
+        test("the labels and yaml of a kind Karse does not know are shown too", async () => {
+            await page.locator("[data-test-id='resource-tab-labels']").click();
+            await expect(page.locator("[data-test-id='labels-tab']")).toContainText("shop");
+            await page.locator("[data-test-id='resource-tab-yaml']").click();
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("kind: Lease");
+            await expect(page.locator("[data-test-id='yaml-content']")).toContainText("holderIdentity: shop-worker-1");
         });
     });
 

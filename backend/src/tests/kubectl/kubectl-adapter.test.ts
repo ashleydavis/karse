@@ -25,10 +25,10 @@ import {
     getPodLogs,
     getResourceYaml,
     getResourceDetail,
-    isResourceKindToken,
     streamPodLogs,
     getNodePerformance,
 } from "../../kubectl/kubectl-adapter";
+import { isReadableResourceKind } from "karse-types";
 
 // jest.requireMock returns any, so mock methods are accessible without casting.
 const { run, stream } = jest.requireMock("../../command-runner");
@@ -2482,25 +2482,41 @@ describe("getPodLogs", () => {
     });
 });
 
-describe("isResourceKindToken", () => {
+describe("isReadableResourceKind", () => {
     test("accepts every kind that has its own detail page", () => {
         for (const type of ["nodes", "pods", "deployments", "daemonsets", "statefulsets", "namespaces"]) {
-            expect(isResourceKindToken(type)).toBe(true);
+            expect(isReadableResourceKind(type)).toBe(true);
         }
     });
 
-    test("accepts the generic kinds the widened whitelist added", () => {
+    test("accepts the common kinds the generic detail page serves", () => {
         for (const type of [
             "horizontalpodautoscalers", "replicasets", "jobs", "cronjobs", "services",
             "configmaps", "persistentvolumes", "storageclasses", "clusterroles",
         ]) {
-            expect(isResourceKindToken(type)).toBe(true);
+            expect(isReadableResourceKind(type)).toBe(true);
         }
     });
 
-    test("rejects types outside the whitelist", () => {
-        for (const type of ["secrets", "", "Pod", "__proto__", "pods --all-namespaces", "delete"]) {
-            expect(isResourceKindToken(type)).toBe(false);
+    test("accepts a kind Karse has never heard of, including a custom resource", () => {
+        // The kinds Karse knows are not a permission list: a resource the cluster serves
+        // and Karse does not know about is still readable, so it gets a detail page too.
+        for (const type of ["leases", "endpointslices", "widgets.example.com", "csidrivers"]) {
+            expect(isReadableResourceKind(type)).toBe(true);
+        }
+    });
+
+    test("refuses secrets, in every form kubectl would accept", () => {
+        for (const type of ["secrets", "secret", "secrets.v1.", "secret.v1."]) {
+            expect(isReadableResourceKind(type)).toBe(false);
+        }
+    });
+
+    test("rejects anything that is not a bare lowercase resource name", () => {
+        // A leading dash is what a kubectl flag looks like, and the character set excludes
+        // whitespace and separators, so nothing a caller sends can become an extra argument.
+        for (const type of ["", "Pod", "__proto__", "pods --all-namespaces", "-o", "--all", "pods;delete", "pods/nginx"]) {
+            expect(isReadableResourceKind(type)).toBe(false);
         }
     });
 });
@@ -2530,10 +2546,18 @@ describe("getResourceYaml", () => {
         expect(yaml).toBe("kind: StatefulSet\n");
     });
 
-    test("throws for an unsupported type without invoking kubectl", async () => {
+    test("throws for a kind Karse will not read, without invoking kubectl", async () => {
         await expect(getResourceYaml("ctx", "secrets", "my-secret", "default"))
-            .rejects.toThrow("unsupported resource type: secrets");
+            .rejects.toThrow("Karse will not read resources of type: secrets");
         expect(run).not.toHaveBeenCalled();
+    });
+
+    test("uses the token itself as the kubectl kind for a kind Karse does not know", async () => {
+        setRunnerHandlers({
+            "--context ctx -n default get leases node-lease -o yaml": () => ok("kind: Lease\n"),
+        });
+        const yaml = await getResourceYaml("ctx", "leases", "node-lease", "default");
+        expect(yaml).toBe("kind: Lease\n");
     });
 
     test("throws on non-zero exit", async () => {
@@ -2576,7 +2600,7 @@ describe("getResourceDetail", () => {
         },
     });
 
-    test("returns the parsed metadata for a permitted namespaced kind", async () => {
+    test("returns the parsed metadata for a namespaced kind", async () => {
         setRunnerHandlers({
             "--context ctx -n default get horizontalpodautoscaler web-hpa -o json": () => ok(HPA_JSON),
         });
@@ -2596,7 +2620,7 @@ describe("getResourceDetail", () => {
         });
     });
 
-    test("issues only a read-only get, with the whitelisted kubectl kind", async () => {
+    test("issues only a read-only get, with the shared table's kubectl kind", async () => {
         setRunnerHandlers({
             "--context ctx -n default get horizontalpodautoscaler web-hpa -o json": () => ok(HPA_JSON),
         });
@@ -2630,10 +2654,42 @@ describe("getResourceDetail", () => {
         });
     });
 
-    test("throws for an unpermitted kind without invoking kubectl", async () => {
+    test("throws for a kind Karse will not read, without invoking kubectl", async () => {
         await expect(getResourceDetail("ctx", "secrets", "my-secret", "default"))
-            .rejects.toThrow("unsupported resource type: secrets");
+            .rejects.toThrow("Karse will not read resources of type: secrets");
         expect(run).not.toHaveBeenCalled();
+    });
+
+    test("reads a kind Karse does not know, passing the token through as the kubectl kind", async () => {
+        // The generic page serves any kind the cluster has, so a kind absent from the
+        // shared table is read with the token itself as kubectl's resource name.
+        setRunnerHandlers({
+            "--context ctx -n kube-node-lease get leases node-1 -o json": () => ok(JSON.stringify({
+                kind: "Lease",
+                metadata: {
+                    name: "node-1",
+                    namespace: "kube-node-lease",
+                    creationTimestamp: "2024-06-01T00:00:00Z",
+                    labels: { "kubernetes.io/hostname": "node-1" },
+                },
+                spec: { holderIdentity: "node-1", leaseDurationSeconds: 40 },
+            })),
+        });
+        const detail = await getResourceDetail("ctx", "leases", "node-1", "kube-node-lease");
+        expect(detail).toEqual({
+            type: "leases",
+            kind: "Lease",
+            name: "node-1",
+            namespace: "kube-node-lease",
+            createdAt: "2024-06-01T00:00:00Z",
+            labels: { "kubernetes.io/hostname": "node-1" },
+            annotations: {},
+        });
+        expect(run).toHaveBeenCalledTimes(1);
+        expect(run).toHaveBeenCalledWith("kubectl", [
+            "--context", "ctx", "-n", "kube-node-lease",
+            "get", "leases", "node-1", "-o", "json",
+        ]);
     });
 
     test("returns null when the resource does not exist", async () => {

@@ -1,16 +1,16 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { Box, Alert, Paper } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
-import type { ResourceKindToken } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
 import { fetchResourceYaml } from "../lib/api-client";
 import { LoadingIndicator } from "./loading-indicator";
 import { CopyButton } from "./copy-button";
 
-// Which resource to fetch YAML for. namespace is omitted for cluster-scoped
-// resources (nodes, namespaces) and supplied for namespaced ones.
+// Which resource to fetch YAML for. `type` is the kind's kubectl resource name, e.g.
+// "pods" or "horizontalpodautoscalers". namespace is omitted for cluster-scoped resources
+// (nodes, namespaces) and supplied for namespaced ones.
 type YamlTarget = {
-    type: ResourceKindToken;
+    type: string;
     name: string;
     namespace?: string;
 };

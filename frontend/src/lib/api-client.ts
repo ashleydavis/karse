@@ -5,7 +5,7 @@ import type {
     DeploymentsResponse, StatefulSetsResponse, DaemonSetsResponse,
     HorizontalPodAutoscalersResponse,
     WorkloadKind, WorkloadDetail, NamespaceDetail,
-    PodDetail, NodeDetail, ResourceKindToken, ResourceDetail, YamlResponse,
+    PodDetail, NodeDetail, ResourceDetail, YamlResponse,
     LogStreamLine, LogStreamStarted, EventsResponse, ErrorsResponse,
     ClusterPerformance, NodePerformance, ClusterSummary, MultiClusterTotals,
     PodPerformance, CacheConfigResponse, CacheClearResponse,
@@ -285,7 +285,7 @@ export async function fetchWorkloadDetail(context: string, kind: WorkloadKind, n
 // resources (nodes, namespaces) and supplied for namespaced ones.
 export async function fetchResourceYaml(
     context: string,
-    type: ResourceKindToken,
+    type: string,
     name: string,
     namespace?: string,
 ): Promise<YamlResponse> {
@@ -306,7 +306,7 @@ export async function fetchResourceYaml(
 // not-found state instead of a load error offering a retry that can never succeed.
 export async function fetchResourceDetail(
     context: string,
-    type: ResourceKindToken,
+    type: string,
     name: string,
     namespace?: string,
 ): Promise<ResourceDetail | null> {

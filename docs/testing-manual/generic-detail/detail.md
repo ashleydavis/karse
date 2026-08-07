@@ -2,7 +2,7 @@
 
 Manual tests for the generic detail page. See the spec: [generic-detail](../../spec/generic-detail/detail.md).
 
-Karse has purpose-built detail pages for six kinds (Pod, Node, Namespace, Deployment, StatefulSet, DaemonSet). Every other readable kind gets the generic detail page at `/resources/:type/:name` (cluster-scoped) or `/resources/:type/:namespace/:name` (namespaced), which shows the metadata every Kubernetes object carries plus that resource's labels and raw YAML.
+Karse has purpose-built detail pages for six kinds (Pod, Node, Namespace, Deployment, StatefulSet, DaemonSet). Every other kind gets the generic detail page at `/resources/:type/:name` (cluster-scoped) or `/resources/:type/:namespace/:name` (namespaced), which shows the metadata every Kubernetes object carries plus that resource's labels and raw YAML. That includes kinds Karse does not know by name, such as a custom resource.
 
 Start the app first. From the repo root run:
 
@@ -14,7 +14,7 @@ Then open the frontend at `http://127.0.0.1:5173`. The scenario's fixture stands
 
 ## Scenario: Resources with no detail page of their own
 
-A cluster holding kinds Karse has no specific page for: the namespaced `shop-hpa` (HorizontalPodAutoscaler), `shop-svc` (Service) and `nightly-backup` (Job) in `default`, plus the cluster-scoped `archive-pv` (PersistentVolume). A 0-replica `shop` deployment is present as the autoscaler's target; nothing in the fixture creates a pod.
+A cluster holding kinds Karse has no specific page for: the namespaced `shop-hpa` (HorizontalPodAutoscaler), `shop-svc` (Service), `nightly-backup` (Job) and `shop-lease` (Lease, a kind Karse does not know by name at all) in `default`, plus the cluster-scoped `archive-pv` (PersistentVolume). A 0-replica `shop` deployment is present as the autoscaler's target; nothing in the fixture creates a pod.
 
 **Fixture:** [_fixtures-kwok/38-generic-detail](../_fixtures-kwok/38-generic-detail/)
 
@@ -77,11 +77,18 @@ A cluster holding kinds Karse has no specific page for: the namespaced `shop-hpa
 - Open `/resources/horizontalpodautoscalers/default/no-such-hpa`.
 - The page shows a clear **Not found** notice naming the kind, the name and the namespace, rather than a blank page, an endless spinner, or a crash. There is no Retry button: retrying cannot make the resource exist.
 
-### A kind Karse will not read
+### A kind Karse does not know by name
+
+- Open `/resources/leases/default/shop-lease`.
+- The page renders exactly as it does for any other kind: the name `shop-lease`, the chip `Lease`, the Namespace / Kind / Age fields, the Labels tab (`app` / `shop`) and the YAML tab (`kind: Lease`, `holderIdentity: shop-worker-1`).
+- This is the point of the page. Karse has no entry for Lease in its table of known kinds, and it makes no difference: a kind having no page of its own is why the generic page exists, so it never refuses one.
+- Open `/resources/notathing/default/whatever`. The cluster has no such kind, so the page shows the **Not found** notice, the same as any missing resource.
+
+### The one kind Karse refuses
 
 - Open `/resources/secrets/default/db-password`.
-- The page shows an **Unsupported resource type** message naming `secrets`. Karse deliberately refuses to read secrets, and no request is sent to the cluster.
-- Open `/resources/notathing/default/whatever`. The same message appears, naming `notathing`.
+- The page shows a load error saying Karse will not read resources of type `secrets`. Karse deliberately never reads secrets, and no request reaches the cluster.
+- Nothing in the app links here: a reference to a Secret stays plain text, so this state is only reachable by typing the URL.
 
 ### Light and dark mode
 

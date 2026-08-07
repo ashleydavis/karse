@@ -1,15 +1,17 @@
 import { Router } from "express";
-import { RESOURCE_KINDS } from "karse-types";
+import { isReadableResourceKind, knownResourceKind } from "karse-types";
 import * as kubectl from "../kubectl/kubectl-adapter";
 
 // Router handling GET /resource/:type/:name, returning the common metadata (kind, name,
 // namespace, creation timestamp, labels, annotations) of a single resource of any kind
-// Karse is allowed to read. It backs the generic detail page, the page shown for a kind
-// with no purpose-built page of its own.
+// the cluster serves. It backs the generic detail page, the page shown for a kind with no
+// purpose-built page of its own.
 //
-// The kind is never taken from the request as-is: `:type` is checked against the
-// RESOURCE_KINDS whitelist and the kubectl resource name comes from that table, so an
-// arbitrary string cannot reach the kubectl argument list. The read itself is a single
+// `:type` is checked with isReadableResourceKind before it is used: it must look like a
+// kubectl resource name (so it can never be read as a flag) and must not name a kind
+// Karse refuses to read (Secrets). It is not checked against a list of known kinds,
+// because a kind Karse has never heard of is still a resource the dashboard should show;
+// whether it exists is the cluster's answer to give. The read itself is a single
 // `kubectl get ... -o json`, consistent with the read-only invariant.
 export const resourceRouter = Router();
 
@@ -20,23 +22,27 @@ resourceRouter.get("/resource/:type/:name", async (req, res) => {
         return;
     }
     const { type, name } = req.params;
-    if (!kubectl.isResourceKindToken(type!)) {
-        res.status(400).json({ error: `unsupported resource type: ${type}` });
+    if (!isReadableResourceKind(type!)) {
+        res.status(400).json({ error: `Karse will not read resources of type: ${type}` });
         return;
     }
-    const info = RESOURCE_KINDS[type];
+    const known = knownResourceKind(type!);
     const namespace = typeof req.query.namespace === "string" && req.query.namespace.trim() !== ""
         ? req.query.namespace
         : undefined;
-    // A namespaced kind cannot be identified by name alone, so refuse rather than run a
-    // read that would silently target the kubeconfig's default namespace.
-    if (info.namespaced && namespace === undefined) {
-        res.status(400).json({ error: `namespace query parameter is required for ${info.kind}` });
+    // A kind Karse knows to be namespaced cannot be identified by name alone, so refuse
+    // rather than run a read that would silently target the kubeconfig's default
+    // namespace. For a kind Karse does not know, the caller supplying a namespace is the
+    // only signal of scope there is, so the read follows what it was given.
+    if (known?.namespaced === true && namespace === undefined) {
+        res.status(400).json({ error: `namespace query parameter is required for ${known.kind}` });
         return;
     }
-    const detail = await kubectl.getResourceDetail(context, type, name!, info.namespaced ? namespace : undefined);
+    const detail = await kubectl.getResourceDetail(
+        context, type!, name!, known?.namespaced === false ? undefined : namespace,
+    );
     if (detail === null) {
-        res.status(404).json({ error: `${info.kind} "${name}" was not found in this cluster` });
+        res.status(404).json({ error: `${known?.kind ?? type} "${name}" was not found in this cluster` });
         return;
     }
     res.json(detail);

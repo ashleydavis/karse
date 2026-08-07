@@ -465,48 +465,27 @@ export type PodPerformance = {
 // Disk is deliberately excluded: the Metrics API does not report disk usage.
 export type PerformanceMetric = "cpu" | "memory";
 
-// The URL/API token identifying a resource kind Karse can read: the lowercase plural
-// name kubectl uses, e.g. "pods", "horizontalpodautoscalers". It appears in the
-// /api/yaml/:type/:name and /api/resource/:type/:name paths, and in the generic detail
-// route's own path (/resources/:type/...). Declared as an explicit union so a token that
-// is not in RESOURCE_KINDS cannot be written by mistake.
-export type ResourceKindToken =
-    // Kinds with their own purpose-built page in Karse.
-    "nodes" | "pods" | "deployments" | "daemonsets" | "statefulsets" | "namespaces"
-    // Workloads.
-    | "replicasets" | "replicationcontrollers" | "jobs" | "cronjobs"
-    // Networking.
-    | "services" | "endpoints" | "ingresses" | "networkpolicies"
-    // Configuration and identity.
-    | "configmaps" | "serviceaccounts"
-    // Storage.
-    | "persistentvolumeclaims" | "persistentvolumes" | "storageclasses"
-    // Scaling, scheduling, and quota policy.
-    | "horizontalpodautoscalers" | "poddisruptionbudgets" | "resourcequotas"
-    | "limitranges" | "priorityclasses"
-    // RBAC.
-    | "roles" | "rolebindings" | "clusterroles" | "clusterrolebindings";
-
-// One resource kind Karse is allowed to read: its singular display kind (what the UI
-// shows and what a resource reference names it by), the resource name handed to
-// "kubectl get", and whether the kind is namespaced.
+// One resource kind Karse knows by name: its singular display kind (what the UI shows
+// and what a resource reference names it by), the resource name handed to "kubectl get",
+// and whether the kind is namespaced.
 export type ResourceKindInfo = {
     kind: string;
     kubectlKind: string;
     namespaced: boolean;
 };
 
-// Every resource kind Karse will read, keyed by its URL/API token. This is one table
-// shared by both sides on purpose: the backend uses it as the read whitelist that stops
-// an arbitrary caller-supplied kind reaching the kubectl argument list, and the frontend
-// uses it to decide which kinds a resource reference can link to and which carry a
-// namespace segment. Keeping it in one place is what stops the two disagreeing about a
-// kind's name or scope.
+// The resource kinds Karse knows the details of, keyed by their URL/API token (the
+// lowercase plural name kubectl uses, e.g. "horizontalpodautoscalers"). The token appears
+// in the /api/yaml/:type/:name and /api/resource/:type/:name paths and in the generic
+// detail route (/resources/:type/...).
 //
-// Secrets are deliberately absent: Karse would be showing their contents verbatim, and
-// nothing in the dashboard needs them. Adding a kind here is what makes it readable, so
-// only add kinds the dashboard is meant to show.
-export const RESOURCE_KINDS: Record<ResourceKindToken, ResourceKindInfo> = {
+// This table is knowledge, not permission: it is what lets Karse turn a kind named in a
+// reference ("HorizontalPodAutoscaler") into a route token, and know whether that kind
+// carries a namespace segment. A kind absent from it is still readable (see
+// isReadableResourceKind); the reference simply falls back to the kind's own lowercase
+// name as its token, and its scope is taken from whether a namespace was supplied.
+// Both sides share the table so they can never disagree about a kind's name or scope.
+export const RESOURCE_KINDS: Record<string, ResourceKindInfo> = {
     nodes: { kind: "Node", kubectlKind: "node", namespaced: false },
     pods: { kind: "Pod", kubectlKind: "pod", namespaced: true },
     deployments: { kind: "Deployment", kubectlKind: "deployment", namespaced: true },
@@ -537,6 +516,41 @@ export const RESOURCE_KINDS: Record<ResourceKindToken, ResourceKindInfo> = {
     clusterrolebindings: { kind: "ClusterRoleBinding", kubectlKind: "clusterrolebinding", namespaced: false },
 };
 
+// The entry for a kind Karse knows, or undefined for one it does not. Goes through
+// hasOwnProperty so an inherited property name ("__proto__", "constructor") can never be
+// mistaken for a kind.
+export function knownResourceKind(token: string): ResourceKindInfo | undefined {
+    return Object.prototype.hasOwnProperty.call(RESOURCE_KINDS, token)
+        ? RESOURCE_KINDS[token]
+        : undefined;
+}
+
+// The kinds Karse will never read, whatever a caller asks for. Secrets are refused
+// because Karse would be showing their contents verbatim and nothing in the dashboard
+// needs them. Compared against the token's first dot-separated segment, so the
+// fully-qualified forms kubectl also accepts ("secrets.v1.") are refused too.
+export const DENIED_RESOURCE_KINDS: readonly string[] = ["secret", "secrets"];
+
+// The form a resource kind token may take: a lowercase kubectl resource name, optionally
+// qualified with its API group ("horizontalpodautoscalers.autoscaling", "widgets.example.com").
+// A leading letter is required, so a token can never look like a kubectl flag, and the
+// character set excludes everything a shell or kubectl would treat as syntax.
+const RESOURCE_KIND_TOKEN = /^[a-z][a-z0-9.-]*$/;
+
+// Whether Karse will read resources of the kind this token names. This is the check that
+// stands between a caller-supplied string and the kubectl argument list: the token must
+// look like a kubectl resource name and must not name a kind Karse refuses. It is
+// deliberately not a list of allowed kinds, because a kind Karse has never heard of (a
+// custom resource, a kind added by a newer Kubernetes) is still a resource the dashboard
+// should be able to show; the cluster decides whether it exists, not Karse.
+export function isReadableResourceKind(token: string): boolean {
+    if (!RESOURCE_KIND_TOKEN.test(token)) {
+        return false;
+    }
+    const [head] = token.split(".");
+    return !DENIED_RESOURCE_KINDS.includes(head!);
+}
+
 // Response body for GET /api/yaml/:type/:name.
 export type YamlResponse = {
     yaml: string;
@@ -547,7 +561,7 @@ export type YamlResponse = {
 // kind with no purpose-built page of its own. `namespace` is "" for a cluster-scoped kind,
 // and `createdAt` is the ISO creation timestamp the UI turns into an age.
 export type ResourceDetail = {
-    type: ResourceKindToken;
+    type: string;
     kind: string;
     name: string;
     namespace: string;

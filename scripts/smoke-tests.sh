@@ -168,6 +168,17 @@ spec:
       target:
         type: Utilization
         averageUtilization: 80
+---
+# A kind Karse does not know by name, so the generic resource endpoints are exercised
+# against something outside the table of kinds compiled into the app.
+apiVersion: coordination.k8s.io/v1
+kind: Lease
+metadata:
+  name: smoke-lease
+  namespace: default
+spec:
+  holderIdentity: smoke-worker
+  leaseDurationSeconds: 60
 EOF
 
 echo "--- Starting backend (OS-assigned free port) ---"
@@ -471,18 +482,18 @@ else
     echo "SKIP (no nodes)"
 fi
 
-echo "--- GET /api/yaml/secrets/:name (unsupported type rejected) ---"
+echo "--- GET /api/yaml/secrets/:name (refused kind) ---"
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
     "$BASE/api/yaml/secrets/whatever?context=$CURRENT_CTX&namespace=default")
 if [[ "$HTTP_CODE" != "400" ]]; then
-    echo "Expected HTTP 400 for unsupported yaml type, got $HTTP_CODE" >&2
+    echo "Expected HTTP 400 for a yaml read of a refused kind, got $HTTP_CODE" >&2
     exit 1
 fi
 echo "OK"
 
 echo "--- GET /api/yaml/horizontalpodautoscalers/:name (kind with no page of its own) ---"
-# The whitelist was widened past the six kinds with their own pages, so the YAML tab
-# on the generic detail page can fetch any kind the generic page shows.
+# The YAML endpoint serves every kind the generic detail page shows, not just the six
+# kinds with pages of their own, so its YAML tab works wherever the page does.
 curl -fsS "$BASE/api/yaml/horizontalpodautoscalers/smoke-hpa?context=$CURRENT_CTX&namespace=default" \
     | jq -r '.yaml' | grep -q "kind: HorizontalPodAutoscaler"
 echo "OK"
@@ -502,13 +513,25 @@ else
     echo "SKIP (no nodes)"
 fi
 
-echo "--- GET /api/resource/secrets/:name (unpermitted kind rejected) ---"
+echo "--- GET /api/resource/secrets/:name (refused kind) ---"
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
     "$BASE/api/resource/secrets/whatever?context=$CURRENT_CTX&namespace=default")
 if [[ "$HTTP_CODE" != "400" ]]; then
-    echo "Expected HTTP 400 for an unpermitted resource kind, got $HTTP_CODE" >&2
+    echo "Expected HTTP 400 for a refused resource kind, got $HTTP_CODE" >&2
     exit 1
 fi
+echo "OK"
+
+echo "--- GET /api/resource/:type/:name (kind Karse does not know) ---"
+# Karse has no entry for Lease, and the endpoint must serve it anyway: the kinds it
+# knows are not a permission list, so any kind the cluster has gets a detail page.
+LEASE_RESP=$(curl -fsS "$BASE/api/resource/leases/smoke-lease?context=$CURRENT_CTX&namespace=default")
+echo "$LEASE_RESP" | jq -e '.kind == "Lease" and .name == "smoke-lease" and .namespace == "default"' > /dev/null
+echo "OK"
+
+echo "--- GET /api/yaml/:type/:name (kind Karse does not know) ---"
+curl -fsS "$BASE/api/yaml/leases/smoke-lease?context=$CURRENT_CTX&namespace=default" \
+    | jq -r '.yaml' | grep -q "kind: Lease"
 echo "OK"
 
 echo "--- GET /api/resource/:type/:name (missing resource reported as not found) ---"

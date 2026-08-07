@@ -37,6 +37,7 @@ kubectl wait --for=condition=Ready node/fake-node-1 --timeout=30s
 # generic detail page:
 #   - a namespaced HorizontalPodAutoscaler, a Service and a Job in `default`
 #   - a cluster-scoped PersistentVolume, which carries no namespace segment in its route
+#   - a Lease, a kind Karse does not know by name at all, which the page must still show
 # The HPA targets a 0-replica deployment: an autoscaler does nothing to a target scaled to
 # zero, so the fixture stays inert and creates no pods.
 kubectl apply -f - <<'EOF'
@@ -133,6 +134,17 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   hostPath:
     path: /mnt/archive
+---
+apiVersion: coordination.k8s.io/v1
+kind: Lease
+metadata:
+  name: shop-lease
+  namespace: default
+  labels:
+    app: shop
+spec:
+  holderIdentity: shop-worker-1
+  leaseDurationSeconds: 60
 EOF
 
 echo "Cluster ready. Select the 'kwok-karse-test' context in Karse."

@@ -1,4 +1,4 @@
-import { resolveResourceKind, resourceNameSegments, resourcePath } from "../../lib/resource-link";
+import { resourceKindLabel, resourceNameSegments, resourcePath } from "../../lib/resource-link";
 
 describe("resourcePath", () => {
     test("builds the pod route from namespace and name", () => {
@@ -86,9 +86,22 @@ describe("resourcePath", () => {
         expect(resourcePath("StorageClass", "", "")).toBeNull();
     });
 
-    test("returns null for a kind Karse will not read at all", () => {
+    test("links a kind Karse has never heard of to the generic route", () => {
+        // A kind absent from the shared table still gets a detail page: its token is the
+        // kind's own lowercase name, and its scope comes from the reference itself.
+        expect(resourcePath("Lease", "node-1", "kube-node-lease")).toBe("/resources/lease/kube-node-lease/node-1");
+        expect(resourcePath("EndpointSlice", "web-abc", "default")).toBe("/resources/endpointslice/default/web-abc");
+        expect(resourcePath("CustomWidget", "thing", "")).toBe("/resources/customwidget/thing");
+    });
+
+    test("returns null for a kind Karse refuses to read", () => {
         expect(resourcePath("Secret", "db-password", "default")).toBeNull();
-        expect(resourcePath("CustomWidget", "thing", "default")).toBeNull();
+    });
+
+    test("returns null for a kind name that could not be a kubectl resource name", () => {
+        expect(resourcePath("", "thing", "default")).toBeNull();
+        expect(resourcePath("-o", "thing", "default")).toBeNull();
+        expect(resourcePath("two words", "thing", "default")).toBeNull();
     });
 });
 
@@ -109,22 +122,19 @@ describe("resourceNameSegments", () => {
     });
 });
 
-describe("resolveResourceKind", () => {
-    test("resolves a permitted token to its kind and scope", () => {
-        expect(resolveResourceKind("horizontalpodautoscalers")).toEqual({
-            token: "horizontalpodautoscalers",
-            info: {
-                kind: "HorizontalPodAutoscaler",
-                kubectlKind: "horizontalpodautoscaler",
-                namespaced: true,
-            },
-        });
-        expect(resolveResourceKind("persistentvolumes")?.info.namespaced).toBe(false);
+describe("resourceKindLabel", () => {
+    test("names a kind Karse knows by its display kind", () => {
+        expect(resourceKindLabel("horizontalpodautoscalers")).toBe("HorizontalPodAutoscaler");
+        expect(resourceKindLabel("persistentvolumes")).toBe("PersistentVolume");
     });
 
-    test("returns null for a token Karse will not read", () => {
-        expect(resolveResourceKind("secrets")).toBeNull();
-        expect(resolveResourceKind("")).toBeNull();
-        expect(resolveResourceKind("__proto__")).toBeNull();
+    test("names any other kind by its own token", () => {
+        expect(resourceKindLabel("leases")).toBe("leases");
+        expect(resourceKindLabel("widgets.example.com")).toBe("widgets.example.com");
+    });
+
+    test("does not mistake an inherited property name for a kind", () => {
+        expect(resourceKindLabel("__proto__")).toBe("__proto__");
+        expect(resourceKindLabel("constructor")).toBe("constructor");
     });
 });

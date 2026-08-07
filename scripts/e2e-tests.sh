@@ -319,14 +319,16 @@ spec:
         image: agent:latest
 EOF
 
-# Two resources of kinds that have NO detail page of their own, so the generic detail page
-# has a real subject to render: a namespaced HorizontalPodAutoscaler and a cluster-scoped
+# Three resources of kinds that have NO detail page of their own, so the generic detail
+# page has real subjects to render: a namespaced HorizontalPodAutoscaler, a cluster-scoped
 # PersistentVolume (the cluster-scoped route carries no namespace segment, which is the
-# part most easily got wrong).
+# part most easily got wrong), and a Lease, whose kind Karse does not know at all and so
+# proves the page is not limited to a list of kinds compiled into the app.
 #
-# Both are inert. The autoscaler targets the 0-replica `shop` deployment above, and an
+# All three are inert. The autoscaler targets the 0-replica `shop` deployment above, and an
 # autoscaler does nothing to a target scaled to zero, so it creates no pods and leaves
-# every pod count the rest of the suite asserts on untouched. The volume is never claimed.
+# every pod count the rest of the suite asserts on untouched. The volume is never claimed,
+# and nothing renews the lease.
 apply_manifest "" <<'EOF'
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -366,6 +368,19 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   hostPath:
     path: /mnt/archive
+---
+apiVersion: coordination.k8s.io/v1
+kind: Lease
+metadata:
+  name: shop-lease
+  namespace: default
+  labels:
+    app: shop
+  annotations:
+    karse.test/purpose: generic detail page subject of a kind Karse does not know
+spec:
+  holderIdentity: shop-worker-1
+  leaseDurationSeconds: 60
 EOF
 
 # ── Cluster 2 nodes ──────────────────────────────────────────────────────────

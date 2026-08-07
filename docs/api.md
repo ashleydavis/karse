@@ -479,10 +479,10 @@ When the Metrics API is unavailable, `metricsAvailable` is `false` and usage fie
 
 Returns the raw YAML of a single resource, from `kubectl get <kind> <name> -o yaml`. Backs the YAML sub tab on every resource detail page. See `docs/spec/yaml-viewer`.
 
-- **Path params**: `type` — the resource kind's token (a key of `RESOURCE_KINDS` in `packages/karse-types`, e.g. `pods`, `horizontalpodautoscalers`); `name` — the resource name.
+- **Path params**: `type` — the kind's kubectl resource name (e.g. `pods`, `horizontalpodautoscalers`, `leases`); `name` — the resource name.
 - **Request query**: `context` (required) — the kubeconfig context name. `namespace` (required for a namespaced kind, ignored for a cluster-scoped one).
 - **Response 200**: `YamlResponse` — `{ "yaml": string }`.
-- **Response 400**: `{ "error": "context query parameter is required" }`, or `{ "error": "unsupported resource type: <type>" }` when `type` is not whitelisted. Neither case runs kubectl.
+- **Response 400**: `{ "error": "context query parameter is required" }`, or `{ "error": "Karse will not read resources of type: <type>" }` when `type` does not look like a kubectl resource name or names a kind Karse refuses to read (Secrets). Neither case runs kubectl.
 - **Response 500**: `{ "error": "<kubectl stderr>" }` when the read fails.
 
 ```sh
@@ -493,12 +493,12 @@ curl -fsS 'http://127.0.0.1:5172/api/yaml/pods/web?context=my-ctx&namespace=defa
 
 Returns the common metadata of a single resource of any readable kind: what every Kubernetes object carries, with no kind-specific interpretation. Backs the generic detail page (`/resources/:type/...`), the page shown for a kind with no purpose-built page of its own. See `docs/spec/generic-detail`.
 
-The kind handed to kubectl always comes from the `RESOURCE_KINDS` whitelist; `type` is only ever a lookup key into it and is never interpolated into the kubectl argument list. The read is a single `kubectl get <kind> <name> -o json`.
+`type` is validated by `isReadableResourceKind` (`packages/karse-types`) before it is used: it must look like a kubectl resource name (lowercase, starting with a letter, optionally group-qualified), so it can never be read as a flag, and it must not name a kind Karse refuses to read (Secrets). It is deliberately not checked against a list of known kinds, so a custom resource or a kind newer than Karse still has a detail page. The read is a single `kubectl get <kind> <name> -o json`.
 
-- **Path params**: `type` — the resource kind's token (a key of `RESOURCE_KINDS`); `name` — the resource name.
-- **Request query**: `context` (required) — the kubeconfig context name. `namespace` (required for a namespaced kind, ignored for a cluster-scoped one).
+- **Path params**: `type` — the kind's kubectl resource name (e.g. `pods`, `horizontalpodautoscalers`, `leases`); `name` — the resource name.
+- **Request query**: `context` (required) — the kubeconfig context name. `namespace` (required for a kind Karse knows to be namespaced, ignored for one it knows to be cluster-scoped, and used as supplied for a kind it does not know).
 - **Response 200**: `ResourceDetail` — `{ "type": string, "kind": string, "name": string, "namespace": string, "createdAt": string, "labels": Record<string,string>, "annotations": Record<string,string> }`. `namespace` is `""` for a cluster-scoped kind.
-- **Response 400**: `{ "error": "context query parameter is required" }`; `{ "error": "unsupported resource type: <type>" }` when `type` is not whitelisted; `{ "error": "namespace query parameter is required for <Kind>" }` when a namespaced kind is requested without one. None of these run kubectl.
+- **Response 400**: `{ "error": "context query parameter is required" }`; `{ "error": "Karse will not read resources of type: <type>" }` when `type` fails the check above; `{ "error": "namespace query parameter is required for <Kind>" }` when a kind Karse knows to be namespaced is requested without one. None of these run kubectl.
 - **Response 404**: `{ "error": "<Kind> \"<name>\" was not found in this cluster" }` when the resource does not exist, or the cluster does not serve that kind at all.
 - **Response 500**: `{ "error": "<kubectl stderr>" }` on any other kubectl failure.
 

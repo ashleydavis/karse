@@ -24,7 +24,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useKubeContext } from "../../lib/kube-context";
 import { useShareableNavigate } from "../../lib/nav-state";
 import { fetchResourceDetail } from "../../lib/api-client";
-import { resolveResourceKind } from "../../lib/resource-link";
+import { resourceKindLabel } from "../../lib/resource-link";
 import { YamlTabPanel } from "../../components/yaml-tab-panel";
 import { LabelsTab } from "../../components/labels-tab";
 import { LoadingIndicator } from "../../components/loading-indicator";
@@ -47,8 +47,9 @@ const BACK_TO = "/all-resources";
 // metadata every Kubernetes object carries: kind, name, namespace where namespaced, age,
 // annotations, plus the resource's labels and raw YAML on their own sub tabs.
 //
-// The kind is taken from the URL, not fixed per route, so one page serves every kind. Two
-// routes reach it: /resources/:type/:name for a cluster-scoped kind and
+// The kind is taken from the URL, not fixed per route, so one page serves every kind,
+// including one Karse has never heard of: the cluster decides what exists. Two routes
+// reach it: /resources/:type/:name for a cluster-scoped kind and
 // /resources/:type/:namespace/:name for a namespaced one, matching how the rest of the app
 // routes cluster-scoped and namespaced resources.
 export function ResourceDetailPage() {
@@ -57,24 +58,15 @@ export function ResourceDetailPage() {
     const navigate = useShareableNavigate();
     const [activeTab, setActiveTab] = useState<ResourceDetailTab>("detail");
 
-    const resolved = resolveResourceKind(type ?? "");
+    // How to name the kind before the cluster has answered: the display kind for a kind
+    // Karse knows, otherwise the URL token itself.
+    const kindLabel = resourceKindLabel(type ?? "");
 
     const { data, error, isPending, refetch } = useQuery({
-        queryKey: ["resource-detail", current, resolved?.token, namespace ?? "", name],
-        queryFn: () => fetchResourceDetail(current!, resolved!.token, name!, namespace),
-        enabled: current !== null && resolved !== null && !!name,
+        queryKey: ["resource-detail", current, type, namespace ?? "", name],
+        queryFn: () => fetchResourceDetail(current!, type!, name!, namespace),
+        enabled: current !== null && !!type && !!name,
     });
-
-    // A kind Karse will not read at all (a hand-typed or stale URL). Say so rather than
-    // firing a request the backend would reject with the same answer.
-    if (resolved === null) {
-        return (
-            <Alert severity="error" data-test-id="resource-detail-unsupported">
-                <AlertTitle>Unsupported resource type</AlertTitle>
-                Karse cannot show resources of type "{type}".
-            </Alert>
-        );
-    }
 
     if (error) {
         return <LoadError message={(error as Error).message} onRetry={() => refetch()} />;
@@ -92,8 +84,8 @@ export function ResourceDetailPage() {
         return (
             <Alert severity="warning" data-test-id="resource-detail-not-found">
                 <AlertTitle>Not found</AlertTitle>
-                No {resolved.info.kind} named "{name}"
-                {resolved.info.namespaced ? ` in namespace "${namespace}"` : ""} exists in this cluster.
+                No {kindLabel} named "{name}"
+                {namespace ? ` in namespace "${namespace}"` : ""} exists in this cluster.
             </Alert>
         );
     }
@@ -213,7 +205,7 @@ export function ResourceDetailPage() {
                 <Box data-test-id="resource-panel-yaml">
                     <YamlTabPanel
                         target={{
-                            type: resolved.token,
+                            type: type!,
                             name: data.name,
                             namespace: data.namespace === "" ? undefined : data.namespace,
                         }}

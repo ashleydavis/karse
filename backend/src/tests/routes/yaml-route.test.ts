@@ -1,9 +1,6 @@
 jest.mock("../../kubectl/kubectl-adapter", () => ({
     getResourceYaml: jest.fn(),
     getResourceDetail: jest.fn(),
-    // isResourceKindToken is exercised for real so the route's whitelist behaviour
-    // matches the adapter; only getResourceYaml is stubbed.
-    isResourceKindToken: jest.requireActual("../../kubectl/kubectl-adapter").isResourceKindToken,
     // The server mounts other routers too; stub their adapter functions so Express
     // route registration doesn't fail at import time.
     listPods: jest.fn(),
@@ -79,12 +76,21 @@ describe("GET /api/yaml/:type/:name", () => {
         expect(kubectlMocks.getResourceYaml).not.toHaveBeenCalled();
     });
 
-    test("unsupported resource type returns 400 without calling the adapter", async () => {
+    test("a kind Karse refuses to read returns 400 without calling the adapter", async () => {
         const res = await fetch(`http://127.0.0.1:${port}/api/yaml/secrets/my-secret?context=my-ctx`);
         const body = await res.json();
         expect(res.status).toBe(400);
-        expect(body).toEqual({ error: "unsupported resource type: secrets" });
+        expect(body).toEqual({ error: "Karse will not read resources of type: secrets" });
         expect(kubectlMocks.getResourceYaml).not.toHaveBeenCalled();
+    });
+
+    test("a kind Karse does not know is fetched like any other", async () => {
+        // The YAML tab of the generic detail page must work for a kind absent from the
+        // shared table, so the route passes the token straight through to the adapter.
+        kubectlMocks.getResourceYaml.mockResolvedValue("kind: Lease\n");
+        const res = await fetch(`http://127.0.0.1:${port}/api/yaml/leases/node-1?context=my-ctx&namespace=kube-node-lease`);
+        expect(res.status).toBe(200);
+        expect(kubectlMocks.getResourceYaml).toHaveBeenCalledWith("my-ctx", "leases", "node-1", "kube-node-lease");
     });
 
     test("adapter throws returns 500", async () => {

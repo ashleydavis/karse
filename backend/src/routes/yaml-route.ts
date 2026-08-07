@@ -1,9 +1,11 @@
 import { Router } from "express";
+import { isReadableResourceKind } from "karse-types";
 import * as kubectl from "../kubectl/kubectl-adapter";
 
 // Router handling GET /yaml/:type/:name, returning the raw YAML for a single resource.
-// Works generically for every readable resource type (the RESOURCE_KINDS tokens in
-// karse-types). The adapter enforces the allowed-type whitelist.
+// Works generically for every resource kind the cluster serves; `:type` is checked with
+// isReadableResourceKind (it must look like a kubectl resource name and must not name a
+// kind Karse refuses to read), which the adapter enforces again.
 export const yamlRouter = Router();
 
 yamlRouter.get("/yaml/:type/:name", async (req, res) => {
@@ -13,8 +15,8 @@ yamlRouter.get("/yaml/:type/:name", async (req, res) => {
         return;
     }
     const { type, name } = req.params;
-    if (!kubectl.isResourceKindToken(type!)) {
-        res.status(400).json({ error: `unsupported resource type: ${type}` });
+    if (!isReadableResourceKind(type!)) {
+        res.status(400).json({ error: `Karse will not read resources of type: ${type}` });
         return;
     }
     const namespace = typeof req.query.namespace === "string" && req.query.namespace.trim() !== ""

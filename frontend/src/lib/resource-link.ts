@@ -1,4 +1,4 @@
-import { RESOURCE_KINDS, type ResourceKindInfo, type ResourceKindToken } from "karse-types";
+import { RESOURCE_KINDS, isReadableResourceKind, knownResourceKind, type ResourceKindInfo } from "karse-types";
 
 // The first path segment of the generic detail route, the page shown for a kind that has
 // no purpose-built detail page of its own: /resources/:type/:name for a cluster-scoped
@@ -22,41 +22,20 @@ const SPECIFIC_DETAIL_PAGES: Record<string, DetailRouteBuilder | undefined> = {
     DaemonSet: (name, namespace) => namespace === "" ? null : `/daemonsets/${namespace}/${name}`,
 };
 
-// Every readable kind, keyed by its singular display kind ("HorizontalPodAutoscaler")
-// rather than by its URL token, because that is what a resource reference names it by.
-// Derived from the shared RESOURCE_KINDS table so the kinds the generic page can show are
-// exactly the kinds the backend will serve, and the two cannot drift apart.
+// The kinds Karse knows, keyed by their singular display kind ("HorizontalPodAutoscaler")
+// rather than by their URL token, because that is what a resource reference names them by.
+// Derived from the shared RESOURCE_KINDS table so the two sides cannot drift apart on a
+// kind's token or its scope.
 const KINDS_BY_DISPLAY_KIND: Record<string, (ResourceKindInfo & { token: string }) | undefined> =
     Object.fromEntries(
         Object.entries(RESOURCE_KINDS).map(([token, info]) => [info.kind, { ...info, token }]),
     );
 
-// Whether a URL token names a resource kind Karse reads. Narrowing the string is what
-// lets the generic detail page index the shared table and call the API client without a
-// cast.
-function isResourceKindToken(token: string): token is ResourceKindToken {
-    return Object.prototype.hasOwnProperty.call(RESOURCE_KINDS, token);
-}
-
-// A resource kind resolved from the URL token naming it, carrying the narrowed token back
-// so the caller can hand it straight to the API client.
-export type ResolvedResourceKind = {
-    token: ResourceKindToken;
-    info: ResourceKindInfo;
-};
-
-// Resolves the `:type` segment of a generic detail route to the kind it names. Returns
-// null for a token Karse does not read (a hand-typed or stale URL), so the page can say
-// so rather than requesting a kind the backend would refuse anyway.
-export function resolveResourceKind(token: string): ResolvedResourceKind | null {
-    if (!isResourceKindToken(token))
-    {
-        return null;
-    }
-    return {
-        token,
-        info: RESOURCE_KINDS[token],
-    };
+// How a kind is named in the UI, given the `:type` token from a generic detail route. A
+// kind Karse knows gives its singular display kind; any other token names itself, which
+// is the best the app can say before the cluster answers with the resource's real kind.
+export function resourceKindLabel(token: string): string {
+    return knownResourceKind(token)?.kind ?? token;
 }
 
 // Maps a Kubernetes resource reference (its kind, name, and namespace) to the
@@ -66,16 +45,21 @@ export function resolveResourceKind(token: string): ResolvedResourceKind | null 
 // the app resolves routes the same way.
 //
 // A kind with its own purpose-built page (Pod, Node, Namespace, Deployment, StatefulSet,
-// DaemonSet) always resolves to that page. Every other readable kind falls back to the
-// generic detail route, so a reference to a ReplicaSet, a Job, a Service, or a
-// HorizontalPodAutoscaler is a working link rather than dead text.
+// DaemonSet) always resolves to that page. Every other kind falls back to the generic
+// detail route, so a reference to a ReplicaSet, a Job, a Service, a HorizontalPodAutoscaler
+// or a kind Karse has never heard of is a working link rather than dead text.
+//
+// A kind Karse knows contributes its route token and its scope from the shared table. For
+// any other kind the token is the kind's own lowercase name (which is how kubectl names
+// the resource), and the scope is read from the reference itself: a namespace was supplied
+// or it was not.
 //
 // Returns null when the reference cannot be resolved to a detail page, in which
 // case the caller renders plain text rather than a broken link. A reference is
 // unresolvable when:
 //   - the name is empty, or
-//   - the kind is one Karse will not read at all (it is not in RESOURCE_KINDS), or
-//   - the kind is namespaced but no namespace was supplied.
+//   - the kind is one Karse refuses to read (a Secret), or is not a kind name at all, or
+//   - the kind is known to be namespaced but no namespace was supplied.
 //
 // Cluster-scoped kinds carry only a name; namespaced kinds carry both namespace and name.
 export function resourcePath(
@@ -92,20 +76,24 @@ export function resourcePath(
     {
         return specific(name, namespace);
     }
-    const generic = KINDS_BY_DISPLAY_KIND[kind];
-    if (generic === undefined)
+    const known = KINDS_BY_DISPLAY_KIND[kind];
+    const token = known?.token ?? kind.toLowerCase();
+    if (!isReadableResourceKind(token))
     {
         return null;
     }
-    if (!generic.namespaced)
+    // A kind Karse knows is placed by its recorded scope; any other kind is placed by
+    // whether the reference carried a namespace, that being the only signal available.
+    const namespaced = known === undefined ? namespace !== "" : known.namespaced;
+    if (!namespaced)
     {
-        return `/${GENERIC_DETAIL_ROOT}/${generic.token}/${name}`;
+        return `/${GENERIC_DETAIL_ROOT}/${token}/${name}`;
     }
     if (namespace === "")
     {
         return null;
     }
-    return `/${GENERIC_DETAIL_ROOT}/${generic.token}/${namespace}/${name}`;
+    return `/${GENERIC_DETAIL_ROOT}/${token}/${namespace}/${name}`;
 }
 
 // The path segments below the kubeconfig context that identify a resource, ready to hand
