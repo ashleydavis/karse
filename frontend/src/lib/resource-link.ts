@@ -20,6 +20,7 @@ const SPECIFIC_DETAIL_PAGES: Record<string, DetailRouteBuilder | undefined> = {
     Deployment: (name, namespace) => namespace === "" ? null : `/deployments/${namespace}/${name}`,
     StatefulSet: (name, namespace) => namespace === "" ? null : `/statefulsets/${namespace}/${name}`,
     DaemonSet: (name, namespace) => namespace === "" ? null : `/daemonsets/${namespace}/${name}`,
+    HorizontalPodAutoscaler: (name, namespace) => namespace === "" ? null : `/autoscalers/${namespace}/${name}`,
 };
 
 // The kinds Karse knows, keyed by their singular display kind ("HorizontalPodAutoscaler")
@@ -45,9 +46,9 @@ export function resourceKindLabel(token: string): string {
 // the app resolves routes the same way.
 //
 // A kind with its own purpose-built page (Pod, Node, Namespace, Deployment, StatefulSet,
-// DaemonSet) always resolves to that page. Every other kind falls back to the generic
-// detail route, so a reference to a ReplicaSet, a Job, a Service, a HorizontalPodAutoscaler
-// or a kind Karse has never heard of is a working link rather than dead text.
+// DaemonSet, HorizontalPodAutoscaler) always resolves to that page. Every other kind falls
+// back to the generic detail route, so a reference to a ReplicaSet, a Job, a Service or a
+// kind Karse has never heard of is a working link rather than dead text.
 //
 // A kind Karse knows contributes its route token and its scope from the shared table. For
 // any other kind the token is the kind's own lowercase name (which is how kubectl names

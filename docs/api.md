@@ -347,6 +347,7 @@ Lists the horizontal pod autoscalers (HPAs) for the given context, optionally sc
 curl -fsS 'http://127.0.0.1:5172/api/horizontalpodautoscalers?context=my-ctx&namespace=default'
 ```
 
+
 ```json
 {
   "horizontalPodAutoscalers": [
@@ -361,6 +362,46 @@ curl -fsS 'http://127.0.0.1:5172/api/horizontalpodautoscalers?context=my-ctx&nam
       "targets": "cpu: 55%/80%",
       "createdAt": "2024-06-01T00:00:00Z",
       "labels": { "app": "web" }
+    }
+  ]
+}
+```
+
+## GET /api/horizontalpodautoscalers/:namespace/:name
+
+Returns a single horizontal pod autoscaler in full. Backs the autoscaler detail page. Read-only: one `kubectl get horizontalpodautoscalers <name> -o json`.
+
+- **Path params**: `namespace`, `name`.
+- **Request query**: `context` (required) — the kubeconfig context name.
+- **Response 200**: `HorizontalPodAutoscalerDetail` — the list fields (`name`, `namespace`, `reference`, `minReplicas`, `maxReplicas`, `currentReplicas`, `desiredReplicas`, `createdAt`, `labels`) plus `annotations`, `conditions[]` (`{ type, status, reason, message, lastTransitionTime }`), and `metrics[]` (`{ name, current, target }`), the per-metric breakdown that replaces the list response's joined `targets` string. A metric the cluster has not reported yet has `current: null`; an HPA with no metric status at all has `metrics: []` (the structured equivalent of the list response's `<none>`).
+- **Response 400**: `{ "error": "context query parameter is required" }` when `context` is missing or blank.
+- **Response 404**: `{ "error": "HorizontalPodAutoscaler \"<name>\" was not found in namespace \"<namespace>\"" }` when no such HPA exists.
+- **Response 500**: `{ "error": "<kubectl stderr>" }` when the read fails for any other reason.
+
+```sh
+curl -fsS 'http://127.0.0.1:5172/api/horizontalpodautoscalers/default/web?context=my-ctx'
+```
+
+```json
+{
+  "name": "web",
+  "namespace": "default",
+  "reference": "Deployment/web",
+  "minReplicas": 2,
+  "maxReplicas": 10,
+  "currentReplicas": 4,
+  "desiredReplicas": 6,
+  "createdAt": "2024-06-01T00:00:00Z",
+  "labels": { "app": "web" },
+  "annotations": { "karse.test/purpose": "detail" },
+  "metrics": [{ "name": "cpu", "current": 55, "target": 80 }],
+  "conditions": [
+    {
+      "type": "AbleToScale",
+      "status": "True",
+      "reason": "ReadyForNewScale",
+      "message": "recommended size matches current size",
+      "lastTransitionTime": "2024-06-01T00:05:00Z"
     }
   ]
 }

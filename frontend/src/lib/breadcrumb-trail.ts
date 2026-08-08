@@ -112,7 +112,7 @@ export const LIST_LABELS: Record<string, string> = {
 // The list-page segments whose detail route carries a namespace segment before the
 // resource name (/pods/:namespace/:name). Every other detail route names the
 // resource directly (/nodes/:name), so the leaf sits one segment earlier.
-const NAMESPACED_ROOTS = ["pods", "deployments", "statefulsets", "daemonsets"];
+const NAMESPACED_ROOTS = ["pods", "deployments", "statefulsets", "daemonsets", "autoscalers"];
 
 // The crumb standing in for the generic detail route's list page. GENERIC_DETAIL_ROOT is
 // not in LIST_LABELS because there is no /resources list page: the list a generic resource

@@ -145,6 +145,45 @@ export type HorizontalPodAutoscalersResponse = {
     horizontalPodAutoscalers: HorizontalPodAutoscaler[];
 };
 
+// One metric an HPA scales on, broken out of the joined `targets` summary the list
+// endpoint carries. `current` is the metric's latest reading and `target` the utilisation
+// the HPA steers towards, both as percentages; either is null when the cluster has not
+// reported it (a freshly created HPA, no Metrics API, or a non-utilisation target).
+export type HpaMetricStatus = {
+    name: string;
+    current: number | null;
+    target: number | null;
+};
+
+// One condition an HPA reports (AbleToScale, ScalingActive, ScalingLimited), with the
+// reason and message explaining why it holds. `status` is the Kubernetes "True"/"False"/
+// "Unknown" string, and `lastTransitionTime` the ISO timestamp it last changed.
+export type HpaCondition = {
+    type: string;
+    status: string;
+    reason: string;
+    message: string;
+    lastTransitionTime: string;
+};
+
+// Response body for GET /api/horizontalpodautoscalers/:namespace/:name: everything the
+// HPA detail page shows. It carries the list fields plus the three the list response does
+// not: the per-metric breakdown, the HPA's conditions, and its annotations.
+export type HorizontalPodAutoscalerDetail = {
+    name: string;
+    namespace: string;
+    reference: string;
+    minReplicas: number;
+    maxReplicas: number;
+    currentReplicas: number;
+    desiredReplicas: number;
+    createdAt: string;
+    labels: Record<string, string>;
+    annotations: Record<string, string>;
+    metrics: HpaMetricStatus[];  // empty when the HPA has no metric status yet
+    conditions: HpaCondition[];
+};
+
 // The lifecycle state of a container within a pod.
 export type ContainerState = "Running" | "Waiting" | "Terminated" | "Unknown";
 

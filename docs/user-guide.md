@@ -53,7 +53,7 @@ Every reference to a resource is a link to that resource's own detail page, so a
 - **Table rows**: click a row to open the resource it names.
 - **Cells within a row**: a row's **Namespace**, **Node**, and **Object** cells link to that namespace, node, or referenced resource, rather than to the row's own target. Clicking one of those cells opens the resource it names; clicking anywhere else on the row opens the row's resource.
 - **Detail-page fields**: a pod's **Namespace** and **Node**, a workload's **Namespace**, a container's **Pod**, and the object an error or event refers to are all links.
-- A reference to a kind with no page of its own (a ReplicaSet, a Service, an autoscaler) opens a generic detail page showing that resource's kind, namespace, age, labels, annotations and raw YAML.
+- A reference to a kind with no page of its own (a ReplicaSet, a Service, a Job) opens a generic detail page showing that resource's kind, namespace, age, labels, annotations and raw YAML.
 
 ### The breadcrumb shows how you got there
 
@@ -277,8 +277,21 @@ A read-only table of the cluster's horizontal pod autoscalers (HPAs) and how eac
 - **Targets**: an inline bar showing the HPA's current metric against the target it steers to. The bar fills to the current reading as a share of the target, so a full bar means the metric is *at* its target and the HPA is about to scale up; the value beside it reads, e.g., `cpu 40%/80%` (current/target). An HPA that scales on several metrics shows them all, comma-separated. If the cluster has no Metrics API the current reading is unknown: the bar is empty and the value shows an em-dash (`cpu —/80%`) rather than a fabricated zero. An HPA with no metrics reads `<none>`.
 - **Replicas**: an inline bar showing how much of its maximum scale the HPA is using (current replicas ÷ **Max**), with the value reading current over desired replicas (`4/6` while it is scaling up, `4/4` once settled). A full bar means the HPA is maxed out and cannot add replicas.
 - **Sort** by any column (the Targets and Replicas columns sort by the number behind the bar, so "which autoscaler is under most pressure?" is one click) and **search** across every column, including labels.
-- Rows are not clickable: Karse has no HPA detail page. Use the **Reference** link to reach the workload the HPA scales.
+- **Click a row** to open that autoscaler's own detail page. The **Reference** and **Namespace** links inside the row still go to their own targets.
 - Like every Karse view this page is **read-only**: it shows how an autoscaler is performing and never offers a way to scale, edit, or delete anything.
+
+## Autoscaler detail page (`/autoscalers/:namespace/:name`)
+
+Opened by clicking an autoscaler row, an HPA row on the All resources page, or any HorizontalPodAutoscaler reference elsewhere in Karse.
+
+- **Details**: the namespace, the scale target (a link to that workload's detail page), min and max replicas, current and desired replicas, and the age.
+- **Scale**: the same Replicas and Targets bars the Autoscalers table shows.
+- **Metrics**: one row per metric the HPA scales on, each with its own bar. An HPA the cluster has not reported a metric for yet says so rather than showing a fabricated reading.
+- **Conditions**: the HPA's `AbleToScale`, `ScalingActive` and `ScalingLimited` conditions with the reason and message explaining each.
+- **Annotations**: the HPA's annotations.
+- Sub tabs: **Labels**, **Commands** (read-only `kubectl` suggestions you can copy and run yourself), and **YAML** (the HPA's raw manifest).
+- The breadcrumb shows the route you took to get here, and its first crumb takes you back to the view you left.
+- A name that does not exist shows a clear "Not found" message.
 
 ## Pods page (`/pods`)
 

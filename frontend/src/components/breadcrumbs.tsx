@@ -19,6 +19,7 @@ const ORIGIN_KIND_LABELS: Record<string, string> = {
     deployments: "Deployment",
     statefulsets: "StatefulSet",
     daemonsets: "DaemonSet",
+    autoscalers: "HorizontalPodAutoscaler",
     // The generic detail route serves every other kind, so its entry names none of them
     // in particular. The label is not shown in the trail (the leaf is the resource name);
     // it exists so a generic page reached from All resources gets an origin trail at all.
@@ -102,6 +103,17 @@ function buildCrumbs(
     {
         return [
             { label: "All resources", to: "/all-resources" },
+            { label: middleTruncate(params.name, MAX_NAME_LENGTH) },
+        ];
+    }
+
+    // Autoscaler detail: /autoscalers/:namespace/:name ->
+    // Autoscalers > <namespace> > <name>
+    if (root === "autoscalers" && params.namespace && params.name)
+    {
+        return [
+            { label: "Autoscalers", to: "/autoscalers" },
+            { label: middleTruncate(params.namespace, MAX_NAME_LENGTH) },
             { label: middleTruncate(params.name, MAX_NAME_LENGTH) },
         ];
     }

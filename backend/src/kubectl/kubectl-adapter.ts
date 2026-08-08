@@ -8,6 +8,7 @@ import { isReadableResourceKind, knownResourceKind } from "karse-types";
 import type {
     Context, NodeStatus, Node, ClusterOverview, Namespace, Pod, PodPhase,
     Deployment, StatefulSet, DaemonSet, HorizontalPodAutoscaler,
+    HorizontalPodAutoscalerDetail, HpaMetricStatus,
     ContainerInfo, ContainerState, KubeEvent, PodDetail,
     NodeCondition, NodeAddress, ResourceAmounts, NodeDetail,
     ClusterEvent, WorkloadKind, WorkloadStat, WorkloadDetail, ClusterError,
@@ -365,6 +366,71 @@ export async function listHorizontalPodAutoscalers(context: string, namespace?: 
             labels: item.metadata.labels ?? {},
         };
     });
+}
+
+// Breaks an HPA's metrics out into one entry per metric it scales on, pairing each
+// target with the matching current reading. This is the per-metric form the detail page
+// needs, where the list endpoint carries only the joined `targets` summary. A metric the
+// cluster has not reported yet contributes null readings rather than a fabricated 0, and
+// an HPA with no metrics at all yields an empty list (the structured equivalent of the
+// list endpoint's "<none>").
+function parseHpaMetrics(item: any): HpaMetricStatus[] {
+    const currentMetrics: any[] = item.status?.currentMetrics ?? [];
+    const targetMetrics: any[] = item.spec?.metrics ?? [];
+    return targetMetrics.map((target, index) => {
+        const current = currentMetrics[index];
+        const targetUtil = target?.resource?.target?.averageUtilization;
+        const currentUtil = current?.resource?.current?.averageUtilization;
+        return {
+            name: target?.resource?.name ?? target?.name ?? "?",
+            current: typeof currentUtil === "number" ? currentUtil : null,
+            target: typeof targetUtil === "number" ? targetUtil : null,
+        };
+    });
+}
+
+// Returns the detail of a single horizontal pod autoscaler: the fields the list endpoint
+// carries plus the ones only the detail page needs (per-metric breakdown, conditions,
+// annotations). Read-only, a single "kubectl get horizontalpodautoscalers <name> -o json".
+// Returns null when no such HPA exists in that namespace, so the route can answer with a
+// not-found rather than a server error.
+export async function getHorizontalPodAutoscalerDetail(
+    context: string,
+    namespace: string,
+    name: string,
+): Promise<HorizontalPodAutoscalerDetail | null> {
+    const result = await kubectl([
+        "--context", context, "-n", namespace, "get", "horizontalpodautoscalers", name, "-o", "json",
+    ]);
+    if (result.exitCode !== 0) {
+        if (isNotFoundError(result.stderr)) {
+            return null;
+        }
+        throw new Error(result.stderr);
+    }
+    const item = JSON.parse(result.stdout);
+    const target = item.spec?.scaleTargetRef ?? {};
+    const conditions: any[] = item.status?.conditions ?? [];
+    return {
+        name: item.metadata.name,
+        namespace: item.metadata.namespace,
+        reference: target.kind && target.name ? `${target.kind}/${target.name}` : "",
+        minReplicas: item.spec?.minReplicas ?? 0,
+        maxReplicas: item.spec?.maxReplicas ?? 0,
+        currentReplicas: item.status?.currentReplicas ?? 0,
+        desiredReplicas: item.status?.desiredReplicas ?? 0,
+        createdAt: item.metadata.creationTimestamp,
+        labels: item.metadata.labels ?? {},
+        annotations: item.metadata.annotations ?? {},
+        metrics: parseHpaMetrics(item),
+        conditions: conditions.map((condition) => ({
+            type: condition.type ?? "",
+            status: condition.status ?? "",
+            reason: condition.reason ?? "",
+            message: condition.message ?? "",
+            lastTransitionTime: condition.lastTransitionTime ?? "",
+        })),
+    };
 }
 
 // Returns Kubernetes events for the given context, optionally scoped to a namespace.

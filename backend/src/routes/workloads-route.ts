@@ -64,6 +64,25 @@ workloadsRouter.get("/daemonsets", async (req, res) => {
     res.json({ daemonSets });
 });
 
+// The HPA detail route is registered before the list route, matching how the workload
+// detail routes above sit before their list routes.
+workloadsRouter.get("/horizontalpodautoscalers/:namespace/:name", async (req, res) => {
+    const context = req.query.context;
+    if (typeof context !== "string" || context.trim() === "") {
+        res.status(400).json({ error: "context query parameter is required" });
+        return;
+    }
+    const { namespace, name } = req.params;
+    const detail = await kubectl.getHorizontalPodAutoscalerDetail(context, namespace!, name!);
+    // A name that does not exist is a not-found, not a server error: retrying cannot
+    // change it, so the page shows a plain message rather than a retry prompt.
+    if (detail === null) {
+        res.status(404).json({ error: `HorizontalPodAutoscaler "${name}" was not found in namespace "${namespace}"` });
+        return;
+    }
+    res.json(detail);
+});
+
 workloadsRouter.get("/horizontalpodautoscalers", async (req, res) => {
     const context = req.query.context;
     if (typeof context !== "string" || context.trim() === "") {

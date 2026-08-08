@@ -3,6 +3,7 @@ jest.mock("../../kubectl/kubectl-adapter", () => ({
     listStatefulSets: jest.fn(),
     listDaemonSets: jest.fn(),
     listHorizontalPodAutoscalers: jest.fn(),
+    getHorizontalPodAutoscalerDetail: jest.fn(),
     getWorkloadDetail: jest.fn(),
 }));
 
@@ -35,6 +36,7 @@ beforeEach(() => {
     kubectlMocks.listStatefulSets.mockReset();
     kubectlMocks.listDaemonSets.mockReset();
     kubectlMocks.listHorizontalPodAutoscalers.mockReset();
+    kubectlMocks.getHorizontalPodAutoscalerDetail.mockReset();
     kubectlMocks.getWorkloadDetail.mockReset();
 });
 
@@ -257,5 +259,64 @@ describe("GET /api/daemonsets/:namespace/:name", () => {
     test("missing context returns 400", async () => {
         const res = await fetch(`http://127.0.0.1:${port}/api/daemonsets/kube-system/fluentd`);
         expect(res.status).toBe(400);
+    });
+});
+
+// A minimal valid HPA detail returned by the mock adapter, carrying the three fields the
+// list response does not: the per-metric breakdown, conditions, and annotations.
+const FAKE_HPA_DETAIL = {
+    name: "nginx",
+    namespace: "default",
+    reference: "Deployment/nginx",
+    minReplicas: 2,
+    maxReplicas: 10,
+    currentReplicas: 4,
+    desiredReplicas: 6,
+    createdAt: "2024-06-01T00:00:00Z",
+    labels: { app: "nginx" },
+    annotations: { "karse.test/purpose": "detail" },
+    metrics: [{ name: "cpu", current: 55, target: 80 }],
+    conditions: [
+        {
+            type: "AbleToScale",
+            status: "True",
+            reason: "ReadyForNewScale",
+            message: "recommended size matches current size",
+            lastTransitionTime: "2024-06-01T00:05:00Z",
+        },
+    ],
+};
+
+describe("GET /api/horizontalpodautoscalers/:namespace/:name", () => {
+    test("returns the HPA detail for a context", async () => {
+        kubectlMocks.getHorizontalPodAutoscalerDetail.mockResolvedValue(FAKE_HPA_DETAIL);
+        const res = await fetch(`http://127.0.0.1:${port}/api/horizontalpodautoscalers/default/nginx?context=my-ctx`);
+        const body = await res.json();
+        expect(res.status).toBe(200);
+        expect(body).toEqual(FAKE_HPA_DETAIL);
+        expect(kubectlMocks.getHorizontalPodAutoscalerDetail).toHaveBeenCalledWith("my-ctx", "default", "nginx");
+    });
+
+    test("a name that does not exist is a not found with a readable message", async () => {
+        kubectlMocks.getHorizontalPodAutoscalerDetail.mockResolvedValue(null);
+        const res = await fetch(`http://127.0.0.1:${port}/api/horizontalpodautoscalers/default/no-such-hpa?context=my-ctx`);
+        const body = await res.json();
+        expect(res.status).toBe(404);
+        expect(body).toEqual({
+            error: 'HorizontalPodAutoscaler "no-such-hpa" was not found in namespace "default"',
+        });
+    });
+
+    test("missing context returns 400", async () => {
+        const res = await fetch(`http://127.0.0.1:${port}/api/horizontalpodautoscalers/default/nginx`);
+        const body = await res.json();
+        expect(res.status).toBe(400);
+        expect(body).toEqual({ error: "context query parameter is required" });
+    });
+
+    test("adapter throws returns 500", async () => {
+        kubectlMocks.getHorizontalPodAutoscalerDetail.mockRejectedValue(new Error("unreachable"));
+        const res = await fetch(`http://127.0.0.1:${port}/api/horizontalpodautoscalers/default/nginx?context=my-ctx`);
+        expect(res.status).toBe(500);
     });
 });

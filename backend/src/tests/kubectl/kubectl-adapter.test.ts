@@ -20,6 +20,7 @@ import {
     getPodPerformance,
     listPods,
     listHorizontalPodAutoscalers,
+    getHorizontalPodAutoscalerDetail,
     listEvents,
     listClusterErrors,
     getPodLogs,
@@ -3911,5 +3912,161 @@ describe("getPodPerformance", () => {
 
         expect(result.metricsAvailable).toBe(true);
         expect(result.node).toBeNull();
+    });
+});
+
+describe("getHorizontalPodAutoscalerDetail", () => {
+    // A fully-populated autoscaling/v2 HPA, carrying the three things the list response
+    // does not: per-metric status, conditions, and annotations.
+    const detailHpa = {
+        metadata: {
+            name: "web",
+            namespace: "default",
+            creationTimestamp: "2024-06-01T00:00:00Z",
+            labels: { app: "web" },
+            annotations: { "kubectl.kubernetes.io/last-applied-configuration": "{}" },
+        },
+        spec: {
+            scaleTargetRef: { kind: "Deployment", name: "web" },
+            minReplicas: 2,
+            maxReplicas: 10,
+            metrics: [
+                { type: "Resource", resource: { name: "cpu", target: { averageUtilization: 80 } } },
+                { type: "Resource", resource: { name: "memory", target: { averageUtilization: 70 } } },
+            ],
+        },
+        status: {
+            currentReplicas: 4,
+            desiredReplicas: 6,
+            currentMetrics: [
+                { type: "Resource", resource: { name: "cpu", current: { averageUtilization: 55 } } },
+                { type: "Resource", resource: { name: "memory", current: { averageUtilization: 30 } } },
+            ],
+            conditions: [
+                {
+                    type: "AbleToScale",
+                    status: "True",
+                    reason: "ReadyForNewScale",
+                    message: "recommended size matches current size",
+                    lastTransitionTime: "2024-06-01T00:05:00Z",
+                },
+                {
+                    type: "ScalingLimited",
+                    status: "False",
+                    reason: "DesiredWithinRange",
+                    message: "the desired count is within the acceptable range",
+                    lastTransitionTime: "2024-06-01T00:05:00Z",
+                },
+            ],
+        },
+    };
+
+    test("returns the HPA with the fields the list endpoint does not carry", async () => {
+        setRunnerHandlers({
+            "--context test-ctx -n default get horizontalpodautoscalers web -o json": () =>
+                ok(JSON.stringify(detailHpa)),
+        });
+        const result = await getHorizontalPodAutoscalerDetail("test-ctx", "default", "web");
+        expect(result).toEqual({
+            name: "web",
+            namespace: "default",
+            reference: "Deployment/web",
+            minReplicas: 2,
+            maxReplicas: 10,
+            currentReplicas: 4,
+            desiredReplicas: 6,
+            createdAt: "2024-06-01T00:00:00Z",
+            labels: { app: "web" },
+            annotations: { "kubectl.kubernetes.io/last-applied-configuration": "{}" },
+            metrics: [
+                { name: "cpu", current: 55, target: 80 },
+                { name: "memory", current: 30, target: 70 },
+            ],
+            conditions: [
+                {
+                    type: "AbleToScale",
+                    status: "True",
+                    reason: "ReadyForNewScale",
+                    message: "recommended size matches current size",
+                    lastTransitionTime: "2024-06-01T00:05:00Z",
+                },
+                {
+                    type: "ScalingLimited",
+                    status: "False",
+                    reason: "DesiredWithinRange",
+                    message: "the desired count is within the acceptable range",
+                    lastTransitionTime: "2024-06-01T00:05:00Z",
+                },
+            ],
+        });
+    });
+
+    test("issues only a read-only kubectl get", async () => {
+        setRunnerHandlers({
+            "--context test-ctx -n default get horizontalpodautoscalers web -o json": () =>
+                ok(JSON.stringify(detailHpa)),
+        });
+        await getHorizontalPodAutoscalerDetail("test-ctx", "default", "web");
+        expect(run.mock.calls).toEqual([
+            ["kubectl", ["--context", "test-ctx", "-n", "default", "get", "horizontalpodautoscalers", "web", "-o", "json"]],
+        ]);
+    });
+
+    test("an HPA with no metric status yields the same <none> the list endpoint reports", async () => {
+        const bareHpa = {
+            metadata: { name: "bare", namespace: "default", creationTimestamp: "2024-06-01T00:00:00Z" },
+            spec: { scaleTargetRef: { kind: "Deployment", name: "bare" }, minReplicas: 1, maxReplicas: 5 },
+            status: { currentReplicas: 1, desiredReplicas: 1 },
+        };
+        setRunnerHandlers({
+            "--context test-ctx -n default get horizontalpodautoscalers bare -o json": () =>
+                ok(JSON.stringify(bareHpa)),
+            "--context test-ctx get horizontalpodautoscalers -A -o json": () =>
+                ok(JSON.stringify({ items: [bareHpa] })),
+        });
+        const detail = await getHorizontalPodAutoscalerDetail("test-ctx", "default", "bare");
+        const list = await listHorizontalPodAutoscalers("test-ctx");
+        // The list endpoint says "<none>"; the detail's structured equivalent is no metrics
+        // at all, rather than an undefined field or a thrown error.
+        expect(list[0]!.targets).toBe("<none>");
+        expect(detail!.metrics).toEqual([]);
+        expect(detail!.conditions).toEqual([]);
+        expect(detail!.annotations).toEqual({});
+    });
+
+    test("a metric the cluster has not reported yet yields a null current reading", async () => {
+        setRunnerHandlers({
+            "--context test-ctx -n default get horizontalpodautoscalers pending -o json": () =>
+                ok(JSON.stringify({
+                    metadata: { name: "pending", namespace: "default", creationTimestamp: "2024-06-01T00:00:00Z" },
+                    spec: {
+                        scaleTargetRef: { kind: "Deployment", name: "pending" },
+                        minReplicas: 1,
+                        maxReplicas: 5,
+                        metrics: [{ type: "Resource", resource: { name: "cpu", target: { averageUtilization: 80 } } }],
+                    },
+                    status: { currentReplicas: 1, desiredReplicas: 1 },
+                })),
+        });
+        const result = await getHorizontalPodAutoscalerDetail("test-ctx", "default", "pending");
+        expect(result!.metrics).toEqual([{ name: "cpu", current: null, target: 80 }]);
+    });
+
+    test("returns null when the HPA does not exist", async () => {
+        setRunnerHandlers({
+            "--context test-ctx -n default get horizontalpodautoscalers missing -o json": () =>
+                fail('Error from server (NotFound): horizontalpodautoscalers.autoscaling "missing" not found'),
+        });
+        const result = await getHorizontalPodAutoscalerDetail("test-ctx", "default", "missing");
+        expect(result).toBeNull();
+    });
+
+    test("throws when kubectl fails for any other reason", async () => {
+        setRunnerHandlers({
+            "--context test-ctx -n default get horizontalpodautoscalers web -o json": () =>
+                fail("The connection to the server was refused"),
+        });
+        await expect(getHorizontalPodAutoscalerDetail("test-ctx", "default", "web"))
+            .rejects.toThrow("The connection to the server was refused");
     });
 });

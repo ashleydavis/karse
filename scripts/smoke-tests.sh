@@ -498,6 +498,24 @@ curl -fsS "$BASE/api/yaml/horizontalpodautoscalers/smoke-hpa?context=$CURRENT_CT
     | jq -r '.yaml' | grep -q "kind: HorizontalPodAutoscaler"
 echo "OK"
 
+echo "--- GET /api/horizontalpodautoscalers/:namespace/:name ---"
+HPA_DETAIL_RESP=$(curl -fsS "$BASE/api/horizontalpodautoscalers/default/smoke-hpa?context=$CURRENT_CTX")
+echo "$HPA_DETAIL_RESP" | jq -e '.name == "smoke-hpa" and .namespace == "default" and .reference == "Deployment/smoke-deploy"' > /dev/null
+echo "$HPA_DETAIL_RESP" | jq -e '.minReplicas == 1 and .maxReplicas == 5' > /dev/null
+# The three fields the list endpoint does not carry.
+echo "$HPA_DETAIL_RESP" | jq -e '(.metrics | type == "array") and (.conditions | type == "array") and has("annotations")' > /dev/null
+echo "$HPA_DETAIL_RESP" | jq -e '.metrics[0].name == "cpu" and .metrics[0].target == 80' > /dev/null
+echo "OK"
+
+echo "--- GET /api/horizontalpodautoscalers/:namespace/:name (missing HPA reported as not found) ---"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+    "$BASE/api/horizontalpodautoscalers/default/no-such-hpa?context=$CURRENT_CTX")
+if [[ "$HTTP_CODE" != "404" ]]; then
+    echo "Expected HTTP 404 for an HPA that does not exist, got $HTTP_CODE" >&2
+    exit 1
+fi
+echo "OK"
+
 echo "--- GET /api/resource/:type/:name (namespaced generic kind) ---"
 RESOURCE_RESP=$(curl -fsS "$BASE/api/resource/horizontalpodautoscalers/smoke-hpa?context=$CURRENT_CTX&namespace=default")
 echo "$RESOURCE_RESP" | jq -e '.kind == "HorizontalPodAutoscaler" and .name == "smoke-hpa" and .namespace == "default"' > /dev/null

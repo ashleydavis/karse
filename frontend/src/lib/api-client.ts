@@ -4,6 +4,7 @@ import type {
     ContextsResponse, ClusterOverview, Node, NamespacesResponse, PodsResponse,
     DeploymentsResponse, StatefulSetsResponse, DaemonSetsResponse,
     HorizontalPodAutoscalersResponse,
+    HorizontalPodAutoscalerDetail,
     WorkloadKind, WorkloadDetail, NamespaceDetail,
     PodDetail, NodeDetail, ResourceDetail, YamlResponse,
     LogStreamLine, LogStreamStarted, EventsResponse, ErrorsResponse,
@@ -136,6 +137,24 @@ export async function fetchDaemonSets(context: string, namespace?: string): Prom
     }
     const response = await http.get<DaemonSetsResponse>("/daemonsets", { params });
     return response.data;
+}
+
+// Fetches a single horizontal pod autoscaler's detail. Returns null when no such HPA
+// exists in that namespace, which the backend answers with a 404: that is a real answer
+// about the cluster rather than a request failure, so it is not thrown as an error.
+export async function fetchHorizontalPodAutoscalerDetail(
+    context: string,
+    namespace: string,
+    name: string,
+): Promise<HorizontalPodAutoscalerDetail | null> {
+    const response = await http.get<HorizontalPodAutoscalerDetail>(
+        `/horizontalpodautoscalers/${namespace}/${name}`,
+        {
+            params: { context },
+            validateStatus: (status) => (status >= 200 && status < 300) || status === 404,
+        },
+    );
+    return response.status === 404 ? null : response.data;
 }
 
 // Fetches horizontal pod autoscalers (HPAs) for the given context, optionally

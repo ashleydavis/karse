@@ -5,7 +5,7 @@
 import { fuzzyMatch } from "./fuzzy-filter";
 
 // The resource kinds for which guided commands can be generated.
-export type GuidedResourceKind = "pod" | "node" | "namespace" | "deployment" | "statefulset" | "daemonset" | "container";
+export type GuidedResourceKind = "pod" | "node" | "namespace" | "deployment" | "statefulset" | "daemonset" | "horizontalpodautoscaler" | "container";
 
 // Identifies a single resource for which to build command suggestions.
 // For the "container" kind, name is the pod name and container is the
@@ -156,6 +156,34 @@ function buildWorkloadCommands(kind: string, name: string, namespace?: string): 
     return commands;
 }
 
+// Builds the kubectl command suggestions for a horizontal pod autoscaler. An HPA has no
+// rollout of its own (it drives its target's), so the workload commands do not fit: these
+// describe it, read its YAML, and show the target it scales.
+function buildAutoscalerCommands(name: string, namespace?: string): GuidedCommand[] {
+    return [
+        {
+            label: "Describe autoscaler",
+            command: withNamespace(`kubectl describe hpa ${name}`, namespace),
+        },
+        {
+            label: "Get autoscaler YAML",
+            command: withNamespace(`kubectl get hpa ${name} -o yaml`, namespace),
+        },
+        {
+            label: "List autoscalers in this namespace",
+            command: withNamespace("kubectl get hpa", namespace),
+        },
+        {
+            label: "Watch the autoscaler scale",
+            command: withNamespace(`kubectl get hpa ${name} --watch`, namespace),
+        },
+        {
+            label: "Delete autoscaler",
+            command: withNamespace(`kubectl delete hpa ${name}`, namespace),
+        },
+    ];
+}
+
 // Builds the kubectl command suggestions for a single container within a pod.
 // Each command targets the named container in the pod via the `-c` flag.
 function buildContainerCommands(podName: string, container: string, namespace?: string): GuidedCommand[] {
@@ -200,6 +228,10 @@ export function buildGuidedCommands(target: GuidedResourceTarget): GuidedCommand
     if (target.kind === "namespace")
     {
         return buildNamespaceCommands(target.name);
+    }
+    if (target.kind === "horizontalpodautoscaler")
+    {
+        return buildAutoscalerCommands(target.name, target.namespace);
     }
     return buildWorkloadCommands(target.kind, target.name, target.namespace);
 }

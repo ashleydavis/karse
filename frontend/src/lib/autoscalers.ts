@@ -12,6 +12,23 @@ export type HpaMetric = {
     target: number | null;
 };
 
+// Splits an HPA's scale target reference ("Deployment/web") into its kind and name, so a
+// reference can be linked to that workload's own detail page. Returns an empty kind when
+// the reference is absent or malformed, which ResourceRef renders as plain text.
+export function splitHpaReference(reference: string): { kind: string; name: string } {
+    const slash = reference.indexOf("/");
+    if (slash === -1) {
+        return {
+            kind: "",
+            name: reference,
+        };
+    }
+    return {
+        kind: reference.slice(0, slash),
+        name: reference.slice(slash + 1),
+    };
+}
+
 // Parses a percentage token from the targets summary ("55%" → 55). Returns null for
 // the placeholders the backend emits when a value is unavailable ("<unknown>", "auto").
 function parsePercent(token: string): number | null {
@@ -88,10 +105,15 @@ export function metricLevel(percent: number | null): ThresholdLevel {
     return "ok";
 }
 
+// The replica fields the scale helpers below read. Narrowing to these lets the same
+// helpers serve the autoscalers table (a HorizontalPodAutoscaler) and the HPA detail page
+// (a HorizontalPodAutoscalerDetail), rather than one of them growing a second copy.
+export type HpaReplicas = Pick<HorizontalPodAutoscaler, "currentReplicas" | "desiredReplicas" | "maxReplicas">;
+
 // How much of its maximum scale the HPA is currently using (current replicas as a
 // percentage of maxReplicas), so a nearly-maxed-out autoscaler is visible at a glance.
 // Null when maxReplicas is not reported, so the bar renders empty.
-export function replicaPercent(hpa: HorizontalPodAutoscaler): number | null {
+export function replicaPercent(hpa: HpaReplicas): number | null {
     if (hpa.maxReplicas <= 0) {
         return null;
     }
@@ -101,14 +123,14 @@ export function replicaPercent(hpa: HorizontalPodAutoscaler): number | null {
 // The replica summary shown beside the Replicas bar: current replicas over the replica
 // count the HPA is driving the target towards ("4/6" while a scale-up is in flight,
 // "4/4" once settled).
-export function formatReplicas(hpa: HorizontalPodAutoscaler): string {
+export function formatReplicas(hpa: HpaReplicas): string {
     return `${hpa.currentReplicas}/${hpa.desiredReplicas}`;
 }
 
 // Classifies an HPA's scale: maxed out (critical, it cannot scale up any further),
 // mid-scale with current and desired disagreeing (warn, a scale-up or scale-down is in
 // flight), or settled within its bounds (ok).
-export function replicaLevel(hpa: HorizontalPodAutoscaler): ThresholdLevel {
+export function replicaLevel(hpa: HpaReplicas): ThresholdLevel {
     if (hpa.maxReplicas > 0 && hpa.currentReplicas >= hpa.maxReplicas) {
         return "critical";
     }

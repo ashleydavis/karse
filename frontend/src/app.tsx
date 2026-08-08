@@ -11,6 +11,7 @@ import { DeploymentsPage } from "./pages/deployments";
 import { StatefulSetsPage } from "./pages/statefulsets";
 import { DaemonSetsPage } from "./pages/daemonsets";
 import { AutoscalersPage } from "./pages/autoscalers";
+import { AutoscalerDetailPage } from "./pages/autoscaler-detail";
 import { EventsPage } from "./pages/events";
 import { EventDetailPage } from "./pages/event-detail";
 import { ErrorsPage } from "./pages/errors";
@@ -55,6 +56,7 @@ export function App() {
                 <Route path="daemonsets" element={<DaemonSetsPage />} />
                 <Route path="daemonsets/:namespace/:name" element={<WorkloadDetailPage kind="daemonsets" />} />
                 <Route path="autoscalers" element={<AutoscalersPage />} />
+                <Route path="autoscalers/:namespace/:name" element={<AutoscalerDetailPage />} />
                 {/*
                   The generic detail page, for a kind with no purpose-built page of its
                   own. The cluster-scoped form carries no namespace segment, the

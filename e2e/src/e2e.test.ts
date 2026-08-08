@@ -2786,6 +2786,151 @@ test.describe("karse e2e", () => {
         });
     });
 
+    test.describe("autoscaler detail page", () => {
+        // Two HPAs: one reporting a cpu metric against its target, and one with no metric
+        // status yet, whose scale target the fixture never creates. Both are served from
+        // route mocks so the page's states are exercised without a metrics server.
+        const DETAIL_AUTOSCALERS = {
+            horizontalPodAutoscalers: [
+                {
+                    name: "nginx", namespace: "default", reference: "Deployment/nginx",
+                    minReplicas: 2, maxReplicas: 10, currentReplicas: 4, desiredReplicas: 6,
+                    targets: "cpu: 40%/80%", createdAt: new Date().toISOString(), labels: { app: "nginx" },
+                },
+                {
+                    name: "pending", namespace: "default", reference: "Deployment/ghost",
+                    minReplicas: 1, maxReplicas: 5, currentReplicas: 1, desiredReplicas: 1,
+                    targets: "<none>", createdAt: new Date().toISOString(), labels: {},
+                },
+            ],
+        };
+        const NGINX_DETAIL = {
+            name: "nginx", namespace: "default", reference: "Deployment/nginx",
+            minReplicas: 2, maxReplicas: 10, currentReplicas: 4, desiredReplicas: 6,
+            createdAt: new Date().toISOString(), labels: { app: "nginx" },
+            annotations: { "karse.test/purpose": "autoscaler detail" },
+            metrics: [{ name: "cpu", current: 40, target: 80 }],
+            conditions: [
+                {
+                    type: "AbleToScale", status: "True", reason: "ReadyForNewScale",
+                    message: "recommended size matches current size",
+                    lastTransitionTime: new Date().toISOString(),
+                },
+            ],
+        };
+        // An HPA with no metric status yet, whose scale target no longer exists: the two
+        // degraded cases the page must render readably rather than blank.
+        const PENDING_DETAIL = {
+            name: "pending", namespace: "default", reference: "Deployment/ghost",
+            minReplicas: 1, maxReplicas: 5, currentReplicas: 1, desiredReplicas: 1,
+            createdAt: new Date().toISOString(), labels: {}, annotations: {},
+            metrics: [], conditions: [],
+        };
+        const GHOST_WORKLOAD_DETAIL = {
+            kind: "deployments", name: "nginx", namespace: "default", createdAt: new Date().toISOString(),
+            labels: { app: "nginx" }, selector: { app: "nginx" },
+            stats: [{ label: "Ready", value: "4/4" }], pods: [], events: [],
+        };
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/deployments/**", async (route) => {
+                await route.fulfill({ json: GHOST_WORKLOAD_DETAIL });
+            });
+            await page.route("**/api/horizontalpodautoscalers*", async (route) => {
+                await route.fulfill({ json: DETAIL_AUTOSCALERS });
+            });
+            // Registered after the list route so it wins for the detail paths, which the
+            // list glob also matches.
+            await page.route("**/api/horizontalpodautoscalers/**", async (route) => {
+                const detail = route.request().url().includes("/pending") ? PENDING_DETAIL : NGINX_DETAIL;
+                await route.fulfill({ json: detail });
+            });
+            await page.goto("/autoscalers", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='autoscalers-table']")).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/horizontalpodautoscalers/**");
+            await page.unroute("**/api/horizontalpodautoscalers*");
+            await page.unroute("**/api/deployments/**");
+        });
+
+        test("clicking an autoscaler row opens its detail page", async () => {
+            await page.locator("[data-test-id='autoscaler-row']").first().click();
+            await expect(page).toHaveURL(/\/autoscalers\/default\/nginx/);
+            await expect(page.locator("[data-test-id='autoscaler-detail']")).toBeVisible();
+            await expect(page.getByRole("heading", { name: "nginx" })).toBeVisible();
+            await expect(page.locator("[data-test-id='autoscaler-detail-kind-chip']")).toHaveText("HorizontalPodAutoscaler");
+        });
+
+        test("the page shows the scale target, bounds, replicas and metric", async () => {
+            await expect(page.locator("[data-test-id='autoscaler-detail-reference']")).toHaveText("Deployment/nginx");
+            await expect(page.locator("[data-test-id='autoscaler-stat'][data-stat='min replicas']")).toContainText("2");
+            await expect(page.locator("[data-test-id='autoscaler-stat'][data-stat='max replicas']")).toContainText("10");
+            await expect(page.locator("[data-test-id='autoscaler-detail-replicas-value']")).toHaveText("4/6");
+            await expect(page.locator("[data-test-id='autoscaler-detail-targets-value']")).toHaveText("cpu 40%/80%");
+            await expect(page.locator("[data-test-id='autoscaler-metric-row']")).toHaveCount(1);
+        });
+
+        test("the page shows the autoscaler's conditions and annotations", async () => {
+            await expect(page.locator("[data-test-id='autoscaler-condition-row']")).toHaveCount(1);
+            await expect(page.locator("[data-test-id='autoscaler-condition-row']")).toContainText("AbleToScale");
+            await expect(page.locator("[data-test-id='autoscaler-condition-row']")).toContainText("ReadyForNewScale");
+            await expect(page.locator("[data-test-id='autoscaler-annotation-row'] td:first-child")
+                .filter({ hasText: "karse.test/purpose" })).toHaveCount(1);
+        });
+
+        test("the breadcrumb trail shows the route taken from Autoscalers and returns to it", async () => {
+            const crumbs = page.locator("[data-test-id='breadcrumbs'] [data-test-id='breadcrumb-item']");
+            await expect(crumbs).toHaveText(["Autoscalers", "nginx"]);
+            await crumbs.first().click();
+            await expect(page).toHaveURL(/\/autoscalers(\?|$)/);
+        });
+
+        test("the Labels, Commands and YAML sub tabs are present and populated", async () => {
+            await page.goto("/autoscalers/default/nginx", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='autoscaler-tab-labels']").click();
+            await expect(page.locator("[data-test-id='labels-tab']")).toContainText("app");
+            await page.locator("[data-test-id='autoscaler-tab-commands']").click();
+            await expect(page.locator("[data-test-id='commands-tab']")).toContainText("kubectl describe hpa nginx");
+            await page.locator("[data-test-id='autoscaler-tab-yaml']").click();
+            await expect(page.locator("[data-test-id='autoscaler-panel-yaml']")).toBeVisible();
+        });
+
+        test("the scale-target reference navigates to the target workload's detail page", async () => {
+            await page.goto("/autoscalers/default/nginx", { waitUntil: "networkidle" });
+            await page.locator("a[data-test-id='autoscaler-detail-reference']").click();
+            await expect(page).toHaveURL(/\/deployments\/default\/nginx/);
+            await expect(page.locator("[data-test-id='workload-detail']")).toBeVisible();
+        });
+
+        test("an autoscaler with no metric status yet renders readably", async () => {
+            await page.goto("/autoscalers/default/pending", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='autoscaler-detail']")).toBeVisible();
+            await expect(page.locator("[data-test-id='autoscaler-detail-targets-value']")).toHaveText("<none>");
+            await expect(page.locator("[data-test-id='no-autoscaler-metrics']")).toBeVisible();
+            await expect(page.locator("[data-test-id='no-autoscaler-conditions']")).toBeVisible();
+            await expect(page.locator("[data-test-id='no-autoscaler-annotations']")).toBeVisible();
+        });
+
+        test("a scale target that no longer exists still reads as its reference", async () => {
+            // The Deployment "ghost" was never created, so the reference is still a link
+            // (the kind resolves) but the page it opens is the target's own, not a crash.
+            await expect(page.locator("[data-test-id='autoscaler-detail-reference']")).toHaveText("Deployment/ghost");
+        });
+    });
+
+    test.describe("autoscaler detail page not found", () => {
+        test("a name that does not exist renders a clear not-found message", async () => {
+            setContext(CLUSTER_1);
+            await page.goto("/autoscalers/default/no-such-hpa", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='autoscaler-detail-not-found']")).toBeVisible();
+            await expect(page.locator("[data-test-id='autoscaler-detail-not-found']")).toContainText("no-such-hpa");
+            await expect(page.locator("[data-test-id='autoscaler-detail']")).toHaveCount(0);
+        });
+    });
+
     test.describe("autoscalers page empty state", () => {
         test.beforeAll(async () => {
             setContext(CLUSTER_1);
@@ -9564,8 +9709,14 @@ test.describe("karse e2e", () => {
             kind: "deployments", name: "web-deploy", namespace: "default", createdAt: new Date().toISOString(),
             labels: { app: "web" }, selector: { app: "web" }, stats: [{ label: "Ready", value: "1/1" }], pods: [], events: [],
         };
-        // The generic detail payload for the HPA row, which has no page of its own and so
-        // opens the generic detail page.
+        // The HPA row's detail payload. The HPA has a page of its own, so this is what
+        // that page fetches when the row is opened.
+        const FAKE_HPA_DETAIL = {
+            name: "web-hpa", namespace: "default", reference: "Deployment/web-deploy",
+            minReplicas: 1, maxReplicas: 10, currentReplicas: 3, desiredReplicas: 3,
+            createdAt: new Date().toISOString(), labels: { app: "web" }, annotations: {},
+            metrics: [{ name: "cpu", current: 40, target: 80 }], conditions: [],
+        };
         const FAKE_RESOURCE_DETAIL = {
             type: "horizontalpodautoscalers", kind: "HorizontalPodAutoscaler", name: "web-hpa",
             namespace: "default", createdAt: new Date().toISOString(),
@@ -9594,6 +9745,9 @@ test.describe("karse e2e", () => {
             await page.route("**/api/statefulsets*", async (route) => { await route.fulfill({ json: FAKE_STATEFULSETS }); });
             await page.route("**/api/daemonsets*", async (route) => { await route.fulfill({ json: FAKE_DAEMONSETS }); });
             await page.route("**/api/horizontalpodautoscalers*", async (route) => { await route.fulfill({ json: FAKE_HPAS }); });
+            // Registered after the list route so it wins for the detail path, which the
+            // list glob also matches.
+            await page.route("**/api/horizontalpodautoscalers/**", async (route) => { await route.fulfill({ json: FAKE_HPA_DETAIL }); });
             await page.route("**/api/resource/**", async (route) => { await route.fulfill({ json: FAKE_RESOURCE_DETAIL }); });
             await page.goto("/all-resources", { waitUntil: "networkidle" });
             await expect(page.locator("[data-test-id='all-resources-table']")).toBeVisible();
@@ -9609,6 +9763,7 @@ test.describe("karse e2e", () => {
             await page.unroute("**/api/statefulsets*");
             await page.unroute("**/api/daemonsets*");
             await page.unroute("**/api/horizontalpodautoscalers*");
+            await page.unroute("**/api/horizontalpodautoscalers/**");
             await page.unroute("**/api/resource/**");
             setContext(CLUSTER_1);
         });
@@ -9700,15 +9855,19 @@ test.describe("karse e2e", () => {
             await expect((await rows()).first()).toBeVisible();
         });
 
-        test("a row of a kind with no page of its own opens the generic detail page", async () => {
-            // The HorizontalPodAutoscaler row used to be dead text: no HPA detail page
-            // existed, so resourcePath returned null and the row was not clickable. It now
-            // falls back to the generic route and shows the resource there.
+        test("an HPA row opens the HPA's own detail page, not the generic one", async () => {
+            // The precedence rule, asserted through the UI: HorizontalPodAutoscaler has a
+            // purpose-built page, so the All resources row opens that rather than the
+            // generic /resources route the kind used to fall back to.
             await page.locator("[data-test-id='all-resource-row']", { hasText: "web-hpa" }).click();
-            await expect(page).toHaveURL(/\/resources\/horizontalpodautoscalers\/default\/web-hpa/);
-            await expect(page.locator("[data-test-id='resource-detail']")).toBeVisible();
+            await expect(page).toHaveURL(/\/autoscalers\/default\/web-hpa/);
+            await expect(page.locator("[data-test-id='autoscaler-detail']")).toBeVisible();
+            await expect(page.locator("[data-test-id='resource-detail']")).toHaveCount(0);
             await expect(page.getByRole("heading", { name: "web-hpa" })).toBeVisible();
-            await expect(page.locator("[data-test-id='resource-detail-kind-chip']")).toHaveText("HorizontalPodAutoscaler");
+            await expect(page.locator("[data-test-id='autoscaler-detail-kind-chip']")).toHaveText("HorizontalPodAutoscaler");
+            // Reached from All resources, so the trail starts there.
+            await expect(page.locator("[data-test-id='breadcrumbs'] [data-test-id='breadcrumb-item']"))
+                .toHaveText(["All resources", "web-hpa"]);
             // Return to the page for any later tests.
             await page.goto("/all-resources", { waitUntil: "networkidle" });
             await expect((await rows()).first()).toBeVisible();

@@ -22,6 +22,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSort, faSortDown, faSortUp } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { HorizontalPodAutoscaler } from "karse-types";
+import { useShareableNavigate, useOriginTag } from "../../../lib/nav-state";
 import { useKubeContext } from "../../../lib/kube-context";
 import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { fetchHorizontalPodAutoscalers } from "../../../lib/api-client";
@@ -39,27 +40,10 @@ import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { useSearchFilter } from "../../../lib/use-search-filter";
 import {
     parseHpaTargets, metricPercent, metricLevel, formatHpaMetrics,
-    replicaPercent, replicaLevel, formatReplicas,
+    replicaPercent, replicaLevel, formatReplicas, splitHpaReference,
 } from "../../../lib/autoscalers";
 import { Timestamp } from "../../../components/timestamp";
 import { SearchBox } from "../../../components/search-box";
-
-// Splits an HPA's scale target reference ("Deployment/web") into its kind and name so
-// the Reference cell can link to that workload's own detail page. Returns empty strings
-// when the reference is absent or malformed, which ResourceRef renders as plain text.
-function splitReference(reference: string): { kind: string; name: string } {
-    const slash = reference.indexOf("/");
-    if (slash === -1) {
-        return {
-            kind: "",
-            name: reference,
-        };
-    }
-    return {
-        kind: reference.slice(0, slash),
-        name: reference.slice(slash + 1),
-    };
-}
 
 // Column definitions for the autoscalers table. Targets and Replicas are the two
 // performance columns: each renders the shared table bar (fill plus a monospace value)
@@ -82,9 +66,12 @@ const columns: ColumnDef<HorizontalPodAutoscaler>[] = [
         accessorKey: "namespace",
         header: "Namespace",
         // The autoscaler's namespace links to its own detail page, like the scale-target
-        // reference beside it.
+        // reference beside it. The row navigates to the autoscaler, so the link stops its
+        // click from bubbling up to the row.
         cell: (info) => (
-            <ResourceRef kind="Namespace" name={info.getValue<string>()} testId="autoscaler-row-namespace-link" />
+            <span onClick={(e) => e.stopPropagation()}>
+                <ResourceRef kind="Namespace" name={info.getValue<string>()} testId="autoscaler-row-namespace-link" />
+            </span>
         ),
     },
     {
@@ -92,15 +79,19 @@ const columns: ColumnDef<HorizontalPodAutoscaler>[] = [
         accessorKey: "reference",
         header: "Reference",
         cell: (info) => {
-            const { kind, name } = splitReference(info.row.original.reference);
+            const { kind, name } = splitHpaReference(info.row.original.reference);
+            // The reference links to the scale target, so its click must not also
+            // navigate the row to the autoscaler.
             return (
-                <ResourceRef
-                    kind={kind}
-                    name={name}
-                    namespace={info.row.original.namespace}
-                    label={info.row.original.reference}
-                    testId="autoscaler-reference"
-                />
+                <span onClick={(e) => e.stopPropagation()}>
+                    <ResourceRef
+                        kind={kind}
+                        name={name}
+                        namespace={info.row.original.namespace}
+                        label={info.row.original.reference}
+                        testId="autoscaler-reference"
+                    />
+                </span>
             );
         },
     },
@@ -169,6 +160,10 @@ const columns: ColumnDef<HorizontalPodAutoscaler>[] = [
 export function AutoscalersTable() {
     const { current } = useKubeContext();
     const { namespace } = useKubeNamespace();
+    const navigate = useShareableNavigate();
+    // Tags each row link with this page, so the HPA detail page's breadcrumb shows the
+    // trail the user actually took and its origin crumb links back here.
+    const from = useOriginTag();
 
     const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["horizontalpodautoscalers", current, namespace],
@@ -280,7 +275,11 @@ export function AutoscalersTable() {
                             <TableRow
                                 key={row.id}
                                 data-test-id="autoscaler-row"
-                                sx={tableRowSx(false)}
+                                sx={tableRowSx(true)}
+                                onClick={() => navigate(
+                                    `/autoscalers/${row.original.namespace}/${row.original.name}`,
+                                    { from },
+                                )}
                             >
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell key={cell.id}>

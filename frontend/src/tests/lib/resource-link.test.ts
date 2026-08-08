@@ -43,8 +43,6 @@ describe("resourcePath", () => {
         expect(resourcePath("ReplicaSet", "web-7d9", "default")).toBe("/resources/replicasets/default/web-7d9");
         expect(resourcePath("Job", "backup", "default")).toBe("/resources/jobs/default/backup");
         expect(resourcePath("Service", "web", "default")).toBe("/resources/services/default/web");
-        expect(resourcePath("HorizontalPodAutoscaler", "web-hpa", "default"))
-            .toBe("/resources/horizontalpodautoscalers/default/web-hpa");
     });
 
     test("falls back to the generic route with no namespace segment for a cluster-scoped kind", () => {
@@ -58,7 +56,7 @@ describe("resourcePath", () => {
     });
 
     test("a kind with its own detail page never resolves to the generic route", () => {
-        // The precedence rule: the six purpose-built pages always win. Asserted here so it
+        // The precedence rule: the purpose-built pages always win. Asserted here so it
         // is a checked property rather than a consequence of the order two branches are
         // written in.
         const withOwnPage: [string, string, string][] = [
@@ -68,6 +66,7 @@ describe("resourcePath", () => {
             ["Deployment", "web", "prod"],
             ["StatefulSet", "db", "data"],
             ["DaemonSet", "agent", "kube-system"],
+            ["HorizontalPodAutoscaler", "web-hpa", "default"],
         ];
         for (const [kind, name, namespace] of withOwnPage) {
             const path = resourcePath(kind, name, namespace);
