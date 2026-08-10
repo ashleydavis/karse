@@ -38,6 +38,7 @@ bash docs/testing-manual/_fixtures-kwok/13-two-contexts/teardown.sh
 2. On the All clusters page, expect the **Clusters** table to have one row per context in your kubeconfig (two, with the fixture), not just the active one.
 3. Expect each row to show its context name, the cluster it points at, that cluster's node count, and CPU and memory bars.
 4. Expect the **Clusters** card to read the number of configured contexts and the **Nodes** card to read the sum of the per-row node counts.
+5. Expect the rows to sit under one or more shaded environment heading rows (with this fixture, a single **Unassigned** heading, because the kwok context names carry no environment token). Those headings are checked in sections 12 to 15 below.
 
 ## 3. Rows arrive progressively, with the shared loading indicator
 
@@ -131,3 +132,56 @@ kwok clusters have no metrics server, so with the fixture running as above every
    ```
 
 2. Expect every entry from the page load to be `config view` or a `get` command. Expect no `apply`, `create`, `delete`, `patch`, `scale`, or any other mutating verb.
+
+## 12. The table is broken into environment sections
+
+Rebuild the two-context fixture first if you tore it down in section 9 or replaced it in section 10:
+
+```sh
+bash docs/testing-manual/_fixtures-kwok/14-many-contexts/teardown.sh
+bash docs/testing-manual/_fixtures-kwok/13-two-contexts/setup.sh
+```
+
+The fixture's context names carry no environment token, so both clusters start in one **Unassigned** section. Labelling one of them is what produces a second section.
+
+1. On All clusters, expect a single shaded heading row reading **Unassigned**, followed by both cluster rows.
+2. Expect that heading to also carry `2 clusters`, the summed node count of the two rows (`N nodes`), and a `CPU` and a `Memory` figure.
+3. Go to the **Contexts** page and set the **Environment** selector on the first context to **Production**.
+4. Return to All clusters **without reloading or restarting**: the section split must follow the label immediately.
+5. Expect two heading rows now: **Production** first, **Unassigned** second, with that context's row under Production and the other under Unassigned.
+6. Expect the **Production** heading to read `1 cluster` and that cluster's own node count, and the **Unassigned** heading to read `1 cluster` and the other cluster's node count.
+
+## 13. The sections add up to the totals
+
+1. With the two sections from section 12 on screen, add up the node counts in the two headings.
+2. Expect the sum to equal the **Nodes** card at the top of the page.
+3. Expect each heading's cluster count to add up to the **Clusters** card.
+4. Click **Requests** in the **Usage | Requests** toggle. Expect each heading's CPU and Memory figures to switch with the cards, and each section's figures to describe only that section's clusters, not the whole page (with the fixture, the two sections show different figures).
+5. Switch back to **Usage**.
+
+## 14. Relabelling moves a cluster and its numbers
+
+1. On the **Contexts** page, change the same context's **Environment** from **Production** to **Staging**.
+2. Return to All clusters. Expect the **Production** section to be gone entirely (an environment with no clusters gets no heading) and a **Staging** section in its place, carrying the same cluster count and node count Production had.
+3. On the **Contexts** page, set that context back to **Auto (from name)**.
+4. Return to All clusters. Expect one **Unassigned** section again, holding both clusters, with the two node counts recombined into one total.
+
+## 15. An unreachable cluster in a section
+
+1. Add a kubeconfig context pointing at a server that is not there:
+
+   ```sh
+   kubectl config set-cluster karse-dead --server=https://127.0.0.1:1
+   kubectl config set-context karse-dead --cluster=karse-dead --user=karse-dead
+   ```
+
+2. Reload All clusters. `karse-dead` matches no environment token, so expect its error row inside the **Unassigned** section rather than in a section of its own or outside the sections.
+3. Expect the **Unassigned** heading to count it (`3 clusters`) but exclude it from the node count and the CPU and memory figures, which must be unchanged from before it was added.
+4. Expect the heading to carry a red `Covers 2 of 3 clusters` note saying how many of that environment's clusters the numbers actually cover.
+5. Label the first context **Production** on the **Contexts** page and return. Expect the **Production** heading to carry **no** coverage note: it is fully covered, and only a section that is short says so.
+6. Set that context back to **Auto (from name)** and remove the dead context:
+
+   ```sh
+   kubectl config delete-context karse-dead
+   kubectl config delete-cluster karse-dead
+   ```

@@ -11587,4 +11587,199 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='stat-nodes']")).toContainText(String(CLUSTER_2_NODES));
         });
     });
+
+    test.describe("multi-cluster overview by environment", () => {
+        // The overview breaks its clusters into a section per environment. kwokctl names its
+        // contexts kwok-karse-e2e-<run>-N, which carries no environment token at all, so both
+        // real clusters infer to Unassigned. Labelling one of them through the contexts page
+        // (the only place labels are set) is therefore what produces two different
+        // environments here; a fixture whose names inferred would not exercise the labelling
+        // path this ticket also needs, and leaving both in Unassigned would prove nothing.
+        const CLUSTER_1_NODES = 3;
+        const CLUSTER_2_NODES = 2;
+
+        // Opens the overview and blocks until the stream has finished and the totals rendered.
+        async function navigateToClusters(): Promise<void> {
+            await page.goto("/clusters", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='clusters-total-clusters']")).toBeVisible();
+            await expect(page.locator("[data-test-id='loading-indicator']")).toHaveCount(0);
+        }
+
+        // Sets (or with "auto" clears) a context's environment label on the contexts page,
+        // which is where labels are set, then returns to the freshly rendered overview.
+        async function labelContext(contextName: string, value: string): Promise<void> {
+            await page.goto("/contexts", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='context-row']")).toHaveCount(2);
+            await page.locator(`[data-test-id='context-environment-select'][data-context='${contextName}']`).click();
+            await page.locator(`[data-value="${value}"]`).click();
+            await expect(page.locator(`[data-value="${value}"]`)).toHaveCount(0);
+        }
+
+        // The environment section headings the overview renders, top to bottom.
+        async function sectionHeadings(): Promise<string[]> {
+            return page
+                .locator("[data-test-id='clusters-table'] [data-test-id='cluster-environment-group-label']")
+                .allTextContents();
+        }
+
+        // One environment's section, located by the environment it heads.
+        function section(environment: string) {
+            return page.locator(`[data-test-id='cluster-environment-group'][data-environment='${environment}']`);
+        }
+
+        // The environment of the section heading a cluster's row currently sits under, read by
+        // walking the table body in DOM order. Returns null when the context has no row.
+        async function sectionOf(contextName: string): Promise<string | null> {
+            return page.locator("[data-test-id='clusters-table'] tbody tr").evaluateAll((rows, name) => {
+                let heading: string | null = null;
+                for (const row of rows) {
+                    const environment = row.getAttribute("data-environment");
+                    if (environment !== null) {
+                        heading = environment;
+                        continue;
+                    }
+                    const cell = row.querySelector("td");
+                    if (cell !== null && (cell.textContent ?? "").trim() === name) {
+                        return heading;
+                    }
+                }
+                return null;
+            }, contextName);
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+        });
+
+        test.afterAll(async () => {
+            // Drop the label this block wrote, leaving the other UI settings alone.
+            await page.evaluate(() => {
+                const raw = window.localStorage.getItem("karse-config");
+                if (raw === null) {
+                    return;
+                }
+                const config = JSON.parse(raw);
+                delete config.contextEnvironments;
+                window.localStorage.setItem("karse-config", JSON.stringify(config));
+            });
+            setContext(CLUSTER_1);
+        });
+
+        test("puts both unlabelled clusters in one Unassigned section", async () => {
+            await navigateToClusters();
+            expect(await sectionHeadings()).toEqual(["Unassigned"]);
+            await expect(section("unassigned").locator("[data-test-id='cluster-environment-group-clusters']"))
+                .toHaveText("2 clusters");
+            expect(await sectionOf(CLUSTER_1)).toBe("unassigned");
+            expect(await sectionOf(CLUSTER_2)).toBe("unassigned");
+        });
+
+        test("splits into two environment sections once a cluster is labelled", async () => {
+            await labelContext(CLUSTER_1, "production");
+            await navigateToClusters();
+            // Production first, unassigned last: the same fixed order the contexts page uses.
+            expect(await sectionHeadings()).toEqual(["Production", "Unassigned"]);
+            expect(await sectionOf(CLUSTER_1)).toBe("production");
+            expect(await sectionOf(CLUSTER_2)).toBe("unassigned");
+        });
+
+        test("gives each section its own cluster and node counts", async () => {
+            await expect(section("production").locator("[data-test-id='cluster-environment-group-clusters']"))
+                .toHaveText("1 cluster");
+            await expect(section("production").locator("[data-test-id='cluster-environment-group-nodes']"))
+                .toHaveText(`${CLUSTER_1_NODES} nodes`);
+            await expect(section("unassigned").locator("[data-test-id='cluster-environment-group-clusters']"))
+                .toHaveText("1 cluster");
+            await expect(section("unassigned").locator("[data-test-id='cluster-environment-group-nodes']"))
+                .toHaveText(`${CLUSTER_2_NODES} nodes`);
+        });
+
+        test("the section node counts add up to the grand total", async () => {
+            const counts = await page
+                .locator("[data-test-id='cluster-environment-group-nodes']")
+                .allTextContents();
+            const summed = counts.reduce((total, text) => total + Number(text.split(" ")[0]), 0);
+            expect(summed).toBe(CLUSTER_1_NODES + CLUSTER_2_NODES);
+            await expect(page.locator("[data-test-id='clusters-total-nodes']"))
+                .toContainText(String(CLUSTER_1_NODES + CLUSTER_2_NODES));
+        });
+
+        test("each section reports its own aggregate CPU and memory", async () => {
+            // The kwok clusters have no metrics entry for every node, so live usage is
+            // unknown and must read as an em-dash, never a fabricated 0%.
+            await expect(section("production").locator("[data-test-id='cluster-environment-group-cpu']"))
+                .toHaveText("CPU —");
+            // Requests come from pod specs and node status, so they are real figures.
+            await page.locator("[data-test-id='util-view-mode-requests']").click();
+            await expect(section("production").locator("[data-test-id='cluster-environment-group-cpu']"))
+                .toContainText("%");
+            await expect(section("production").locator("[data-test-id='cluster-environment-group-memory']"))
+                .toContainText("%");
+            // Cluster 1 carries every pod in the fixture and cluster 2 none, so the two
+            // sections must not report the same figure: each is aggregated over its own
+            // clusters, not handed the page's grand total.
+            const productionCpu = await section("production")
+                .locator("[data-test-id='cluster-environment-group-cpu']").textContent();
+            const unassignedCpu = await section("unassigned")
+                .locator("[data-test-id='cluster-environment-group-cpu']").textContent();
+            expect(productionCpu).not.toBe(unassignedCpu);
+            await page.locator("[data-test-id='util-view-mode-usage']").click();
+        });
+
+        test("a cluster row still links through from its section", async () => {
+            await section("unassigned")
+                .locator("xpath=following-sibling::tr[@data-test-id='cluster-row'][1]")
+                .click();
+            await expect(page).toHaveURL(new RegExp(`/cluster\\?context=${CLUSTER_2}`));
+            await waitForStatTiles();
+            await expect(page.locator("[data-test-id='stat-nodes']")).toContainText(String(CLUSTER_2_NODES));
+        });
+
+        test("relabelling a cluster moves it and its numbers into the other section", async () => {
+            await labelContext(CLUSTER_1, "staging");
+            await navigateToClusters();
+            expect(await sectionHeadings()).toEqual(["Staging", "Unassigned"]);
+            expect(await sectionOf(CLUSTER_1)).toBe("staging");
+            await expect(section("staging").locator("[data-test-id='cluster-environment-group-nodes']"))
+                .toHaveText(`${CLUSTER_1_NODES} nodes`);
+            await expect(section("unassigned").locator("[data-test-id='cluster-environment-group-nodes']"))
+                .toHaveText(`${CLUSTER_2_NODES} nodes`);
+        });
+
+        test("an unreachable cluster is reported in its section and left out of its totals", async () => {
+            // A kubeconfig entry pointing at a port nothing listens on: a real unreachable
+            // API server, without tearing down one of the kwok clusters. Its name carries no
+            // environment token, so it lands in Unassigned beside cluster 2.
+            execSync("kubectl config set-cluster karse-e2e-dead --server=https://127.0.0.1:1", { stdio: "ignore" });
+            execSync("kubectl config set-context karse-e2e-dead --cluster=karse-e2e-dead --user=karse-e2e-dead", { stdio: "ignore" });
+            try {
+                await navigateToClusters();
+                expect(await sectionOf("karse-e2e-dead")).toBe("unassigned");
+                await expect(page.locator("[data-test-id='cluster-row-error']")).toBeVisible();
+                await expect(section("unassigned").locator("[data-test-id='cluster-environment-group-clusters']"))
+                    .toHaveText("2 clusters");
+                // The dead cluster contributes no nodes, and the section says so.
+                await expect(section("unassigned").locator("[data-test-id='cluster-environment-group-nodes']"))
+                    .toHaveText(`${CLUSTER_2_NODES} nodes`);
+                await expect(section("unassigned").locator("[data-test-id='cluster-environment-group-coverage']"))
+                    .toHaveText("Covers 1 of 2 clusters");
+                // The staging section is fully covered, so it states no shortfall.
+                await expect(section("staging").locator("[data-test-id='cluster-environment-group-coverage']"))
+                    .toHaveCount(0);
+            }
+            finally {
+                execSync("kubectl config delete-context karse-e2e-dead", { stdio: "ignore" });
+                execSync("kubectl config delete-cluster karse-e2e-dead", { stdio: "ignore" });
+            }
+        });
+
+        test("clearing the label returns the cluster to the Unassigned section", async () => {
+            await labelContext(CLUSTER_1, "auto");
+            await navigateToClusters();
+            expect(await sectionHeadings()).toEqual(["Unassigned"]);
+            expect(await sectionOf(CLUSTER_1)).toBe("unassigned");
+            await expect(section("unassigned").locator("[data-test-id='cluster-environment-group-nodes']"))
+                .toHaveText(`${CLUSTER_1_NODES + CLUSTER_2_NODES} nodes`);
+        });
+    });
 });

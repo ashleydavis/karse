@@ -227,6 +227,7 @@ Notes:
 - `contextCount` is every configured context; `coveredCount` is how many the totals actually include and `failedCount` how many could not be read, so a total over 3 of 5 clusters cannot be misread as covering all 5.
 - The totals are summed **absolutes** (`usage`, `requests`, `allocatable`) across the covered clusters, never an average of their percentages: capacity is what weighs a cluster. A `null` usage on any covered cluster makes the aggregate usage `null` (unknown), not smaller.
 - Each context's read is the same `getClusterPerformance` call `GET /api/cluster/performance` makes, so it shares the on-disk cluster cache. At most 4 contexts are queried at once and each is bounded by a 20s timeout.
+- **The per-environment breakdown is folded from these same events, client-side.** The environment labels live only in the browser's `karse-config` local-storage entry, so the backend cannot see them: this endpoint takes no environment parameter, emits no per-environment payload, and has no environment-aware variant. The page groups the `cluster` events by the environment each `context` resolves to and re-runs the same `aggregateClusters` fold per group. Every context therefore appears in exactly one `cluster` event, which is what lets the sections add up to the `totals` event.
 
 ## GET /api/namespaces
 

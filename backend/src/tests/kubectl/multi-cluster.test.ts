@@ -4,9 +4,9 @@ jest.mock("../../kubectl/cache");
 
 import type { CommandResult } from "../../command-runner";
 import type { ClusterSummary } from "karse-types";
+import { aggregateClusters } from "karse-types";
 import {
     getClusterSummary,
-    aggregateClusters,
     streamMultiClusterOverview,
 } from "../../kubectl/multi-cluster";
 

@@ -63,7 +63,8 @@ They are always rendered in exactly that order: **production first** so the risk
 - **Contexts page** (`/contexts`): the table body is split into one group per environment, each introduced by a heading row naming the environment and the number of contexts in it. Sorting and the search box run over the whole table first, so a group holds only the rows that survived them, in the sorted order; a search that hides every context in an environment hides that environment's heading too. The Environment column itself is sortable and searchable on the environment's heading text.
 - **Header dropdown**: the context `Select` in the top bar lists its entries under one subheading per environment, in the same order.
 - **`Ctrl+K` quick-picker**: the same, under the same subheadings, applied after its own name/cluster filter.
-- All three call the same resolver module. There is no second copy of the rule.
+- **All clusters page** (`/clusters`): the multi-cluster overview's table is split the same way, each section additionally headed by that environment's cluster count, node count and aggregate utilisation. Those figures are [multi-cluster-overview](../multi-cluster-overview/detail.md)'s; what this feature supplies is which environment each context is in and the order the sections appear in.
+- All four call the same resolver module. There is no second copy of the rule.
 
 ### The active context's environment
 

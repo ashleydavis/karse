@@ -294,6 +294,22 @@ echo "$TOTALS_EVENT" | jq -e '.coveredCount == .contextCount' > /dev/null
 echo "$TOTALS_EVENT" | jq -e '.failedCount == 0' > /dev/null
 echo "$TOTALS_EVENT" | jq -e '.nodeCount >= 2' > /dev/null
 echo "$TOTALS_EVENT" | jq -e '.totals.allocatable.cpuMillicores != null and .totals.requests.cpuMillicores != null' > /dev/null
+# This same stream is what the per-environment breakdown is built from: the environment
+# labels live only in the browser's local storage, so the backend cannot group by them and
+# the frontend folds these per-cluster events into sections instead. That fold needs every
+# cluster event to carry a non-empty context name (the key it resolves an environment from)
+# and its own node count and absolute totals (what it re-aggregates per environment), so
+# check each event has them, not just the first.
+CLUSTER_EVENTS=$(echo "$CLUSTERS_RESP" | grep -A 1 "^event: cluster$" | grep "^data: " | cut -c 7-)
+[[ -n "$CLUSTER_EVENTS" ]]
+echo "$CLUSTER_EVENTS" | jq -se 'length >= 1' > /dev/null
+echo "$CLUSTER_EVENTS" | jq -se 'all(.context | type == "string" and length > 0)' > /dev/null
+echo "$CLUSTER_EVENTS" | jq -se 'all(has("nodeCount") and has("error") and (.totals.allocatable | has("cpuMillicores") and has("memoryBytes")))' > /dev/null
+# Every context appears exactly once, so no cluster can land in two environment sections
+# or in none, and the per-cluster node counts add up to the totals event's node count.
+echo "$CLUSTER_EVENTS" | jq -se '[.[].context] | length == (unique | length)' > /dev/null
+echo "$CLUSTER_EVENTS" | jq -se --argjson total "$(echo "$TOTALS_EVENT" | jq '.nodeCount')" \
+    '[.[] | select(.error == null) | .nodeCount] | add == $total' > /dev/null
 echo "OK"
 
 echo "--- GET /api/namespaces ---"

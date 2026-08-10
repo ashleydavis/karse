@@ -162,6 +162,17 @@ Underneath the cards, a line states how many clusters the totals actually cover,
 
 Below that, the **Clusters** table has one row per context, with its node count and its own CPU and memory bars, searchable and sortable like every other table. **Click a row to switch to that cluster**: it makes that context active and takes you to its cluster home page.
 
+### Broken down by environment
+
+The table is split into sections, one per environment, in the same order as the Contexts page: Production first, Unassigned last. Each section's heading carries that environment's own numbers, so you can read "how big is production" straight off the page:
+
+`Production   2 clusters   14 nodes   CPU 62%   Memory 48%`
+
+- The **environments come from the Contexts page**, exactly as they do everywhere else: a name Karse recognises, or a label you set yourself. Label a context there and it moves to that environment's section here immediately, along with its nodes and its share of the CPU and memory. No restart, no reload.
+- **The sections add up.** Each section's figures are worked out the same way as the totals at the top of the page, from summed absolute usage and capacity, so the sections always total to the **Across all clusters** cards.
+- **An environment with no clusters gets no section**, and the **Unassigned** section shows up only when you have contexts Karse could not place and you have not labelled.
+- **An unreachable cluster stays in its own environment's section** and its heading says how many of that environment's clusters the numbers actually cover, for example `Covers 1 of 2 clusters`.
+
 Things you will see:
 
 - **A cluster that cannot be reached** (VPN down, expired credentials, a stale context) shows as a row whose **Status** cell names the reason, with dashes instead of figures. The other clusters still report normally.

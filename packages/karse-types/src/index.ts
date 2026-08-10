@@ -649,3 +649,75 @@ export type MultiClusterTotals = {
     metricsAvailable: boolean;
     totals: ClusterResourceTotals;
 };
+
+// Adds one numeric field of two usage readings. A null on either side makes the sum
+// null: a total that is missing one cluster's contribution is unknown, not smaller.
+function addField(total: number | null, part: number | null): number | null {
+    if (total === null || part === null) {
+        return null;
+    }
+    return total + part;
+}
+
+// Adds two ResourceUsage readings field by field, propagating null as unknown.
+function addUsage(a: ResourceUsage, b: ResourceUsage): ResourceUsage {
+    return {
+        cpuMillicores: addField(a.cpuMillicores, b.cpuMillicores),
+        memoryBytes: addField(a.memoryBytes, b.memoryBytes),
+    };
+}
+
+// Totals a set of per-cluster summaries into the figures the multi-cluster overview shows.
+//
+// It lives in this shared package rather than in the backend because both sides fold with
+// it: the backend totals every configured context for the `totals` event of
+// GET /api/clusters/overview, and the frontend totals each environment's clusters for the
+// per-environment breakdown. One fold means an environment's figures and the grand total
+// are computed the same way and cannot drift apart.
+//
+// Aggregate utilisation is NOT an average of the per-cluster percentages: a 100-node
+// cluster and a 1-node cluster do not weigh the same. The absolute usage, requests and
+// allocatable capacity are summed across clusters and the percentage is derived from
+// those sums, so a cluster's weight is its actual capacity.
+//
+// Only clusters that were read contribute. coveredCount says how many that is, against
+// contextCount (every context handed in), so a total computed over 3 of 5 clusters
+// cannot be misread as covering all 5.
+export function aggregateClusters(summaries: readonly ClusterSummary[]): MultiClusterTotals {
+    const covered = summaries.filter((summary) => summary.error === null);
+    let usage: ResourceUsage = {
+        cpuMillicores: 0,
+        memoryBytes: 0,
+    };
+    let requests: ResourceUsage = {
+        cpuMillicores: 0,
+        memoryBytes: 0,
+    };
+    let allocatable: ResourceUsage = {
+        cpuMillicores: 0,
+        memoryBytes: 0,
+    };
+    let nodeCount = 0;
+    let metricsAvailable = true;
+    for (const summary of covered) {
+        usage = addUsage(usage, summary.totals.usage);
+        requests = addUsage(requests, summary.totals.requests);
+        allocatable = addUsage(allocatable, summary.totals.allocatable);
+        nodeCount += summary.nodeCount ?? 0;
+        if (!summary.metricsAvailable) {
+            metricsAvailable = false;
+        }
+    }
+    return {
+        contextCount: summaries.length,
+        coveredCount: covered.length,
+        failedCount: summaries.length - covered.length,
+        nodeCount,
+        metricsAvailable: covered.length > 0 && metricsAvailable,
+        totals: {
+            usage,
+            requests,
+            allocatable,
+        },
+    };
+}

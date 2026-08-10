@@ -1,5 +1,6 @@
+import { aggregateClusters } from "karse-types";
 import { listContexts, getClusterPerformance } from "./kubectl-adapter";
-import type { ClusterSummary, MultiClusterTotals, ClusterResourceTotals, ResourceUsage } from "karse-types";
+import type { ClusterSummary, MultiClusterTotals, ClusterResourceTotals } from "karse-types";
 
 // How many contexts are queried at once during the fan-out. A kubeconfig can hold
 // dozens of contexts and each one costs several kubectl invocations, so the fan-out is
@@ -51,23 +52,6 @@ function withTimeout<T>(promise: Promise<T>, ms: number, context: string): Promi
     });
 }
 
-// Adds one numeric field of two usage readings. A null on either side makes the sum
-// null: a total that is missing one cluster's contribution is unknown, not smaller.
-function addField(total: number | null, part: number | null): number | null {
-    if (total === null || part === null) {
-        return null;
-    }
-    return total + part;
-}
-
-// Adds two ResourceUsage readings field by field, propagating null as unknown.
-function addUsage(a: ResourceUsage, b: ResourceUsage): ResourceUsage {
-    return {
-        cpuMillicores: addField(a.cpuMillicores, b.cpuMillicores),
-        memoryBytes: addField(a.memoryBytes, b.memoryBytes),
-    };
-}
-
 // Reads one context's node count and cluster-wide CPU/memory totals, reusing exactly the
 // reads the cluster home page makes (GET /api/cluster/performance's adapter call), so the
 // fan-out shares the on-disk cluster cache with that page rather than issuing new queries.
@@ -99,55 +83,6 @@ export async function getClusterSummary(context: string, cluster: string): Promi
             totals: UNKNOWN_TOTALS,
         };
     }
-}
-
-// Totals the per-cluster summaries into the figures the overview page shows.
-//
-// Aggregate utilisation is NOT an average of the per-cluster percentages: a 100-node
-// cluster and a 1-node cluster do not weigh the same. The absolute usage, requests and
-// allocatable capacity are summed across clusters and the percentage is derived from
-// those sums, so a cluster's weight is its actual capacity.
-//
-// Only clusters that were read contribute. coveredCount says how many that is, against
-// contextCount (every configured context), so a total computed over 3 of 5 clusters
-// cannot be misread as covering all 5.
-export function aggregateClusters(summaries: readonly ClusterSummary[]): MultiClusterTotals {
-    const covered = summaries.filter((summary) => summary.error === null);
-    let usage: ResourceUsage = {
-        cpuMillicores: 0,
-        memoryBytes: 0,
-    };
-    let requests: ResourceUsage = {
-        cpuMillicores: 0,
-        memoryBytes: 0,
-    };
-    let allocatable: ResourceUsage = {
-        cpuMillicores: 0,
-        memoryBytes: 0,
-    };
-    let nodeCount = 0;
-    let metricsAvailable = true;
-    for (const summary of covered) {
-        usage = addUsage(usage, summary.totals.usage);
-        requests = addUsage(requests, summary.totals.requests);
-        allocatable = addUsage(allocatable, summary.totals.allocatable);
-        nodeCount += summary.nodeCount ?? 0;
-        if (!summary.metricsAvailable) {
-            metricsAvailable = false;
-        }
-    }
-    return {
-        contextCount: summaries.length,
-        coveredCount: covered.length,
-        failedCount: summaries.length - covered.length,
-        nodeCount,
-        metricsAvailable: covered.length > 0 && metricsAvailable,
-        totals: {
-            usage,
-            requests,
-            allocatable,
-        },
-    };
 }
 
 // Queries every configured kubeconfig context and returns the aggregate totals, handing
