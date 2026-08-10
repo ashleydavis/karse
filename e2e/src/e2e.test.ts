@@ -1639,6 +1639,297 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Cluster environments editor ───────────────────────────────────────────
+
+    test.describe("cluster environments editor", () => {
+        // The environment list is the user's, edited on the Config page's environments tab.
+        // The contexts payload is mocked (as the block above does) because kwokctl's own
+        // context names carry no token and so cannot demonstrate a name matching two
+        // environments or none.
+        const EDITOR_PAYLOAD = {
+            contexts: [
+                {
+                    name: "apollo",
+                    cluster: "apollo-cluster",
+                    user: "apollo-user",
+                    namespace: null,
+                },
+                {
+                    name: "prod-eu-1",
+                    cluster: "prod-cluster",
+                    user: "prod-user",
+                    namespace: null,
+                },
+                {
+                    name: "my-dev-box",
+                    cluster: "dev-cluster",
+                    user: "dev-user",
+                    namespace: null,
+                },
+                {
+                    name: "blue-green-1",
+                    cluster: "blue-cluster",
+                    user: "blue-user",
+                    namespace: null,
+                },
+            ],
+            current: "prod-eu-1",
+        };
+
+        // Open the Config page's environments tab and wait for the panel.
+        async function openEnvironmentsTab(): Promise<void> {
+            await page.goto("/config", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='config-tab-environments']").click();
+            await expect(page.locator("[data-test-id='config-environments-panel']")).toBeVisible();
+        }
+
+        // The environment ids the editor lists, top to bottom.
+        async function editorRowIds(): Promise<(string | null)[]> {
+            return page
+                .locator("[data-test-id='config-environment-row']")
+                .evaluateAll((rows) => rows.map((row) => row.getAttribute("data-environment")));
+        }
+
+        // One editor row, by the environment's id.
+        function editorRow(id: string) {
+            return page.locator(`[data-test-id='config-environment-row'][data-environment='${id}']`);
+        }
+
+        // The environment of the group heading a context's row currently sits under, read by
+        // walking the contexts table body in DOM order.
+        async function groupOf(contextName: string): Promise<string | null> {
+            return page.locator("[data-test-id='contexts-table'] tbody tr").evaluateAll((rows, name) => {
+                let heading: string | null = null;
+                for (const row of rows) {
+                    const environment = row.getAttribute("data-environment");
+                    if (environment !== null) {
+                        heading = environment;
+                        continue;
+                    }
+                    const cell = row.querySelector("td");
+                    if (cell !== null && (cell.textContent ?? "").includes(name)) {
+                        return heading;
+                    }
+                }
+                return null;
+            }, contextName);
+        }
+
+        // The group headings the contexts table renders, top to bottom.
+        async function groupHeadings(): Promise<string[]> {
+            return page
+                .locator("[data-test-id='contexts-table'] [data-test-id='context-environment-group-label']")
+                .allTextContents();
+        }
+
+        // Go to the contexts page and settle on its rendered rows before reading them.
+        async function openContexts(): Promise<void> {
+            await page.goto("/contexts", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='context-row']")).toHaveCount(EDITOR_PAYLOAD.contexts.length);
+        }
+
+        // Add an environment through the add-an-environment control.
+        async function addEnvironment(name: string, pattern: string): Promise<void> {
+            await page.locator("[data-test-id='config-environments-add-name']").fill(name);
+            await page.locator("[data-test-id='config-environments-add-pattern']").fill(pattern);
+            await page.locator("[data-test-id='config-environments-add-button']").click();
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/contexts", async (route) => {
+                await route.fulfill({ json: EDITOR_PAYLOAD });
+            });
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/contexts");
+            // Drop the environment list this block wrote so the later blocks see the shipped
+            // defaults. Removing just the one field leaves the other UI settings alone.
+            await page.evaluate(() => {
+                const raw = window.localStorage.getItem("karse-config");
+                if (raw === null) {
+                    return;
+                }
+                const config = JSON.parse(raw);
+                delete config.environments;
+                window.localStorage.setItem("karse-config", JSON.stringify(config));
+            });
+            setContext(CLUSTER_1);
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+        });
+
+        test("the config page presents its settings as subtabs, landing on the cache tab", async () => {
+            await page.goto("/config", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='config-tabs']")).toBeVisible();
+            await expect(page.locator("[data-test-id='config-cache-panel']")).toBeVisible();
+            await expect(page.locator("[data-test-id='config-environments-panel']")).toHaveCount(0);
+        });
+
+        test("the environments subtab shows the default list", async () => {
+            await openEnvironmentsTab();
+            expect(await editorRowIds()).toEqual([
+                "production",
+                "staging",
+                "development",
+                "test",
+                "local",
+            ]);
+            await expect(editorRow("production").locator("[data-test-id='config-environment-chip']")).toHaveText("Production");
+        });
+
+        test("switching back to the cache subtab leaves the cache settings working", async () => {
+            await page.locator("[data-test-id='config-tab-cache']").click();
+            await expect(page.locator("[data-test-id='config-cache-panel']")).toBeVisible();
+            const input = page.locator("[data-test-id='config-staleness-input']");
+            await input.fill("9");
+            await expect(page.locator("[data-test-id='config-save-button']")).toBeEnabled();
+            await input.fill("-1");
+            await expect(page.locator("[data-test-id='config-save-button']")).toBeDisabled();
+        });
+
+        test("adding an environment moves a matching context into its group", async () => {
+            await openEnvironmentsTab();
+            await addEnvironment("Apollo Lab", "apollo");
+            await expect(editorRow("apollo-lab")).toBeVisible();
+            await openContexts();
+            expect(await groupOf("apollo")).toBe("apollo-lab");
+        });
+
+        test("deleting an environment moves its contexts to whichever environment matches next", async () => {
+            await openEnvironmentsTab();
+            await addEnvironment("Lab", "apollo");
+            await expect(editorRow("lab")).toBeVisible();
+            await editorRow("apollo-lab").locator("[data-test-id='config-environment-delete']").click();
+            await expect(editorRow("apollo-lab")).toHaveCount(0);
+            await openContexts();
+            expect(await groupOf("apollo")).toBe("lab");
+        });
+
+        test("deleting the last environment that matches drops its contexts to Unassigned", async () => {
+            await openEnvironmentsTab();
+            await editorRow("lab").locator("[data-test-id='config-environment-delete']").click();
+            await expect(editorRow("lab")).toHaveCount(0);
+            await openContexts();
+            expect(await groupOf("apollo")).toBe("unassigned");
+        });
+
+        test("editing a default environment's regex changes which contexts land in it", async () => {
+            await openEnvironmentsTab();
+            await editorRow("production").locator("[data-test-id='config-environment-pattern-input']").fill("artemis");
+            await openContexts();
+            expect(await groupOf("prod-eu-1")).toBe("unassigned");
+            await openEnvironmentsTab();
+            await editorRow("production").locator("[data-test-id='config-environment-pattern-input']").fill("prod");
+            await openContexts();
+            expect(await groupOf("prod-eu-1")).toBe("production");
+        });
+
+        test("reordering two matching environments changes which group a context appears under", async () => {
+            await openEnvironmentsTab();
+            await addEnvironment("Blue", "blue");
+            await addEnvironment("Green", "green");
+            await openContexts();
+            expect(await groupOf("blue-green-1")).toBe("blue");
+
+            await openEnvironmentsTab();
+            await editorRow("green").locator("[data-test-id='config-environment-up']").click();
+            expect(await editorRowIds()).toEqual([
+                "production",
+                "staging",
+                "development",
+                "test",
+                "local",
+                "green",
+                "blue",
+            ]);
+            await openContexts();
+            expect(await groupOf("blue-green-1")).toBe("green");
+        });
+
+        test("the edited list survives a page reload", async () => {
+            await page.reload({ waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='context-row']")).toHaveCount(EDITOR_PAYLOAD.contexts.length);
+            expect(await groupOf("blue-green-1")).toBe("green");
+            await openEnvironmentsTab();
+            await expect(editorRow("green").locator("[data-test-id='config-environment-pattern-input']")).toHaveValue("green");
+        });
+
+        test("an invalid regex shows an error at the point of entry and is never saved", async () => {
+            await openEnvironmentsTab();
+            const pattern = editorRow("blue").locator("[data-test-id='config-environment-pattern-input']");
+            await pattern.fill("blue(");
+            await expect(editorRow("blue").locator(".MuiFormHelperText-root.Mui-error")).toContainText("Not a valid regular expression");
+            await openEnvironmentsTab();
+            await expect(editorRow("blue").locator("[data-test-id='config-environment-pattern-input']")).toHaveValue("blue");
+        });
+
+        test("an invalid regex in the add control leaves the Add button disabled", async () => {
+            await page.locator("[data-test-id='config-environments-add-name']").fill("Bad");
+            await page.locator("[data-test-id='config-environments-add-pattern']").fill("bad(");
+            await expect(page.locator("[data-test-id='config-environments-add-button']")).toBeDisabled();
+            await page.locator("[data-test-id='config-environments-add-pattern']").fill("bad");
+            await expect(page.locator("[data-test-id='config-environments-add-button']")).toBeEnabled();
+            await page.locator("[data-test-id='config-environments-add-name']").fill("");
+            await page.locator("[data-test-id='config-environments-add-pattern']").fill("");
+        });
+
+        test("clearing the whole list puts every context under Unassigned", async () => {
+            await openEnvironmentsTab();
+            await page.locator("[data-test-id='config-environments-clear']").click();
+            await expect(page.locator("[data-test-id='config-environments-empty']")).toBeVisible();
+            await expect(page.locator("[data-test-id='config-environment-row']")).toHaveCount(0);
+            await openContexts();
+            expect(await groupHeadings()).toEqual(["Unassigned"]);
+            expect(await groupOf("prod-eu-1")).toBe("unassigned");
+            expect(await groupOf("blue-green-1")).toBe("unassigned");
+        });
+
+        test("the header dropdown and the quick-picker stay usable with no environments", async () => {
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='header-environment-chip']")).toHaveText("Unassigned");
+            await page.locator("[aria-haspopup='listbox']").click();
+            await expect(page.locator("[data-test-id='context-picker-group']")).toHaveText(["Unassigned"]);
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='context-picker-group']")).toHaveCount(0);
+
+            await page.keyboard.press("Control+k");
+            await expect(page.locator("[data-test-id='context-quick-picker-dropdown']")).toBeVisible();
+            await expect(page.locator("[data-test-id='context-quick-picker-group']")).toHaveText(["Unassigned"]);
+            await expect(page.locator("[data-test-id='context-quick-picker-row']")).toHaveCount(EDITOR_PAYLOAD.contexts.length);
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='context-quick-picker-dropdown']")).not.toBeVisible();
+        });
+
+        test("cancelling the reset confirmation leaves the list untouched", async () => {
+            await openEnvironmentsTab();
+            await page.locator("[data-test-id='config-environments-reset']").click();
+            await expect(page.locator("[data-test-id='config-environments-reset-dialog']")).toBeVisible();
+            await expect(page.locator("[data-test-id='config-environments-reset-message']")).toContainText("discards your custom environments");
+            await page.locator("[data-test-id='config-environments-reset-cancel']").click();
+            await expect(page.locator("[data-test-id='config-environments-reset-dialog']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='config-environments-empty']")).toBeVisible();
+        });
+
+        test("confirming the reset restores the defaults", async () => {
+            await page.locator("[data-test-id='config-environments-reset']").click();
+            await expect(page.locator("[data-test-id='config-environments-reset-dialog']")).toBeVisible();
+            await page.locator("[data-test-id='config-environments-reset-confirm']").click();
+            await expect(page.locator("[data-test-id='config-environments-reset-dialog']")).toHaveCount(0);
+            expect(await editorRowIds()).toEqual([
+                "production",
+                "staging",
+                "development",
+                "test",
+                "local",
+            ]);
+            await openContexts();
+            expect(await groupOf("prod-eu-1")).toBe("production");
+            expect(await groupOf("my-dev-box")).toBe("development");
+            expect(await groupOf("apollo")).toBe("unassigned");
+        });
+    });
+
     // ── Namespaces page ───────────────────────────────────────────────────────
 
     test.describe("namespaces page", () => {

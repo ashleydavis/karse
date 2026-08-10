@@ -24,9 +24,14 @@ mkdir -p "$FIXTURE_DIR"
 MIXED="$FIXTURE_DIR/karse-environment-contexts.yaml"
 UNASSIGNED="$FIXTURE_DIR/karse-unassigned-contexts.yaml"
 
-# Every environment group at once, including `devops-prod`: its token is `prod`, and `devops`
-# is NOT `dev`, so it must land under Production. That context is what proves the inference
-# matches name segments rather than bare substrings.
+# Every environment group at once, including `devops-prod`: the default Production expression
+# matches its `prod` and the default Development one does not match its `devops`, so it must
+# land under Production. That context is what proves the shipped expressions match whole parts
+# of a name rather than bare substrings.
+#
+# `prod-staging-mirror` matches TWO of the default expressions (Production and Staging). It is
+# the context to reorder the list around: whichever of the two environments sits higher is the
+# one it must appear under.
 cat > "$MIXED" <<'EOF'
 apiVersion: v1
 kind: Config
@@ -57,6 +62,10 @@ contexts:
       user: acme-admin
       namespace: payments
   - name: devops-prod
+    context:
+      cluster: acme-us
+      user: acme-admin
+  - name: prod-staging-mirror
     context:
       cluster: acme-us
       user: acme-admin
@@ -121,7 +130,7 @@ EOF
 echo ""
 echo "Two kubeconfigs written:"
 echo ""
-echo "  Every environment group (9 contexts):"
+echo "  Every environment group (10 contexts):"
 echo "    $MIXED"
 echo "    Start Karse with:  KUBECONFIG=$MIXED bun run dev"
 echo ""

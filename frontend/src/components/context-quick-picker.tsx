@@ -29,7 +29,7 @@ type Props = {
 // using a MUI Tooltip so the dropdown gets a built-in arrow pointing at the button.
 export function ContextQuickPicker({ open, onClose, children }: Props) {
     const { contexts, current, switchTo } = useKubeContext();
-    const { config: { contextEnvironments } } = useConfig();
+    const { config: { contextEnvironments }, compiledEnvironments } = useConfig();
     const [query, setQuery] = useState("");
 
     useEffect(() => {
@@ -43,11 +43,11 @@ export function ContextQuickPicker({ open, onClose, children }: Props) {
         .filter((c) => c.name.toLowerCase().includes(q) || c.cluster.toLowerCase().includes(q))
         .sort((a, b) => a.name.localeCompare(b.name));
 
-    // The matching contexts under one subheading per environment, in the same fixed order the
+    // The matching contexts under one subheading per environment, in the same order the
     // contexts page and the header dropdown use, resolved by the same module rather than a
     // second copy of the rule. Filtering runs first, so a search that hides every context in
     // an environment hides that environment's heading too.
-    const groups = groupByEnvironment(filtered, contextEnvironments);
+    const groups = groupByEnvironment(filtered, compiledEnvironments, contextEnvironments);
 
     function handleSelect(name: string): void {
         switchTo(name);
@@ -85,11 +85,11 @@ export function ContextQuickPicker({ open, onClose, children }: Props) {
                     <List dense disablePadding>
                         {groups.flatMap((group) => [
                             <ListSubheader
-                                key={`group-${group.environment}`}
+                                key={`group-${group.environment.id}`}
                                 data-test-id="context-quick-picker-group"
-                                data-environment={group.environment}
+                                data-environment={group.environment.id}
                             >
-                                {group.label}
+                                {group.environment.name}
                             </ListSubheader>,
                             ...group.items.map((ctx) => (
                                 <ListItemButton

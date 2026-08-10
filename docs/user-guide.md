@@ -140,11 +140,13 @@ A table of all kubeconfig contexts, grouped by environment. Each row shows the c
 
 ### Environments
 
-So you can tell production from development at a glance, every context is placed in an environment, and the table is split into a group per environment: **Production**, **Staging**, **Development**, **Test / QA**, **Local**, then **Unassigned**. That order is fixed, so production is always at the top and contexts Karse could not place are always at the bottom. The header dropdown and the `Ctrl+K` context picker group their entries the same way, and a chip beside the header dropdown always names the active context's environment, so it is obvious when what you are looking at is production.
+So you can tell production from development at a glance, every context is placed in an environment, and the table is split into a group per environment. The header dropdown and the `Ctrl+K` context picker group their entries the same way, and a chip beside the header dropdown always names the active context's environment, so it is obvious when what you are looking at is production.
 
-Karse works the environment out from the context name, matching the usual words as whole parts of the name: `prod` / `prd` / `production`, `stg` / `stage` / `staging`, `dev` / `develop` / `development`, `test` / `testing` / `qa`, and `local` / `localhost` / `minikube` / `kind`. Matching is case-insensitive and never matches inside a longer word, so `devops-prod` is Production (its `devops` part is not `dev`). A name mentioning two environments takes the riskier one, so `prod-test-eu` is Production. A name mentioning none is Unassigned.
+**The environment list is yours.** Karse ships with **Production**, **Staging**, **Development**, **Test / QA** and **Local**, and you can add, rename, re-match, recolour, reorder and delete any of them (including the ones it shipped with) on the Config page's **Environments** tab. Each environment matches a regular expression against the context name, case-insensitively, and a context goes into the **first** environment in the list that matches it, so the order of the list is the priority. A context matching none of them is **Unassigned**, which is built in, always last, and cannot be deleted: clear the whole list and every context is Unassigned.
 
-If the name gets it wrong, or your clusters are not named that way, set the environment yourself: each row's **Environment** column has a selector. Pick an environment to label that context, and the label wins over the name. Pick **Auto (from name)** to clear the label and go back to whatever the name implies. A chip you set by hand is drawn filled; one Karse worked out from the name is outlined, so you can always see which is which.
+The shipped expressions match the usual words as whole parts of the name: `prod` / `prd` / `production`, `stg` / `stage` / `staging`, `dev` / `develop` / `development`, `test` / `testing` / `qa`, and `local` / `localhost` / `minikube` / `kind`. They never match inside a longer word, so `devops-prod` is Production (its `devops` part is not `dev`). Production ships at the top of the list, so a name mentioning two environments takes the riskier one and `prod-test-eu` is Production. Move Test / QA above Production and it would be Test / QA instead: the order decides.
+
+If a name gets it wrong for one context, or your clusters are not named that way at all, set the environment yourself: each row's **Environment** column has a selector offering every environment in your list. Pick one to label that context, and the label wins over the expressions. Pick **Auto (from name)** to clear the label and go back to whatever matches. A chip you set by hand is drawn filled; one Karse matched from the name is outlined, so you can always see which is which. If you delete an environment you had labelled a context with, the label is ignored and the context falls back to whatever matches next.
 
 Labels are yours, not the cluster's: they are stored in your browser alongside your colour mode and timestamp format, so they survive a reload and a restart of Karse, and nothing is ever written to your kubeconfig. A label is remembered against the context's name, so a context that disappears from your kubeconfig and later comes back still has it.
 
@@ -459,10 +461,27 @@ Breadcrumbs show the full trail: Pods > namespace > pod > container > tab.
 
 ## Config page (`/config`)
 
-Karse caches read-only cluster data fetched with `kubectl` on disk (under `cache/`) so it does not re-run `kubectl` on every request. The **Config** page (gear icon in the sidebar) controls the cache:
+The **Config** page (gear icon in the sidebar) holds Karse's settings, on two tabs.
+
+### Cluster data cache
+
+Karse caches read-only cluster data fetched with `kubectl` on disk (under `cache/`) so it does not re-run `kubectl` on every request. This tab controls the cache:
 
 - **Staleness threshold (seconds)**: how long a cached read is served before Karse re-fetches it from the cluster. Lower it for fresher data, raise it to spare more kubectl calls. Set it to **0** to disable the cache entirely. The value is saved server-side and persists across restarts.
 - The navbar **Refresh** button empties the cache (the threshold is kept) and re-fetches, so you always have a one-click way to get fresh data regardless of the threshold.
+
+### Environments
+
+This tab is the environment list the Contexts page, the header dropdown and the `Ctrl+K` picker group by. The rows are in priority order: a context goes into the first one whose expression matches its name.
+
+- Each row shows its chip, its **Name**, the **regular expression** it matches against a context name, and its **colour**. All three are editable, on the rows Karse shipped as well as on your own.
+- **Add an environment** with the name, expression and colour fields at the bottom, then **Add**. It joins the end of the list.
+- **Move a row up or down** with the arrow buttons. That changes which environment wins a context name that matches two of them.
+- **Delete a row** with the bin button. Its contexts move to whichever environment matches next, or to Unassigned.
+- **Clear the list** removes every environment, so every context is Unassigned. That is a supported state, not a broken one: every page still works.
+- **Reset to defaults** puts back the list Karse ships with. It asks first, and says plainly that your custom environments will be discarded; cancelling changes nothing.
+- Expressions are matched **case-insensitively against the whole context name**, so the expression is the whole rule. An expression that is not valid shows the reason under the field and is never saved, so the list can never end up in a state that breaks the pages that read it.
+- The list lives in your browser, in the same `karse-config` entry as your colour mode and timestamp format. Nothing is written to your kubeconfig, and nothing is sent to the backend.
 
 ## Audit log
 

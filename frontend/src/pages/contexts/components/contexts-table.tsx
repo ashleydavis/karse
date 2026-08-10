@@ -39,8 +39,6 @@ import {
     groupByEnvironment,
     resolveEnvironment,
     AUTO_ENVIRONMENT_VALUE,
-    ENVIRONMENT_LABELS,
-    LABELLABLE_ENVIRONMENTS,
 } from "../../../lib/cluster-environments";
 
 type Props = {
@@ -54,7 +52,7 @@ type Props = {
 export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetDefault }: Props) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const { search, setSearch, deferredSearch } = useSearchFilter();
-    const { config: { contextEnvironments }, setContextEnvironment } = useConfig();
+    const { config: { contextEnvironments, environments }, compiledEnvironments, setContextEnvironment } = useConfig();
 
     const columns: ColumnDef<Context>[] = [
         {
@@ -78,11 +76,11 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
             // page search matches on the environment the row actually shows.
             id: "environment",
             header: "Environment",
-            accessorFn: (context) => ENVIRONMENT_LABELS[resolveEnvironment(context.name, contextEnvironments).environment],
+            accessorFn: (context) => resolveEnvironment(context.name, compiledEnvironments, contextEnvironments).environment.name,
             cell: (info) => {
                 const name = info.row.original.name;
-                const resolved = resolveEnvironment(name, contextEnvironments);
-                const label = contextLabel(name, contextEnvironments);
+                const resolved = resolveEnvironment(name, compiledEnvironments, contextEnvironments);
+                const label = contextLabel(name, compiledEnvironments, contextEnvironments);
                 return (
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                         <EnvironmentChip
@@ -93,16 +91,16 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
                         <Select
                             size="small"
                             value={label ?? AUTO_ENVIRONMENT_VALUE}
-                            onChange={(event) => setContextEnvironment(name, environmentFromSelection(event.target.value))}
+                            onChange={(event) => setContextEnvironment(name, environmentFromSelection(event.target.value, compiledEnvironments))}
                             data-test-id="context-environment-select"
                             data-context={name}
                             inputProps={{ "aria-label": `environment for ${name}` }}
                             sx={{ minWidth: 150 }}
                         >
                             <MenuItem value={AUTO_ENVIRONMENT_VALUE}>Auto (from name)</MenuItem>
-                            {LABELLABLE_ENVIRONMENTS.map((environment) => (
-                                <MenuItem key={environment} value={environment}>
-                                    {ENVIRONMENT_LABELS[environment]}
+                            {environments.map((environment) => (
+                                <MenuItem key={environment.id} value={environment.id}>
+                                    {environment.name}
                                 </MenuItem>
                             ))}
                         </Select>
@@ -165,15 +163,16 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
 
     const rows = table.getRowModel().rows;
 
-    // The rows the table would render, partitioned into environment groups in the fixed
-    // ENVIRONMENT_ORDER (production first, unassigned last) rather than whatever order the
-    // kubeconfig or the current sort produced. Sorting and searching still run over the whole
-    // table first, so a group holds only the rows that survived them, in the sorted order.
+    // The rows the table would render, partitioned into environment groups in the user's own
+    // list order (with Unassigned last) rather than whatever order the kubeconfig or the
+    // current sort produced. Sorting and searching still run over the whole table first, so a
+    // group holds only the rows that survived them, in the sorted order.
     const groups = groupByEnvironment(
         rows.map((row) => ({
             name: row.original.name,
             row,
         })),
+        compiledEnvironments,
         contextEnvironments,
     );
 
@@ -234,10 +233,10 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
                             </TableRow>
                         )}
                         {groups.map((group) => (
-                            <Fragment key={group.environment}>
+                            <Fragment key={group.environment.id}>
                                 <TableRow
                                     data-test-id="context-environment-group"
-                                    data-environment={group.environment}
+                                    data-environment={group.environment.id}
                                 >
                                     <TableCell
                                         colSpan={table.getVisibleLeafColumns().length}
@@ -249,7 +248,7 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
                                                 variant="subtitle2"
                                                 data-test-id="context-environment-group-label"
                                             >
-                                                {group.label}
+                                                {group.environment.name}
                                             </Typography>
                                             <Typography
                                                 component="span"

@@ -1,348 +1,306 @@
 import {
-    inferEnvironment,
-    resolveEnvironment,
+    compileEnvironments,
     contextLabel,
     environmentFromSelection,
+    environmentId,
     groupByEnvironment,
-    AUTO_ENVIRONMENT_VALUE,
-    ENVIRONMENT_ORDER,
-    ENVIRONMENT_LABELS,
-    LABELLABLE_ENVIRONMENTS,
-    type EnvironmentLabels,
+    normalizeEnvironments,
+    resolveEnvironment,
+    validateEnvironmentName,
+    validatePattern,
+    DEFAULT_ENVIRONMENTS,
+    MAX_PATTERN_LENGTH,
+    UNASSIGNED_ENVIRONMENT,
+    type EnvironmentDefinition,
 } from "../../lib/cluster-environments";
 
-// No explicit labels: the resolver falls through to name inference.
-const NO_LABELS: EnvironmentLabels = {};
+// The compiled default list, which is what an untouched install resolves through.
+const defaults = compileEnvironments(DEFAULT_ENVIRONMENTS);
 
-describe("inferEnvironment", () => {
-    test("matches a production token as a name segment", () => {
-        expect(inferEnvironment("prod-eu-1")).toBe("production");
-    });
+// A two-row list whose expressions both match `blue-green-1`, used for the precedence tests.
+const blue: EnvironmentDefinition = {
+    id: "blue",
+    name: "Blue",
+    pattern: "blue",
+    color: "info",
+};
+const green: EnvironmentDefinition = {
+    id: "green",
+    name: "Green",
+    pattern: "green",
+    color: "success",
+};
 
-    test("matches production when the token is the trailing segment", () => {
-        expect(inferEnvironment("acme-cluster-prod")).toBe("production");
-    });
-
-    test("matches the long form production", () => {
-        expect(inferEnvironment("production-eu")).toBe("production");
-    });
-
-    test("matches the prd abbreviation", () => {
-        expect(inferEnvironment("prd-01")).toBe("production");
-    });
-
-    test("devops-prod is production, not development", () => {
-        expect(inferEnvironment("devops-prod")).toBe("production");
-    });
-
-    test("matches staging", () => {
-        expect(inferEnvironment("staging-eu-west")).toBe("staging");
-    });
-
-    test("matches the stg abbreviation", () => {
-        expect(inferEnvironment("acme-stg-1")).toBe("staging");
-    });
-
-    test("matches stage", () => {
-        expect(inferEnvironment("stage.acme.internal")).toBe("staging");
-    });
-
-    test("matches development", () => {
-        expect(inferEnvironment("my-dev-box")).toBe("development");
-    });
-
-    test("matches the long form development", () => {
-        expect(inferEnvironment("development-cluster")).toBe("development");
-    });
-
-    test("matches test", () => {
-        expect(inferEnvironment("kwok-karse-test-1")).toBe("test");
-    });
-
-    test("matches qa", () => {
-        expect(inferEnvironment("qa-cluster")).toBe("test");
-    });
-
-    test("matches local", () => {
-        expect(inferEnvironment("local-cluster")).toBe("local");
-    });
-
-    test("matches minikube", () => {
-        expect(inferEnvironment("minikube")).toBe("local");
-    });
-
-    test("matches kind as a whole segment", () => {
-        expect(inferEnvironment("kind-karse")).toBe("local");
-    });
-
-    test("is case-insensitive", () => {
-        expect(inferEnvironment("ACME-PROD-1")).toBe("production");
-    });
-
-    test("splits at a letter/digit boundary so staging2 still matches", () => {
-        expect(inferEnvironment("staging2")).toBe("staging");
-    });
-
-    test("splits on an underscore", () => {
-        expect(inferEnvironment("acme_dev_1")).toBe("development");
-    });
-
-    test("splits on a slash", () => {
-        expect(inferEnvironment("acme/staging")).toBe("staging");
-    });
-
-    test("a token buried in a longer word does not match", () => {
-        expect(inferEnvironment("predevelopmentplan")).toBe("unassigned");
-    });
-
-    test("devops alone is not development", () => {
-        expect(inferEnvironment("devops-cluster")).toBe("unassigned");
-    });
-
-    test("a name carrying two tokens resolves to the riskier one", () => {
-        expect(inferEnvironment("prod-test-eu")).toBe("production");
-    });
-
-    test("staging beats development when a name carries both", () => {
-        expect(inferEnvironment("dev-staging-mirror")).toBe("staging");
-    });
-
-    test("a name with no recognisable token is unassigned", () => {
-        expect(inferEnvironment("arn:aws:eks:eu-west-1:1234:cluster/apollo")).toBe("unassigned");
-    });
-
-    test("the e2e kwok context names carry no token", () => {
-        expect(inferEnvironment("kwok-karse-e2e-4821-1")).toBe("unassigned");
-    });
-
-    test("an empty name is unassigned", () => {
-        expect(inferEnvironment("")).toBe("unassigned");
-    });
-});
+// The environment a context name resolves to under a given list, as an id.
+function environmentOf(name: string, environments: EnvironmentDefinition[], labels = {}): string {
+    return resolveEnvironment(name, compileEnvironments(environments), labels).environment.id;
+}
 
 describe("resolveEnvironment", () => {
-    test("falls back to the inferred environment when nothing is labelled", () => {
-        expect(resolveEnvironment("prod-eu-1", NO_LABELS)).toEqual({
-            environment: "production",
-            source: "inferred",
-        });
+    test("returns the first environment in the list whose expression matches", () => {
+        expect(environmentOf("blue-green-1", [blue, green])).toBe("blue");
     });
 
-    test("an unrecognised name resolves to unassigned by inference", () => {
-        expect(resolveEnvironment("apollo", NO_LABELS)).toEqual({
-            environment: "unassigned",
-            source: "inferred",
-        });
+    test("reordering the list changes which environment wins a name matching two", () => {
+        expect(environmentOf("blue-green-1", [green, blue])).toBe("green");
     });
 
-    test("an explicit label overrides the inferred environment", () => {
-        expect(resolveEnvironment("devops-prod", { "devops-prod": "development" })).toEqual({
-            environment: "development",
-            source: "label",
-        });
+    test("a name matching one expression resolves to that environment whatever the order", () => {
+        expect(environmentOf("blue-1", [blue, green])).toBe("blue");
+        expect(environmentOf("blue-1", [green, blue])).toBe("blue");
     });
 
-    test("an explicit label gives an environment to a name that infers nothing", () => {
-        expect(resolveEnvironment("apollo", { apollo: "production" })).toEqual({
-            environment: "production",
-            source: "label",
-        });
+    test("a name matching nothing resolves to Unassigned", () => {
+        expect(environmentOf("apollo", [blue, green])).toBe("unassigned");
     });
 
-    test("a label matching the inferred environment still reports itself as a label", () => {
-        expect(resolveEnvironment("prod-eu-1", { "prod-eu-1": "production" })).toEqual({
-            environment: "production",
-            source: "label",
-        });
+    test("matching is case-insensitive", () => {
+        expect(environmentOf("BLUE-1", [blue])).toBe("blue");
     });
 
-    test("clearing a label restores the inferred environment, not unassigned", () => {
-        const labelled: EnvironmentLabels = { "prod-eu-1": "development" };
-        expect(resolveEnvironment("prod-eu-1", labelled).environment).toBe("development");
-        const cleared: EnvironmentLabels = {};
-        expect(resolveEnvironment("prod-eu-1", cleared)).toEqual({
-            environment: "production",
-            source: "inferred",
-        });
+    test("matching runs against the whole context name, not a name segment", () => {
+        const substring: EnvironmentDefinition = {
+            id: "infra",
+            name: "Infra",
+            pattern: "fra",
+            color: "info",
+        };
+        expect(environmentOf("infrastructure-eu", [substring])).toBe("infra");
     });
 
-    test("a label naming a different context does not leak onto this one", () => {
-        expect(resolveEnvironment("apollo", { artemis: "production" })).toEqual({
-            environment: "unassigned",
-            source: "inferred",
-        });
+    test("reports where the environment came from", () => {
+        const matched = resolveEnvironment("blue-1", compileEnvironments([blue]), {});
+        expect(matched.source).toBe("inferred");
+        const labelled = resolveEnvironment("apollo", compileEnvironments([blue]), { apollo: "blue" });
+        expect(labelled.source).toBe("label");
     });
 
-    test("a stored label that is not a known environment is ignored", () => {
-        const labels = { apollo: "sandbox" } as any;
-        expect(resolveEnvironment("apollo", labels)).toEqual({
-            environment: "unassigned",
-            source: "inferred",
-        });
-    });
-});
-
-describe("contextLabel", () => {
-    test("returns the explicit label when one is set", () => {
-        expect(contextLabel("apollo", { apollo: "staging" })).toBe("staging");
-    });
-
-    test("returns null when no label is set", () => {
-        expect(contextLabel("apollo", NO_LABELS)).toBeNull();
-    });
-
-    test("returns null for a stored value that is not a known environment", () => {
-        expect(contextLabel("apollo", { apollo: "sandbox" } as any)).toBeNull();
-    });
-});
-
-describe("environmentFromSelection", () => {
-    test("the auto value clears the label", () => {
-        expect(environmentFromSelection(AUTO_ENVIRONMENT_VALUE)).toBeNull();
-    });
-
-    test("an environment value sets that label", () => {
-        expect(environmentFromSelection("production")).toBe("production");
-    });
-
-    test("every labellable environment round-trips", () => {
-        for (const environment of LABELLABLE_ENVIRONMENTS) {
-            expect(environmentFromSelection(environment)).toBe(environment);
+    test("an empty list puts every context in Unassigned", () => {
+        for (const name of ["prod-eu-1", "my-dev-box", "apollo", "minikube"]) {
+            expect(environmentOf(name, [])).toBe("unassigned");
         }
     });
 
-    test("an unrecognised value clears the label rather than setting a bogus one", () => {
-        expect(environmentFromSelection("sandbox")).toBeNull();
+    test("the Unassigned bucket keeps its built-in name and colour", () => {
+        const resolved = resolveEnvironment("apollo", [], {});
+        expect(resolved.environment.name).toBe("Unassigned");
+        expect(resolved.environment.color).toBe("default");
     });
 
-    test("the auto value is not itself a known environment", () => {
-        expect(ENVIRONMENT_ORDER).not.toContain(AUTO_ENVIRONMENT_VALUE);
+    test("an explicit label overrides the expression that would have matched", () => {
+        expect(environmentOf("blue-1", [blue, green], { "blue-1": "green" })).toBe("green");
     });
 
-    test("the auto value is not the empty string, which MUI reserves", () => {
-        expect(AUTO_ENVIRONMENT_VALUE).not.toBe("");
+    test("a label naming a deleted environment is ignored and the expression result is used", () => {
+        expect(environmentOf("blue-1", [blue], { "blue-1": "green" })).toBe("blue");
+    });
+
+    test("a label naming a deleted environment falls through to Unassigned when nothing matches", () => {
+        expect(environmentOf("apollo", [blue], { apollo: "green" })).toBe("unassigned");
+    });
+});
+
+describe("the default list", () => {
+    test("reproduces the documented production cases", () => {
+        expect(environmentOf("devops-prod", DEFAULT_ENVIRONMENTS)).toBe("production");
+        expect(environmentOf("production-eu", DEFAULT_ENVIRONMENTS)).toBe("production");
+        expect(environmentOf("prod-eu-1", DEFAULT_ENVIRONMENTS)).toBe("production");
+        expect(environmentOf("ACME-PROD-1", DEFAULT_ENVIRONMENTS)).toBe("production");
+    });
+
+    test("reproduces the documented development cases", () => {
+        expect(environmentOf("my-dev-box", DEFAULT_ENVIRONMENTS)).toBe("development");
+        expect(environmentOf("acme-development", DEFAULT_ENVIRONMENTS)).toBe("development");
+    });
+
+    test("reproduces the documented unassigned case", () => {
+        expect(environmentOf("predevelopmentplan", DEFAULT_ENVIRONMENTS)).toBe("unassigned");
+        expect(environmentOf("apollo", DEFAULT_ENVIRONMENTS)).toBe("unassigned");
+    });
+
+    test("matches the staging, test and local tokens", () => {
+        expect(environmentOf("staging-eu-west", DEFAULT_ENVIRONMENTS)).toBe("staging");
+        expect(environmentOf("acme-stg-2", DEFAULT_ENVIRONMENTS)).toBe("staging");
+        expect(environmentOf("staging2", DEFAULT_ENVIRONMENTS)).toBe("staging");
+        expect(environmentOf("qa-cluster", DEFAULT_ENVIRONMENTS)).toBe("test");
+        expect(environmentOf("acme-testing", DEFAULT_ENVIRONMENTS)).toBe("test");
+        expect(environmentOf("minikube", DEFAULT_ENVIRONMENTS)).toBe("local");
+        expect(environmentOf("kind-dashboard", DEFAULT_ENVIRONMENTS)).toBe("local");
+    });
+
+    test("puts production first, so a name mentioning two lands in the riskier one", () => {
+        expect(environmentOf("prod-test-eu", DEFAULT_ENVIRONMENTS)).toBe("production");
+        expect(environmentOf("dev-staging-mirror", DEFAULT_ENVIRONMENTS)).toBe("staging");
+    });
+
+    test("every default expression compiles", () => {
+        expect(defaults).toHaveLength(DEFAULT_ENVIRONMENTS.length);
     });
 });
 
 describe("groupByEnvironment", () => {
-    const CONTEXTS = [
-        { name: "apollo" },
-        { name: "my-dev-box" },
+    const contexts = [
         { name: "prod-eu-1" },
-        { name: "qa-cluster" },
-        { name: "staging-eu-west" },
-        { name: "minikube" },
+        { name: "my-dev-box" },
+        { name: "apollo" },
         { name: "devops-prod" },
     ];
 
-    test("groups in the stable order with production first and unassigned last", () => {
-        const groups = groupByEnvironment(CONTEXTS, NO_LABELS);
-        expect(groups.map((group) => group.environment)).toEqual([
-            "production",
-            "staging",
-            "development",
-            "test",
-            "local",
-            "unassigned",
-        ]);
+    test("groups in the list order, with Unassigned last", () => {
+        const groups = groupByEnvironment(contexts, defaults, {});
+        expect(groups.map((group) => group.environment.id)).toEqual(["production", "development", "unassigned"]);
     });
 
-    test("puts each context in its inferred group", () => {
-        const groups = groupByEnvironment(CONTEXTS, NO_LABELS);
-        const byEnvironment = Object.fromEntries(groups.map((group) => [group.environment, group.items.map((item) => item.name)]));
-        expect(byEnvironment.production).toEqual(["prod-eu-1", "devops-prod"]);
-        expect(byEnvironment.staging).toEqual(["staging-eu-west"]);
-        expect(byEnvironment.development).toEqual(["my-dev-box"]);
-        expect(byEnvironment.test).toEqual(["qa-cluster"]);
-        expect(byEnvironment.local).toEqual(["minikube"]);
-        expect(byEnvironment.unassigned).toEqual(["apollo"]);
+    test("drops every environment no context resolved to", () => {
+        const groups = groupByEnvironment([{ name: "apollo" }], defaults, {});
+        expect(groups.map((group) => group.environment.id)).toEqual(["unassigned"]);
     });
 
-    test("carries the display heading for each group", () => {
-        const groups = groupByEnvironment([{ name: "prod-eu-1" }], NO_LABELS);
-        expect(groups).toEqual([
-            {
-                environment: "production",
-                label: "Production",
-                items: [{ name: "prod-eu-1" }],
-            },
-        ]);
+    test("keeps the order the contexts were given in within a group", () => {
+        const groups = groupByEnvironment(contexts, defaults, {});
+        expect(groups[0].items.map((item) => item.name)).toEqual(["prod-eu-1", "devops-prod"]);
     });
 
-    test("drops environments no context resolved to", () => {
-        const groups = groupByEnvironment([{ name: "prod-eu-1" }, { name: "prod-us-1" }], NO_LABELS);
-        expect(groups.map((group) => group.environment)).toEqual(["production"]);
+    test("reordering the list reorders the groups", () => {
+        const reversed = compileEnvironments(DEFAULT_ENVIRONMENTS.slice().reverse());
+        const groups = groupByEnvironment(contexts, reversed, {});
+        expect(groups.map((group) => group.environment.id)).toEqual(["development", "production", "unassigned"]);
     });
 
-    test("an explicit label moves a context into that group", () => {
-        const groups = groupByEnvironment(CONTEXTS, { "devops-prod": "development" });
-        const byEnvironment = Object.fromEntries(groups.map((group) => [group.environment, group.items.map((item) => item.name)]));
-        expect(byEnvironment.production).toEqual(["prod-eu-1"]);
-        expect(byEnvironment.development).toEqual(["my-dev-box", "devops-prod"]);
+    test("an empty list puts every context under one Unassigned group", () => {
+        const groups = groupByEnvironment(contexts, [], {});
+        expect(groups).toHaveLength(1);
+        expect(groups[0].environment.id).toBe(UNASSIGNED_ENVIRONMENT.id);
+        expect(groups[0].items).toHaveLength(4);
     });
 
-    test("a label for a context that is no longer in the kubeconfig produces no phantom row", () => {
-        const labels: EnvironmentLabels = {
-            "prod-eu-1": "staging",
-            "retired-cluster": "production",
-        };
-        const groups = groupByEnvironment([{ name: "prod-eu-1" }], labels);
-        expect(groups).toEqual([
-            {
-                environment: "staging",
-                label: "Staging",
-                items: [{ name: "prod-eu-1" }],
-            },
-        ]);
-    });
-
-    test("a label for a context that comes back applies again", () => {
-        const labels: EnvironmentLabels = { "retired-cluster": "production" };
-        const whileMissing = groupByEnvironment([{ name: "apollo" }], labels);
-        expect(whileMissing.map((group) => group.environment)).toEqual(["unassigned"]);
-        const whenBack = groupByEnvironment([{ name: "apollo" }, { name: "retired-cluster" }], labels);
-        expect(whenBack.map((group) => group.environment)).toEqual(["production", "unassigned"]);
-        expect(whenBack[0].items).toEqual([{ name: "retired-cluster" }]);
-    });
-
-    test("a kubeconfig where nothing matches puts every context under unassigned", () => {
-        const groups = groupByEnvironment([{ name: "apollo" }, { name: "artemis" }, { name: "hermes" }], NO_LABELS);
-        expect(groups).toEqual([
-            {
-                environment: "unassigned",
-                label: "Unassigned",
-                items: [{ name: "apollo" }, { name: "artemis" }, { name: "hermes" }],
-            },
-        ]);
-    });
-
-    test("no contexts produces no groups", () => {
-        expect(groupByEnvironment([], NO_LABELS)).toEqual([]);
-    });
-
-    test("the order contexts were given in is preserved within a group", () => {
-        const contexts = [{ name: "prod-c" }, { name: "prod-a" }, { name: "prod-b" }];
-        expect(groupByEnvironment(contexts, NO_LABELS)[0].items).toEqual(contexts);
+    test("a label for a context that is not present produces no phantom group", () => {
+        const groups = groupByEnvironment([{ name: "apollo" }], defaults, { "gone-prod": "local" });
+        expect(groups.map((group) => group.environment.id)).toEqual(["unassigned"]);
     });
 });
 
-describe("environment metadata", () => {
-    test("every environment in the order has a display label", () => {
-        for (const environment of ENVIRONMENT_ORDER) {
-            expect(typeof ENVIRONMENT_LABELS[environment]).toBe("string");
-            expect(ENVIRONMENT_LABELS[environment].length).toBeGreaterThan(0);
-        }
+describe("contextLabel", () => {
+    test("returns the label when it names an environment in the list", () => {
+        expect(contextLabel("apollo", defaults, { apollo: "production" })).toBe("production");
     });
 
-    test("unassigned is last so an ungrouped context never leads the list", () => {
-        expect(ENVIRONMENT_ORDER[ENVIRONMENT_ORDER.length - 1]).toBe("unassigned");
+    test("returns null when the context has no label", () => {
+        expect(contextLabel("apollo", defaults, {})).toBeNull();
     });
 
-    test("production is first so the riskiest cluster is never buried", () => {
-        expect(ENVIRONMENT_ORDER[0]).toBe("production");
+    test("returns null when the label names an environment that was deleted", () => {
+        expect(contextLabel("apollo", compileEnvironments([blue]), { apollo: "production" })).toBeNull();
+    });
+});
+
+describe("environmentFromSelection", () => {
+    test("maps an environment id in the list to itself", () => {
+        expect(environmentFromSelection("production", defaults)).toBe("production");
     });
 
-    test("every environment except unassigned can be picked as a label", () => {
-        expect(LABELLABLE_ENVIRONMENTS).toEqual(ENVIRONMENT_ORDER.filter((environment) => environment !== "unassigned"));
+    test("maps the auto choice to null", () => {
+        expect(environmentFromSelection("auto", defaults)).toBeNull();
+    });
+
+    test("maps an unknown id to null", () => {
+        expect(environmentFromSelection("blue", defaults)).toBeNull();
+    });
+});
+
+describe("validatePattern", () => {
+    test("accepts a usable expression", () => {
+        expect(validatePattern("^prod")).toBeNull();
+    });
+
+    test("rejects an expression that does not compile, with a readable message", () => {
+        const message = validatePattern("prod(");
+        expect(message).not.toBeNull();
+        expect(message).toContain("Not a valid regular expression");
+    });
+
+    test("rejects an empty expression", () => {
+        expect(validatePattern("   ")).toBe("Enter a regular expression.");
+    });
+
+    test("rejects an expression longer than the cap", () => {
+        expect(validatePattern("a".repeat(MAX_PATTERN_LENGTH + 1))).toContain(String(MAX_PATTERN_LENGTH));
+    });
+});
+
+describe("validateEnvironmentName", () => {
+    test("accepts a name", () => {
+        expect(validateEnvironmentName("Blue")).toBeNull();
+    });
+
+    test("rejects a blank name", () => {
+        expect(validateEnvironmentName("  ")).toBe("Enter a name.");
+    });
+});
+
+describe("normalizeEnvironments", () => {
+    test("a stored config with no environment list yields the defaults", () => {
+        expect(normalizeEnvironments(undefined)).toEqual(DEFAULT_ENVIRONMENTS);
+    });
+
+    test("a stored value that is not an array yields the defaults", () => {
+        expect(normalizeEnvironments({ production: "prod" })).toEqual(DEFAULT_ENVIRONMENTS);
+        expect(normalizeEnvironments("production")).toEqual(DEFAULT_ENVIRONMENTS);
+    });
+
+    test("a row with no expression yields the defaults", () => {
+        expect(normalizeEnvironments([{ id: "blue", name: "Blue" }])).toEqual(DEFAULT_ENVIRONMENTS);
+    });
+
+    test("a row whose expression does not compile yields the defaults", () => {
+        expect(normalizeEnvironments([{ id: "blue", name: "Blue", pattern: "blue(", color: "info" }])).toEqual(DEFAULT_ENVIRONMENTS);
+    });
+
+    test("a row with no name yields the defaults", () => {
+        expect(normalizeEnvironments([{ id: "blue", name: "  ", pattern: "blue", color: "info" }])).toEqual(DEFAULT_ENVIRONMENTS);
+    });
+
+    test("a stored empty list is kept, because that is how a cleared list persists", () => {
+        expect(normalizeEnvironments([])).toEqual([]);
+    });
+
+    test("a valid stored list is read back as it was written", () => {
+        expect(normalizeEnvironments([blue, green])).toEqual([blue, green]);
+    });
+
+    test("an unrecognised colour falls back to the neutral default", () => {
+        const normalized = normalizeEnvironments([{ id: "blue", name: "Blue", pattern: "blue", color: "chartreuse" }]);
+        expect(normalized[0].color).toBe("default");
+    });
+});
+
+describe("compileEnvironments", () => {
+    test("compiles every usable row, case-insensitively", () => {
+        const compiled = compileEnvironments([blue]);
+        expect(compiled).toHaveLength(1);
+        expect(compiled[0].regex.test("BLUE")).toBe(true);
+    });
+
+    test("drops a row whose expression will not compile rather than throwing", () => {
+        const compiled = compileEnvironments([blue, { id: "bad", name: "Bad", pattern: "bad(", color: "info" }]);
+        expect(compiled.map((environment) => environment.definition.id)).toEqual(["blue"]);
+    });
+});
+
+describe("environmentId", () => {
+    test("slugs the name", () => {
+        expect(environmentId("Test / QA", [])).toBe("test-qa");
+    });
+
+    test("uniquifies against the ids already in use", () => {
+        expect(environmentId("Blue", [blue])).toBe("blue-2");
+    });
+
+    test("never collides with the built-in Unassigned bucket", () => {
+        expect(environmentId("Unassigned", [])).toBe("unassigned-2");
+    });
+
+    test("falls back to a usable id when the name slugs to nothing", () => {
+        expect(environmentId("///", [])).toBe("environment");
     });
 });

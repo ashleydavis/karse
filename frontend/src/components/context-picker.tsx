@@ -11,7 +11,7 @@ type Props = {
 };
 
 export function ContextPicker({ contexts, current, onSwitch }: Props) {
-    const { config: { contextEnvironments } } = useConfig();
+    const { config: { contextEnvironments }, compiledEnvironments } = useConfig();
 
     function handleChange(e: SelectChangeEvent) {
         if (e.target.value !== current) {
@@ -22,11 +22,11 @@ export function ContextPicker({ contexts, current, onSwitch }: Props) {
     // The active context's environment, shown beside the picker so it is obvious when the
     // current view is pointed at production, without opening anything. Resolved through the
     // same module the contexts page and the quick-picker use.
-    const activeEnvironment = current === null ? null : resolveEnvironment(current, contextEnvironments);
+    const activeEnvironment = current === null ? null : resolveEnvironment(current, compiledEnvironments, contextEnvironments);
 
-    // The dropdown's entries, under one subheading per environment, in the same fixed order
-    // the contexts page groups by.
-    const groups = groupByEnvironment(contexts, contextEnvironments);
+    // The dropdown's entries, under one subheading per environment, in the same order the
+    // contexts page groups by: the user's list order, with Unassigned last.
+    const groups = groupByEnvironment(contexts, compiledEnvironments, contextEnvironments);
 
     return (
         <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
@@ -48,11 +48,11 @@ export function ContextPicker({ contexts, current, onSwitch }: Props) {
                 >
                     {groups.flatMap((group) => [
                         <ListSubheader
-                            key={`group-${group.environment}`}
+                            key={`group-${group.environment.id}`}
                             data-test-id="context-picker-group"
-                            data-environment={group.environment}
+                            data-environment={group.environment.id}
                         >
-                            {group.label}
+                            {group.environment.name}
                         </ListSubheader>,
                         ...group.items.map((ctx) => (
                             <MenuItem key={ctx.name} value={ctx.name}>
