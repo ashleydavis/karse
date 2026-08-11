@@ -32,6 +32,8 @@ import { ACTIONS_COLUMN_ID, stickyActionsHeaderSx } from "../../../lib/sticky-ac
 import { NoContextsGuidance } from "../../../components/no-contexts-guidance";
 import { SearchBox } from "../../../components/search-box";
 import { EnvironmentChip } from "../../../components/environment-chip";
+import { useColumnConfig } from "../../../lib/column-config";
+import { ColumnConfigButton } from "../../../components/column-config-modal";
 import { useConfig } from "../../../lib/config";
 import {
     contextLabel,
@@ -71,7 +73,11 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
             ),
         },
         {
-            // The environment the context resolves to, plus the control that labels it.
+            // The environment the context resolves to, shown as a chip. It has a column of its
+            // own rather than sharing one with the selector below, so the chip's width (which
+            // varies with the environment's name) cannot push each row's selector to a different
+            // x position, and so the user can hide the chip from the column configuration like
+            // any other optional column.
             // The accessor returns the environment's heading so the column sorts and the
             // page search matches on the environment the row actually shows.
             id: "environment",
@@ -80,31 +86,43 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
             cell: (info) => {
                 const name = info.row.original.name;
                 const resolved = resolveEnvironment(name, compiledEnvironments, contextEnvironments);
+                return (
+                    <EnvironmentChip
+                        environment={resolved.environment}
+                        source={resolved.source}
+                        testId="context-environment-chip"
+                    />
+                );
+            },
+        },
+        {
+            // The control that labels a context by hand, or hands the decision back to the name.
+            // A display column: it carries no value of its own, so it neither sorts nor feeds the
+            // page search (the Environment column beside it already does both on the same value).
+            id: "environment-label",
+            header: "Set environment",
+            enableSorting: false,
+            enableGlobalFilter: false,
+            cell: (info) => {
+                const name = info.row.original.name;
                 const label = contextLabel(name, compiledEnvironments, contextEnvironments);
                 return (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                        <EnvironmentChip
-                            environment={resolved.environment}
-                            source={resolved.source}
-                            testId="context-environment-chip"
-                        />
-                        <Select
-                            size="small"
-                            value={label ?? AUTO_ENVIRONMENT_VALUE}
-                            onChange={(event) => setContextEnvironment(name, environmentFromSelection(event.target.value, compiledEnvironments))}
-                            data-test-id="context-environment-select"
-                            data-context={name}
-                            inputProps={{ "aria-label": `environment for ${name}` }}
-                            sx={{ minWidth: 150 }}
-                        >
-                            <MenuItem value={AUTO_ENVIRONMENT_VALUE}>Auto (from name)</MenuItem>
-                            {environments.map((environment) => (
-                                <MenuItem key={environment.id} value={environment.id}>
-                                    {environment.name}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </span>
+                    <Select
+                        size="small"
+                        value={label ?? AUTO_ENVIRONMENT_VALUE}
+                        onChange={(event) => setContextEnvironment(name, environmentFromSelection(event.target.value, compiledEnvironments))}
+                        data-test-id="context-environment-select"
+                        data-context={name}
+                        inputProps={{ "aria-label": `environment for ${name}` }}
+                        sx={{ minWidth: 150 }}
+                    >
+                        <MenuItem value={AUTO_ENVIRONMENT_VALUE}>Auto (from name)</MenuItem>
+                        {environments.map((environment) => (
+                            <MenuItem key={environment.id} value={environment.id}>
+                                {environment.name}
+                            </MenuItem>
+                        ))}
+                    </Select>
                 );
             },
         },
@@ -128,6 +146,10 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
             id: ACTIONS_COLUMN_ID,
             header: "Actions",
             enableSorting: false,
+            // Excluded from the column-config modal: the actions cell is pinned to the right-hand
+            // edge of the row by the sticky-actions styling, which assumes it is the last column,
+            // so it is neither reorderable nor hideable.
+            enableHiding: false,
             cell: (info) => {
                 const name = info.row.original.name;
                 return (
@@ -144,10 +166,14 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
         },
     ];
 
+    // The user's saved column configuration for this table: which columns are shown and the
+    // order to show them in, persisted under its own storage key. Every column ships visible.
+    const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("contexts", columns);
+
     const table = useReactTable({
         data: contexts,
         columns,
-        state: { sorting, globalFilter: deferredSearch },
+        state: { sorting, globalFilter: deferredSearch, columnOrder, columnVisibility },
         onSortingChange: setSorting,
         onGlobalFilterChange: setSearch,
         // No pagination row model is installed (every matching row is rendered, bounded only by
@@ -186,12 +212,15 @@ export function ContextsTable({ contexts, active, terminalDefault, onUse, onSetD
 
     return (
         <div className="flex flex-col gap-2">
-            <SearchBox
-                placeholder="Search contexts..."
-                value={search}
-                onChange={setSearch}
-                testId="contexts-search"
-            />
+            <div className="flex flex-row gap-2 items-center">
+                <SearchBox
+                    placeholder="Search contexts..."
+                    value={search}
+                    onChange={setSearch}
+                    testId="contexts-search"
+                />
+                <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
+            </div>
             <TableContainer component={Paper} data-test-id="contexts-table">
                 <Table size="small">
                     <TableHead>

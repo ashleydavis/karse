@@ -2,7 +2,7 @@
 
 Manual tests for per-table configurable columns (visibility + order), persisted per table. See the spec: [column-config](../../spec/column-config/detail.md).
 
-Every resource table (nodes, pods, deployments, stateful sets, daemon sets, events, errors) has a **Columns** button beside its search box. The steps below use the nodes table; the same button and modal appear on every resource table.
+Every resource table (nodes, pods, deployments, stateful sets, daemon sets, events, errors) and the contexts table have a **Columns** button beside their search box. The steps below use the nodes table; the same button and modal appear on every one of them.
 
 Start the app first. From the repo root run:
 

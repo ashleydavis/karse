@@ -131,8 +131,9 @@ Label chips have no copy control.
 
 ## Contexts page (`/contexts`)
 
-A table of all kubeconfig contexts, grouped by environment. Each row shows the context name, its environment, cluster, user, and default namespace.
+A table of all kubeconfig contexts, grouped by environment. Each row shows the context name, its environment, the selector that sets that environment by hand, cluster, user, and default namespace.
 
+- **Columns**: opens the same column modal as the other tables, so you can reorder the columns or hide the ones you do not want (the environment chip included). The choice is saved and survives a reload. Actions stays where it is: it is pinned to the right-hand edge of the row.
 - **Set as active**: makes this context the active one in the current tab.
 - **Set as default**: writes this context as the current context in your kubeconfig (`kubectl config use-context`).
 - **active** chip: this context is active in the current tab.
@@ -148,7 +149,7 @@ The shipped expressions match the usual words as whole parts of the name: `prod`
 
 Three is all Karse ships, on purpose: they are the environments nearly every kubeconfig has. If you want a Test / QA, a Local or an Infra, add it with the name, expression and colour you want rather than editing one Karse guessed at. Until you do, a context matching none of the three (a `qa-cluster`, a `minikube`) sits under Unassigned.
 
-If a name gets it wrong for one context, or your clusters are not named that way at all, set the environment yourself: each row's **Environment** column has a selector offering every environment in your list. Pick one to label that context, and the label wins over the expressions. Pick **Auto (from name)** to clear the label and go back to whatever matches. A chip you set by hand is drawn filled; one Karse matched from the name is outlined, so you can always see which is which. If you delete an environment you had labelled a context with, the label is ignored and the context falls back to whatever matches next.
+If a name gets it wrong for one context, or your clusters are not named that way at all, set the environment yourself: each row's **Set environment** column has a selector offering every environment in your list, beside the **Environment** column that shows the chip. Pick one to label that context, and the label wins over the expressions. Pick **Auto (from name)** to clear the label and go back to whatever matches. A chip you set by hand is drawn filled; one Karse matched from the name is outlined, so you can always see which is which. If you delete an environment you had labelled a context with, the label is ignored and the context falls back to whatever matches next.
 
 Labels are yours, not the cluster's: they are stored in your browser alongside your colour mode and timestamp format, so they survive a reload and a restart of Karse, and nothing is ever written to your kubeconfig. A label is remembered against the context's name, so a context that disappears from your kubeconfig and later comes back still has it.
 

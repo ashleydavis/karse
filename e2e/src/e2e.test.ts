@@ -1505,6 +1505,9 @@ test.describe("karse e2e", () => {
                 const config = JSON.parse(raw);
                 delete config.contextEnvironments;
                 window.localStorage.setItem("karse-config", JSON.stringify(config));
+                // Drop the contexts table's column configuration too, so a later block sees the
+                // table's shipped columns rather than whatever the hiding test left behind.
+                window.localStorage.removeItem("karse-columns-contexts");
             });
             setContext(CLUSTER_1);
             await page.goto("/cluster", { waitUntil: "networkidle" });
@@ -1637,6 +1640,90 @@ test.describe("karse e2e", () => {
         test("the cleared label stays cleared across a reload", async () => {
             await page.reload({ waitUntil: "networkidle" });
             expect(await groupHeadings()).toEqual(["Unassigned"]);
+        });
+
+        // The environment chip has a column of its own, separate from the selector that labels
+        // a context. The mocked payload is used again here because its names resolve to four
+        // different environments, so the chips have four different widths: that is what makes
+        // the alignment assertion below mean something.
+        test("the environment chip and its selector are separate columns", async () => {
+            await page.route("**/api/contexts", async (route) => {
+                await route.fulfill({ json: INFERENCE_PAYLOAD });
+            });
+            await page.goto("/contexts", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='context-row']")).toHaveCount(7);
+            const headers = await page.locator("[data-test-id='contexts-table'] thead th").allTextContents();
+            expect(headers.map((text) => text.trim())).toEqual([
+                "Name",
+                "Environment",
+                "Set environment",
+                "Cluster",
+                "User",
+                "Default Namespace",
+                "Actions",
+            ]);
+            const sharesACell = await page
+                .locator("[data-test-id='context-row']")
+                .first()
+                .evaluate((row) => {
+                    const chip = row.querySelector("[data-test-id='context-environment-chip']");
+                    const select = row.querySelector("[data-test-id='context-environment-select']");
+                    return chip?.closest("td") === select?.closest("td");
+                });
+            expect(sharesACell).toBe(false);
+        });
+
+        test("every row's environment selector starts at the same x position", async () => {
+            const selects = page.locator("[data-test-id='context-environment-select']");
+            await expect(selects).toHaveCount(7);
+            const lefts: number[] = [];
+            for (let index = 0; index < 7; index++) {
+                const box = await selects.nth(index).boundingBox();
+                if (box === null) {
+                    throw new Error("environment selector has no bounding box");
+                }
+                lefts.push(Math.round(box.x));
+            }
+            // "Production", "Development" and "Unassigned" are all different widths, so the
+            // selectors only share a left edge because the chip is in its own column.
+            expect(new Set(lefts).size).toBe(1);
+        });
+
+        test("the environment column can be hidden from the column configuration", async () => {
+            await page.locator("[data-test-id='column-config-button']").click();
+            await expect(page.locator("[data-test-id='column-config-modal']")).toBeVisible();
+            await dragColumnOnto("column-config-item-environment", "column-config-section-hidden");
+            await expect(
+                page.locator("[data-test-id='column-config-section-hidden'] [data-test-id='column-config-item-environment']"),
+            ).toBeVisible();
+            await page.locator("[data-test-id='column-config-close']").click();
+            await expect(page.locator("[data-test-id='context-environment-chip']")).toHaveCount(0);
+            // Hiding the chip takes nothing else with it: the selector, the rows and the
+            // grouping are all still there.
+            await expect(page.locator("[data-test-id='context-environment-select']")).toHaveCount(7);
+            await expect(page.locator("[data-test-id='context-row']")).toHaveCount(7);
+            expect(await groupHeadings()).toEqual(["Production", "Staging", "Development", "Unassigned"]);
+        });
+
+        test("the hidden environment column survives a reload and can be shown again", async () => {
+            await page.reload({ waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='context-row']")).toHaveCount(7);
+            await expect(page.locator("[data-test-id='context-environment-chip']")).toHaveCount(0);
+            await page.locator("[data-test-id='column-config-button']").click();
+            // Dropped onto the selector's row, so it returns to its shipped slot ahead of it.
+            await dragColumnOnto("column-config-item-environment", "column-config-item-environment-label");
+            await page.locator("[data-test-id='column-config-close']").click();
+            await expect(page.locator("[data-test-id='context-environment-chip']")).toHaveCount(7);
+            const headers = await page.locator("[data-test-id='contexts-table'] thead th").allTextContents();
+            expect(headers.map((text) => text.trim())).toEqual([
+                "Name",
+                "Environment",
+                "Set environment",
+                "Cluster",
+                "User",
+                "Default Namespace",
+                "Actions",
+            ]);
         });
     });
 

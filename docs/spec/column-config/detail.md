@@ -2,7 +2,7 @@
 
 ## Overview
 
-A shared, per-table column configuration: which columns are visible and the order they appear in. Every resource table (nodes, pods, deployments, stateful sets, daemon sets, events, errors) gets a "Columns" button that opens a configuration modal. The chosen configuration is persisted per table so it survives navigation and reload.
+A shared, per-table column configuration: which columns are visible and the order they appear in. Every resource table (nodes, pods, deployments, stateful sets, daemon sets, events, errors) and the contexts table get a "Columns" button that opens a configuration modal. The chosen configuration is persisted per table so it survives navigation and reload.
 
 Backed by:
 - `frontend/src/lib/column-config.tsx`: the `useColumnConfig(tableId, columns, defaultHidden?)` hook that derives TanStack Table's `columnOrder` and `columnVisibility` state from a persisted config and exposes the configurable columns and a setter. The optional `defaultHidden` lists column ids that start in the Hidden section when there is no saved configuration.
