@@ -47,7 +47,7 @@ Each default expression requires its token to be delimited by a non-letter or th
 ### Editing the list
 
 - The Config page (`/config`) presents its settings as subtabs: **Cluster data cache** (the existing on-disk cache settings, unchanged, and the tab the page opens on) and **Environments**.
-- The Environments tab lists the environments in order. Each row shows its chip (name in its colour), its name, its expression, and its colour, with controls to move it up, move it down, and delete it.
+- The Environments tab lists the environments in order. Each row shows its chip (name in its colour), its name, its expression, and its colour, with controls to move it up, move it down, and delete it. The chip sits in a fixed-width column so every row's name field starts at the same place however long the environment's name is; a name too long for the column is ellipsised in the chip.
 - **Add**: a name and an expression, plus a colour, appended to the end of the list. Its id is derived from the name and uniquified against the ids already in use.
 - **Edit**: the name, the expression and the colour of any row, including a row that shipped as a default.
 - **Delete**: any row, including a default. Its contexts fall through to whichever environment matches next, or to Unassigned.

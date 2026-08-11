@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import {
+    Box,
     Paper,
     Typography,
     TextField,
@@ -140,11 +141,16 @@ export function EnvironmentsSettings() {
                             data-test-id="config-environment-row"
                             data-environment={row.id}
                         >
-                            <EnvironmentChip
-                                environment={row}
-                                source="inferred"
-                                testId="config-environment-chip"
-                            />
+                            {/* The chip column is a fixed width so every row's Name field starts
+                                at the same place however long the environment's name is. A name
+                                too long for the column is ellipsised by the chip. */}
+                            <Box sx={{ display: "flex", width: 140, flexShrink: 0 }}>
+                                <EnvironmentChip
+                                    environment={row}
+                                    source="inferred"
+                                    testId="config-environment-chip"
+                                />
+                            </Box>
                             <TextField
                                 label="Name"
                                 size="small"
