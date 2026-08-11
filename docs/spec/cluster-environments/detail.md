@@ -30,17 +30,17 @@ The list Karse ships with, and what "reset to defaults" restores:
 | Production | `(^\|[^a-z])(production\|prod\|prd)([^a-z]\|$)` | error (red) |
 | Staging | `(^\|[^a-z])(staging\|stage\|stg)([^a-z]\|$)` | warning (amber) |
 | Development | `(^\|[^a-z])(development\|develop\|dev)([^a-z]\|$)` | info (blue) |
-| Test / QA | `(^\|[^a-z])(testing\|test\|qa)([^a-z]\|$)` | secondary (purple) |
-| Local | `(^\|[^a-z])(localhost\|local\|minikube\|kind)([^a-z]\|$)` | success (green) |
 
-Each default expression requires its token to be delimited by a non-letter or the end of the name, which is what makes `devops-prod` **Production** (its `devops` is not `dev`) and `predevelopmentplan` **Unassigned**. Digits are not delimiters, so `staging2` is still Staging.
+Three, deliberately: they are the environments almost every kubeconfig has, and anything else (a Test / QA, a Local, an Infra) is a row the user adds for themselves in a couple of seconds. Shipping a longer list would put rows most users do not want in front of them and make the first thing they do a deletion.
+
+Each default expression requires its token to be delimited by a non-letter or the end of the name, which is what makes `devops-prod` **Production** (its `devops` is not `dev`) and `predevelopmentplan` **Unassigned**. Digits are not delimiters, so `staging2` is still Staging. A name matching none of the three, such as `qa-cluster` or `minikube`, is Unassigned until the user adds an environment that matches it.
 
 ## Behaviour
 
 ### Resolving a context's environment
 
 - Every context resolves to exactly one environment: its explicit label if it has one, otherwise the **first** environment in the list whose expression matches its name, otherwise Unassigned.
-- **Order is precedence.** When a name matches two environments' expressions, the one nearer the top of the list wins, and moving a row changes the answer. The shipped list is ordered Production first for that reason: `prod-test-eu` is Production, not Test / QA.
+- **Order is precedence.** When a name matches two environments' expressions, the one nearer the top of the list wins, and moving a row changes the answer. The shipped list is ordered Production first for that reason: `prod-staging-mirror` is Production, not Staging.
 - **Matching is case-insensitive and runs against the whole context name.** The expression is the whole rule: there is no token table, no name-segment splitting, and no second matching mechanism behind the list.
 - A name matching no expression is Unassigned. A kubeconfig where **no** name matches puts every context under Unassigned and still renders a usable, fully functional contexts page, as does an empty list.
 

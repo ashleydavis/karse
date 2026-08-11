@@ -78,18 +78,6 @@ export const DEFAULT_ENVIRONMENTS: EnvironmentDefinition[] = [
         pattern: tokenPattern(["development", "develop", "dev"]),
         color: "info",
     },
-    {
-        id: "test",
-        name: "Test / QA",
-        pattern: tokenPattern(["testing", "test", "qa"]),
-        color: "secondary",
-    },
-    {
-        id: "local",
-        name: "Local",
-        pattern: tokenPattern(["localhost", "local", "minikube", "kind"]),
-        color: "success",
-    },
 ];
 
 // Checks a regular expression the user typed. Returns null when it is usable, otherwise the

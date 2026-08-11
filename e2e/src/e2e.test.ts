@@ -1516,13 +1516,11 @@ test.describe("karse e2e", () => {
             });
             await page.goto("/contexts", { waitUntil: "networkidle" });
             await expect(page.locator("[data-test-id='context-row']")).toHaveCount(7);
-            // Production first, unassigned last, in the fixed order, not alphabetical.
+            // Production first, unassigned last, in the shipped list's order, not alphabetical.
             expect(await groupHeadings()).toEqual([
                 "Production",
                 "Staging",
                 "Development",
-                "Test / QA",
-                "Local",
                 "Unassigned",
             ]);
         });
@@ -1531,9 +1529,12 @@ test.describe("karse e2e", () => {
             expect(await groupOf("prod-eu-1")).toBe("production");
             expect(await groupOf("staging-1")).toBe("staging");
             expect(await groupOf("my-dev-box")).toBe("development");
-            expect(await groupOf("qa-cluster")).toBe("test");
-            expect(await groupOf("minikube")).toBe("local");
             expect(await groupOf("apollo")).toBe("unassigned");
+        });
+
+        test("a name the shipped list does not match is Unassigned, not a fourth environment", async () => {
+            expect(await groupOf("qa-cluster")).toBe("unassigned");
+            expect(await groupOf("minikube")).toBe("unassigned");
         });
 
         test("matches tokens as name segments, so devops-prod is production", async () => {
@@ -1772,8 +1773,6 @@ test.describe("karse e2e", () => {
                 "production",
                 "staging",
                 "development",
-                "test",
-                "local",
             ]);
             await expect(editorRow("production").locator("[data-test-id='config-environment-chip']")).toHaveText("Production");
         });
@@ -1838,8 +1837,6 @@ test.describe("karse e2e", () => {
                 "production",
                 "staging",
                 "development",
-                "test",
-                "local",
                 "green",
                 "blue",
             ]);
@@ -1920,8 +1917,6 @@ test.describe("karse e2e", () => {
                 "production",
                 "staging",
                 "development",
-                "test",
-                "local",
             ]);
             await openContexts();
             expect(await groupOf("prod-eu-1")).toBe("production");

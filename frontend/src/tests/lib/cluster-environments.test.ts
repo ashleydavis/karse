@@ -118,18 +118,27 @@ describe("the default list", () => {
         expect(environmentOf("apollo", DEFAULT_ENVIRONMENTS)).toBe("unassigned");
     });
 
-    test("matches the staging, test and local tokens", () => {
+    test("matches the staging tokens", () => {
         expect(environmentOf("staging-eu-west", DEFAULT_ENVIRONMENTS)).toBe("staging");
         expect(environmentOf("acme-stg-2", DEFAULT_ENVIRONMENTS)).toBe("staging");
         expect(environmentOf("staging2", DEFAULT_ENVIRONMENTS)).toBe("staging");
-        expect(environmentOf("qa-cluster", DEFAULT_ENVIRONMENTS)).toBe("test");
-        expect(environmentOf("acme-testing", DEFAULT_ENVIRONMENTS)).toBe("test");
-        expect(environmentOf("minikube", DEFAULT_ENVIRONMENTS)).toBe("local");
-        expect(environmentOf("kind-dashboard", DEFAULT_ENVIRONMENTS)).toBe("local");
+    });
+
+    test("ships exactly Production, Staging and Development", () => {
+        expect(DEFAULT_ENVIRONMENTS.map((environment) => environment.id)).toEqual([
+            "production",
+            "staging",
+            "development",
+        ]);
+    });
+
+    test("a name whose only token was dropped from the defaults is Unassigned", () => {
+        expect(environmentOf("qa-cluster", DEFAULT_ENVIRONMENTS)).toBe("unassigned");
+        expect(environmentOf("minikube", DEFAULT_ENVIRONMENTS)).toBe("unassigned");
     });
 
     test("puts production first, so a name mentioning two lands in the riskier one", () => {
-        expect(environmentOf("prod-test-eu", DEFAULT_ENVIRONMENTS)).toBe("production");
+        expect(environmentOf("prod-staging-mirror", DEFAULT_ENVIRONMENTS)).toBe("production");
         expect(environmentOf("dev-staging-mirror", DEFAULT_ENVIRONMENTS)).toBe("staging");
     });
 
@@ -175,7 +184,7 @@ describe("groupByEnvironment", () => {
     });
 
     test("a label for a context that is not present produces no phantom group", () => {
-        const groups = groupByEnvironment([{ name: "apollo" }], defaults, { "gone-prod": "local" });
+        const groups = groupByEnvironment([{ name: "apollo" }], defaults, { "gone-prod": "production" });
         expect(groups.map((group) => group.environment.id)).toEqual(["unassigned"]);
     });
 });
