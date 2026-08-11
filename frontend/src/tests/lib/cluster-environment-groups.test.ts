@@ -1,7 +1,12 @@
 import { aggregateClusters } from "karse-types";
 import type { ClusterSummary } from "karse-types";
 import { groupClustersByEnvironment } from "../../lib/cluster-environment-groups";
+import { compileEnvironments, DEFAULT_ENVIRONMENTS } from "../../lib/cluster-environments";
 import type { EnvironmentLabels } from "../../lib/cluster-environments";
+
+// The shipped list, compiled once: the grouping reads the user's list, and these tests
+// describe what the overview does for a user who has not edited it.
+const DEFAULTS = compileEnvironments(DEFAULT_ENVIRONMENTS);
 
 // No explicit labels: every context falls through to the environment its name implies.
 const NO_LABELS: EnvironmentLabels = {};
@@ -68,10 +73,11 @@ function unreachable(context: string, message: string): ClusterSummary {
 // Groups bare summaries: the tests below group the summaries themselves, where the overview
 // table groups its rows, so summaryOf is the identity here.
 function group(summaries: ClusterSummary[], labels: EnvironmentLabels) {
-    return groupClustersByEnvironment(summaries, (summary) => summary, labels);
+    return groupClustersByEnvironment(summaries, (summary) => summary, DEFAULTS, labels);
 }
 
-// Three contexts across three environments by name alone, plus one that matches no token.
+// Three contexts across three environments by name alone, plus one that matches no
+// expression in the shipped list.
 const PROD = reachable("prod-eu-1", 4, 1000, 4000, 2_000_000_000, 8_000_000_000);
 const PROD_2 = reachable("acme-prod-us", 6, 3000, 12000, 6_000_000_000, 24_000_000_000);
 const STAGING = reachable("staging-1", 2, 500, 2000, 1_000_000_000, 4_000_000_000);
@@ -119,18 +125,34 @@ describe("groupClustersByEnvironment", () => {
         expect(groups[0]!.totals.totals.allocatable.cpuMillicores).toBe(101000);
     });
 
-    test("orders the environments production first and unassigned last", () => {
-        const local = reachable("minikube", 1, 10, 100, 1, 2);
+    test("orders the environments by the list, production first and unassigned last", () => {
         const development = reachable("my-dev-box", 1, 10, 100, 1, 2);
-        const test = reachable("qa-cluster", 1, 10, 100, 1, 2);
+        const unmatched = reachable("qa-cluster", 1, 10, 100, 1, 2);
         // Handed in deliberately back-to-front, so a passing order cannot be the input order.
-        const groups = group([APOLLO, local, test, development, STAGING, PROD], NO_LABELS);
+        const groups = group([APOLLO, unmatched, development, STAGING, PROD], NO_LABELS);
         expect(groups.map((entry) => entry.environment)).toEqual([
             "production",
             "staging",
             "development",
-            "test",
-            "local",
+            "unassigned",
+        ]);
+    });
+
+    test("orders the environments by the user's list, not a fixed order", () => {
+        // The same clusters under a list the user has put staging above production.
+        const reordered = compileEnvironments([
+            DEFAULT_ENVIRONMENTS[1]!,
+            DEFAULT_ENVIRONMENTS[0]!,
+        ]);
+        const groups = groupClustersByEnvironment(
+            [PROD, STAGING, APOLLO],
+            (summary) => summary,
+            reordered,
+            NO_LABELS,
+        );
+        expect(groups.map((entry) => entry.environment)).toEqual([
+            "staging",
+            "production",
             "unassigned",
         ]);
     });
@@ -266,7 +288,7 @@ describe("environment totals against the grand total", () => {
     test("they still add up after a context is relabelled", () => {
         expectTotalsAddUp([PROD, PROD_2, STAGING, APOLLO], {
             apollo: "staging",
-            "prod-eu-1": "local",
+            "prod-eu-1": "development",
         });
     });
 

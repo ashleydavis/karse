@@ -43,7 +43,7 @@ Clicking a row navigates to `/cluster?context=<name>`: the `context` query param
 
 | Field | Contents |
 |---|---|
-| Environment | The environment's heading (Production, Staging, Development, Test / QA, Local, Unassigned). |
+| Environment | The environment's heading: an environment from the user's own list (Production, Staging and Development ship as the defaults), or Unassigned. |
 | Clusters | How many of the overview's clusters belong to this environment. |
 | Nodes | Their summed node count. |
 | CPU / Memory | The environment's aggregate utilisation, under the same Usage/Requests and %/Absolute toggles as the totals block. |
@@ -51,7 +51,7 @@ Clicking a row navigates to `/cluster?context=<name>`: the `context` query param
 
 The rows underneath a heading are that environment's clusters, still clickable and still linking through to each cluster's home page. Every configured context appears in exactly one section.
 
-**Which environment a cluster belongs to is [cluster-environments](../cluster-environments/detail.md)' decision, not this feature's.** The section order is that feature's fixed order (production first, unassigned last), reached through the same `groupByEnvironment` call the contexts page and both context pickers make, so there is no second ordering rule and no second resolver. An environment no cluster resolved to renders no section, and an **Unassigned** section appears only when a context is neither labelled nor inferable from its name.
+**Which environment a cluster belongs to is [cluster-environments](../cluster-environments/detail.md)' decision, not this feature's.** The section order is the user's own environment list order, with Unassigned last, reached through the same `groupByEnvironment` call the contexts page and both context pickers make, so there is no second ordering rule and no second resolver. Editing the list on the Config page reorders, renames, adds and removes the page's sections with it. An environment no cluster resolved to renders no section, and an **Unassigned** section appears only when a context is neither labelled nor inferable from its name.
 
 **The grouping happens in the frontend**, in `lib/cluster-environment-groups.ts`. That follows from where the environment labels ended up: they live only in the browser's `karse-config` local-storage entry, so the backend cannot see them and cannot group by them. What the frontend folds is exactly the per-context summaries the stream already delivers, so there is no second, environment-aware fetch path and no new endpoint. It also means **relabelling a context takes effect without a restart**: the label is read from the shared config on every render, so a cluster and its numbers move to the new environment's section as soon as the label changes.
 

@@ -165,7 +165,7 @@ function EnvironmentGroupHeading({
 export function ClustersTable({ clusters, onOpen }: Props) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const { search, setSearch, deferredSearch } = useSearchFilter();
-    const { config: { contextEnvironments } } = useConfig();
+    const { config: { contextEnvironments }, compiledEnvironments } = useConfig();
 
     const columns: ColumnDef<ClusterSummary>[] = [
         {
@@ -249,13 +249,13 @@ export function ClustersTable({ clusters, onOpen }: Props) {
 
     const rows = table.getRowModel().rows;
 
-    // The rows the table would render, split into environment sections in the fixed
-    // ENVIRONMENT_ORDER (production first, unassigned last) with each section's aggregate
-    // figures. Sorting and searching run over the whole table first, so a section holds the
-    // rows that survived them, in the sorted order, and its figures describe exactly the
-    // clusters shown under it. With no search active that is every cluster, so the sections
-    // add up to the "Across all clusters" totals above the table.
-    const groups = groupClustersByEnvironment(rows, (row) => row.original, contextEnvironments);
+    // The rows the table would render, split into environment sections in the user's own list
+    // order (Unassigned last) with each section's aggregate figures. Sorting and searching run
+    // over the whole table first, so a section holds the rows that survived them, in the
+    // sorted order, and its figures describe exactly the clusters shown under it. With no
+    // search active that is every cluster, so the sections add up to the "Across all clusters"
+    // totals above the table.
+    const groups = groupClustersByEnvironment(rows, (row) => row.original, compiledEnvironments, contextEnvironments);
 
     // The sort affordance in a column header: which way the column is currently sorted,
     // or the neutral icon when it is not.
