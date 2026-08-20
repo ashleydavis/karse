@@ -110,6 +110,18 @@ Use a table/column with many distinct values, e.g. the Pods page with a namespac
 
 Check this in both **light and dark mode**.
 
+#### Long option labels (truncation)
+
+Use a table whose loaded rows carry a long label value, e.g. pods labelled `app.kubernetes.io/instance=payment-gateway-authorization-service-canary-eu-west-1-primary` (a Kubernetes label value can be up to 63 characters). Open the **Filter** editor and scroll to that label key's group:
+
+- The dropdown body is wider than a single option column (960px, three columns of at least 300px on the usual window), so ordinary label values read in full.
+- A value too long for its column is **cut off with a trailing ellipsis** and stays inside its own column. It must not run over the checkbox or the text of the option to its right, and the checkboxes must stay lined up down each column.
+- **Hover the truncated label**: the full value appears as a tooltip, so nothing is unreadable without leaving the dropdown.
+- **Click the checkbox of the option immediately to the right of a truncated one**: it ticks that option (not the long one) and the table narrows to that value's rows.
+- Narrow the browser window until the dropdown would be wider than the screen: it shrinks to stay on-screen (capped at 90% of the window) instead of running off the right-hand edge.
+
+Check this in both **light and dark mode**.
+
 ### Search on real-cluster label shapes
 
 Teardown the fuzzy-search fixture, then stand up the real-shaped-labels fixture:

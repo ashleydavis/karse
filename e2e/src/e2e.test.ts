@@ -10581,6 +10581,192 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Pods page: filter editor long option labels ─────────────────────────────
+
+    test.describe("pods page filter editor long option labels", () => {
+        // Pods carrying an `app.kubernetes.io/instance` label whose values are real,
+        // long Kubernetes label values (the API caps a value at 63 characters). A
+        // label-key group's options are arbitrary strings, so this is the case where
+        // an option label used to overflow its grid cell and paint over the next
+        // column's checkbox and text.
+        const LONG_VALUE = "payment-gateway-authorization-service-canary-eu-west-1-primary";
+        const SHORT_VALUE = "checkout";
+        const INSTANCE_VALUES = [
+            SHORT_VALUE,
+            LONG_VALUE,
+            "karse-production-checkout-service-eu-west-1",
+            "search",
+            "recommendation-engine-batch-reindexer-nightly-eu-central-1",
+            "identity-provider-token-exchange-sidecar",
+        ];
+        const LONG_LABEL_PODS = {
+            pods: INSTANCE_VALUES.map((instance, i) => ({
+                name: `instance-pod-${i + 1}`,
+                namespace: "default",
+                phase: "Running",
+                ready: "1/1",
+                containerCount: 1,
+                restarts: 0,
+                node: "node-worker",
+                createdAt: new Date().toISOString(),
+                labels: {
+                    "app.kubernetes.io/instance": instance,
+                },
+            })),
+        };
+        const INSTANCE_GRID = "[data-test-id='pods-filter-options-label:app.kubernetes.io/instance']";
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: LONG_LABEL_PODS });
+            });
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']").first()).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+            setContext(CLUSTER_1);
+        });
+
+        test("a long option label is truncated with an ellipsis inside its own column", async () => {
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            const grid = page.locator(INSTANCE_GRID);
+            await expect(grid).toBeVisible();
+            const longOption = page.locator(`[data-test-id='pods-filter-item-label:app.kubernetes.io/instance-${LONG_VALUE}']`);
+            await longOption.scrollIntoViewIfNeeded();
+
+            // The label's painted box stays inside its option cell, and the cell stays
+            // inside the grid, so nothing can be drawn over the next column. The label
+            // is genuinely clipped (its content is wider than the box it is given) and
+            // renders the overflow as an ellipsis rather than letting it spill out.
+            const measured = await longOption.evaluate((el) => {
+                // The truncation lives on the label's own span (the element the
+                // ellipsis styles are applied to), so measure that, not the
+                // ListItemText wrapper that clips it.
+                const label = el.querySelector<HTMLElement>(".MuiListItemText-root span")!;
+                const style = getComputedStyle(label);
+                return {
+                    cellRight: Math.round(el.getBoundingClientRect().right),
+                    labelRight: Math.round(label.getBoundingClientRect().right),
+                    scrollWidth: label.scrollWidth,
+                    clientWidth: label.clientWidth,
+                    textOverflow: style.textOverflow,
+                    whiteSpace: style.whiteSpace,
+                    overflow: style.overflow,
+                };
+            });
+            expect(measured.labelRight).toBeLessThanOrEqual(measured.cellRight);
+            expect(measured.scrollWidth).toBeGreaterThan(measured.clientWidth);
+            expect(measured.textOverflow).toBe("ellipsis");
+            expect(measured.whiteSpace).toBe("nowrap");
+            expect(measured.overflow).toBe("hidden");
+            await page.keyboard.press("Escape");
+        });
+
+        test("a truncated label keeps its full value available as a title tooltip, and a short one is untouched", async () => {
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            const longLabel = page.locator(`[data-test-id='pods-filter-item-label:app.kubernetes.io/instance-${LONG_VALUE}'] .MuiListItemText-root span`);
+            const shortLabel = page.locator(`[data-test-id='pods-filter-item-label:app.kubernetes.io/instance-${SHORT_VALUE}'] .MuiListItemText-root span`);
+            await expect(longLabel).toHaveAttribute("title", LONG_VALUE);
+            await expect(shortLabel).toHaveAttribute("title", SHORT_VALUE);
+
+            // The short value needs no truncation: its content fits the box it is given.
+            const short = await shortLabel.evaluate((el) => ({
+                scrollWidth: (el as HTMLElement).scrollWidth,
+                clientWidth: (el as HTMLElement).clientWidth,
+                text: el.textContent,
+            }));
+            expect(short.text).toBe(SHORT_VALUE);
+            expect(short.scrollWidth).toBeLessThanOrEqual(short.clientWidth);
+            await page.keyboard.press("Escape");
+        });
+
+        test("the option beside a long label is still clickable and toggles its own value", async () => {
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            const grid = page.locator(INSTANCE_GRID);
+            await expect(grid).toBeVisible();
+
+            // The option immediately after the long one in the grid's flow order: this
+            // is the neighbour the overflowing label used to paint over.
+            const items = grid.locator("[data-test-id^='pods-filter-item-label:app.kubernetes.io/instance-']");
+            const values = await items.evaluateAll((els) =>
+                els.map((el) => el.querySelector(".MuiListItemText-root span")!.textContent),
+            );
+            const neighbourValue = values[values.indexOf(LONG_VALUE) + 1]!;
+            const neighbour = page.locator(`[data-test-id='pods-filter-item-label:app.kubernetes.io/instance-${neighbourValue}']`);
+
+            // Click the neighbour's checkbox itself (the smallest target, and the part
+            // the long label used to cover) rather than the row.
+            await neighbour.locator("input[type='checkbox']").click();
+            await expect(neighbour.locator("input[type='checkbox']")).toBeChecked();
+            await expect(page.locator(`[data-test-id='pods-filter-item-label:app.kubernetes.io/instance-${LONG_VALUE}'] input[type='checkbox']`)).not.toBeChecked();
+            await page.keyboard.press("Escape");
+
+            // The clicked value, not the long one, is what narrowed the table.
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: 1 selected");
+            const rows = page.locator("[data-test-id='pod-row']");
+            await expect(rows).toHaveCount(1);
+            const expectedPod = `instance-pod-${INSTANCE_VALUES.indexOf(neighbourValue) + 1}`;
+            await expect(rows.locator("td:first-child")).toHaveText(expectedPod);
+
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            await page.locator("[data-test-id='pods-filter-deselect-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(INSTANCE_VALUES.length);
+        });
+
+        test("the options still flow across several columns with their checkboxes aligned", async () => {
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            const grid = page.locator(INSTANCE_GRID);
+            await expect(grid).toBeVisible();
+            const boxes = await grid.locator("[data-test-id^='pods-filter-item-label:app.kubernetes.io/instance-']").evaluateAll((els) =>
+                els.map((el) => ({
+                    left: Math.round(el.getBoundingClientRect().left),
+                    checkboxLeft: Math.round(el.querySelector("input[type='checkbox']")!.getBoundingClientRect().left),
+                })),
+            );
+
+            // Long labels have not collapsed the layout into one column.
+            const columnLefts = new Set(boxes.map((b) => b.left));
+            expect(columnLefts.size).toBeGreaterThan(1);
+
+            // Every column's checkboxes line up: one distinct checkbox position per
+            // column, whatever the label lengths in the rows above.
+            const checkboxLefts = new Set(boxes.map((b) => b.checkboxLeft));
+            expect(checkboxLefts.size).toBe(columnLefts.size);
+            await page.keyboard.press("Escape");
+        });
+
+        test("the widened dropdown still fits inside the viewport", async () => {
+            await page.locator("[data-test-id='pods-filter-button']").click();
+            const menu = page.locator("[data-test-id='pods-filter-menu'] .MuiPaper-root").first();
+            await expect(menu).toBeVisible();
+            const fits = await menu.evaluate((el) => {
+                const r = el.getBoundingClientRect();
+                return {
+                    left: Math.round(r.left),
+                    right: Math.round(r.right),
+                    top: Math.round(r.top),
+                    bottom: Math.round(r.bottom),
+                    viewportWidth: window.innerWidth,
+                    viewportHeight: window.innerHeight,
+                    maxWidth: parseFloat(getComputedStyle(el).maxWidth),
+                    maxHeight: parseFloat(getComputedStyle(el).maxHeight),
+                };
+            });
+            expect(fits.left).toBeGreaterThanOrEqual(0);
+            expect(fits.right).toBeLessThanOrEqual(fits.viewportWidth);
+            expect(fits.top).toBeGreaterThanOrEqual(0);
+            expect(fits.bottom).toBeLessThanOrEqual(fits.viewportHeight);
+            // The 90vw / 90vh caps are still in force at the new widths.
+            expect(Math.abs(fits.maxWidth - fits.viewportWidth * 0.9)).toBeLessThanOrEqual(1);
+            expect(Math.abs(fits.maxHeight - fits.viewportHeight * 0.9)).toBeLessThanOrEqual(1);
+            await page.keyboard.press("Escape");
+        });
+    });
+
     // ── Deployments page: label filter dropdown (other resource kinds) ───────────
 
     test.describe("deployments page label filter", () => {

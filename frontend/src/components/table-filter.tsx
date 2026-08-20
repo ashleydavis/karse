@@ -20,13 +20,20 @@ import { searchColumns, type FilterableColumn, type FilterSelection } from "../l
 // Minimum width of one option column, in pixels. Each group's options are laid
 // out in horizontal rows that wrap into as many columns of at least this width as
 // the editor allows, so the checkboxes fill the available width instead of
-// stacking in a single column. Kept wide enough that labels stay readable.
-const OPTION_COLUMN_MIN_WIDTH = 200;
+// stacking in a single column. Kept wide enough that labels stay readable. Sized
+// against real label values (a label key group's options are arbitrary strings, up
+// to the Kubernetes 63-character cap): at this width an option's label has room for
+// roughly 33 characters, so ordinary values read in full and only the long tail is
+// truncated with an ellipsis.
+const OPTION_COLUMN_MIN_WIDTH = 300;
 // The editor body's width, in pixels. Fixed (and capped to the viewport on the
 // menu paper) so the option grid always has room to flow its checkboxes into
 // several columns and fill the width, rather than collapsing to one narrow
-// column. This keeps the wide dropdown the multi-column layout already had.
-const EDITOR_BODY_WIDTH = 640;
+// column. Wide enough for three columns of OPTION_COLUMN_MIN_WIDTH, so long label
+// values get more room before they need truncating while the multi-column flow is
+// kept. The menu paper's maxWidth: 90vw still caps it to the viewport, and the
+// body's own maxWidth: 100% lets it shrink with the paper on a narrow window.
+const EDITOR_BODY_WIDTH = 960;
 // The capped height of the scrollable editor body, in pixels. When the groups and
 // their options together run past this, the body scrolls and shows a scrollbar so
 // the user can tell there is more. Sized so a few small groups fit without
@@ -73,7 +80,9 @@ function mutedWhen(muted: boolean): Record<string, any> {
 // filters the shown columns/options by column name or value text, and a "Clear"
 // control clears every selection. Each group's options flow in horizontal rows
 // that wrap into multiple columns so the checkboxes fill the editor's width, and
-// the editor body scrolls with a visible scrollbar when its content overflows.
+// the editor body scrolls with a visible scrollbar when its content overflows. An
+// option label too long for its column is truncated with an ellipsis (its full
+// value on hover as a title tooltip) so it cannot paint over the next column.
 // This supersedes the old per-table filters.
 export function TableFilter({ columns, selection, onToggle, onDeselectAll, totalSelected, testIdPrefix }: TableFilterProps) {
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
@@ -170,7 +179,8 @@ export function TableFilter({ columns, selection, onToggle, onDeselectAll, total
                     telling the user there is more to see. The scrollbar is styled so
                     it is always painted (not just an overlay that shows on hover), so
                     the user can always tell when there is more below. The body has a
-                    fixed width, so the dropdown width is unchanged.
+                    fixed width (EDITOR_BODY_WIDTH), which sets the dropdown's width,
+                    and shrinks with the menu paper's 90vw cap on a narrow window.
                 */}
                 {shown.length > 0 && (
                     <Box
@@ -219,10 +229,34 @@ export function TableFilter({ columns, selection, onToggle, onDeselectAll, total
                                         <MenuItem
                                             key={`${column.columnId}=${value}`}
                                             onClick={() => onToggle(column.columnId, value)}
+                                            // A grid item's min-width defaults to auto, which is
+                                            // its content's width, so without minWidth: 0 the
+                                            // option refuses to shrink to its column and a long
+                                            // label spills out over the next column's checkbox
+                                            // and text. Setting it to 0 confines the option to
+                                            // its column so the truncation below can engage.
+                                            sx={{ minWidth: 0 }}
                                             data-test-id={`${testIdPrefix}-item-${column.columnId}-${value}`}
                                         >
                                             <Checkbox checked={(selection[column.columnId] ?? []).includes(value)} size="small" />
-                                            <ListItemText primary={value} />
+                                            {/*
+                                                Truncate a label too long for its column with a
+                                                trailing ellipsis (noWrap) rather than letting it
+                                                overflow. minWidth: 0 is needed on this flex item
+                                                for the same reason as on the MenuItem above.
+                                                The full value stays readable in the dropdown as
+                                                the label's title tooltip on hover.
+                                            */}
+                                            <ListItemText
+                                                primary={value}
+                                                sx={{ minWidth: 0 }}
+                                                slotProps={{
+                                                    primary: {
+                                                        noWrap: true,
+                                                        title: value,
+                                                    },
+                                                }}
+                                            />
                                         </MenuItem>
                                     ))}
                                 </Box>
