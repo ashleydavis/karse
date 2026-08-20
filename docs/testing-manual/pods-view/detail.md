@@ -130,6 +130,39 @@ Three pods in `default`: `web-pod` (labels `app=web`, `tier=frontend`), `db-pod`
 - **Search by label key/value shared form**: type `app=db`. Only `db-pod` remains. Clear the search to restore all rows.
 - **Deployments page** (`/deployments`): the `web-deploy` row shows `app=web` and `tier=frontend` chips in its Labels column.
 
+## Scenario I: OOMKilled filter
+
+Verifies the filter dimension the Cluster Overview's OOMKills health tile links into.
+
+**Fixture:** [_fixtures-kwok/40-overview-count-links](../_fixtures-kwok/40-overview-count-links/)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/40-overview-count-links/setup.sh
+```
+
+Start Karse:
+
+```sh
+bun run dev
+```
+
+Then open `http://127.0.0.1:5173`, select the `kwok-karse-test` context, and go to the **Pods** page (`/pods`).
+
+The fixture holds five pods in `default`. Only `pod-oomkilled` records a previous OOMKilled termination; it is **Running** now, which is the point: the filter is about the pod's history, not its current state.
+
+### What to check
+- **Pods page**: five rows, the **Filter** button reading `Filter: All`.
+- **OOMKilled**: open the Filter editor. Under the **OOMKilled** heading, `Yes` and `No` are listed. Tick `Yes`: only `pod-oomkilled` remains and the button reads `Filter: 1 selected`. Its **Status** cell still reads `Running`, so you can see the filter is matching the restart history, not the current phase.
+- **The other side**: tick `No` instead: the other four pods show.
+- **Clear**: click **Clear**. All five rows return and the button reads `Filter: All`.
+- **Seeded from the URL**: open `http://127.0.0.1:5173/pods?oomKilled=Yes` directly. The page opens already filtered to `pod-oomkilled` with the button reading `Filter: 1 selected` and `Yes` ticked under **OOMKilled**. This is the param the Cluster page's OOMKills tile links with (see [cluster-overview](../cluster-overview/detail.md)). A bad value (`?oomKilled=maybe`) seeds nothing: every pod shows and the button reads `Filter: All`.
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/40-overview-count-links/teardown.sh
+```
+
 Teardown:
 
 ```sh
@@ -139,4 +172,5 @@ Teardown:
 ./docs/testing-manual/_fixtures-kwok/10-mixed-pod-phases/teardown.sh
 ./docs/testing-manual/_fixtures-kwok/21-pod-phase-filter/teardown.sh
 ./docs/testing-manual/_fixtures-kwok/33-labels-column/teardown.sh
+./docs/testing-manual/_fixtures-kwok/40-overview-count-links/teardown.sh
 ```

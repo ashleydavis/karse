@@ -14,6 +14,7 @@ function makePod(name: string): Pod {
         createdAt: "2024-01-01T00:00:00Z",
         node: "node-1",
         labels: {},
+        oomKilled: false,
     };
 }
 

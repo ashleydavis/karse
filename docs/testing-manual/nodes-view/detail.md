@@ -155,6 +155,40 @@ Then open `http://127.0.0.1:5173`, select the `kwok-karse-test` context, and go 
 - **Memory sort**: click the **Memory** header. Rows reorder by memory percentage; confirm the order reflects memory, independent of the CPU order.
 - **Em-dash**: stop the app and restart it **without** `KARSE_FAKE_METRICS=1` (plain `bun run dev`). With no metrics-server on this kwok cluster, both columns show an em-dash (`—`) for every node, since there is no usage to take a percentage of. Such nodes sort to the bottom of the ascending order.
 
+## Scenario J: Pressure and Utilization filters
+
+Verifies the two filter dimensions the Cluster Overview's Node pressure tile and node-utilization strip link into.
+
+**Fixture:** [_fixtures-kwok/40-overview-count-links](../_fixtures-kwok/40-overview-count-links/)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/40-overview-count-links/setup.sh
+```
+
+Start Karse:
+
+```sh
+bun run dev
+```
+
+Then open `http://127.0.0.1:5173`, select the `kwok-karse-test` context, and go to the **Nodes** page (`/nodes`).
+
+The fixture's four nodes are `node-hot` (CPU requests 90% of allocatable), `node-mid` (60%), `node-cool` (10%) and `node-pressure` (reserves nothing, and reports an active MemoryPressure condition).
+
+### What to check
+- **Nodes table**: four rows, the **Filter** button reading `Filter: All`.
+- **Pressure**: open the Filter editor. Under the **Pressure** heading, `Active` and `None` are listed. Tick `Active`: only `node-pressure` remains and the button reads `Filter: 1 selected`. Tick `None` instead: the other three remain.
+- **Utilization**: untick everything, then under the **Utilization** heading tick `Over-utilized`: only `node-hot` remains. Tick `Healthy` instead: only `node-mid`. Tick `Under-utilized` instead: `node-cool` and `node-pressure`.
+- **Clear**: click **Clear** at the top of the editor. All four rows return and the button reads `Filter: All`.
+- **Seeded from the URL**: open `http://127.0.0.1:5173/nodes?pressure=Active` directly. The page opens already filtered to the pressured node with the button reading `Filter: 1 selected` and `Active` ticked under **Pressure**; it clears with **Clear** like any other. Do the same with `http://127.0.0.1:5173/nodes?band=Over-utilized` for the Utilization filter. These are the params the Cluster page's Node pressure tile and node-utilization strip link with (see [cluster-overview](../cluster-overview/detail.md)). A bad value (`?band=Nonsense`) seeds nothing: every node shows and the button reads `Filter: All`.
+- **A band filter waits for the snapshot**: the bands come from the cluster Performance snapshot, which loads after the node list. On a slow load a band-filtered page can read "No nodes match the search." for a moment before its rows appear. That is the snapshot arriving, not a lost row.
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/40-overview-count-links/teardown.sh
+```
+
 Teardown each cluster you stood up while testing this doc:
 
 ```sh
@@ -164,4 +198,5 @@ Teardown each cluster you stood up while testing this doc:
 ./docs/testing-manual/_fixtures-kwok/04-mixed-node-statuses/teardown.sh
 ./docs/testing-manual/_fixtures-kwok/05-nodes-with-no-roles/teardown.sh
 ./docs/testing-manual/_fixtures-kwok/06-nodes-with-multiple-roles/teardown.sh
+./docs/testing-manual/_fixtures-kwok/40-overview-count-links/teardown.sh
 ```

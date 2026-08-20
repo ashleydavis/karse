@@ -22,6 +22,11 @@ export type Node = {
     // The node's cloud instance type, from label node.kubernetes.io/instance-type
     // (falling back to beta.kubernetes.io/instance-type); null when neither label is set.
     instanceType: string | null;
+    // The node's active pressure condition types ("MemoryPressure", "DiskPressure",
+    // "PIDPressure"), in that order; empty when the node is under no pressure. Same rule
+    // as the cluster Node pressure health counter, so the tile and the nodes list
+    // filtered to pressure agree. See backend/src/kubectl/health-rules.ts.
+    pressure: string[];
 };
 
 export type ClusterOverview = {
@@ -66,6 +71,11 @@ export type Pod = {
     createdAt: string;      // ISO timestamp
     node: string;
     labels: Record<string, string>;  // metadata.labels; empty object when none
+    // True when any container or init container records a previous termination with
+    // reason "OOMKilled" (the pod was OOM-killed and restarted). Same rule as the
+    // cluster OOMKills health counter, so the tile's number and the pods list filtered
+    // to OOMKilled hold exactly the same pods. See backend/src/kubectl/health-rules.ts.
+    oomKilled: boolean;
 };
 
 // Response body for GET /api/pods.

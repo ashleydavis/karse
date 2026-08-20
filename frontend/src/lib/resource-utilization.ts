@@ -211,6 +211,23 @@ export function classifyNodeSummaryBand(percent: number | null): ThresholdResult
     return { level: "ok", label: "Healthy" };
 }
 
+// The three band labels the node-summary strip counts and the nodes table filters on, in
+// strip order. They are the labels classifyNodeSummaryBand returns, so the strip card a
+// user clicks and the nodes-list filter it seeds name the same band.
+export const NODE_UTILIZATION_BANDS = ["Over-utilized", "Healthy", "Under-utilized"] as const;
+
+// The band one node falls in, from its CPU requests as a share of its allocatable. The
+// single place that rule is applied: buildNodeUtilizationSummary counts with it and the
+// nodes table's band filter narrows with it, so the strip's numbers and the filtered list
+// cannot drift apart. A node whose requests or allocatable is unreadable is "info" (in no
+// band) rather than being forced into one.
+export function nodeSummaryBandFor(node: NodeUsage): ThresholdResult {
+    // requests is always present on a real snapshot; default a missing object to all-null
+    // so a partial snapshot leaves the node in no band (info) rather than throwing.
+    const requests = node.requests ?? { cpuMillicores: null, memoryBytes: null };
+    return classifyNodeSummaryBand(nodePercent(requests.cpuMillicores, node.allocatable.cpuMillicores));
+}
+
 // The node-summary strip counts: how many nodes are over-utilized (CPU requests ≥ 85% of
 // allocatable), healthy (40–85%), and under-utilized (< 40%). Nodes whose CPU requests or
 // allocatable is unreadable (null base) are excluded from all three counts (classified
@@ -224,11 +241,7 @@ export function buildNodeUtilizationSummary(nodes: NodeUsage[]): {
     let healthy = 0;
     let under = 0;
     for (const node of nodes) {
-        // requests is always present on a real snapshot; default a missing object to all-null
-        // so a partial snapshot leaves the node uncounted (info band) rather than throwing.
-        const requests = node.requests ?? { cpuMillicores: null, memoryBytes: null };
-        const percent = nodePercent(requests.cpuMillicores, node.allocatable.cpuMillicores);
-        const band = classifyNodeSummaryBand(percent);
+        const band = nodeSummaryBandFor(node);
         if (band.level === "critical") {
             over += 1;
         }

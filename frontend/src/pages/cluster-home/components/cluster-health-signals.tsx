@@ -55,6 +55,16 @@ function describeNodePressure(pressure: ClusterHealthSignals["nodePressure"]): {
 // OOMKills surface problem counts; CPU throttling is permanently unavailable from kubectl
 // (a fixed "—" / "N/A" tile that never invents a proxy); node count is informational; and
 // node pressure highlights when any pressure condition is active.
+//
+// Every tile whose value is a count of resources is a link to the list that produced it,
+// with the matching filter seeded from a query param (see docs/spec/cluster-overview).
+// A zero count is a link like any other, landing on the empty filtered list. The CPU
+// throttling tile carries no count, so it stays non-interactive.
+//
+// The node-pressure tile is the one link whose accessible name quotes no number: its value
+// is per-condition counts, and the number of nodes behind them is not derivable from those
+// counts (a node under two pressures is counted twice), so the name says what the link
+// opens instead of a count that could be wrong.
 export function ClusterHealthSignalsSection({ health }: ClusterHealthSignalsProps) {
     const pending = describeCount(health.pendingPods, "Pending pods");
     const oom = describeCount(health.oomKillCount, "OOMKills");
@@ -76,6 +86,8 @@ export function ClusterHealthSignalsSection({ health }: ClusterHealthSignalsProp
                     value={`${health.pendingPods}`}
                     badgeLabel={pending.badgeLabel}
                     level={pending.level}
+                    to="/pods?phase=Pending"
+                    linkLabel={`${health.pendingPods} pending pods: show the pods list filtered to Pending`}
                     testId="health-pending-pods"
                 />
                 <HealthSignalCard
@@ -83,6 +95,8 @@ export function ClusterHealthSignalsSection({ health }: ClusterHealthSignalsProp
                     value={`${health.oomKillCount}`}
                     badgeLabel={oom.badgeLabel}
                     level={oom.level}
+                    to="/pods?oomKilled=Yes"
+                    linkLabel={`${health.oomKillCount} OOMKilled pods: show the pods list filtered to OOMKilled`}
                     testId="health-oomkills"
                 />
                 <HealthSignalCard
@@ -98,6 +112,8 @@ export function ClusterHealthSignalsSection({ health }: ClusterHealthSignalsProp
                     value={`${health.nodeCount}`}
                     badgeLabel="Nodes"
                     level="info"
+                    to="/nodes"
+                    linkLabel={`${health.nodeCount} nodes: show the nodes list`}
                     testId="health-node-count"
                 />
                 <HealthSignalCard
@@ -106,6 +122,8 @@ export function ClusterHealthSignalsSection({ health }: ClusterHealthSignalsProp
                     badgeLabel={pressure.badgeLabel}
                     level={pressure.level}
                     highlighted={pressure.highlighted}
+                    to="/nodes?pressure=Active"
+                    linkLabel="Node pressure: show the nodes list filtered to nodes under pressure"
                     testId="health-node-pressure"
                 />
             </Box>

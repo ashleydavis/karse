@@ -25,6 +25,7 @@ function makePod(name: string, phase: Pod["phase"]): Pod {
         createdAt: "2024-01-01T00:00:00Z",
         node: "node-1",
         labels: {},
+        oomKilled: false,
     };
 }
 
@@ -38,6 +39,7 @@ function makeNode(name: string, status: Node["status"]): Node {
         createdAt: "2024-01-01T00:00:00Z",
         labels: {},
         instanceType: null,
+        pressure: [],
     };
 }
 

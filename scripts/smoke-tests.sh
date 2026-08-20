@@ -242,6 +242,11 @@ echo "$NODES_RESP" | jq -e 'has("nodes")' > /dev/null
 # Verify mixed node statuses derive correctly: Ready nodes and the NotReady node.
 echo "$NODES_RESP" | jq -e '[.nodes[] | select(.status == "Ready")] | length >= 2' > /dev/null
 echo "$NODES_RESP" | jq -e '.nodes[] | select(.name == "fake-node-notready") | .status == "NotReady"' > /dev/null
+# Every node carries its active pressure condition types, so the nodes list can be
+# filtered to the nodes the cluster Node pressure health tile counted. The smoke fixture
+# puts no node under pressure, so every list is empty, but the field must always be there
+# (an absent field would filter to nothing rather than to no nodes).
+echo "$NODES_RESP" | jq -e '.nodes | all(.pressure | type == "array")' > /dev/null
 echo "OK"
 
 echo "--- GET /api/cluster/performance ---"
@@ -268,6 +273,15 @@ echo "$PERF_RESP" | jq -e '.totals.allocatable.cpuMillicores != null and .totals
 # health carries the signal counters; nodeCount matches the node list length.
 echo "$PERF_RESP" | jq -e '.health | has("pendingPods") and has("oomKillCount") and has("nodeCount") and (.nodePressure | has("memoryPressure") and has("diskPressure") and has("pidPressure")) and .cpuThrottlingAvailable == false' > /dev/null
 echo "$PERF_RESP" | jq -e '.health.nodeCount == (.nodes | length)' > /dev/null
+# The health counters and the per-resource flags on the list responses are computed by one
+# shared rule, so a health tile's number and the list its link opens can never disagree.
+# Assert that here: the OOMKills counter equals the pods flagged oomKilled, and the three
+# pressure counters sum to the pressure conditions the nodes list reports.
+OOM_FLAGGED=$(curl -fsS "$BASE/api/pods?context=$CURRENT_CTX" | jq '[.pods[] | select(.oomKilled)] | length')
+echo "$PERF_RESP" | jq -e --argjson flagged "$OOM_FLAGGED" '.health.oomKillCount == $flagged' > /dev/null
+PRESSURE_CONDITIONS=$(echo "$NODES_RESP" | jq '[.nodes[].pressure | length] | add // 0')
+echo "$PERF_RESP" | jq -e --argjson conditions "$PRESSURE_CONDITIONS" \
+    '(.health.nodePressure.memoryPressure + .health.nodePressure.diskPressure + .health.nodePressure.pidPressure) == $conditions' > /dev/null
 # workloads is an array of per-controller rows, each with kind/usage/requests.
 echo "$PERF_RESP" | jq -e '(.workloads | type == "array") and (.workloads | all(has("kind") and has("name") and has("namespace") and (.usage | has("cpuMillicores")) and (.requests | has("cpuMillicores"))))' > /dev/null
 echo "OK"
@@ -327,9 +341,12 @@ echo "$NS_DETAIL" | jq -e '.resources | any(.kind == "Deployment" and .name == "
 echo "OK"
 
 echo "--- GET /api/pods (all namespaces) ---"
-curl -fsS "$BASE/api/pods?context=$CURRENT_CTX" \
-    | jq -e 'has("pods")' \
-    > /dev/null
+PODS_RESP=$(curl -fsS "$BASE/api/pods?context=$CURRENT_CTX")
+echo "$PODS_RESP" | jq -e 'has("pods")' > /dev/null
+# Every pod carries whether it was previously OOM-killed, so the pods list can be filtered
+# to the pods the cluster OOMKills health tile counted. No smoke-fixture pod has been, so
+# the flag is false throughout, but it must always be present and boolean.
+echo "$PODS_RESP" | jq -e '.pods | all(.oomKilled | type == "boolean")' > /dev/null
 echo "OK"
 
 echo "--- GET /api/pods (namespace scoped) ---"

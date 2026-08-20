@@ -97,7 +97,7 @@ curl -fsS http://127.0.0.1:5172/api/cluster/overview
 Returns the nodes in the current context, shaped for the nodes table.
 
 - **Request**: no body.
-- **Response 200**: `{ "nodes": Node[] }`. Each `Node` carries `instanceType`, read from the node's `node.kubernetes.io/instance-type` label (falling back to the legacy `beta.kubernetes.io/instance-type`), or `null` when the cluster does not set it (e.g. kwok).
+- **Response 200**: `{ "nodes": Node[] }`. Each `Node` carries `instanceType`, read from the node's `node.kubernetes.io/instance-type` label (falling back to the legacy `beta.kubernetes.io/instance-type`), or `null` when the cluster does not set it (e.g. kwok); and `pressure`, the node's active pressure condition types (`"MemoryPressure"`, `"DiskPressure"`, `"PIDPressure"`, in that order), an empty array when the node reports none. `pressure` is derived by the same rule as the cluster Node pressure health counters, so the nodes list can be filtered to exactly the nodes those counters counted.
 - **Response 500**: `{ "error": "<kubectl stderr>" }` when listing nodes fails.
 
 ```sh
@@ -113,7 +113,8 @@ curl -fsS http://127.0.0.1:5172/api/cluster/nodes
       "roles": ["control-plane"],
       "version": "v1.30.0",
       "createdAt": "2024-01-01T00:00:00Z",
-      "instanceType": "m5.large"
+      "instanceType": "m5.large",
+      "pressure": ["MemoryPressure"]
     }
   ]
 }
@@ -307,7 +308,7 @@ curl -fsS -X POST http://127.0.0.1:5172/api/namespaces/default \
 Lists pods for the given context, optionally scoped to a namespace.
 
 - **Request query**: `context` (required), `namespace` (optional — omit or leave blank for all namespaces).
-- **Response 200**: `PodsResponse` — `{ "pods": Pod[] }`.
+- **Response 200**: `PodsResponse` — `{ "pods": Pod[] }`. Each `Pod` carries `oomKilled`: `true` when any of its containers or init containers records a previous termination with reason `OOMKilled` (the pod was OOM-killed and restarted). It is derived by the same rule as the cluster OOMKills health counter, so the pods list can be filtered to exactly the pods that counter counted.
 - **Response 400**: `{ "error": "context query parameter is required" }` when `context` is missing or blank.
 - **Response 500**: `{ "error": "<kubectl stderr>" }` when listing pods fails.
 
@@ -329,7 +330,8 @@ curl -fsS 'http://127.0.0.1:5172/api/pods?context=my-ctx&namespace=default'
       "ready": "1/1",
       "restarts": 0,
       "createdAt": "2024-01-01T00:00:00Z",
-      "node": "ctrl-0"
+      "node": "ctrl-0",
+      "oomKilled": false
     }
   ]
 }

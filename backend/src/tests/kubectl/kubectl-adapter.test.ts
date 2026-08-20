@@ -272,6 +272,7 @@ describe("listNodes", () => {
                 "node-role.kubernetes.io/control-plane": "",
             },
             instanceType: null,
+            pressure: [],
         });
         expect(result[1]!).toEqual({
             name: "worker-0",
@@ -281,6 +282,7 @@ describe("listNodes", () => {
             createdAt: "2024-06-01T00:00:00Z",
             labels: {},
             instanceType: null,
+            pressure: [],
         });
     });
 
@@ -754,6 +756,7 @@ describe("getNodeDetail", () => {
                 createdAt: "2024-06-01T00:00:00Z",
                 node: "node-1",
                 labels: {},
+                oomKilled: false,
             },
             {
                 name: "web",
@@ -765,6 +768,7 @@ describe("getNodeDetail", () => {
                 createdAt: "2024-06-01T00:00:00Z",
                 node: "node-1",
                 labels: {},
+                oomKilled: false,
             },
         ]);
     });
@@ -1073,6 +1077,7 @@ describe("getWorkloadDetail", () => {
                 createdAt: "2024-06-01T00:00:00Z",
                 node: "node-1",
                 labels: {},
+                oomKilled: false,
             },
         ]);
         expect(result.events).toEqual([
@@ -1551,6 +1556,7 @@ describe("listPods", () => {
             node: "node-worker",
             createdAt: "2024-01-15T12:00:00Z",
             labels: { app: "nginx", tier: "frontend" },
+            oomKilled: false,
         });
     });
 

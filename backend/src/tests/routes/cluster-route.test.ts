@@ -78,6 +78,7 @@ describe("GET /api/cluster/nodes", () => {
         version: "v1.30.0",
         createdAt: "2024-01-01T00:00:00Z",
         labels: { "node-role.kubernetes.io/control-plane": "" },
+        pressure: [],
         instanceType: null,
     };
 

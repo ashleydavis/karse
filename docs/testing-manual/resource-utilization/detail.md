@@ -150,6 +150,11 @@ utilization**). Below the five stat tiles and the pod-status row you should see,
 - Restart later **without** `KARSE_FAKE_METRICS` is not needed here — requests come from pod
   specs, so the strip still shows. The strip is omitted entirely (not shown as all zeros) only
   when the snapshot has no nodes or no node's CPU requests/allocatable are readable.
+- **Each card is a link** to the nodes list filtered to its band: hover one and it shows an
+  arrow icon beside its title, underlines its count and takes a coloured border. Click
+  **Under-utilized**: the Nodes page opens with `Filter: 1 selected`, `Under-utilized` ticked
+  under **Utilization**, and the same two nodes the card counted. Full walk-through in
+  [cluster-overview](../cluster-overview/detail.md) Scenario E.
 
 ### Cluster-wide resources (cards)
 
@@ -171,7 +176,14 @@ utilization**). Below the five stat tiles and the pod-status row you should see,
   available from kubectl". It never invents a proxy.
 - **Node count** — the cluster's node count (`2`), badge "Nodes".
 - **Node pressure** — per-condition counts (Memory/Disk/PID). On this clean cluster it reads
-  **None** and is calm; a node under pressure makes it read e.g. "Memory 1" and highlight.
+  **None** and is calm; a node under pressure makes it read e.g. "Memory 1" and highlight. The
+  counts are per condition, not per node, so a node under two pressures adds one to each and
+  the nodes list the tile links to can hold fewer rows than the counts add up to.
+- **Every tile but CPU throttling is a link** to the list its count came from (Pending pods and
+  OOMKills to the pods list, Node count and Node pressure to the nodes list), with the matching
+  filter seeded and visibly applied. CPU throttling counts nothing, so it stays a plain,
+  non-interactive readout with no arrow icon and no hover highlight. Full walk-through in
+  [cluster-overview](../cluster-overview/detail.md) Scenario E.
 
 ### Workloads table
 

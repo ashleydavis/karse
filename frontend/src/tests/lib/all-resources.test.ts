@@ -12,6 +12,7 @@ function makePod(name: string, phase: Pod["phase"], namespace = "default"): Pod 
         createdAt: "2024-01-01T00:00:00Z",
         node: "node-1",
         labels: { app: name },
+        oomKilled: false,
     };
 }
 
@@ -23,6 +24,7 @@ function makeNode(name: string, status: Node["status"]): Node {
         version: "v1.29.0",
         createdAt: "2024-02-01T00:00:00Z",
         labels: { "kubernetes.io/hostname": name },
+        pressure: [],
         instanceType: null,
     };
 }

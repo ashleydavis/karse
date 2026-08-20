@@ -6112,6 +6112,339 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Cluster overview: health-signal and node-strip count links ──────────────
+
+    test.describe("cluster overview count links", () => {
+        // Three nodes, one per CPU-requests band, and only the over-utilized one under
+        // pressure. Each band count and the pressure count therefore reads 1, and the
+        // nodes list each link opens holds exactly the node behind that number.
+        const LINK_NODES = {
+            nodes: [
+                {
+                    name: "node-hot",
+                    status: "Ready",
+                    roles: ["worker"],
+                    version: "v1.30.0",
+                    createdAt: new Date().toISOString(),
+                    labels: {},
+                    instanceType: null,
+                    pressure: ["MemoryPressure"],
+                },
+                {
+                    name: "node-mid",
+                    status: "Ready",
+                    roles: ["worker"],
+                    version: "v1.30.0",
+                    createdAt: new Date().toISOString(),
+                    labels: {},
+                    instanceType: null,
+                    pressure: [],
+                },
+                {
+                    name: "node-cool",
+                    status: "Ready",
+                    roles: ["worker"],
+                    version: "v1.30.0",
+                    createdAt: new Date().toISOString(),
+                    labels: {},
+                    instanceType: null,
+                    pressure: [],
+                },
+            ],
+        };
+
+        // Three pods: one Pending, one previously OOM-killed, one plain Running. So the
+        // Pending pods tile reads 1 and the OOMKills tile reads 1, each backed by one row.
+        const LINK_PODS = {
+            pods: [
+                {
+                    name: "pod-pending",
+                    namespace: "default",
+                    phase: "Pending",
+                    ready: "0/1",
+                    containerCount: 1,
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-hot",
+                    labels: { app: "web" },
+                    oomKilled: false,
+                },
+                {
+                    name: "pod-oom",
+                    namespace: "default",
+                    phase: "Running",
+                    ready: "1/1",
+                    containerCount: 1,
+                    restarts: 2,
+                    createdAt: new Date().toISOString(),
+                    node: "node-hot",
+                    labels: { app: "web" },
+                    oomKilled: true,
+                },
+                {
+                    name: "pod-running",
+                    namespace: "default",
+                    phase: "Running",
+                    ready: "1/1",
+                    containerCount: 1,
+                    restarts: 0,
+                    createdAt: new Date().toISOString(),
+                    node: "node-mid",
+                    labels: { app: "web" },
+                    oomKilled: false,
+                },
+            ],
+        };
+
+        // node-hot reserves 900m of 1000m (90%, over-utilized), node-mid 600m (60%,
+        // healthy) and node-cool 100m (10%, under-utilized), so the strip reads 1/1/1.
+        // The health counters match LINK_PODS and LINK_NODES exactly: one Pending pod, one
+        // OOM-killed pod, three nodes, one active memory-pressure condition.
+        const LINK_PERFORMANCE = {
+            metricsAvailable: true,
+            nodes: [
+                { name: "node-hot", usage: { cpuMillicores: 500, memoryBytes: 1_000_000_000 }, requests: { cpuMillicores: 900, memoryBytes: 2_000_000_000 }, allocatable: { cpuMillicores: 1000, memoryBytes: 4_000_000_000 } },
+                { name: "node-mid", usage: { cpuMillicores: 300, memoryBytes: 1_000_000_000 }, requests: { cpuMillicores: 600, memoryBytes: 2_000_000_000 }, allocatable: { cpuMillicores: 1000, memoryBytes: 4_000_000_000 } },
+                { name: "node-cool", usage: { cpuMillicores: 100, memoryBytes: 500_000_000 }, requests: { cpuMillicores: 100, memoryBytes: 500_000_000 }, allocatable: { cpuMillicores: 1000, memoryBytes: 4_000_000_000 } },
+            ],
+            pods: [],
+            totals: {
+                usage: { cpuMillicores: 900, memoryBytes: 2_500_000_000 },
+                requests: { cpuMillicores: 1600, memoryBytes: 4_500_000_000 },
+                allocatable: { cpuMillicores: 3000, memoryBytes: 12_000_000_000 },
+            },
+            health: {
+                pendingPods: 1,
+                oomKillCount: 1,
+                nodeCount: 3,
+                nodePressure: { memoryPressure: 1, diskPressure: 0, pidPressure: 0 },
+                cpuThrottlingAvailable: false,
+            },
+            workloads: [],
+        };
+
+        const LINK_OVERVIEW = {
+            serverVersion: "v1.30.0",
+            clientVersion: "v1.30.0",
+            nodeCount: 3,
+            readyNodeCount: 3,
+            namespaceCount: 1,
+            podCount: 3,
+            runningPodCount: 2,
+            pendingPodCount: 1,
+            failedPodCount: 0,
+            errorCount: 0,
+        };
+
+        // The same cluster with nothing wrong: no Pending pod, no OOM-killed pod, no node
+        // under pressure and every node in the healthy band, so the zero-count links can
+        // be exercised.
+        const CLEAN_PERFORMANCE = {
+            ...LINK_PERFORMANCE,
+            nodes: LINK_PERFORMANCE.nodes.map((node) => ({
+                ...node,
+                requests: { cpuMillicores: 600, memoryBytes: 2_000_000_000 },
+            })),
+            health: {
+                pendingPods: 0,
+                oomKillCount: 0,
+                nodeCount: 3,
+                nodePressure: { memoryPressure: 0, diskPressure: 0, pidPressure: 0 },
+                cpuThrottlingAvailable: false,
+            },
+        };
+
+        const CLEAN_PODS = {
+            pods: LINK_PODS.pods
+                .filter((pod) => pod.name === "pod-running")
+                .map((pod) => ({ ...pod })),
+        };
+
+        const CLEAN_NODES = {
+            nodes: LINK_NODES.nodes.map((node) => ({ ...node, pressure: [] })),
+        };
+
+        // Installs route overrides serving one fixture set to the overview, the pods list,
+        // the nodes list and the performance snapshot.
+        async function intercept(overview: unknown, pods: unknown, nodes: unknown, performance: unknown): Promise<void> {
+            await page.route("**/api/cluster/overview*", async (route) => {
+                await route.fulfill({ json: overview });
+            });
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: pods });
+            });
+            await page.route("**/api/cluster/nodes*", async (route) => {
+                await route.fulfill({ json: nodes });
+            });
+            await page.route("**/api/cluster/performance*", async (route) => {
+                await route.fulfill({ json: performance });
+            });
+        }
+
+        async function unintercept(): Promise<void> {
+            await page.unroute("**/api/cluster/overview*");
+            await page.unroute("**/api/pods*");
+            await page.unroute("**/api/cluster/nodes*");
+            await page.unroute("**/api/cluster/performance*");
+        }
+
+        // Opens the Cluster Overview and waits for the health-signals row and the node
+        // strip, both of which render only once the performance snapshot has landed.
+        async function openOverview(): Promise<void> {
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='cluster-health-signals']")).toBeVisible({ timeout: 20000 });
+            await expect(page.locator("[data-test-id='node-summary-strip']")).toBeVisible({ timeout: 20000 });
+        }
+
+        // Every linked count: the tile or strip card, the number it shows, the route its
+        // link opens, and the rows that route leaves after seeding its filter.
+        const LINKED_COUNTS = [
+            { testId: "health-pending-pods", count: "1", url: /\/pods\?.*phase=Pending/, rowTestId: "pod-row", filterTestId: "pods-filter-button", rows: ["pod-pending"] },
+            { testId: "health-oomkills", count: "1", url: /\/pods\?.*oomKilled=Yes/, rowTestId: "pod-row", filterTestId: "pods-filter-button", rows: ["pod-oom"] },
+            { testId: "health-node-pressure", count: "Memory 1", url: /\/nodes\?.*pressure=Active/, rowTestId: "node-row", filterTestId: "nodes-filter-button", rows: ["node-hot"] },
+            { testId: "node-summary-over", count: "1", url: /\/nodes\?.*band=Over-utilized/, rowTestId: "node-row", filterTestId: "nodes-filter-button", rows: ["node-hot"] },
+            { testId: "node-summary-healthy", count: "1", url: /\/nodes\?.*band=Healthy/, rowTestId: "node-row", filterTestId: "nodes-filter-button", rows: ["node-mid"] },
+            { testId: "node-summary-under", count: "1", url: /\/nodes\?.*band=Under-utilized/, rowTestId: "node-row", filterTestId: "nodes-filter-button", rows: ["node-cool"] },
+        ];
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await intercept(LINK_OVERVIEW, LINK_PODS, LINK_NODES, LINK_PERFORMANCE);
+        });
+
+        test.afterAll(async () => {
+            await unintercept();
+            setContext(CLUSTER_1);
+        });
+
+        test("every counted health signal and strip card is a link, and the throttling tile is not", async () => {
+            await openOverview();
+            for (const linked of LINKED_COUNTS) {
+                const card = page.locator(`[data-test-id='${linked.testId}']`);
+                await expect(card).toHaveAttribute("data-linked", "true");
+                // The link carries an accessible name saying where it goes, since its
+                // visible text is only a number and a title.
+                await expect(card).toHaveAttribute("aria-label", /show the (pods|nodes) list/);
+                // A visible affordance: the arrow icon marking the card as somewhere to go.
+                await expect(card.locator("svg").first()).toBeVisible();
+            }
+            // The node-count tile links to the whole nodes list, with no filter to seed.
+            const nodeCount = page.locator("[data-test-id='health-node-count']");
+            await expect(nodeCount).toHaveAttribute("data-linked", "true");
+            await expect(nodeCount).toContainText("3");
+            // CPU throttling is a permanent "N/A" with no count behind it, so it stays a
+            // plain, non-interactive readout with no link affordance.
+            const throttling = page.locator("[data-test-id='health-cpu-throttling']");
+            await expect(throttling).toHaveAttribute("data-linked", "false");
+            await expect(throttling).toContainText("N/A");
+            await expect(throttling.locator("svg")).toHaveCount(0);
+        });
+
+        test("clicking a count opens the list filtered to exactly the resources it counted", async () => {
+            for (const linked of LINKED_COUNTS) {
+                await openOverview();
+                await expect(page.locator(`[data-test-id='${linked.testId}']`)).toContainText(linked.count);
+                await page.locator(`[data-test-id='${linked.testId}']`).click();
+                await expect(page).toHaveURL(linked.url);
+                // The number on the tile and the number of rows the link opens agree.
+                const rows = page.locator(`[data-test-id='${linked.rowTestId}']`);
+                await expect(rows).toHaveCount(linked.rows.length, { timeout: 20000 });
+                for (const name of linked.rows) {
+                    await expect(rows.filter({ hasText: name })).toHaveCount(1);
+                }
+                // The seeded filter is visibly applied in the toolbar, so the user can see
+                // why the list is narrowed and clear it from there.
+                await expect(page.locator(`[data-test-id='${linked.filterTestId}']`)).toHaveText("Filter: 1 selected");
+            }
+        });
+
+        test("the node count links to the whole nodes list with no filter applied", async () => {
+            await openOverview();
+            await page.locator("[data-test-id='health-node-count']").click();
+            await expect(page).toHaveURL(/\/nodes/);
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='nodes-filter-button']")).toHaveText("Filter: All");
+        });
+
+        test("every count link preserves the shareable context and namespace params", async () => {
+            // Reached with both shareable params pinned in the URL, as a copied link would
+            // be; every count link must carry them on so the destination opens against the
+            // same cluster and namespace.
+            await page.goto(`/cluster?context=${CLUSTER_1}&namespace=default`, { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='cluster-health-signals']")).toBeVisible({ timeout: 20000 });
+            await expect(page.locator("[data-test-id='node-summary-strip']")).toBeVisible({ timeout: 20000 });
+            for (const linked of [...LINKED_COUNTS, { testId: "health-node-count" }]) {
+                const href = await page.locator(`[data-test-id='${linked.testId}']`).getAttribute("href");
+                expect(href).toContain(`context=${CLUSTER_1}`);
+                expect(href).toContain("namespace=default");
+            }
+        });
+
+        test("clearing a seeded filter widens the list back to every row", async () => {
+            await openOverview();
+            await page.locator("[data-test-id='node-summary-over']").click();
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(1, { timeout: 20000 });
+            await page.locator("[data-test-id='nodes-filter-button']").click();
+            await page.locator("[data-test-id='nodes-filter-deselect-all']").click();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(3);
+            await expect(page.locator("[data-test-id='nodes-filter-button']")).toHaveText("Filter: All");
+        });
+
+        test("going back from a followed link returns to the cluster overview", async () => {
+            await openOverview();
+            await page.locator("[data-test-id='health-oomkills']").click();
+            await expect(page).toHaveURL(/\/pods\?.*oomKilled=Yes/);
+            await page.goBack();
+            await expect(page).toHaveURL(/\/cluster/);
+            await expect(page.locator("[data-test-id='cluster-health-signals']")).toBeVisible({ timeout: 20000 });
+        });
+
+        test("a zero count still links, yielding the empty filtered list with the filter applied", async () => {
+            await unintercept();
+            await intercept(
+                { ...LINK_OVERVIEW, podCount: 1, runningPodCount: 1, pendingPodCount: 0 },
+                CLEAN_PODS,
+                CLEAN_NODES,
+                CLEAN_PERFORMANCE,
+            );
+            await openOverview();
+
+            // Pending pods reads 0 and still opens the pods list filtered to Pending.
+            await expect(page.locator("[data-test-id='health-pending-pods']")).toContainText("0");
+            await page.locator("[data-test-id='health-pending-pods']").click();
+            await expect(page).toHaveURL(/\/pods\?.*phase=Pending/);
+            await expect(page.locator("[data-test-id='pods-filter-button']")).toHaveText("Filter: 1 selected");
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-pods-match']")).toBeVisible();
+
+            // Node pressure reads "None" and still opens the nodes list filtered to the
+            // nodes under pressure, which is empty.
+            await openOverview();
+            await expect(page.locator("[data-test-id='health-node-pressure']")).toContainText("None");
+            await page.locator("[data-test-id='health-node-pressure']").click();
+            await expect(page).toHaveURL(/\/nodes\?.*pressure=Active/);
+            await expect(page.locator("[data-test-id='nodes-filter-button']")).toHaveText("Filter: 1 selected");
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-nodes-match']")).toBeVisible();
+
+            // An over-utilized count of 0 does the same on the nodes list: every node is in
+            // the healthy band here, so the over-utilized card reads 0 and its link lands
+            // on the empty filtered list rather than on every node.
+            await openOverview();
+            await expect(page.locator("[data-test-id='node-summary-over']")).toContainText("0");
+            await page.locator("[data-test-id='node-summary-over']").click();
+            await expect(page).toHaveURL(/\/nodes\?.*band=Over-utilized/);
+            await expect(page.locator("[data-test-id='nodes-filter-button']")).toHaveText("Filter: 1 selected");
+            await expect(page.locator("[data-test-id='node-row']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='no-nodes-match']")).toBeVisible();
+
+            // Restore the populated fixture for the rest of the block.
+            await unintercept();
+            await intercept(LINK_OVERVIEW, LINK_PODS, LINK_NODES, LINK_PERFORMANCE);
+        });
+    });
+
     // ── Nodes page: status filter ───────────────────────────────────────────────
 
     test.describe("nodes page status filter", () => {

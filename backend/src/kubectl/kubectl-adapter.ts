@@ -4,6 +4,7 @@ import {
     cacheKey, readCacheEntry, writeCacheEntry, readCacheConfig, isFresh,
 } from "./cache";
 import { parseCpuToMillicores, parseMemoryToBytes } from "./quantity";
+import { podWasOOMKilled, activeNodePressures } from "./health-rules";
 import { isReadableResourceKind, knownResourceKind } from "karse-types";
 import type {
     Context, NodeStatus, Node, ClusterOverview, Namespace, Pod, PodPhase,
@@ -205,6 +206,7 @@ export async function listNodes(context: string): Promise<Node[]> {
             createdAt: item.metadata.creationTimestamp,
             labels,
             instanceType,
+            pressure: activeNodePressures(item),
         };
     });
 }
@@ -245,6 +247,7 @@ function mapPodListItem(item: any): Pod {
         createdAt: item.metadata.creationTimestamp,
         node: item.spec?.nodeName ?? "",
         labels: item.metadata.labels ?? {},
+        oomKilled: podWasOOMKilled(item),
     };
 }
 
@@ -2023,11 +2026,7 @@ function computeHealth(nodeItems: any[], podItems: any[], nodeCount: number): Cl
         if (pod.status?.phase === "Pending") {
             pendingPods++;
         }
-        const statuses: any[] = [
-            ...(pod.status?.containerStatuses ?? []),
-            ...(pod.status?.initContainerStatuses ?? []),
-        ];
-        if (statuses.some((cs) => cs.lastState?.terminated?.reason === "OOMKilled")) {
+        if (podWasOOMKilled(pod)) {
             oomKillCount++;
         }
     }
@@ -2036,17 +2035,16 @@ function computeHealth(nodeItems: any[], podItems: any[], nodeCount: number): Cl
     let diskPressure = 0;
     let pidPressure = 0;
     for (const node of nodeItems) {
-        for (const condition of (node.status?.conditions ?? []) as any[]) {
-            if (condition.status !== "True") {
-                continue;
-            }
-            if (condition.type === "MemoryPressure") {
+        // The same per-node rule the nodes list carries as Node.pressure, so the tile's
+        // counters and the nodes list filtered to pressure can never disagree.
+        for (const type of activeNodePressures(node)) {
+            if (type === "MemoryPressure") {
                 memoryPressure++;
             }
-            else if (condition.type === "DiskPressure") {
+            else if (type === "DiskPressure") {
                 diskPressure++;
             }
-            else if (condition.type === "PIDPressure") {
+            else {
                 pidPressure++;
             }
         }

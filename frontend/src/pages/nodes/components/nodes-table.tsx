@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useShareableNavigate } from "../../../lib/nav-state";
 import {
     useReactTable,
@@ -34,6 +35,7 @@ import { useSearchFilter } from "../../../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
 import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn } from "../../../lib/table-filter-state";
 import { useTableFilter } from "../../../lib/use-table-filter";
+import { bandLabelFor, buildNodeBandMap, nodePressureValue, seedSelection } from "../../../lib/list-filter-seeds";
 import { LabelsCell } from "../../../components/labels-cell";
 import { CopyNameCell } from "../../../components/copy-button";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
@@ -56,6 +58,7 @@ import {
     classifyNodeRow,
     formatAbsoluteCpu,
     formatAbsoluteMemory,
+    NODE_UTILIZATION_BANDS,
     type ValueFormat,
 } from "../../../lib/resource-utilization";
 import {
@@ -104,6 +107,18 @@ const STATUS_ORDER: Record<NodeStatus, number> = { Ready: 0, NotReady: 1, Unknow
 // All selectable node statuses, in display order, for the status filter dropdown.
 const ALL_STATUSES: NodeStatus[] = ["Ready", "NotReady", "Unknown"];
 
+// The two values of the Pressure filter column: whether the node reports at least one
+// active MemoryPressure / DiskPressure / PIDPressure condition. The flag comes from the
+// nodes API (Node.pressure), computed by the same rule as the cluster Node pressure
+// health counters, so the tile and the rows this filter leaves describe the same nodes.
+const PRESSURE_OPTIONS = ["Active", "None"];
+
+// The three values of the Utilization filter column: the CPU-requests band a node falls
+// in, the same labels the node-summary strip counts by (NODE_UTILIZATION_BANDS). A node
+// whose CPU requests or allocatable is unreadable is in no band and is left out of all
+// three, exactly as the strip leaves it out of its counts.
+const BAND_OPTIONS: string[] = [...NODE_UTILIZATION_BANDS];
+
 // The display text for a CPU bar cell: a percent of allocatable in percent format, or a
 // "used / total vCPU" pair in absolute format. The bar always fills to the percent.
 function cpuDisplayText(figure: UtilizationFigure, format: ValueFormat): string {
@@ -124,7 +139,7 @@ function memoryDisplayText(figure: UtilizationFigure, format: ValueFormat): stri
 // CPU/memory utilisation in both View modes; `mode` and `format` come from the shared
 // resource-utilization toggle and pick which base (usage vs requests) and which display
 // (percent vs absolute) the CPU/Memory bar columns and the Status badge use.
-function buildColumns(util: NodeUtilizationMap, mode: ViewMode, format: ValueFormat): ColumnDef<Node>[] {
+function buildColumns(util: NodeUtilizationMap, bands: Map<string, string>, mode: ViewMode, format: ValueFormat): ColumnDef<Node>[] {
     return [
     {
         accessorKey: "name",
@@ -285,6 +300,32 @@ function buildColumns(util: NodeUtilizationMap, mode: ViewMode, format: ValueFor
         filterFn: labelsColumnFilterFn,
     },
     {
+        // Hidden column carrying whether the node reports an active pressure condition
+        // ("Active"/"None"), so the Pressure filter can narrow rows to exactly the nodes
+        // the cluster Node pressure tile counted. Never rendered and excluded from the
+        // fuzzy global filter.
+        id: "pressure",
+        accessorFn: (row) => nodePressureValue(row),
+        filterFn: valueColumnFilterFn,
+        enableSorting: false,
+        enableGlobalFilter: false,
+        // Excluded from the column-config modal: it is an always-hidden filter helper, never shown.
+        enableHiding: false,
+    },
+    {
+        // Hidden column carrying each node's CPU-requests band ("Over-utilized"/
+        // "Healthy"/"Under-utilized", or an em-dash for a node in no band), so the
+        // Utilization filter can narrow rows to exactly the nodes a node-summary strip
+        // card counted. Never rendered and excluded from the fuzzy global filter.
+        id: "utilizationBand",
+        accessorFn: (row) => bandLabelFor(bands, row.name),
+        filterFn: valueColumnFilterFn,
+        enableSorting: false,
+        enableGlobalFilter: false,
+        // Excluded from the column-config modal: it is an always-hidden filter helper, never shown.
+        enableHiding: false,
+    },
+    {
         // Hidden column carrying each node's derived health ("Healthy"/"Error"/
         // "Other") so the health filter can narrow rows. Never rendered (hidden via
         // columnVisibility) and excluded from the fuzzy global filter.
@@ -306,6 +347,7 @@ function buildColumns(util: NodeUtilizationMap, mode: ViewMode, format: ValueFor
 function NodesTableInner() {
     const { current } = useKubeContext();
     const navigate = useShareableNavigate();
+    const [searchParams] = useSearchParams();
     const { mode, format } = useResourceUtilization();
     const { data, error, isLoading, refetch } = useQuery({
         queryKey: ["cluster", "nodes", current],
@@ -328,18 +370,29 @@ function NodesTableInner() {
     const { search, setSearch, deferredSearch } = useSearchFilter();
 
     const utilizationMap = buildNodeUtilizationMap(performance?.nodes ?? []);
+    const bandMap = buildNodeBandMap(performance?.nodes ?? []);
 
-    const columns = buildColumns(utilizationMap, mode, format);
+    const columns = buildColumns(utilizationMap, bandMap, mode, format);
 
-    // The filterable columns the shared editor offers: the Status and Health value
-    // columns plus one column per label key present on the loaded nodes.
+    // The filterable columns the shared editor offers: the Status, Health, Pressure and
+    // Utilization value columns plus one column per label key present on the loaded nodes.
     const allNodes = data?.nodes ?? [];
     const filterableColumns: FilterableColumn[] = [
         { columnId: "status", label: "Status", options: ALL_STATUSES, kind: "value" },
         { columnId: "health", label: "Health", options: HEALTH_FILTER_OPTIONS, kind: "value" },
+        { columnId: "pressure", label: "Pressure", options: PRESSURE_OPTIONS, kind: "value" },
+        { columnId: "utilizationBand", label: "Utilization", options: BAND_OPTIONS, kind: "value" },
         ...collectLabelColumns(allNodes),
     ];
-    const filter = useTableFilter(filterableColumns);
+    // The initial selection seeded from the URL, so a count on the Cluster Overview opens
+    // this list already narrowed to the nodes it counted: `?pressure=` from the Node
+    // pressure health tile, `?band=` from a node-summary strip card. Read once at mount;
+    // afterwards the selection belongs to the user. Only one param is ever set by a link,
+    // but merging them keeps a hand-written URL carrying both working.
+    const filter = useTableFilter(filterableColumns, {
+        ...seedSelection("pressure", searchParams.get("pressure"), PRESSURE_OPTIONS),
+        ...seedSelection("utilizationBand", searchParams.get("band"), BAND_OPTIONS),
+    });
 
     const stats = computeNodeStats(allNodes);
 
@@ -355,10 +408,12 @@ function NodesTableInner() {
     // and looping.
     const rowData = [...(data?.nodes ?? [])];
 
-    // Health is a filter-only column and is never shown.
+    // Health, Pressure and Utilization band are filter-only columns and are never shown.
     const visibility = {
         ...columnVisibility,
         health: false,
+        pressure: false,
+        utilizationBand: false,
     };
 
     const openNode = useCallback((node: Node) => {

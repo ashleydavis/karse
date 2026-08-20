@@ -35,8 +35,9 @@ import { ResourceRef } from "../../../components/resource-ref";
 import { DataTableRows } from "../../../components/data-table-row";
 import { useSearchFilter } from "../../../lib/use-search-filter";
 import { fuzzyGlobalFilter } from "../../../lib/fuzzy-filter";
-import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn, type FilterSelection } from "../../../lib/table-filter-state";
+import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn } from "../../../lib/table-filter-state";
 import { useTableFilter } from "../../../lib/use-table-filter";
+import { podOomKilledValue, seedSelection } from "../../../lib/list-filter-seeds";
 import { LabelsCell } from "../../../components/labels-cell";
 import { CopyNameCell } from "../../../components/copy-button";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
@@ -123,23 +124,11 @@ const PHASE_ORDER: Record<PodPhase, number> = {
 // All selectable pod phases, in display order, for the phase filter dropdown.
 const ALL_PHASES: PodPhase[] = ["Running", "Pending", "Succeeded", "Failed", "Unknown"];
 
-// Turns the optional `?phase=` query param into the table's initial Status-filter
-// selection, so a link can open the pods list already narrowed to one phase (the
-// cluster page's POD STATUS counts link here). The seeded filter is an ordinary
-// selection: the filter button shows it as applied and the user can clear it. An
-// absent or unrecognised phase seeds nothing, leaving the filter off.
-function initialPhaseSelection(phase: string | null): FilterSelection {
-    if (phase === null) {
-        return {};
-    }
-    const match = ALL_PHASES.find((candidate) => candidate === phase);
-    if (match === undefined) {
-        return {};
-    }
-    return {
-        phase: [match],
-    };
-}
+// The two values of the OOMKilled filter column: whether the pod records a previous
+// container termination with reason OOMKilled. The flag comes from the pods API (Pod
+// .oomKilled), computed by the same rule as the cluster OOMKills health counter, so the
+// tile's number and the rows this filter leaves are the same pods.
+const OOM_KILLED_OPTIONS = ["Yes", "No"];
 
 // Builds the column definitions for the pods table. `figures` maps each pod
 // (namespace/name) to its raw CPU/memory usage and request figures (from the cluster
@@ -300,6 +289,19 @@ function buildColumns(figures: PodFiguresMap, mode: ViewMode, format: ValueForma
             filterFn: labelsColumnFilterFn,
         },
         {
+            // Hidden column carrying whether the pod was previously OOM-killed ("Yes"/
+            // "No"), so the OOMKilled filter can narrow rows to exactly the pods the
+            // cluster OOMKills tile counted. Never rendered (hidden via columnVisibility)
+            // and excluded from the fuzzy global filter.
+            id: "oomKilled",
+            accessorFn: (row) => podOomKilledValue(row),
+            filterFn: valueColumnFilterFn,
+            enableSorting: false,
+            enableGlobalFilter: false,
+            // Excluded from the column-config modal: it is an always-hidden filter helper, never shown.
+            enableHiding: false,
+        },
+        {
             // Hidden column carrying each pod's derived health ("Healthy"/"Error"/
             // "Other") so the health filter can narrow rows. Never rendered (hidden via
             // columnVisibility) and excluded from the fuzzy global filter.
@@ -361,25 +363,35 @@ function PodsTableInner() {
     const columns = buildColumns(figuresMap, mode, format);
     const { columnOrder, columnVisibility, configurable, config, setConfig } = useColumnConfig("pods", columns);
 
-    // Health is a filter-only column and is never shown.
+    // Health and OOMKilled are filter-only columns and are never shown.
     const visibility = {
         ...columnVisibility,
         health: false,
+        oomKilled: false,
     };
 
     const openPod = useCallback((pod: Pod) => {
         navigate(`/pods/${pod.namespace}/${pod.name}`);
     }, [navigate]);
 
-    // The filterable columns the shared editor offers: the Status (phase) and
-    // Health value columns plus one column per label key present on the loaded pods.
+    // The filterable columns the shared editor offers: the Status (phase), Health and
+    // OOMKilled value columns plus one column per label key present on the loaded pods.
     const allPods = data?.pods ?? [];
     const filterableColumns: FilterableColumn[] = [
         { columnId: "phase", label: "Status", options: ALL_PHASES, kind: "value" },
         { columnId: "health", label: "Health", options: HEALTH_FILTER_OPTIONS, kind: "value" },
+        { columnId: "oomKilled", label: "OOMKilled", options: OOM_KILLED_OPTIONS, kind: "value" },
         ...collectLabelColumns(allPods),
     ];
-    const filter = useTableFilter(filterableColumns, initialPhaseSelection(searchParams.get("phase")));
+    // The initial selection seeded from the URL, so a count on the Cluster Overview opens
+    // this list already narrowed to the pods it counted: `?phase=` from the POD STATUS
+    // counts, `?oomKilled=` from the OOMKills health tile. Read once at mount; afterwards
+    // the selection belongs to the user. Only one param is ever set by a link, but merging
+    // them keeps a hand-written URL carrying both working.
+    const filter = useTableFilter(filterableColumns, {
+        ...seedSelection("phase", searchParams.get("phase"), ALL_PHASES),
+        ...seedSelection("oomKilled", searchParams.get("oomKilled"), OOM_KILLED_OPTIONS),
+    });
 
     const stats = computePodStats(allPods);
 

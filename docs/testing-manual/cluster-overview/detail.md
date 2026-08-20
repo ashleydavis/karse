@@ -107,6 +107,45 @@ Teardown:
 ./docs/testing-manual/_fixtures-kwok/10-mixed-pod-phases/teardown.sh
 ```
 
+## Scenario E: every health signal and node-strip count links to the list that produced it
+
+Confirms the Pending pods, OOMKills, Node count and Node pressure health tiles, and the three node-utilization strip cards, each open the list holding exactly the resources they counted, with the filter visibly applied and clearable, and that the CPU-throttling tile stays a plain readout.
+
+**Fixture:** [_fixtures-kwok/40-overview-count-links](../_fixtures-kwok/40-overview-count-links/)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/40-overview-count-links/setup.sh
+```
+
+Start Karse:
+
+```sh
+bun run dev
+```
+
+Then open the frontend at `http://127.0.0.1:5173`. `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically; select it in Karse and open the **Cluster** page.
+
+This fixture gives you four nodes (`node-hot` at 90% of its CPU allocatable, `node-mid` at 60%, `node-cool` at 10%, and `node-pressure` reporting an active MemoryPressure condition) and five pods (`pod-pending` with no node, `pod-oomkilled` Running but recording a previous OOMKilled termination, and one pod per banded node). So Pending pods reads `1`, OOMKills reads `1`, Node count reads `4`, Node pressure reads `Memory 1`, and the strip reads `1` over-utilized, `1` healthy and `2` under-utilized (`node-cool` and `node-pressure`, which reserves nothing).
+
+### What to check
+- **Each counted tile looks like a link**: on the Cluster page, hover **Pending pods**, **OOMKills**, **Node count** and **Node pressure**, and each of the three strip cards. Each shows a small arrow icon beside its title, underlines its number, and takes a coloured border on hover; the browser's status bar shows where it points. Tab to one with the keyboard: it takes focus and shows the same highlight.
+- **CPU throttling is not a link**: the **CPU throttling** tile still reads `—` / `N/A` with "Not available from kubectl", has no arrow icon, does not highlight on hover, and cannot be clicked or tabbed to.
+- **Pending pods**: click it. Karse opens the Pods page showing only `pod-pending` — one row, matching the `1` you clicked — with the **Filter** button reading `Filter: 1 selected` and `Pending` ticked under **Status**.
+- **OOMKills**: go back and click it. The Pods page shows only `pod-oomkilled` with the **Filter** button reading `Filter: 1 selected` and `Yes` ticked under **OOMKilled**. Note this is the pod's history: `pod-oomkilled` is Running now, and it is still counted.
+- **Node count**: go back and click it. The Nodes page opens showing all four nodes with the **Filter** button reading `Filter: All` — it is every node, so there is nothing to filter.
+- **Node pressure**: go back and click it. The Nodes page shows only `node-pressure`, with the **Filter** button reading `Filter: 1 selected` and `Active` ticked under **Pressure**.
+- **The strip cards**: go back and click **Over-utilized**: only `node-hot`. Back, **Healthy**: only `node-mid`. Back, **Under-utilized**: `node-cool` and `node-pressure`. Each time the **Filter** button reads `Filter: 1 selected` with the band ticked under **Utilization**, and the number of rows matches the number you clicked.
+- **The filter clears**: with a seeded filter applied, open the Filter dropdown and click **Clear**. Every node comes back and the button reads `Filter: All`.
+- **Back returns you to the overview**: after following any of these links, press the browser's Back button. You land on the Cluster page again with the tiles and strip as you left them.
+- **The links keep the context and namespace**: pick a namespace in the navbar, then click a tile. The URL you land on still carries `context=` and `namespace=`, so a copied link opens the same view.
+- **A zero count still links**: delete the pending pod (`kubectl delete pod pod-pending -n default`) and reload the Cluster page. **Pending pods** now reads `0` and is still a link: clicking it opens the pods list filtered to Pending, showing "No pods match the search." with the **Filter** button reading `Filter: 1 selected` — the empty filtered list, not an unfiltered one.
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/40-overview-count-links/teardown.sh
+```
+
 ## Related coverage
 
 The "Select a context to see cluster overview." empty state (when no context is selected) is verified under [context-switching](../context-switching/detail.md) (no-contexts scenario). Tile counts also appear after a context switch in [context-switching](../context-switching/detail.md). The pods-list Status filter itself (ticking values by hand, combining with search) is covered under [pods-view](../pods-view/detail.md).
@@ -120,4 +159,5 @@ Tear down any cluster you stood up while testing this doc:
 ./docs/testing-manual/_fixtures-kwok/02-empty-cluster-no-nodes/teardown.sh
 ./docs/testing-manual/_fixtures-kwok/10-mixed-pod-phases/teardown.sh
 ./docs/testing-manual/_fixtures-kwok/32-errors-view/teardown.sh
+./docs/testing-manual/_fixtures-kwok/40-overview-count-links/teardown.sh
 ```

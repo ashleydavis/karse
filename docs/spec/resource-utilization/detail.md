@@ -82,10 +82,23 @@ The cluster Overview tab shows health-signal tiles, all derived from data alread
 - **Node count** — the number of nodes in the cluster.
 - **Node pressure** — per-condition counts of nodes whose `MemoryPressure`, `DiskPressure`, or
   `PIDPressure` condition is `"True"`. The tile is highlighted when any count is greater than zero.
+  The counts are per condition, not per node: a node under two pressures adds one to each, so the
+  nodes list the tile links to (every node with at least one active pressure condition) can hold
+  fewer rows than the counts add up to.
 - **CPU throttling** — **always shown as unavailable**. kubectl cannot expose CPU throttling
   (it needs `container_cpu_cfs_throttled_periods_total` from Prometheus), so the tile shows a
   permanent "Not available" / "N/A" state and never invents a proxy metric. The
   `cpuThrottlingAvailable` field is therefore the literal `false`.
+
+Every tile that counts resources links to the list holding exactly the resources it counted, with
+the matching filter seeded (see [cluster-overview](../cluster-overview/detail.md)). The CPU-throttling
+tile counts nothing, so it stays a plain, non-interactive readout.
+
+**One rule per counter.** So a tile's number and the filtered list behind it can never drift apart,
+the rule each counter applies lives in exactly one place and both consumers read it:
+`backend/src/kubectl/health-rules.ts` holds `podWasOOMKilled` and `activeNodePressures`, used both by
+`computeHealth` (the counters here) and by the pods and nodes list mappers, which carry the result on
+each resource as `Pod.oomKilled` and `Node.pressure` for the list filters to narrow on.
 
 ## Treemap label truncation
 
