@@ -79,7 +79,7 @@ Both selections start at the same value on first load. You can diverge them — 
 The header bar has two quick-picker buttons:
 
 - **Context picker** (link icon, `Ctrl+K`): opens a searchable list of contexts, grouped by environment. Click a row to switch the active context for the tab.
-- **Namespace picker** (layers icon, `Ctrl+Shift+K`): opens a searchable list of namespaces for the active context. Click "All namespaces" to clear the namespace selection, or click a namespace name to scope all views to that namespace.
+- **Namespace picker** (`Ctrl+Shift+K`): a labelled button naming the namespace your views are scoped to, or "All namespaces" when they are not scoped, so the header always states the scope in force. Clicking it opens a searchable list of namespaces for the active context. Click "All namespaces" to clear the namespace selection, or click a namespace name to scope all views to that namespace. A long namespace name is shortened with an ellipsis on the button.
 
 The header also has a dropdown showing the current context (grouped by environment, with a chip beside it naming the active context's environment) and a **Refresh** button (circular-arrows icon) that empties the on-disk cluster-data cache and re-fetches all data fresh from the cluster. Clicking it clears the page you are on and reloads it: the list or detail you were looking at is replaced by a spinner and comes back with fresh data, so a refresh always looks like a real reload. The button acknowledges the click too — the icon spins and a "Refreshing…" toast appears at the bottom of the window, then a brief check and a "Refreshed" toast when done — so you can tell a refresh happened even when the data comes back unchanged. See the Config page below for the cache.
 

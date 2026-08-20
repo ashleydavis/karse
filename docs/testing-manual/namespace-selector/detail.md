@@ -21,7 +21,7 @@ Then open the frontend at `http://127.0.0.1:5173`. Each fixture stands up a `kar
 ```
 
 ### What to check
-- Open the namespace picker (layers icon or Ctrl+Shift+K), select `default`. Both pods are shown and the Namespace column remains visible. Select a different namespace: the empty state appears.
+- Open the namespace picker (the labelled namespace button in the header, or Ctrl+Shift+K), select `default`. The trigger now reads `default`. Both pods are shown and the Namespace column remains visible. Select a different namespace: the empty state appears.
 - Navigate to `/namespaces`, click "Set as active" on `default`. Confirm the `active` chip appears and views scope to that namespace.
 - The namespace picker lists the system namespaces only (no user namespaces in this fixture).
 
@@ -49,7 +49,7 @@ Then open the frontend at `http://127.0.0.1:5173`. Each fixture stands up a `kar
 - The picker lists `team-1`..`team-5` alongside system namespaces; selecting one scopes all views.
 - On `/namespaces`, "Set as active" shows the `active` chip; "Set as default" shows the `default` chip (tab-local active vs persisted default).
 - With `team-1` active, exactly 4 pods are shown.
-- "All namespaces" clears the selection; all 20 pods appear and the header namespace chip is removed.
+- "All namespaces" clears the selection; all 20 pods appear and the header trigger reverts to reading `All namespaces`.
 
 ## Scenario D: Resource-count column
 

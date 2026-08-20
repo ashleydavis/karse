@@ -18,6 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
 import { fetchNamespaces } from "../lib/api-client";
+import { ALL_NAMESPACES_LABEL } from "./namespace-trigger-label";
 
 // Dropdown picker for selecting a namespace, anchored to the header button.
 type Props = {
@@ -95,7 +96,7 @@ export function NamespaceQuickPicker({ open, onClose, children }: Props) {
                                 onClick={() => handleSelect(null)}
                                 data-test-id="namespace-quick-picker-all"
                             >
-                                <ListItemText primary="All namespaces" />
+                                <ListItemText primary={ALL_NAMESPACES_LABEL} />
                                 {currentNamespace === null && (
                                     <Chip label="active" size="small" color="primary" sx={{ ml: 1 }} />
                                 )}

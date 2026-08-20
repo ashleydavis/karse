@@ -14,8 +14,8 @@ Backed by: `GET /api/namespaces`, `POST /api/namespaces/default`, `backend/src/r
 - The **active** namespace is tab-local (`kube-namespace.tsx`), resets on reload, and is included in query keys so changing it refetches scoped views.
 - When an active namespace is set, list views (pods, deployments, etc.) are scoped to it; when none is set, views show all namespaces (`-A`). The pods table's Namespace column is always rendered regardless of the active namespace.
 - The namespaces page (`/namespaces`) lists namespaces for the active context with per-row "Set as active / Clear active" (tab-local) and "Set as default / Clear default" (kubeconfig), plus active/default chips. A Labels column renders each namespace's labels as compact `key=value` chips (a muted dash when none) and participates in the table's fuzzy search. It truncates to the first few chips with a `+N ...` control that opens a searchable labels modal (the shared Labels column behaviour, see `resource-search`).
-- The header quick-picker button (layers icon, `Ctrl+Shift+K`) opens a searchable dropdown including an "All namespaces" entry that clears the selection.
-- The active namespace is reflected in the URL query string and shown as a chip in the header.
+- The header quick-picker trigger (`Ctrl+Shift+K`) is a labelled button showing the active namespace's name, or "All namespaces" when none is set, and opens a searchable dropdown including an "All namespaces" entry that clears the selection (see [quick-find](../quick-find/detail.md)).
+- The active namespace is reflected in the URL query string and named in the header by the quick-picker's trigger. The header names it once, on that trigger; there is no separate namespace chip beside the breadcrumbs.
 
 ## Acceptance Criteria
 
@@ -26,6 +26,7 @@ Backed by: `GET /api/namespaces`, `POST /api/namespaces/default`, `backend/src/r
 - [x] The namespaces page sets/clears active and default per namespace, with chips.
 - [x] The namespaces page has a Labels column showing each namespace's labels as key=value chips, searchable.
 - [x] A `Ctrl+Shift+K` header quick-picker selects a namespace or clears the selection via "All namespaces".
+- [x] The header quick-picker's trigger shows the active namespace's name ("All namespaces" when none), and is the header's only display of it.
 - [x] The namespaces page shows a Resources column with the per-namespace pod count, defined and documented as pods, computed without a per-namespace call, and a failure to count does not break the table (shows an em-dash).
 
 ## Open Questions

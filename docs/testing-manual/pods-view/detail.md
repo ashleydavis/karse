@@ -20,7 +20,7 @@ Then open the frontend at `http://127.0.0.1:5173`. Namespace scoping is exercise
 
 ### What to check
 - **Pods page**: two rows visible with no namespace selected (all-namespaces view). Both pods show a Running status chip (under the **Status** column) and the Namespace column shows `default`. Click either row to navigate to the pod detail page; confirm the pod name, status chip, containers table, and log viewer button are shown.
-- **Namespace scoping**: open the namespace picker (layers icon or Ctrl+Shift+K), select `default`. Both pods are still shown and the Namespace column remains visible. Select a different namespace. The empty state appears.
+- **Namespace scoping**: open the namespace picker (the labelled namespace button in the header, or Ctrl+Shift+K), select `default`. Both pods are still shown and the Namespace column remains visible. Select a different namespace. The empty state appears.
 - **Namespaces page**: navigate to `/namespaces`, click "Set as active" on `default`. Confirm the `active` chip appears and the Pods page scopes to that namespace.
 - **Overview tiles**: pod count shows `2`.
 
@@ -49,7 +49,7 @@ Then open the frontend at `http://127.0.0.1:5173`. Namespace scoping is exercise
 ```
 
 ### What to check
-- **Namespace picker** (layers icon or Ctrl+Shift+K): lists `team-1` through `team-5` alongside system namespaces. Selecting one scopes all views.
+- **Namespace picker** (the labelled namespace button in the header, or Ctrl+Shift+K): lists `team-1` through `team-5` alongside system namespaces. Selecting one scopes all views.
 - **Namespaces page**: navigate to `/namespaces` and confirm all 5 team namespaces appear. Click "Set as active" on `team-1` and confirm the `active` chip appears. Click "Set as default" and confirm the `default` chip appears.
 - **Pods page per namespace**: with `team-1` active, exactly 4 pods are shown and the Namespace column is still visible.
 - **All namespaces**: open the namespace picker and click "All namespaces". All 20 pods appear.

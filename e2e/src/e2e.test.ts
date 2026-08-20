@@ -2473,6 +2473,41 @@ test.describe("karse e2e", () => {
             await closePicker();
         });
 
+        // The trigger carries the value: it names the namespace in force rather than being a
+        // bare icon, and it is the only place the header names it (the old separate chip
+        // beside the breadcrumbs is gone, so the namespace is never shown twice).
+        test("the trigger reads All namespaces when no namespace is selected", async () => {
+            await expect(page.locator("[data-test-id='header-namespace-trigger']")).toHaveText("All namespaces");
+        });
+
+        test("selecting a namespace shows its name on the trigger", async () => {
+            await openPicker();
+            await page.locator("[data-test-id='namespace-quick-picker-row']").filter({ hasText: /^default/ }).click();
+            await expect(page.locator("[data-test-id='header-namespace-trigger']")).toHaveText("default");
+        });
+
+        test("clearing the selection reverts the trigger to All namespaces", async () => {
+            await openPicker();
+            await page.locator("[data-test-id='namespace-quick-picker-all']").click();
+            await expect(page.locator("[data-test-id='header-namespace-trigger']")).toHaveText("All namespaces");
+        });
+
+        test("the header no longer shows a separate namespace chip", async () => {
+            await openPicker();
+            await page.locator("[data-test-id='namespace-quick-picker-row']").filter({ hasText: /^default/ }).click();
+            await expect(page.locator("[data-test-id='header-namespace-trigger']")).toHaveText("default");
+            await expect(page.locator("[data-test-id='header-namespace-chip']")).toHaveCount(0);
+            await openPicker();
+            await page.locator("[data-test-id='namespace-quick-picker-all']").click();
+            await expect(page.locator("[data-test-id='header-namespace-trigger']")).toHaveText("All namespaces");
+        });
+
+        test("clicking the labelled trigger opens the dropdown", async () => {
+            await page.locator("[data-test-id='header-namespace-trigger']").click();
+            await expect(page.locator("[data-test-id='namespace-quick-picker-dropdown']")).toBeVisible();
+            await closePicker();
+        });
+
     });
 
     // ── Quick-picker console output ───────────────────────────────────────────
@@ -2600,9 +2635,9 @@ test.describe("karse e2e", () => {
             expect(names).not.toContain("node-cp");
         });
 
-        test("navigating to a URL with ?namespace restores the namespace chip in the header", async () => {
+        test("navigating to a URL with ?namespace restores the namespace on the header trigger", async () => {
             await page.goto(`/nodes?context=${CLUSTER_1}&namespace=kube-system`, { waitUntil: "networkidle" });
-            await expect(page.locator("[data-test-id='header-namespace-chip']")).toHaveText("kube-system");
+            await expect(page.locator("[data-test-id='header-namespace-trigger']")).toHaveText("kube-system");
         });
 
         test("the context param survives navigation to a workloads page via the sidebar", async () => {
@@ -5475,12 +5510,12 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
         });
 
-        test("shows namespace chip in header when scoped to a namespace", async () => {
+        test("shows the namespace on the header trigger when scoped to a namespace", async () => {
             // Select a namespace via namespace picker then navigate to pods page.
             await page.locator("[aria-label='namespace picker']").click();
             await page.locator("[data-test-id='namespace-quick-picker-row']").filter({ hasText: /^default/ }).click();
             await expect(page.locator("[data-test-id='pods-table']")).toBeVisible();
-            await expect(page.locator("[data-test-id='header-namespace-chip']")).toHaveText("default");
+            await expect(page.locator("[data-test-id='header-namespace-trigger']")).toHaveText("default");
         });
 
         test("Namespace column is always visible regardless of namespace selection", async () => {

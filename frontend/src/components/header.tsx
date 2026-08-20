@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { AppBar, Toolbar, IconButton, Alert, Tooltip, Box, Menu, MenuItem, ListItemIcon, ListItemText, Chip, Snackbar } from "@mui/material";
+import { AppBar, Toolbar, IconButton, Button, Alert, Tooltip, Box, Menu, MenuItem, ListItemIcon, ListItemText, Snackbar } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLink, faLayerGroup, faSun, faMoon, faCircleHalfStroke, faCheck, faShareNodes, faRotate, faClockRotateLeft, faCalendarDays } from "@fortawesome/free-solid-svg-icons";
+import { faLink, faLayerGroup, faSun, faMoon, faCircleHalfStroke, faCheck, faShareNodes, faRotate, faClockRotateLeft, faCalendarDays, faChevronDown } from "@fortawesome/free-solid-svg-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
@@ -14,6 +14,7 @@ import { copyToClipboard } from "../lib/clipboard";
 import { ContextPicker } from "./context-picker";
 import { ContextQuickPicker } from "./context-quick-picker";
 import { NamespaceQuickPicker } from "./namespace-quick-picker";
+import { namespaceTriggerLabel } from "./namespace-trigger-label";
 import { Breadcrumbs } from "./breadcrumbs";
 import { PageHelp } from "./page-help";
 import { TOP_BAR_HEIGHT } from "../lib/layout";
@@ -105,14 +106,6 @@ export function Header() {
             <AppBar position="static" color="default" elevation={0}>
                 <Toolbar variant="dense" sx={{ gap: 1, minHeight: TOP_BAR_HEIGHT }}>
                     <Breadcrumbs />
-                    {namespace !== null && (
-                        <Chip
-                            label={namespace}
-                            size="small"
-                            variant="outlined"
-                            data-test-id="header-namespace-chip"
-                        />
-                    )}
                     <Box sx={{ flexGrow: 1 }} />
                     <ContextPicker contexts={contexts} current={current} onSwitch={switchTo} />
                     <ContextQuickPicker
@@ -132,14 +125,28 @@ export function Header() {
                         open={namespacePickerOpen}
                         onClose={() => setNamespacePickerOpen(false)}
                     >
-                        <IconButton
+                        <Button
                             size="small"
+                            variant="outlined"
+                            color="inherit"
                             onClick={() => setNamespacePickerOpen(true)}
                             aria-label="namespace picker"
                             title="Namespace picker (Ctrl+Shift+K)"
+                            data-test-id="header-namespace-trigger"
+                            startIcon={<FontAwesomeIcon icon={faLayerGroup} />}
+                            endIcon={<FontAwesomeIcon icon={faChevronDown} size="xs" />}
+                            sx={{ textTransform: "none", maxWidth: 240 }}
                         >
-                            <FontAwesomeIcon icon={faLayerGroup} />
-                        </IconButton>
+                            {/* The label is clipped rather than allowed to grow, so a long
+                                namespace name ellipsises instead of pushing the rest of the
+                                header's controls around. */}
+                            <Box
+                                component="span"
+                                sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                            >
+                                {namespaceTriggerLabel(namespace)}
+                            </Box>
+                        </Button>
                     </NamespaceQuickPicker>
                     <PageHelp />
                     <Tooltip title={timestampTitle}>

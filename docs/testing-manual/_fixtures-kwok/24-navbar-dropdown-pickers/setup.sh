@@ -41,8 +41,9 @@ metadata:
 spec: {}
 EOF
 
-# Add a couple of extra namespaces to cluster 1 so the namespace picker
-# dropdown has rows to filter and select.
+# Add a few extra namespaces to cluster 1 so the namespace picker dropdown has rows to
+# filter and select. The long name is there so the header trigger's ellipsis can be
+# checked against a name that does not fit.
 kwokctl --name karse-test-1 kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: Namespace
@@ -53,6 +54,11 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: team-beta
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: a-very-long-namespace-name-for-truncation
 EOF
 
 # Add one node to cluster 2 (distinct shape so the switch is visible)
@@ -71,7 +77,7 @@ EOF
 
 echo ""
 echo "Two clusters ready:"
-echo "  kwok-karse-test-1  (2 nodes, extra namespaces team-alpha/team-beta)"
+echo "  kwok-karse-test-1  (2 nodes, extra namespaces team-alpha/team-beta/a-very-long-namespace-name-for-truncation)"
 echo "  kwok-karse-test-2  (1 node)"
 echo ""
 echo "Use the header context and namespace pickers (they drop down from the nav bar)."
