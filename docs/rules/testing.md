@@ -4,10 +4,10 @@ Test setup for Karse. Every change must follow every rule below.
 
 ## Frameworks and layout
 
-- The two testing frameworks for this project are **Jest** (unit tests) and **Playwright** (e2e tests). No other test runners are used.
-- `bun run test` runs the backend and frontend Jest projects in sequence (both via `@swc/jest`).
+- The two testing frameworks for this project are **Jest** (backend unit tests) and **Playwright** (e2e tests). No other test runners are used.
+- Backend tests run with `bun run test` (which invokes Jest via `@swc/jest`).
 - Every **backend** non-React TypeScript module has tests under `backend/src/tests/`, mirroring the source tree. The one exception is `index.ts`, pure bootstrap wiring covered by the smoke script.
-- **Frontend** unit tests live under `frontend/src/tests/`, mirroring the source tree, and cover its plain TypeScript modules: `frontend/src/lib/*.ts` helpers and the pure cores extracted from components (for example `components/labels-cell-pairs.ts`). React components and pages themselves are **not** unit-tested (the frontend Jest project runs in `node` and matches `*.test.ts` only, so nothing renders React); they are exercised by the Playwright e2e suite and `scripts/smoke-tests.sh`. Modules that only wire up the browser environment (`api-client.ts`, `query-client.ts`) are covered the same way.
+- The **frontend is not unit-tested at all** per project policy. This includes React components, pages, and non-React `frontend/src/lib/*.ts` modules (`api-client.ts`, `query-client.ts`, `font-awesome.ts`). They are exercised by the Playwright e2e suite and `scripts/smoke-tests.sh`.
 - **E2E tests** live in `e2e/src/` and use `@playwright/test`. They are run by `scripts/e2e-tests.sh`, which spins up two kwok clusters, starts the full stack, then invokes Playwright. E2E tests use `test.describe` and `test` (Playwright's API).
 
 ## Testing rules
