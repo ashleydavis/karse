@@ -14,8 +14,6 @@ import {
     TableBody,
     TableRow,
     TableCell,
-    TableContainer,
-    Paper,
     Chip,
     Typography,
 } from "@mui/material";
@@ -31,6 +29,7 @@ import { TableFilter } from "../../../components/table-filter";
 import { valueColumnFilterFn, type FilterableColumn } from "../../../lib/table-filter-state";
 import { useTableFilter } from "../../../lib/use-table-filter";
 import { LoadError } from "../../../components/load-error";
+import { ScrollableTableContainer } from "../../../components/scrollable-table-container";
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
 import { useShareableNavigate } from "../../../lib/nav-state";
@@ -294,7 +293,7 @@ export function EventsTable() {
                 onReset={rowFilters.reset}
                 testIdPrefix="events"
             />
-            <TableContainer component={Paper} data-test-id="events-table">
+            <ScrollableTableContainer testId="events-table">
                 <Table size="small">
                     <TableHead>
                         {table.getHeaderGroups().map((hg) => (
@@ -343,7 +342,7 @@ export function EventsTable() {
                         />
                     </TableBody>
                 </Table>
-            </TableContainer>
+            </ScrollableTableContainer>
         </div>
     );
 }

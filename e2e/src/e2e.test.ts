@@ -12709,4 +12709,190 @@ test.describe("karse e2e", () => {
                 .toHaveText(`${CLUSTER_1_NODES + CLUSTER_2_NODES} nodes`);
         });
     });
+    // ── Wide-table scrolling ──────────────────────────────────────────────────
+
+    test.describe("wide table scrolling", () => {
+        // A wide table used to lay itself out down the whole page, so its horizontal
+        // scrollbar ended up below the fold at the bottom of a 100-row table and the
+        // trailing columns (Labels here) were unreachable (table-layout-2). The table now
+        // bounds itself to the window and scrolls inside it, with an always-visible
+        // horizontal bar drawn below it.
+        //
+        // The lists are mocked rather than seeded into kwok so the rest of the suite's pod
+        // and autoscaler counts are untouched: what is under test is a client-side layout
+        // property, not anything the cluster reports.
+        const WIDE_LABELS = {
+            "app.kubernetes.io/name": "checkout-service-frontend",
+            "app.kubernetes.io/instance": "checkout-service-frontend-prod-eu-west-1",
+            "app.kubernetes.io/component": "web-frontend-with-a-long-component-name",
+            "app.kubernetes.io/part-of": "commerce-platform-europe",
+            "app.kubernetes.io/managed-by": "helm-release-controller",
+        };
+
+        const WIDE_PODS = {
+            pods: Array.from({ length: 60 }, (_unused, index) => ({
+                name: `checkout-service-frontend-${String(index).padStart(3, "0")}`,
+                namespace: "commerce-platform-production",
+                phase: "Running",
+                ready: "1/1",
+                restarts: 0,
+                node: "node-worker",
+                createdAt: new Date().toISOString(),
+                labels: WIDE_LABELS,
+            })),
+        };
+
+        const SHORT_POD_LIST = {
+            pods: WIDE_PODS.pods.slice(0, 3),
+        };
+
+        const WIDE_AUTOSCALERS = {
+            horizontalPodAutoscalers: Array.from({ length: 30 }, (_unused, index) => ({
+                name: `checkout-service-frontend-${String(index).padStart(3, "0")}`,
+                namespace: "commerce-platform-production",
+                reference: `Deployment/checkout-service-frontend-${String(index).padStart(3, "0")}`,
+                minReplicas: 2,
+                maxReplicas: 20,
+                currentReplicas: 4,
+                desiredReplicas: 4,
+                targets: "cpu: 42%/80%, memory: 51%/75%",
+                createdAt: new Date().toISOString(),
+                labels: WIDE_LABELS,
+            })),
+        };
+
+        // The scroll metrics of a table's container, read from the live element.
+        async function metricsOf(testId: string): Promise<{
+            scrollTop: number;
+            scrollLeft: number;
+            scrollWidth: number;
+            scrollHeight: number;
+            clientWidth: number;
+            clientHeight: number;
+        }> {
+            return page.locator(`[data-test-id='${testId}']`).evaluate((element) => ({
+                scrollTop: element.scrollTop,
+                scrollLeft: element.scrollLeft,
+                scrollWidth: element.scrollWidth,
+                scrollHeight: element.scrollHeight,
+                clientWidth: element.clientWidth,
+                clientHeight: element.clientHeight,
+            }));
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            // A window narrow enough that the Labels column cannot fit, which is the
+            // reported case.
+            await page.setViewportSize({ width: 1024, height: 720 });
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: WIDE_PODS });
+            });
+            await page.route("**/api/horizontalpodautoscalers*", async (route) => {
+                await route.fulfill({ json: WIDE_AUTOSCALERS });
+            });
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']").first()).toBeVisible();
+        });
+
+        test.afterAll(async () => {
+            await page.unroute("**/api/pods*");
+            await page.unroute("**/api/horizontalpodautoscalers*");
+            await page.setViewportSize({ width: 1280, height: 800 });
+        });
+
+        test("the pods table scrolls inside the window instead of down the page", async () => {
+            const metrics = await metricsOf("pods-table");
+            // Bounded: the rows overflow a container that is itself no taller than the window.
+            expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+            expect(metrics.clientHeight).toBeLessThanOrEqual(720);
+            // And the columns overflow it horizontally, which is what the bar is for.
+            expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
+        });
+
+        test("the horizontal scrollbar is on screen without scrolling the page", async () => {
+            const track = page.locator("[data-test-id='pods-table-hscroll-track']");
+            await expect(track).toBeVisible();
+            const box = await track.boundingBox();
+            expect(box).not.toBeNull();
+            // Its bottom edge is inside the window, so it is found without hunting for it.
+            expect(box!.y + box!.height).toBeLessThanOrEqual(720);
+        });
+
+        test("the page itself gains no horizontal scrollbar", async () => {
+            const pageOverflow = await page.evaluate(() => ({
+                documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+                bodyOverflow: document.body.scrollWidth - document.body.clientWidth,
+            }));
+            expect(pageOverflow.documentOverflow).toBeLessThanOrEqual(0);
+            expect(pageOverflow.bodyOverflow).toBeLessThanOrEqual(0);
+        });
+
+        test("dragging the scrollbar thumb reaches the last column", async () => {
+            const thumb = page.locator("[data-test-id='pods-table-hscroll-thumb']");
+            const box = await thumb.boundingBox();
+            expect(box).not.toBeNull();
+            await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+            await page.mouse.down();
+            // Well past the end of the track, so the drag clamps at the last column.
+            await page.mouse.move(box!.x + 2000, box!.y + box!.height / 2, { steps: 10 });
+            await page.mouse.up();
+            const metrics = await metricsOf("pods-table");
+            expect(metrics.scrollLeft).toBe(metrics.scrollWidth - metrics.clientWidth);
+            // The Labels column is the last one, and it is now in view.
+            await expect(page.locator("[data-test-id='pods-table'] thead th").last()).toBeInViewport();
+            await expect(page.locator("[data-test-id='pod-row'] [data-test-id='labels-cell']").first()).toBeInViewport();
+        });
+
+        test("the header row stays visible while the body scrolls down", async () => {
+            // The previous test left the table scrolled to its last column, which would put
+            // the first header cell off the left edge of the window; this test is about the
+            // vertical axis, so it starts from the table's own top-left corner.
+            await page.locator("[data-test-id='pods-table']").evaluate((element) => {
+                element.scrollLeft = 0;
+                element.scrollTop = 0;
+            });
+            const header = page.locator("[data-test-id='pods-table'] thead th").first();
+            await expect(header).toBeInViewport();
+            const before = await header.boundingBox();
+            await page.locator("[data-test-id='pods-table']").evaluate((element) => {
+                element.scrollTop = element.scrollHeight;
+            });
+            const metrics = await metricsOf("pods-table");
+            expect(metrics.scrollTop).toBeGreaterThan(0);
+            await expect(header).toBeInViewport();
+            const after = await header.boundingBox();
+            // Sticky: the header sat still while the rows moved under it.
+            expect(Math.abs(after!.y - before!.y)).toBeLessThan(2);
+        });
+
+        test("the autoscalers table's trailing Labels column is reachable too", async () => {
+            await page.goto("/autoscalers", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='autoscaler-row']").first()).toBeVisible();
+            const before = await metricsOf("autoscalers-table");
+            expect(before.scrollWidth).toBeGreaterThan(before.clientWidth);
+            await expect(page.locator("[data-test-id='autoscalers-table-hscroll-track']")).toBeVisible();
+            await page.locator("[data-test-id='autoscalers-table']").evaluate((element) => {
+                element.scrollLeft = element.scrollWidth;
+            });
+            const after = await metricsOf("autoscalers-table");
+            expect(after.scrollLeft).toBe(after.scrollWidth - after.clientWidth);
+            await expect(page.locator("[data-test-id='autoscalers-table'] thead th").last()).toBeInViewport();
+        });
+
+        test("a short table is only as tall as its rows, with no bar and no empty space", async () => {
+            await page.unroute("**/api/pods*");
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: SHORT_POD_LIST });
+            });
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='pod-row']")).toHaveCount(3);
+            const metrics = await metricsOf("pods-table");
+            // The bound is a maximum, so three rows leave no vertical overflow and no
+            // stretched-out empty area below them.
+            expect(metrics.scrollHeight).toBe(metrics.clientHeight);
+            expect(metrics.clientHeight).toBeLessThan(300);
+        });
+    });
+
 });

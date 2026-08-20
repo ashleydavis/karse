@@ -16,8 +16,6 @@ import {
     TableBody,
     TableRow,
     TableCell,
-    TableContainer,
-    Paper,
     Chip,
     Typography,
 } from "@mui/material";
@@ -29,6 +27,7 @@ import { useKubeContext } from "../../../lib/kube-context";
 import { fetchNodes, fetchClusterPerformance } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
+import { ScrollableTableContainer } from "../../../components/scrollable-table-container";
 import { TableFilter } from "../../../components/table-filter";
 import { DataTableRows } from "../../../components/data-table-row";
 import { useSearchFilter } from "../../../lib/use-search-filter";
@@ -476,7 +475,7 @@ function NodesTableInner() {
                 />
                 <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
             </div>
-            <TableContainer component={Paper} data-test-id="nodes-table">
+            <ScrollableTableContainer testId="nodes-table">
                 <Table size="small">
                     <TableHead>
                         {table.getHeaderGroups().map((hg) => (
@@ -520,7 +519,7 @@ function NodesTableInner() {
                         />
                     </TableBody>
                 </Table>
-            </TableContainer>
+            </ScrollableTableContainer>
         </div>
     );
 }

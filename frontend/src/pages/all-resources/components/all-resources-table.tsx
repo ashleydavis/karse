@@ -14,8 +14,6 @@ import {
     TableBody,
     TableRow,
     TableCell,
-    TableContainer,
-    Paper,
     Typography,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -31,6 +29,7 @@ import {
 } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
+import { ScrollableTableContainer } from "../../../components/scrollable-table-container";
 import { TableFilter } from "../../../components/table-filter";
 import { ResourceRef } from "../../../components/resource-ref";
 import { DataTableRows } from "../../../components/data-table-row";
@@ -267,7 +266,7 @@ export function AllResourcesTable() {
                     testIdPrefix="all-resources-filter"
                 />
             </div>
-            <TableContainer component={Paper} data-test-id="all-resources-table">
+            <ScrollableTableContainer testId="all-resources-table">
                 <Table size="small">
                     <TableHead>
                         {table.getHeaderGroups().map((hg) => (
@@ -314,7 +313,7 @@ export function AllResourcesTable() {
                         />
                     </TableBody>
                 </Table>
-            </TableContainer>
+            </ScrollableTableContainer>
         </div>
     );
 }

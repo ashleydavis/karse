@@ -14,8 +14,6 @@ import {
     TableBody,
     TableRow,
     TableCell,
-    TableContainer,
-    Paper,
     Chip,
     Typography,
 } from "@mui/material";
@@ -32,6 +30,7 @@ import { TableFilter } from "../../../components/table-filter";
 import { valueColumnFilterFn, type FilterableColumn } from "../../../lib/table-filter-state";
 import { useTableFilter } from "../../../lib/use-table-filter";
 import { LoadError } from "../../../components/load-error";
+import { ScrollableTableContainer } from "../../../components/scrollable-table-container";
 import { useColumnConfig } from "../../../lib/column-config";
 import { ColumnConfigButton } from "../../../components/column-config-modal";
 import { ResourceRef } from "../../../components/resource-ref";
@@ -302,7 +301,7 @@ export function ErrorsTable() {
                 onReset={rowFilters.reset}
                 testIdPrefix="errors"
             />
-            <TableContainer component={Paper} data-test-id="errors-table">
+            <ScrollableTableContainer testId="errors-table">
                 <Table size="small">
                     <TableHead>
                         {table.getHeaderGroups().map((hg) => (
@@ -351,7 +350,7 @@ export function ErrorsTable() {
                         />
                     </TableBody>
                 </Table>
-            </TableContainer>
+            </ScrollableTableContainer>
         </div>
     );
 }

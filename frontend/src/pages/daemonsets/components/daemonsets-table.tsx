@@ -14,8 +14,6 @@ import {
     TableBody,
     TableRow,
     TableCell,
-    TableContainer,
-    Paper,
     Typography,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -31,6 +29,7 @@ import { TableFilter } from "../../../components/table-filter";
 import { valueColumnFilterFn, labelsColumnFilterFn, collectLabelColumns, type FilterableColumn } from "../../../lib/table-filter-state";
 import { useTableFilter } from "../../../lib/use-table-filter";
 import { LoadError } from "../../../components/load-error";
+import { ScrollableTableContainer } from "../../../components/scrollable-table-container";
 import { ResourceRef } from "../../../components/resource-ref";
 import { DataTableRows } from "../../../components/data-table-row";
 import { useSearchFilter } from "../../../lib/use-search-filter";
@@ -210,7 +209,7 @@ export function DaemonSetsTable() {
                 />
                 <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
             </div>
-            <TableContainer component={Paper} data-test-id="daemonsets-table">
+            <ScrollableTableContainer testId="daemonsets-table">
                 <Table size="small">
                     <TableHead>
                         {table.getHeaderGroups().map((hg) => (
@@ -257,7 +256,7 @@ export function DaemonSetsTable() {
                         />
                     </TableBody>
                 </Table>
-            </TableContainer>
+            </ScrollableTableContainer>
         </div>
     );
 }

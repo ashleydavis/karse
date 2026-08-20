@@ -263,3 +263,37 @@ Teardown:
 ```sh
 ./docs/testing-manual/_fixtures-kwok/37-large-pod-list/teardown.sh
 ```
+
+## Scenario: Wide table scrolling
+
+A cluster whose pods carry real-world label sets, so the Labels column runs past the right edge of the window and the table has to scroll sideways.
+
+With the previous scenario's fixture torn down, stand up the real-shaped-labels fixture:
+
+**Fixture:** [_fixtures-kwok/36-real-shaped-labels](../_fixtures-kwok/36-real-shaped-labels/)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/36-real-shaped-labels/setup.sh
+```
+
+`kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse.
+
+### What to check
+
+Size the browser window to roughly 1440px wide (narrower is fine, and makes the overflow more obvious). Open the **Pods page** and select the `reallabels` namespace.
+
+- **The bar is in view**: a horizontal scrollbar sits directly under the table, on screen, without scrolling the page. It is a solid, always-visible bar, not something that fades in only while you scroll.
+- **The last column is reachable**: drag that bar to its right-hand end. The **Labels** column comes into view, including each row's `+N ...` control. Click the track to the right of the thumb: the table jumps sideways.
+- **The page does not scroll sideways**: the browser's own window never gains a horizontal scrollbar, and the sidebar and navbar stay put while the table scrolls under them.
+- **The header sticks**: scroll the table's rows down with the mouse wheel. The header row (NAME, NAMESPACE, STATUS, ...) stays where it is while the rows move under it, and its background stays opaque (no row text showing through it).
+- **The page stays put**: scrolling the rows scrolls the table, not the whole page. The search box, the **Filter** button and the stats header above the table stay on screen.
+- **A short table is not stretched**: select the `shortlabels` namespace and search for a single pod name so one row is left. The table shrinks to that one row plus the header; it is not held open at the full window height with empty space below the row.
+- **Every table behaves the same**: repeat the first two checks on **Nodes**, **Events**, **Errors**, **Autoscalers**, **All Resources**, **Deployments**, **Stateful Sets** and **Daemon Sets**. Each bounds itself to the window and shows the same bar when its columns do not fit.
+
+Check the bar, the sticky header and the reachable Labels column in both **light and dark mode**.
+
+Teardown:
+
+```sh
+./docs/testing-manual/_fixtures-kwok/36-real-shaped-labels/teardown.sh
+```

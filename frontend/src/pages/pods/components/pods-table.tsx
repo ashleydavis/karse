@@ -15,8 +15,6 @@ import {
     TableBody,
     TableRow,
     TableCell,
-    TableContainer,
-    Paper,
     Chip,
     Typography,
 } from "@mui/material";
@@ -30,6 +28,7 @@ import { useShareableNavigate } from "../../../lib/nav-state";
 import { fetchPods, fetchClusterPerformance } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
+import { ScrollableTableContainer } from "../../../components/scrollable-table-container";
 import { TableFilter } from "../../../components/table-filter";
 import { ResourceRef } from "../../../components/resource-ref";
 import { DataTableRows } from "../../../components/data-table-row";
@@ -461,7 +460,7 @@ function PodsTableInner() {
                 <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
                 <ViewToggles />
             </div>
-            <TableContainer component={Paper} data-test-id="pods-table">
+            <ScrollableTableContainer testId="pods-table">
                 <Table size="small">
                     <TableHead>
                         {table.getHeaderGroups().map((hg) => (
@@ -508,7 +507,7 @@ function PodsTableInner() {
                         />
                     </TableBody>
                 </Table>
-            </TableContainer>
+            </ScrollableTableContainer>
         </div>
     );
 }

@@ -14,8 +14,6 @@ import {
     TableBody,
     TableRow,
     TableCell,
-    TableContainer,
-    Paper,
     Typography,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -28,6 +26,7 @@ import { useKubeNamespace } from "../../../lib/kube-namespace";
 import { fetchHorizontalPodAutoscalers } from "../../../lib/api-client";
 import { LoadingIndicator } from "../../../components/loading-indicator";
 import { LoadError } from "../../../components/load-error";
+import { ScrollableTableContainer } from "../../../components/scrollable-table-container";
 import { LabelsCell } from "../../../components/labels-cell";
 import { CopyNameCell } from "../../../components/copy-button";
 import { labelsToPairs } from "../../../components/labels-cell-pairs";
@@ -233,7 +232,7 @@ export function AutoscalersTable() {
                 />
                 <ColumnConfigButton configurable={configurable} config={config} onChange={setConfig} />
             </div>
-            <TableContainer component={Paper} data-test-id="autoscalers-table">
+            <ScrollableTableContainer testId="autoscalers-table">
                 <Table size="small">
                     <TableHead>
                         {table.getHeaderGroups().map((hg) => (
@@ -290,7 +289,7 @@ export function AutoscalersTable() {
                         ))}
                     </TableBody>
                 </Table>
-            </TableContainer>
+            </ScrollableTableContainer>
         </div>
     );
 }
