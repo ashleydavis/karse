@@ -6,7 +6,7 @@ Karse currently ships the cluster home page, namespace scoping, the core workloa
 
 **Should there just be a single "resource" page?** That allows the user to pick "All resources" or select particular types (e.g. Pods and Deployments). From there the user could sort, search, and filter all resources in one place. It would also be good if they could export a CSV from there.
 
-1. **Quick-find dropdown**: a button in the navbar opens a searchable dropdown (command-palette style) that queries all resources across kinds; selecting a result navigates directly to that resource's detail page. (The header context/namespace quick-pickers ship today; the global cross-kind quick-find does not.)
+1. **Quick-find dropdown**: a button in the navbar opens a searchable dropdown (command-palette style) that queries all resources across kinds; selecting a result navigates directly to that resource's detail page. (The header's named context dropdown and the namespace quick-picker ship today; the global cross-kind quick-find does not.)
 2. **Auto-refresh / polling controls**: configurable refresh intervals per view, with a pause toggle.
 3. **Audit log viewer**: surface the on-disk audit log in the UI so users can see what Karse has run.
 4. **Host-header allowlist / DNS-rebinding guard**: add an explicit Host-header allowlist to the backend so the one mutating route is not protected by CORS preflight alone (the accepted risk noted in `docs/security.md`).

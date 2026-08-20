@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { AppBar, Toolbar, IconButton, Button, Alert, Tooltip, Box, Menu, MenuItem, ListItemIcon, ListItemText, Snackbar } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLink, faLayerGroup, faSun, faMoon, faCircleHalfStroke, faCheck, faShareNodes, faRotate, faClockRotateLeft, faCalendarDays, faChevronDown } from "@fortawesome/free-solid-svg-icons";
+import { faLayerGroup, faSun, faMoon, faCircleHalfStroke, faCheck, faShareNodes, faRotate, faClockRotateLeft, faCalendarDays, faChevronDown } from "@fortawesome/free-solid-svg-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { useKubeContext } from "../lib/kube-context";
 import { useKubeNamespace } from "../lib/kube-namespace";
@@ -12,7 +12,6 @@ import { runRefresh } from "../lib/refresh-feedback";
 import { reloadQueries } from "../lib/reload-queries";
 import { copyToClipboard } from "../lib/clipboard";
 import { ContextPicker } from "./context-picker";
-import { ContextQuickPicker } from "./context-quick-picker";
 import { NamespaceQuickPicker } from "./namespace-quick-picker";
 import { namespaceTriggerLabel } from "./namespace-trigger-label";
 import { Breadcrumbs } from "./breadcrumbs";
@@ -107,20 +106,14 @@ export function Header() {
                 <Toolbar variant="dense" sx={{ gap: 1, minHeight: TOP_BAR_HEIGHT }}>
                     <Breadcrumbs />
                     <Box sx={{ flexGrow: 1 }} />
-                    <ContextPicker contexts={contexts} current={current} onSwitch={switchTo} />
-                    <ContextQuickPicker
+                    <ContextPicker
+                        contexts={contexts}
+                        current={current}
+                        onSwitch={switchTo}
                         open={contextPickerOpen}
+                        onOpen={() => setContextPickerOpen(true)}
                         onClose={() => setContextPickerOpen(false)}
-                    >
-                        <IconButton
-                            size="small"
-                            onClick={() => setContextPickerOpen(true)}
-                            aria-label="context picker"
-                            title="Context picker (Ctrl+K)"
-                        >
-                            <FontAwesomeIcon icon={faLink} />
-                        </IconButton>
-                    </ContextQuickPicker>
+                    />
                     <NamespaceQuickPicker
                         open={namespacePickerOpen}
                         onClose={() => setNamespacePickerOpen(false)}

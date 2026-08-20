@@ -6,7 +6,7 @@ A kubeconfig with many contexts is a flat list in which nothing tells production
 
 The environment list is **the user's**. It is an ordered list of rows, each a name, a regular expression matched against the context name, and a chip colour, edited on the Config page's Environments subtab. Karse ships a default list, but nothing is hard-coded behind it: a default row can be renamed, re-matched, moved, or deleted like any other. An environment is either **matched** by its expression or **labelled** by hand on a context. A label always wins, and both the list and the labels persist.
 
-Backed by: `frontend/src/lib/cluster-environments.ts` (the resolver: the list, the compilation, the precedence, the grouping, the validation), `frontend/src/components/environment-chip.tsx` (the shared chip), `frontend/src/lib/config.tsx` (the persisted list and labels), `frontend/src/pages/config/index.tsx` plus `frontend/src/pages/config/components/environments-settings.tsx` (the editor), `frontend/src/pages/contexts/components/contexts-table.tsx` (the grouped table and the labelling control), `frontend/src/components/context-picker.tsx` (the header dropdown and the active-context chip), `frontend/src/components/context-quick-picker.tsx` (the `Ctrl+K` picker).
+Backed by: `frontend/src/lib/cluster-environments.ts` (the resolver: the list, the compilation, the precedence, the grouping, the validation), `frontend/src/components/environment-chip.tsx` (the shared chip), `frontend/src/lib/config.tsx` (the persisted list and labels), `frontend/src/pages/config/index.tsx` plus `frontend/src/pages/config/components/environments-settings.tsx` (the editor), `frontend/src/pages/contexts/components/contexts-table.tsx` (the grouped table and the labelling control), `frontend/src/components/context-picker.tsx` plus `frontend/src/lib/context-picker-rows.ts` (the header dropdown, its search, and the active-context chip).
 
 This is a frontend-only concern. No backend route changes, no new kubectl call, and nothing is ever written to the kubeconfig: consistent with [read-only-invariant](../read-only-invariant/detail.md), resolving an environment is a display and grouping decision made in the browser.
 
@@ -82,7 +82,7 @@ A user-supplied expression never reaches a shell or kubectl (see [read-only-inva
 
 - **Contexts page** (`/contexts`): the table body is split into one group per environment, each introduced by a heading row naming the environment and the number of contexts in it, in the user's list order with Unassigned last. Sorting and the search box run over the whole table first, so a group holds only the rows that survived them, in the sorted order; a search that hides every context in an environment hides that environment's heading too. The Environment column itself is sortable and searchable on the environment's name; the Set environment column beside it holds only a control, so it neither sorts nor feeds the search.
 - **Header dropdown**: the context `Select` in the top bar lists its entries under one subheading per environment, in the same order.
-- **`Ctrl+K` quick-picker**: the same, under the same subheadings, applied after its own name/cluster filter.
+- **The header dropdown's search**: the same subheadings, applied after its name/cluster filter, so a query that hides an environment's every context hides its subheading too.
 - **All clusters page** (`/clusters`): the multi-cluster overview's table is split the same way, each section additionally headed by that environment's cluster count, node count and aggregate utilisation. Those figures are [multi-cluster-overview](../multi-cluster-overview/detail.md)'s; what this feature supplies is which environment each context is in and the order the sections appear in.
 - All four call the same resolver module, reading the same compiled list. There is no second copy of the rule.
 
@@ -101,13 +101,13 @@ A user-supplied expression never reaches a shell or kubectl (see [read-only-inva
 - [x] An invalid expression is rejected with a readable message at the point of entry and is never saved, so a stored list can never hold one that throws when compiled.
 - [x] The Config page presents its settings as subtabs, with the existing cluster-data cache settings unchanged on their own tab and the environment editor alongside.
 - [x] The list persists in the `karse-config` local-storage entry beside `contextEnvironments`, with no second storage key; an absent list reads back as the defaults and a malformed one falls back to them.
-- [x] Clearing the list puts every context under Unassigned, and the contexts page, header dropdown and quick-picker all still render and are still usable.
+- [x] Clearing the list puts every context under Unassigned, and the contexts page and the header dropdown both still render and are still usable.
 - [x] A context can be labelled from the contexts page, and the label changed or cleared; clearing falls back to the matched environment, not to Unassigned. A label naming a deleted environment is ignored.
 - [x] A labelled context is shown as labelled rather than matched.
 - [x] Labels persist across a page reload and an app restart, in the `karse-config` local-storage entry.
 - [x] A label for a context no longer in the kubeconfig is ignored rather than shown as a phantom row, and is not lost if that context comes back.
 - [x] The contexts page groups its rows by environment in the user's list order, with Unassigned last.
-- [x] The header dropdown and the `Ctrl+K` quick-picker group their entries the same way, using the same resolver.
+- [x] The header dropdown groups its entries the same way as the contexts page, using the same resolver, whether it was opened by click or by `Ctrl+K`.
 - [x] The active context's environment is visible in the header without opening a picker.
 - [x] Environment resolution never changes the active context and never writes to the kubeconfig.
 

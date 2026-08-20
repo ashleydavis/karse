@@ -6,7 +6,7 @@ Karse gives every kubeconfig context an environment from the user's own editable
 
 ## Scenario A: Every shipped environment group at once
 
-A handcrafted kubeconfig whose ten context names cover every group. No cluster is created and none is needed: Karse lists contexts with `kubectl config view`, which reads the file and never contacts a cluster. Only the contexts page, the header dropdown and the quick-picker are exercised here; the cluster-data pages report load errors under this kubeconfig, which is expected.
+A handcrafted kubeconfig whose ten context names cover every group. No cluster is created and none is needed: Karse lists contexts with `kubectl config view`, which reads the file and never contacts a cluster. Only the contexts page and the header context dropdown are exercised here; the cluster-data pages report load errors under this kubeconfig, which is expected.
 
 **Fixture:** [_fixtures-kwok/39-environment-contexts](../_fixtures-kwok/39-environment-contexts/)
 
@@ -47,7 +47,7 @@ Then open the frontend at `http://127.0.0.1:5173` and go to **Contexts** (`/cont
 - **Matched chips are outlined, not filled.** Hover one: the tooltip reads "Matched *<Environment>* from the context name". Nothing has been labelled yet, so every chip on this page is outlined.
 - **Header**: an environment chip sits immediately left of the context dropdown, reading **Production** (the active context is `prod-eu-1`). This is the "is this view pointed at production?" signal, visible without opening anything.
 - **Header dropdown** (click the context name in the top bar): the entries are listed under the same subheadings in the same order, Production first, Unassigned last.
-- **Quick-picker** (link icon, or `Ctrl+K`): the same subheadings, same order. Type `acme` into its search box: only the matching contexts remain, and a subheading whose contexts were all filtered out disappears with them.
+- **The dropdown's search** (open it by click or `Ctrl+K`): the same subheadings, same order. Type `acme` into its search box: only the matching contexts remain, and a subheading whose contexts were all filtered out disappears with them.
 - Check the whole page in **both light and dark mode** (header colour-mode button). Every chip colour must stay legible against both backgrounds.
 
 ## Scenario B: Labelling, clearing, and persistence
@@ -61,7 +61,7 @@ Continue with Scenario A's kubeconfig and the contexts page.
 - **The selector reflects the label**: `devops-prod`'s selector now reads **Development**, not *Auto (from name)*.
 - **The selector offers your list, and only your list.** Open any selector: the options are *Auto (from name)* followed by Production, Staging and Development, which is exactly the environment list on the Config page. There is no Unassigned entry, because Unassigned is not in the list: it is the built-in bucket for a context nothing matched, and clearing the label is what hands the decision back to the name.
 - **Nothing else moved**: the `active` and `default` chips are still on `prod-eu-1`. Labelling is a display concern; it must not switch the active context. Confirm in your terminal that `KUBECONFIG=./fixtures-tmp/karse-environment-contexts.yaml kubectl config current-context` still prints `prod-eu-1`, i.e. the kubeconfig was not written to.
-- **The pickers follow**: open the header dropdown and the `Ctrl+K` picker. `devops-prod` now appears under Development in both. All three surfaces read the same resolver, so they can never disagree.
+- **The picker follows**: open the header context dropdown. `devops-prod` now appears under Development there too. Both surfaces read the same resolver, so they can never disagree.
 - **The All clusters page follows too**: open **All clusters** in the left nav. Its table is split into the same environment sections, in the same order, with `devops-prod` under Development. (Under this handcrafted kubeconfig the clusters are unreachable, so the sections show error rows and no figures; the per-environment figures are checked in the [multi-cluster-overview](../multi-cluster-overview/detail.md) manual instead.)
 - **The label survives a reload**: press F5. `devops-prod` is still under Development with a filled chip.
 - **The label survives an app restart**: stop Karse (Ctrl+C in the terminal running it), start it again with the same command, and reload the page. `devops-prod` is still under Development. The label lives in the browser's `karse-config` local-storage entry, alongside the colour mode and timestamp format; check with DevTools → Application → Local Storage that there is exactly **one** `karse-config` entry and that it now carries a `contextEnvironments` field (and an `environments` field once you have edited the list in Scenario D). There must be no second storage key.
@@ -86,7 +86,7 @@ Then open the frontend at `http://127.0.0.1:5173` and go to **Contexts**.
 - **One group only**: a single **Unassigned** heading with a count of 3, holding `apollo`, `artemis` and `hermes`. No empty Production, Staging or Development headings are rendered, even though all three are still in the list.
 - **The page is still usable**: search filters the rows, the column headers still sort, "Set as active" and "Set as default" still work, and the Environment selector still offers all three environments.
 - **The header chip reads Unassigned** for the active context.
-- **The dropdown and quick-picker** each show a single Unassigned subheading.
+- **The header context dropdown** shows a single Unassigned subheading.
 - **Labelling still works from here**: label `apollo` as **Production**. A Production group appears above Unassigned, and the header chip changes to Production the moment `apollo` is the active context. Clear it again with *Auto (from name)* and the Production group disappears.
 - Check both light and dark mode.
 
@@ -110,7 +110,7 @@ Then open the frontend at `http://127.0.0.1:5173` and go to **Config** (`/config
 - **An invalid expression is refused at the point of entry**: type `prod(` into Production's expression field. A red message appears under the field reading "Not a valid regular expression: …". Reload the page (F5) and go back to the Environments tab: Production's expression is the one it had before, not `prod(`. Nothing invalid was saved. The same goes for the add controls: type `bad(` into the add expression and the **Add** button stays disabled.
 - **Delete an environment**: delete **Development**. On the Contexts page, `my-dev-box` has moved to Unassigned (nothing else matches it). Deleting the row Karse shipped must be allowed: there is no hidden built-in behind it.
 - **The edited list survives a reload and a restart**: press F5, then stop Karse (Ctrl+C) and start it again with the same command. The Environments tab still shows your edited list, including the `Test / QA` row you added and without the `Development` row you deleted.
-- **Clear the whole list**: click **Clear the list**. Every row goes and the tab says "No environments. Every context is Unassigned." Go to **Contexts**: one **Unassigned** heading holding all ten contexts, and the page is still fully usable (search filters, headers sort, "Set as active" and "Set as default" still work). Open the header dropdown and the `Ctrl+K` picker: each shows a single Unassigned subheading with every context under it, and both still switch context. Nothing may crash or render blank with an empty list.
+- **Clear the whole list**: click **Clear the list**. Every row goes and the tab says "No environments. Every context is Unassigned." Go to **Contexts**: one **Unassigned** heading holding all ten contexts, and the page is still fully usable (search filters, headers sort, "Set as active" and "Set as default" still work). Open the header context dropdown (by click and by `Ctrl+K`): it shows a single Unassigned subheading with every context under it, and still switches context either way. Nothing may crash or render blank with an empty list.
 - **Reset asks first, and cancelling changes nothing**: back on the Environments tab, click **Reset to defaults**. A dialog appears saying it discards your custom environments and cannot be undone. Click **Cancel**: the list is still empty. Nothing was restored.
 - **Reset restores the defaults**: click **Reset to defaults** again and confirm. The three shipped rows are back in their shipped order with their shipped expressions and colours, and the `Test / QA` row you added is gone. On the Contexts page every context is back in the group Scenario A described.
 - **A label for an environment you deleted is ignored**: label `apollo` as **Staging**, confirm it moves, then delete the **Staging** row on the Environments tab. `apollo` falls back to whatever matches next, which for `apollo` is nothing, so it returns to Unassigned rather than showing a dead label. Reset to defaults afterwards; `apollo`'s label is still stored, so it goes back to Staging.

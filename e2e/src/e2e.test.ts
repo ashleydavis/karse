@@ -1611,15 +1611,15 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='context-picker-group']")).toHaveCount(0);
         });
 
-        test("the Ctrl+K quick-picker groups its entries the same way", async () => {
+        test("Ctrl+K opens the same dropdown, grouped the same way", async () => {
             await page.keyboard.press("Control+k");
-            await expect(page.locator("[data-test-id='context-quick-picker-dropdown']")).toBeVisible();
-            await expect(page.locator("[data-test-id='context-quick-picker-group']")).toHaveText([
+            await expect(page.locator("[data-test-id='context-picker-dropdown']")).toBeVisible();
+            await expect(page.locator("[data-test-id='context-picker-group']")).toHaveText([
                 "Production",
                 "Unassigned",
             ]);
             await page.keyboard.press("Escape");
-            await expect(page.locator("[data-test-id='context-quick-picker-dropdown']")).not.toBeVisible();
+            await expect(page.locator("[data-test-id='context-picker-dropdown']")).not.toBeVisible();
         });
 
         test("the active context's environment is visible in the header without opening a picker", async () => {
@@ -1969,7 +1969,7 @@ test.describe("karse e2e", () => {
             expect(await groupOf("blue-green-1")).toBe("unassigned");
         });
 
-        test("the header dropdown and the quick-picker stay usable with no environments", async () => {
+        test("the header dropdown stays usable with no environments, by click and by Ctrl+K", async () => {
             await page.goto("/cluster", { waitUntil: "networkidle" });
             await expect(page.locator("[data-test-id='header-environment-chip']")).toHaveText("Unassigned");
             await page.locator("[aria-haspopup='listbox']").click();
@@ -1978,11 +1978,11 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='context-picker-group']")).toHaveCount(0);
 
             await page.keyboard.press("Control+k");
-            await expect(page.locator("[data-test-id='context-quick-picker-dropdown']")).toBeVisible();
-            await expect(page.locator("[data-test-id='context-quick-picker-group']")).toHaveText(["Unassigned"]);
-            await expect(page.locator("[data-test-id='context-quick-picker-row']")).toHaveCount(EDITOR_PAYLOAD.contexts.length);
+            await expect(page.locator("[data-test-id='context-picker-dropdown']")).toBeVisible();
+            await expect(page.locator("[data-test-id='context-picker-group']")).toHaveText(["Unassigned"]);
+            await expect(page.locator("[data-test-id='context-picker-row']")).toHaveCount(EDITOR_PAYLOAD.contexts.length);
             await page.keyboard.press("Escape");
-            await expect(page.locator("[data-test-id='context-quick-picker-dropdown']")).not.toBeVisible();
+            await expect(page.locator("[data-test-id='context-picker-dropdown']")).not.toBeVisible();
         });
 
         test("cancelling the reset confirmation leaves the list untouched", async () => {
@@ -2287,12 +2287,12 @@ test.describe("karse e2e", () => {
 
         async function openPicker(): Promise<void> {
             await page.locator("[aria-label='context picker']").click();
-            await expect(page.locator("[data-test-id='context-quick-picker-dropdown']")).toBeVisible();
+            await expect(page.locator("[data-test-id='context-picker-dropdown']")).toBeVisible();
         }
 
         async function closePicker(): Promise<void> {
             await page.keyboard.press("Escape");
-            await expect(page.locator("[data-test-id='context-quick-picker-dropdown']")).not.toBeVisible();
+            await expect(page.locator("[data-test-id='context-picker-dropdown']")).not.toBeVisible();
         }
 
         test("opens as a dropdown anchored to the header, not a modal dialog", async () => {
@@ -2300,7 +2300,7 @@ test.describe("karse e2e", () => {
             // The picker is a popover/menu anchored to the header, not a modal dialog.
             await expect(page.locator("[role='dialog']")).toHaveCount(0);
             const buttonBox = await page.locator("[aria-label='context picker']").boundingBox();
-            const dropdownBox = await page.locator("[data-test-id='context-quick-picker-dropdown']").boundingBox();
+            const dropdownBox = await page.locator("[data-test-id='context-picker-dropdown']").boundingBox();
             expect(buttonBox).not.toBeNull();
             expect(dropdownBox).not.toBeNull();
             // The dropdown opens below the trigger button in the header.
@@ -2310,7 +2310,7 @@ test.describe("karse e2e", () => {
 
         test("opens with the Ctrl+K keyboard shortcut", async () => {
             await page.keyboard.press("Control+k");
-            await expect(page.locator("[data-test-id='context-quick-picker-dropdown']")).toBeVisible();
+            await expect(page.locator("[data-test-id='context-picker-dropdown']")).toBeVisible();
             await closePicker();
         });
 
@@ -2321,7 +2321,7 @@ test.describe("karse e2e", () => {
             await expect(arrow).toBeVisible();
             const arrowBox = await arrow.boundingBox();
             const buttonBox = await page.locator("[aria-label='context picker']").boundingBox();
-            const dropdownBox = await page.locator("[data-test-id='context-quick-picker-dropdown']").boundingBox();
+            const dropdownBox = await page.locator("[data-test-id='context-picker-dropdown']").boundingBox();
             expect(arrowBox).not.toBeNull();
             expect(buttonBox).not.toBeNull();
             expect(dropdownBox).not.toBeNull();
@@ -2342,7 +2342,7 @@ test.describe("karse e2e", () => {
 
         test("shows both clusters", async () => {
             await openPicker();
-            const rows = page.locator("[data-test-id='context-quick-picker-row']");
+            const rows = page.locator("[data-test-id='context-picker-row']");
             await expect(rows.filter({ hasText: CLUSTER_1 })).toBeVisible();
             await expect(rows.filter({ hasText: CLUSTER_2 })).toBeVisible();
             await closePicker();
@@ -2350,17 +2350,65 @@ test.describe("karse e2e", () => {
 
         test("filter hides non-matching context rows", async () => {
             await openPicker();
-            await page.locator("[data-test-id='context-quick-picker-dropdown'] input").fill(CLUSTER_1);
-            await expect(page.locator("[data-test-id='context-quick-picker-row']").filter({ hasText: CLUSTER_1 })).toBeVisible();
-            await expect(page.locator("[data-test-id='context-quick-picker-row']").filter({ hasText: CLUSTER_2 })).toHaveCount(0);
+            await page.locator("[data-test-id='context-picker-dropdown'] input").fill(CLUSTER_1);
+            await expect(page.locator("[data-test-id='context-picker-row']").filter({ hasText: CLUSTER_1 })).toBeVisible();
+            await expect(page.locator("[data-test-id='context-picker-row']").filter({ hasText: CLUSTER_2 })).toHaveCount(0);
             await closePicker();
         });
 
         test("selecting a context closes the picker and updates the context display", async () => {
             await openPicker();
-            await page.locator("[data-test-id='context-quick-picker-row']").filter({ hasText: CLUSTER_2 }).click();
-            await expect(page.locator("[data-test-id='context-quick-picker-dropdown']")).not.toBeVisible();
+            await page.locator("[data-test-id='context-picker-row']").filter({ hasText: CLUSTER_2 }).click();
+            await expect(page.locator("[data-test-id='context-picker-dropdown']")).not.toBeVisible();
             await expect(page.locator("[aria-haspopup='listbox']")).toContainText(CLUSTER_2);
+            setContext(CLUSTER_1);
+            await navigateTo();
+        });
+
+        test("the header has exactly one context control, labelled with the active context", async () => {
+            // The old link-icon quick-picker button is gone: the named dropdown is both the
+            // label showing the active context and the thing that opens the searchable list,
+            // so the two selectors that used to find two separate controls find one element.
+            const trigger = page.locator("[data-test-id='context-picker-trigger']");
+            await expect(trigger).toHaveCount(1);
+            await expect(page.locator("[aria-label='context picker']")).toHaveCount(1);
+            await expect(page.locator("[aria-haspopup='listbox']")).toHaveCount(1);
+            await expect(trigger).toHaveAttribute("aria-haspopup", "listbox");
+            await expect(trigger).toContainText(CLUSTER_1);
+        });
+
+        test("the search box is empty again each time the dropdown opens", async () => {
+            await openPicker();
+            const search = page.locator("[data-test-id='context-picker-dropdown'] input");
+            await search.fill(CLUSTER_1);
+            await expect(page.locator("[data-test-id='context-picker-row']")).toHaveCount(1);
+            await closePicker();
+
+            await openPicker();
+            await expect(page.locator("[data-test-id='context-picker-dropdown'] input")).toHaveValue("");
+            await expect(page.locator("[data-test-id='context-picker-row']").filter({ hasText: CLUSTER_1 })).toBeVisible();
+            await expect(page.locator("[data-test-id='context-picker-row']").filter({ hasText: CLUSTER_2 })).toBeVisible();
+            await closePicker();
+        });
+
+        test("the whole keyboard path switches the active context and refetches the page", async () => {
+            await page.goto("/nodes", { waitUntil: "networkidle" });
+            await waitForNodeRows();
+            expect(await getNodeNames()).toContain("node-cp");
+
+            await page.keyboard.press("Control+k");
+            await expect(page.locator("[data-test-id='context-picker-dropdown']")).toBeVisible();
+            await page.locator("[data-test-id='context-picker-dropdown'] input").fill(CLUSTER_2);
+            await expect(page.locator("[data-test-id='context-picker-row']")).toHaveCount(1);
+            await page.locator("[data-test-id='context-picker-row']").click();
+
+            await expect(page.locator("[data-test-id='context-picker-dropdown']")).not.toBeVisible();
+            await expect(page.locator("[aria-haspopup='listbox']")).toContainText(CLUSTER_2);
+            // The context-scoped views refetch, so the nodes table now holds cluster 2's nodes.
+            await expect(page.locator("[data-test-id='node-row']").filter({ hasText: "node-alpha" })).toBeVisible();
+            const names = await getNodeNames();
+            expect(names).toContain("node-alpha");
+            expect(names).not.toContain("node-cp");
         });
 
         test.afterAll(() => {
@@ -2557,7 +2605,7 @@ test.describe("karse e2e", () => {
         });
 
         test("both pickers still open on click and on their keyboard shortcut", async () => {
-            const contextDropdown = page.locator("[data-test-id='context-quick-picker-dropdown']");
+            const contextDropdown = page.locator("[data-test-id='context-picker-dropdown']");
             const namespaceDropdown = page.locator("[data-test-id='namespace-quick-picker-dropdown']");
 
             await page.locator("[aria-label='context picker']").click();

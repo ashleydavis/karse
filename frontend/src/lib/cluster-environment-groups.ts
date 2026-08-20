@@ -8,7 +8,7 @@
 //
 // Nothing here resolves environments or orders them itself: resolveEnvironment and the user's
 // own list order are reached through groupByEnvironment, the same call the contexts page and
-// both context pickers make. And nothing here totals anything itself: aggregateClusters
+// the header context dropdown make. And nothing here totals anything itself: aggregateClusters
 // from karse-types is the same fold the backend runs for the grand total, so an
 // environment's numbers and the page's total cannot drift apart.
 

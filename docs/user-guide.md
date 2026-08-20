@@ -76,9 +76,9 @@ Both selections start at the same value on first load. You can diverge them — 
 
 ### Header shortcuts
 
-The header bar has two quick-picker buttons:
+The header bar has two context/namespace controls:
 
-- **Context picker** (link icon, `Ctrl+K`): opens a searchable list of contexts, grouped by environment. Click a row to switch the active context for the tab.
+- **Context picker** (the dropdown labelled with the active context's name, or `Ctrl+K`): opens a searchable list of contexts, grouped by environment. Click a row to switch the active context for the tab.
 - **Namespace picker** (`Ctrl+Shift+K`): a labelled button naming the namespace your views are scoped to, or "All namespaces" when they are not scoped, so the header always states the scope in force. Clicking it opens a searchable list of namespaces for the active context. Click "All namespaces" to clear the namespace selection, or click a namespace name to scope all views to that namespace. A long namespace name is shortened with an ellipsis on the button.
 
 The header also has a dropdown showing the current context (grouped by environment, with a chip beside it naming the active context's environment) and a **Refresh** button (circular-arrows icon) that empties the on-disk cluster-data cache and re-fetches all data fresh from the cluster. Clicking it clears the page you are on and reloads it: the list or detail you were looking at is replaced by a spinner and comes back with fresh data, so a refresh always looks like a real reload. The button acknowledges the click too — the icon spins and a "Refreshing…" toast appears at the bottom of the window, then a brief check and a "Refreshed" toast when done — so you can tell a refresh happened even when the data comes back unchanged. See the Config page below for the cache.
@@ -141,7 +141,7 @@ A table of all kubeconfig contexts, grouped by environment. Each row shows the c
 
 ### Environments
 
-So you can tell production from development at a glance, every context is placed in an environment, and the table is split into a group per environment. The header dropdown and the `Ctrl+K` context picker group their entries the same way, and a chip beside the header dropdown always names the active context's environment, so it is obvious when what you are looking at is production.
+So you can tell production from development at a glance, every context is placed in an environment, and the table is split into a group per environment. The header context dropdown (click or `Ctrl+K`) groups its entries the same way, and a chip beside it always names the active context's environment, so it is obvious when what you are looking at is production.
 
 **The environment list is yours.** Karse ships with three, **Production**, **Staging** and **Development**, and you can add, rename, re-match, recolour, reorder and delete any of them (including the ones it shipped with) on the Config page's **Environments** tab. Each environment matches a regular expression against the context name, case-insensitively, and a context goes into the **first** environment in the list that matches it, so the order of the list is the priority. A context matching none of them is **Unassigned**, which is built in, always last, and cannot be deleted: clear the whole list and every context is Unassigned.
 
@@ -475,7 +475,7 @@ Karse caches read-only cluster data fetched with `kubectl` on disk (under `cache
 
 ### Environments
 
-This tab is the environment list the Contexts page, the header dropdown and the `Ctrl+K` picker group by. The rows are in priority order: a context goes into the first one whose expression matches its name.
+This tab is the environment list the Contexts page and the header context dropdown group by. The rows are in priority order: a context goes into the first one whose expression matches its name.
 
 - Each row shows its chip, its **Name**, the **regular expression** it matches against a context name, and its **colour**. All three are editable, on the rows Karse shipped as well as on your own.
 - **Add an environment** with the name, expression and colour fields at the bottom, then **Add**. It joins the end of the list.

@@ -118,7 +118,7 @@ KARSE_FAKE_METRICS=1 bun run dev
 ```
 
 Open the frontend at `http://127.0.0.1:5173` and confirm `kwok-karse-test` is the active
-context (the header context picker, `Ctrl+K`).
+context (the header context dropdown, or `Ctrl+K`).
 
 ## The shared toggles
 

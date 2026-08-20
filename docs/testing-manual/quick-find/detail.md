@@ -1,6 +1,6 @@
 # quick-find manual tests
 
-Manual tests for the header quick-pickers. See the spec: [quick-find](../../spec/quick-find/detail.md).
+Manual tests for the header pickers: the named context dropdown and the namespace quick-picker. See the spec: [quick-find](../../spec/quick-find/detail.md).
 
 The spec notes a global cross-kind quick-find is not yet shipped; these tests cover the shipped header context and namespace pickers.
 
@@ -23,9 +23,12 @@ Two KWOK clusters run simultaneously so the context picker has more than one ent
 ```
 
 ### What to check
-- **Context picker drops down from the nav bar** (link icon or Ctrl+K): clicking the link icon in the header opens a popover anchored directly below the button, not a centered modal dialog. There is no full-screen modal backdrop dimming the whole page.
-- **Context picker search**: type into the search box and confirm non-matching contexts are hidden. The active context shows an `active` chip.
-- **Selecting a context**: click a context row. The dropdown closes and the header context display and cluster data update to the chosen cluster.
+- **There is only one context control**: the header shows a single context control, the dropdown labelled with the active context's name. There is no separate link-icon quick-picker button beside it.
+- **Context picker drops down from the nav bar** (the named dropdown or Ctrl+K): clicking the dropdown opens a popover anchored directly below it, not a centered modal dialog. There is no full-screen modal backdrop dimming the whole page.
+- **Context picker search**: type into the search box and confirm non-matching contexts are hidden. Search by cluster name as well as context name: both narrow the list. The active context shows an `active` chip.
+- **Context picker environment subheadings**: the rows sit under one subheading per environment. Type a query matching contexts in only one environment and confirm the other environments' subheadings disappear along with their rows.
+- **Context picker search resets on open**: type a query that narrows the list, close the dropdown, then reopen it. The search box is empty and the full list is back.
+- **Selecting a context**: click a context row. The dropdown closes, the dropdown's own label becomes the chosen context, and the cluster data updates to that cluster.
 - **Namespace picker drops down from the nav bar** (the labelled namespace button or Ctrl+Shift+K): clicking the button opens a popover anchored below it, again not a centered modal.
 - **Namespace picker rows**: confirm `All namespaces` plus the cluster namespaces (`default`, `team-alpha`, `team-beta`, `kube-system`, etc.) appear. Filtering by `team` should narrow to `team-alpha` and `team-beta`.
 - **Namespace trigger names the scope**: with no namespace selected the trigger reads `All namespaces`; it is the only place in the header the namespace is named (there is no separate chip beside the breadcrumbs).
@@ -35,7 +38,7 @@ Two KWOK clusters run simultaneously so the context picker has more than one ent
 - **Keyboard shortcuts**: Ctrl+K opens the context dropdown, Ctrl+Shift+K opens the namespace dropdown, and Escape closes either.
 - **Click-away closes the picker**: clicking outside the open dropdown closes it.
 - **Arrow points at the trigger**: each open dropdown shows a small arrow (the built-in MUI Tooltip arrow) between the trigger button and the dropdown body, visually pointing back up at the button that opened it. No hand-rolled CSS beak.
-- **Hover hint on each trigger**: rest the pointer on the link icon and confirm the browser shows the hint `Context picker (Ctrl+K)`; rest it on the labelled namespace button and confirm it shows `Namespace picker (Ctrl+Shift+K)`.
+- **Hover hint on each trigger**: rest the pointer on the named context dropdown and confirm the browser shows the hint `Context picker (Ctrl+K)`; rest it on the labelled namespace button and confirm it shows `Namespace picker (Ctrl+Shift+K)`.
 - **Console stays clean**: open the browser devtools console before loading the page, then load any page and open and close both pickers (by click and by keyboard shortcut). The console must show no "MUI: You have provided a title prop to the child of Tooltip" errors, and no other new errors or warnings. The pickers render their dropdown inside a MUI Tooltip, so a trigger button carrying its own `title` makes MUI log that error on every render of the header.
 - **Border visible in both modes**: the dropdown panel (and its arrow) has a clear border so its edges stay visible in dark mode, where the panel shares the nav bar's background colour. Switch the app to dark mode, open each picker, and confirm the panel edges and arrow are clearly visible against the nav bar behind them.
 

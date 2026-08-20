@@ -7,7 +7,7 @@
 //
 // This is a display and grouping concern only: nothing here switches a context, calls the
 // backend, or touches the kubeconfig, so it is consistent with the read-only invariant.
-// The contexts page and both header pickers resolve through this module, so there is one
+// The contexts page and the header context dropdown resolve through this module, so there is one
 // rule rather than a copy per surface.
 
 // The MUI chip colours an environment can be drawn in. Kept as a closed list so a stored
