@@ -1622,6 +1622,28 @@ test.describe("karse e2e", () => {
             await expect(page.locator("[data-test-id='context-picker-dropdown']")).not.toBeVisible();
         });
 
+        test("the dropdown's environment headings are drawn with the shared environment badge", async () => {
+            await page.locator("[aria-haspopup='listbox']").click();
+            const heading = page.locator("[data-test-id='context-picker-group'][data-environment='production']");
+            const badge = heading.locator("[data-test-id='context-picker-group-chip']");
+            await expect(badge).toBeVisible();
+            await expect(badge).toHaveText("Production");
+            await expect(badge).toHaveAttribute("data-environment", "production");
+            // The heading says the environment's name once, through the badge: no plain-text
+            // heading beside it, which is what the dropdown used to render.
+            expect((await heading.innerText()).trim()).toBe("Production");
+            // The same component in the same colour as the badge the top bar shows for that
+            // environment, so one environment looks the same in both places.
+            const badgeClass = await badge.getAttribute("class");
+            const headerClass = await page.locator("[data-test-id='header-environment-chip']").getAttribute("class");
+            expect(badgeClass).toContain("MuiChip-root");
+            expect(badgeClass).toContain("MuiChip-colorError");
+            expect(headerClass).toContain("MuiChip-root");
+            expect(headerClass).toContain("MuiChip-colorError");
+            await page.keyboard.press("Escape");
+            await expect(page.locator("[data-test-id='context-picker-group']")).toHaveCount(0);
+        });
+
         test("the active context's environment is visible in the header without opening a picker", async () => {
             const chip = page.locator("[data-test-id='header-environment-chip']");
             await expect(chip).toBeVisible();

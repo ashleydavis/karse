@@ -96,12 +96,26 @@ export function ContextPicker({ contexts, current, onSwitch, open, onOpen, onClo
                     )}
                     <List dense disablePadding>
                         {groups.flatMap((group) => [
+                            // The heading names its environment with the shared environment chip,
+                            // the same component the top bar, the contexts table and the
+                            // environment editor use, so one environment reads identically
+                            // wherever it appears rather than as plain text here and a badge
+                            // everywhere else. `inferred` is the presentation for a chip naming
+                            // an environment itself rather than one context's resolution of it
+                            // (the environment editor's rows do the same): filled versus outlined
+                            // says a *context* was labelled by hand, which a heading covering a
+                            // whole group cannot claim.
                             <ListSubheader
                                 key={`group-${group.environment.id}`}
                                 data-test-id="context-picker-group"
                                 data-environment={group.environment.id}
+                                sx={{ bgcolor: "background.paper", lineHeight: "unset", py: 1 }}
                             >
-                                {group.environment.name}
+                                <EnvironmentChip
+                                    environment={group.environment}
+                                    source="inferred"
+                                    testId="context-picker-group-chip"
+                                />
                             </ListSubheader>,
                             ...group.items.map((ctx) => (
                                 <ListItemButton

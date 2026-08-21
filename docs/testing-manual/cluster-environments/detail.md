@@ -46,7 +46,7 @@ Then open the frontend at `http://127.0.0.1:5173` and go to **Contexts** (`/cont
 - **The chip column can be hidden.** Click **Columns** (beside the search box), drag **Environment** from Visible to Hidden, and close the modal. The chips go, the selectors, the rows and the group headings stay, and the choice survives F5. Drag it back onto **Set environment** to restore it to its shipped place. Try the same with **Set environment** itself; **Actions** is not offered, because it is pinned to the right-hand edge of the row.
 - **Matched chips are outlined, not filled.** Hover one: the tooltip reads "Matched *<Environment>* from the context name". Nothing has been labelled yet, so every chip on this page is outlined.
 - **Header**: an environment chip sits immediately left of the context dropdown, reading **Production** (the active context is `prod-eu-1`). This is the "is this view pointed at production?" signal, visible without opening anything.
-- **Header dropdown** (click the context name in the top bar): the entries are listed under the same subheadings in the same order, Production first, Unassigned last.
+- **Header dropdown** (click the context name in the top bar): the entries are listed under the same subheadings in the same order, Production first, Unassigned last. Each subheading is that environment's chip, matching the badge in the nav bar beside the dropdown.
 - **The dropdown's search** (open it by click or `Ctrl+K`): the same subheadings, same order. Type `acme` into its search box: only the matching contexts remain, and a subheading whose contexts were all filtered out disappears with them.
 - Check the whole page in **both light and dark mode** (header colour-mode button). Every chip colour must stay legible against both backgrounds.
 

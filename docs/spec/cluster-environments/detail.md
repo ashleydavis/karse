@@ -81,7 +81,7 @@ A user-supplied expression never reaches a shell or kubectl (see [read-only-inva
 ### Grouping the surfaces
 
 - **Contexts page** (`/contexts`): the table body is split into one group per environment, each introduced by a heading row naming the environment and the number of contexts in it, in the user's list order with Unassigned last. Sorting and the search box run over the whole table first, so a group holds only the rows that survived them, in the sorted order; a search that hides every context in an environment hides that environment's heading too. The Environment column itself is sortable and searchable on the environment's name; the Set environment column beside it holds only a control, so it neither sorts nor feeds the search.
-- **Header dropdown**: the context `Select` in the top bar lists its entries under one subheading per environment, in the same order.
+- **Header dropdown**: the context dropdown in the top bar lists its entries under one subheading per environment, in the same order. The subheading is the environment's chip, not plain text, so an environment reads the same in the dropdown as it does in the badge beside the dropdown and in the contexts table.
 - **The header dropdown's search**: the same subheadings, applied after its name/cluster filter, so a query that hides an environment's every context hides its subheading too.
 - **All clusters page** (`/clusters`): the multi-cluster overview's table is split the same way, each section additionally headed by that environment's cluster count, node count and aggregate utilisation. Those figures are [multi-cluster-overview](../multi-cluster-overview/detail.md)'s; what this feature supplies is which environment each context is in and the order the sections appear in.
 - All four call the same resolver module, reading the same compiled list. There is no second copy of the rule.
@@ -89,6 +89,7 @@ A user-supplied expression never reaches a shell or kubectl (see [read-only-inva
 ### The active context's environment
 
 - The top bar shows an environment chip beside the context dropdown, naming the active context's environment, so it is obvious when the current view is pointed at production without opening any picker. It is drawn filled or outlined on the same labelled-versus-matched rule as the table's chips.
+- Filled-versus-outlined is a statement about **one context**, so a chip that names an environment itself rather than a context's resolution of it is always drawn outlined: the environment editor's rows and the header dropdown's environment subheadings both do this.
 - With no context selected there is no chip.
 
 ## Acceptance Criteria
