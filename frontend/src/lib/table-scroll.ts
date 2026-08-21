@@ -9,10 +9,12 @@ import { thumbMetrics, scrollTopForThumbTop, type ScrollMetrics } from "./log-au
 // the app shell puts around <main>.
 export const TABLE_BOTTOM_GAP_PX = 24;
 
-// Vertical space the custom horizontal scrollbar row occupies below a table: the bar's
-// own thickness plus the gap between it and the table.
+// The strip a drawn scrollbar occupies alongside the table on either axis: the bar's own
+// thickness plus the gap between it and the table. Vertical space below the table for the
+// horizontal bar, horizontal space to its right for the vertical one.
 export const SCROLLBAR_THICKNESS_PX = 12;
-export const SCROLLBAR_ROW_PX = SCROLLBAR_THICKNESS_PX + 6;
+export const SCROLLBAR_GAP_PX = 6;
+export const SCROLLBAR_ROW_PX = SCROLLBAR_THICKNESS_PX + SCROLLBAR_GAP_PX;
 
 // The smallest a table body is allowed to be squeezed to. A table whose top is already
 // far down the window (a page with a lot of chrome above it, or a very short window)
@@ -66,6 +68,17 @@ function asVertical(metrics: HorizontalScrollMetrics): ScrollMetrics {
 // found at all; the table container hides the native bar and draws this one instead.
 export function horizontalThumbMetrics(metrics: HorizontalScrollMetrics, trackPx: number): BarMetrics {
     const thumb = thumbMetrics(asVertical(metrics), trackPx);
+    return { visible: thumb.visible, lengthPx: thumb.heightPx, offsetPx: thumb.topPx };
+}
+
+// Where to draw the custom vertical scrollbar thumb for a given scroll state and track
+// height. Same reason as the horizontal bar: the native vertical bar is an invisible
+// auto-hiding overlay in this browser, so a table that is long enough to scroll shows no
+// bar at all unless one is drawn. This is the log viewer's own axis, so the maths is used
+// as-is; the wrapper exists only to hand back the same `BarMetrics` the horizontal bar
+// uses, so the container draws and compares both bars through one type.
+export function verticalThumbMetrics(metrics: ScrollMetrics, trackPx: number): BarMetrics {
+    const thumb = thumbMetrics(metrics, trackPx);
     return { visible: thumb.visible, lengthPx: thumb.heightPx, offsetPx: thumb.topPx };
 }
 

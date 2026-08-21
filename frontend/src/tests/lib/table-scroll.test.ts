@@ -1,6 +1,7 @@
 import {
     tableMaxHeightPx,
     horizontalThumbMetrics,
+    verticalThumbMetrics,
     scrollLeftForThumbLeft,
     sameBar,
     MIN_TABLE_BODY_PX,
@@ -52,6 +53,46 @@ describe("horizontalThumbMetrics", () => {
     test("puts the thumb at the end of the track at full scroll", () => {
         const bar = horizontalThumbMetrics({ scrollLeft: 1000, scrollWidth: 2000, clientWidth: 1000 }, 1000);
         expect(bar.offsetPx + bar.lengthPx).toBe(1000);
+    });
+});
+
+describe("verticalThumbMetrics", () => {
+    test("hides the bar when every row fits", () => {
+        expect(verticalThumbMetrics({ scrollTop: 0, scrollHeight: 600, clientHeight: 600 }, 600)).toEqual({
+            visible: false,
+            lengthPx: 600,
+            offsetPx: 0,
+        });
+    });
+
+    test("sizes the thumb by the fraction of the rows on screen", () => {
+        const bar = verticalThumbMetrics({ scrollTop: 0, scrollHeight: 2400, clientHeight: 600 }, 600);
+        expect(bar.visible).toBe(true);
+        expect(bar.lengthPx).toBe(150);
+        expect(bar.offsetPx).toBe(0);
+    });
+
+    test("moves the thumb down the track as the rows scroll", () => {
+        const bar = verticalThumbMetrics({ scrollTop: 900, scrollHeight: 2400, clientHeight: 600 }, 600);
+        expect(bar.offsetPx).toBe(225);
+    });
+
+    test("puts the thumb at the end of the track at full scroll", () => {
+        const bar = verticalThumbMetrics({ scrollTop: 1800, scrollHeight: 2400, clientHeight: 600 }, 600);
+        expect(bar.offsetPx + bar.lengthPx).toBe(600);
+    });
+
+    test("is visible at the same time as the horizontal bar when the table overflows both ways", () => {
+        const container = {
+            scrollTop: 0,
+            scrollHeight: 3000,
+            clientHeight: 600,
+            scrollLeft: 0,
+            scrollWidth: 2000,
+            clientWidth: 1000,
+        };
+        expect(verticalThumbMetrics(container, 600).visible).toBe(true);
+        expect(horizontalThumbMetrics(container, 1000).visible).toBe(true);
     });
 });
 

@@ -285,12 +285,14 @@ Size the browser window to roughly 1440px wide (narrower is fine, and makes the 
 - **The bar is in view**: a horizontal scrollbar sits directly under the table, on screen, without scrolling the page. It is a solid, always-visible bar, not something that fades in only while you scroll.
 - **The last column is reachable**: drag that bar to its right-hand end. The **Labels** column comes into view, including each row's `+N ...` control. Click the track to the right of the thumb: the table jumps sideways.
 - **The page does not scroll sideways**: the browser's own window never gains a horizontal scrollbar, and the sidebar and navbar stay put while the table scrolls under them.
+- **Both bars are there at once**: with enough pods to overflow the table vertically as well, a second, vertical scrollbar sits down the right-hand edge of the table. Both bars are on screen together without scrolling the page: the vertical one beside the rows (not covering them) and the horizontal one below, ending where the vertical one starts. Drag the vertical thumb: the rows scroll down and the table does not move sideways. Release it and drag the horizontal thumb: the table moves sideways and the rows stay where they are.
+- **A short table has no vertical bar**: narrow the list with the search box until only a few rows are left. The vertical bar disappears (nothing to scroll), while the horizontal one stays as long as the columns still overflow.
 - **The header sticks**: scroll the table's rows down with the mouse wheel. The header row (NAME, NAMESPACE, STATUS, ...) stays where it is while the rows move under it, and its background stays opaque (no row text showing through it).
 - **The page stays put**: scrolling the rows scrolls the table, not the whole page. The search box, the **Filter** button and the stats header above the table stay on screen.
 - **A short table is not stretched**: select the `shortlabels` namespace and search for a single pod name so one row is left. The table shrinks to that one row plus the header; it is not held open at the full window height with empty space below the row.
 - **Every table behaves the same**: repeat the first two checks on **Nodes**, **Events**, **Errors**, **Autoscalers**, **All Resources**, **Deployments**, **Stateful Sets** and **Daemon Sets**. Each bounds itself to the window and shows the same bar when its columns do not fit.
 
-Check the bar, the sticky header and the reachable Labels column in both **light and dark mode**.
+Check both bars, the sticky header and the reachable Labels column in both **light and dark mode**.
 
 Teardown:
 

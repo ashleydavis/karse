@@ -12866,6 +12866,66 @@ test.describe("karse e2e", () => {
             expect(Math.abs(after!.y - before!.y)).toBeLessThan(2);
         });
 
+        test("both scrollbars are on screen at once when the table overflows both ways", async () => {
+            // The previous tests left the table scrolled; this one is about the resting state,
+            // so it starts from the table's own top-left corner.
+            await page.locator("[data-test-id='pods-table']").evaluate((element) => {
+                element.scrollLeft = 0;
+                element.scrollTop = 0;
+            });
+            const metrics = await metricsOf("pods-table");
+            // Overflowing in both directions at once is the case under test.
+            expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+            expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
+
+            const horizontalTrack = page.locator("[data-test-id='pods-table-hscroll-track']");
+            const verticalTrack = page.locator("[data-test-id='pods-table-vscroll-track']");
+            await expect(horizontalTrack).toBeVisible();
+            await expect(verticalTrack).toBeVisible();
+            await expect(page.locator("[data-test-id='pods-table-hscroll-thumb']")).toBeVisible();
+            await expect(page.locator("[data-test-id='pods-table-vscroll-thumb']")).toBeVisible();
+
+            // Both bars sit wholly inside the window, so neither has to be hunted for by
+            // scrolling the page first.
+            const horizontalBox = await horizontalTrack.boundingBox();
+            const verticalBox = await verticalTrack.boundingBox();
+            expect(horizontalBox).not.toBeNull();
+            expect(verticalBox).not.toBeNull();
+            for (const box of [horizontalBox!, verticalBox!]) {
+                expect(box.x).toBeGreaterThanOrEqual(0);
+                expect(box.y).toBeGreaterThanOrEqual(0);
+                expect(box.x + box.width).toBeLessThanOrEqual(1024);
+                expect(box.y + box.height).toBeLessThanOrEqual(720);
+            }
+            // And they do not run into each other: the horizontal bar stops where the
+            // vertical one begins.
+            expect(horizontalBox!.x + horizontalBox!.width).toBeLessThanOrEqual(verticalBox!.x + 1);
+        });
+
+        test("the vertical scrollbar sits beside the table and its thumb scrolls the rows", async () => {
+            const tableBox = await page.locator("[data-test-id='pods-table']").boundingBox();
+            const trackBox = await page.locator("[data-test-id='pods-table-vscroll-track']").boundingBox();
+            expect(tableBox).not.toBeNull();
+            expect(trackBox).not.toBeNull();
+            // Beside the rows rather than over them, and the full height of the bounded table.
+            expect(trackBox!.x).toBeGreaterThanOrEqual(tableBox!.x + tableBox!.width);
+            expect(Math.abs(trackBox!.height - tableBox!.height)).toBeLessThan(2);
+
+            const thumb = page.locator("[data-test-id='pods-table-vscroll-thumb']");
+            const box = await thumb.boundingBox();
+            expect(box).not.toBeNull();
+            await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+            await page.mouse.down();
+            // Well past the end of the track, so the drag clamps at the last row.
+            await page.mouse.move(box!.x + box!.width / 2, box!.y + 2000, { steps: 10 });
+            await page.mouse.up();
+            const metrics = await metricsOf("pods-table");
+            expect(metrics.scrollTop).toBeGreaterThanOrEqual(metrics.scrollHeight - metrics.clientHeight - 1);
+            // The rows moved down and nothing moved sideways.
+            expect(metrics.scrollTop).toBeGreaterThan(0);
+            expect(metrics.scrollLeft).toBe(0);
+        });
+
         test("the autoscalers table's trailing Labels column is reachable too", async () => {
             await page.goto("/autoscalers", { waitUntil: "networkidle" });
             await expect(page.locator("[data-test-id='autoscaler-row']").first()).toBeVisible();
@@ -12892,6 +12952,8 @@ test.describe("karse e2e", () => {
             // stretched-out empty area below them.
             expect(metrics.scrollHeight).toBe(metrics.clientHeight);
             expect(metrics.clientHeight).toBeLessThan(300);
+            // Nothing to scroll vertically, so no vertical bar is drawn beside it.
+            await expect(page.locator("[data-test-id='pods-table-vscroll-track']")).toHaveCount(0);
         });
     });
 
