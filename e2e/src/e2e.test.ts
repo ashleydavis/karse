@@ -25,6 +25,15 @@ test.describe("karse e2e", () => {
     test.beforeAll(async ({ browser }) => {
         page = await browser.newPage();
         await page.setViewportSize({ width: 1280, height: 800 });
+        // Opt-in CPU slow-down for reproducing timing failures that only show up on a
+        // loaded CI runner. KARSE_E2E_CPU_THROTTLE=<n> makes the renderer run n times
+        // slower via CDP, which widens the gap between a React commit and the passive
+        // effect that runs after it. Unset in normal runs, so the suite is untouched.
+        const throttle = Number(process.env.KARSE_E2E_CPU_THROTTLE ?? "0");
+        if (throttle > 1) {
+            const cdp = await page.context().newCDPSession(page);
+            await cdp.send("Emulation.setCPUThrottlingRate", { rate: throttle });
+        }
     });
 
     test.afterAll(async () => {

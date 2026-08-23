@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import type { UIEvent, PointerEvent as ReactPointerEvent } from "react";
 import {
     Box,
@@ -24,7 +24,7 @@ import { fetchNamespaces, fetchPods, openLogStream } from "../lib/api-client";
 import { PodFilter } from "./pod-filter";
 import { LoadingIndicator } from "./loading-indicator";
 import { TimeRangeFilter } from "./time-range-filter";
-import { shouldFollow, bottomScrollTop, thumbMetrics, scrollTopForThumbTop, type ThumbMetrics } from "../lib/log-autoscroll";
+import { shouldFollow, isAtBottom, bottomScrollTop, thumbMetrics, scrollTopForThumbTop, type ThumbMetrics } from "../lib/log-autoscroll";
 import { tokenizeLogLine } from "../lib/log-highlight";
 import { colorForPod } from "../lib/log-pod-colors";
 import { DEFAULT_TIME_RANGE, timeRangeSeconds, type TimeRange } from "../lib/time-range";
@@ -181,6 +181,29 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
     // to true once they scroll to the bottom again. A ref (not state) because the
     // append effect reads it synchronously and it must not trigger re-renders.
     const followRef = useRef(true);
+    // The scroll position this component itself last put the viewer at (auto-follow,
+    // a jump button, or a thumb drag). Anything else the viewer is found at was put
+    // there by the user.
+    //
+    // Problem it fixes: scroll events are delivered asynchronously, so when the user
+    // scrolls while lines are arriving the follow flag is still stale at the moment the
+    // next line lands, and auto-follow scrolls the view back down, throwing away the
+    // scroll the user just made.
+    //
+    // How: comparing the viewer's position against this ref detects the user's scroll
+    // synchronously, with no scroll event needed, so the arriving-line path can honour
+    // it immediately.
+    const autoScrollTopRef = useRef(0);
+    // The viewer's content height as of the last time lines were appended.
+    //
+    // Problem it fixes: the arriving-line path runs after the new line has already grown
+    // the content, so measuring "is the user at the bottom" against the current height
+    // reports the user as one line short of the bottom even when they had scrolled
+    // exactly to it, and auto-follow never re-arms.
+    //
+    // How: the user scrolled within the previous height, so that is the height their
+    // position has to be judged against.
+    const lastHeightRef = useRef(0);
     // Geometry of the custom scrollbar thumb. The browser renders native
     // scrollbars as invisible auto-hiding overlays, so the viewer draws its own
     // always-visible bar; this state positions its thumb from the scroll metrics.
@@ -257,14 +280,42 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
     // auto-following. The follow flag is decided from the scroll position *before*
     // these new lines grew the content: see the viewer's onScroll handler. If the
     // user has scrolled up, the scroll position is left untouched.
-    useEffect(() => {
+    // A layout effect, not a passive one.
+    //
+    // Problem it fixes: a passive effect runs after the browser has painted, so the new
+    // line is on screen for a frame with the view still one line short of the bottom.
+    // That is the view visibly not following, and anything reading the scroll position
+    // in that window (a test, or the user's eye) sees one line of lag.
+    //
+    // How: a layout effect runs in the same commit that adds the line, before the paint,
+    // so the line and the scroll to it always reach the screen together.
+    useLayoutEffect(() => {
         const viewer = viewerRef.current;
         if (viewer === null) {
             return;
         }
+        // Problem it fixes: the user's own scroll reaches handleViewerScroll only when
+        // the browser delivers the scroll event, which can be after the next line has
+        // already landed here. Following that stale flag would scroll the view back down
+        // and undo the scroll the user just made.
+        //
+        // How: the viewer sitting anywhere other than where this component last put it
+        // means the user moved it, so their position decides whether following continues,
+        // taking effect on this line rather than whenever the event turns up. Why it is
+        // needed: it is the only reading of the user's intent available before the event.
+        if (viewer.scrollTop !== autoScrollTopRef.current) {
+            followRef.current = isAtBottom({
+                scrollTop: viewer.scrollTop,
+                scrollHeight: lastHeightRef.current,
+                clientHeight: viewer.clientHeight,
+            });
+        }
         if (followRef.current) {
             viewer.scrollTop = bottomScrollTop(viewer);
+            autoScrollTopRef.current = viewer.scrollTop;
         }
+        // The height the user's next scroll will happen within, for the check above.
+        lastHeightRef.current = viewer.scrollHeight;
         refreshThumb();
     }, [lines]);
 

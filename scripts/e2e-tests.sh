@@ -470,7 +470,7 @@ echo "--- Running e2e tests ---"
     export KWOK_CLUSTER_1="kwok-$KWOK_CLUSTER_1"
     export KWOK_CLUSTER_2="kwok-$KWOK_CLUSTER_2"
     export KARSE_E2E_URL="http://127.0.0.1:$FRONTEND_PORT"
-    cd e2e && bunx playwright test
+    cd e2e && bunx playwright test "$@"
 )
 
 echo ""

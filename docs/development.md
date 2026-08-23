@@ -165,6 +165,22 @@ bun run e2e
 
 Runs the full Playwright e2e suite. `scripts/e2e-tests.sh` creates two kwok clusters, starts the backend and Vite dev server, then runs 30 browser-based tests covering every frontend feature: header, stat tiles, nodes table (status chips, roles, age), sort, search, refresh, context switching, and the no-context gate. Requires `kwokctl` on `PATH`.
 
+### Running one e2e test, and slowing the browser down
+
+`scripts/e2e-tests.sh` passes any arguments it is given straight through to `playwright test`, so a single test can be selected without editing the suite:
+
+```sh
+bun run e2e -- --grep "the jump-to-bottom button" --retries 0 --repeat-each 6
+```
+
+Some e2e failures only appear on a loaded CI runner and never on a developer machine, because the machine is fast enough to close the timing window. `KARSE_E2E_CPU_THROTTLE=<n>` slows the browser's renderer by a factor of `n` (CDP `Emulation.setCPUThrottlingRate`, applied to the shared page in the suite's top-level `beforeAll`), which reopens that window locally:
+
+```sh
+KARSE_E2E_CPU_THROTTLE=3 bun run e2e -- --grep "the jump-to-bottom button" --retries 0 --repeat-each 6
+```
+
+Leave it unset for normal runs: the throttle is only applied when the value is greater than 1, so an unset or absent variable leaves the suite exactly as it runs in CI. Pick the factor by experiment. Too low and the failure does not reproduce, too high and tests fail for reasons the CI runner never hits, so raise it a step at a time until the failure you are chasing appears with the symptom the CI log shows.
+
 ### Dynamic ports in tests
 
 Normal `bun run dev` / `bun run start` keep the fixed defaults (backend `5172`, frontend `5173`). The test harness instead runs on OS-assigned free ports so it never conflicts with an already-running instance:
