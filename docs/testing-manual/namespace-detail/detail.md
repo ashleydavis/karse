@@ -2,6 +2,14 @@
 
 Manual tests for the namespace detail page. See the spec: [namespace-detail](../../spec/namespace-detail/detail.md).
 
+Start the app first. From the repo root run:
+
+```sh
+bun run dev
+```
+
+Then open the frontend at `http://127.0.0.1:5173`.
+
 The fixture stands up a `karse-test` KWOK cluster; `kwokctl` adds a `kwok-karse-test` context to your kubeconfig automatically. Select it in Karse. Tear it down with the Teardown step at the end of this doc.
 
 ## Scenario: Namespace detail page and its tabs
