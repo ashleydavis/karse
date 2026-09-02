@@ -77,6 +77,27 @@ The command stays read-only (`docs/rules/security.md`): the flag is hard-coded i
 
 The container detail Logs panel (`PodLogsPanel`) has no Range control and passes no cutoff; its backlog is bounded by its own Tail lines selector.
 
+#### Remembered scope across navigation and reload
+
+Picking pods is the slowest part of using the Logs page, and navigating away used to unmount it and lose the lot. The page therefore persists its **scope** to `localStorage` under the single key `karse-log-scope` and restores it on mount, so returning to `/logs` lands on the same namespace with the same pods ticked and the same search text in the picker. The read/write helpers are the pure module `frontend/src/lib/log-scope-storage.ts`, following the same defensive-parse pattern as the other persisted settings (`frontend/src/lib/config.tsx` and `frontend/src/lib/column-config.tsx`), with the key name held in one place.
+
+**What is stored.** Exactly three things, as one record: the selected `namespace`, the `pods` ticked in the picker, and the picker's `search` text. Pods are namespace-scoped, so the pod names only mean anything alongside the namespace they were picked in; they are stored and restored together and never restored against a different namespace.
+
+**What is deliberately not stored.** The stream and the log lines. Restoring the scope never re-opens a stream: the page comes back with the Stream button in its idle state, no "Streaming N pod(s)" chip row, and the caption reading "No logs yet" until the user presses Stream. Reopening a `kubectl logs -f` follow per pod without being asked would start cluster reads on a bare page load, and the streamed lines themselves are not persisted either, so there would be nothing to restore them into.
+
+**Stale pods are pruned.** Pod names change every time a deployment rolls, so a restored selection routinely names pods the cluster no longer has. The restore is not held back for the pod list to arrive (the picker would sit empty while it loaded): the stored selection is restored immediately, then reconciled once the pod list resolves, dropping the names that are gone and keeping the rest. A dropped pod is never shown as ticked-but-missing, and never reaches the backend as a pod to follow.
+
+**Bad data falls back to empty.** An absent, unparseable, non-object, or wrong-typed entry is discarded and the page starts in its empty state without throwing; individual pod names that are not strings are dropped while the rest of the record still restores.
+
+**Two clear controls, doing different things.** They are separately labelled so a reader can tell which one wipes the saved scope:
+
+- **Clear**, inside the pod picker dropdown, is the existing control and is unchanged: it empties the tick list only. The namespace and the search text stay as they were.
+- **Clear saved scope**, on the page's toolbar beside the Stream button, resets the whole page scope (namespace, ticked pods, search) back to its original empty state, stops any stream, **and removes the stored entry**, so a reload after clearing comes back empty rather than restoring what was just cleared. It is disabled when there is no scope to reset.
+
+An empty scope is stored as no entry at all rather than as a blank record, which is what stops the page writing a fresh empty entry straight back after the user clears it.
+
+Persistence belongs to the Logs page's full-picker mode only. The Pod detail Logs tab renders the same `LogViewer` with a `fixedPod`, and neither reads nor writes the stored scope: its pod is already decided by the route.
+
 ## Acceptance Criteria
 
 - [x] The kubectl-based Logs page (`/logs`) streams multi-pod `kubectl logs -f` output over SSE, merged into one viewer.
@@ -93,6 +114,7 @@ The container detail Logs panel (`PodLogsPanel`) has no Range control and passes
 - [x] The pod picker is the single shared `PodFilter` component (`frontend/src/components/pod-filter.tsx`) used everywhere pods can be selected, with no bespoke per-page selector. Its list shows selected pods at the top and unselected below, each group sorted alphanumerically, with a divider between the two groups drawn only when both are non-empty; the count and Clear sit in a header above the scrolling list.
 - [x] The pod picker dropdown is sized generously (a wide 440px panel, capped to the viewport width, and a list growing up to 60% of the viewport height, capped at 520px) so a typical multi-pod namespace is visible at once with little or no scrolling, while a very long list still scrolls past the visible area. Because the native scrollbar renders as an invisible auto-hiding overlay in the app's browser, the list draws its own always-visible scrollbar (track + draggable grey thumb, shown only while the list overflows), so it is plainly visible that an overflowing pod list scrolls.
 - [x] The Logs page and the Pod detail Logs tab carry the shared time-range control (`Range: Last 7 days` by default, offering "All time" or "Last X \<period\>"). The range is applied **at fetch**: it is sent to `GET /api/logs/stream` as `sinceSeconds` and becomes `kubectl logs --since=<n>s`, so it bounds the backlog `--tail` replays rather than filtering lines already on screen. Changing it re-opens the stream, and "All time" adds no flag. The command stays read-only.
+- [x] The Logs page remembers its scope across navigation and a full reload: the namespace, the ticked pods and the picker's search text are persisted to `localStorage` (`karse-log-scope`) and restored on mount, with the picker trigger summarising the restored selection exactly as it does for one made by hand. The stream and the log lines are not persisted, so a restore opens no stream (Stream button idle, no chip row, "No logs yet"). Stored pods the cluster no longer has are dropped once the pod list resolves, and absent, malformed or wrong-typed stored data falls back to the empty state without throwing. A toolbar **Clear saved scope** control resets the whole scope and deletes the stored entry, distinct from the pod picker's in-dropdown **Clear**, which still only empties the tick list.
 
 ## Open Questions
 

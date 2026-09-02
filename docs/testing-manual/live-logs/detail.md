@@ -116,6 +116,32 @@ The Pod detail Logs tab (see [pod-detail](../pod-detail/detail.md)) carries the 
 - Tail `logs/audit-*.log` while streaming and confirm only `logs -f` and `get` kubectl commands are recorded. No mutating verbs ever appear.
 - Set a Range other than "All time" and stream again. The recorded command gains a `--since=<n>s` flag (for example `--since=600s` for "Last 10 minutes") on the same read-only `logs -f` invocation. No mutating verb appears, and no other flag changes.
 
+### Remembered scope across navigation and reload
+- Select `default` from the Namespace dropdown, open the picker dropdown, check `nginx-one` and `redis-main`, and close the dropdown. The trigger reads "2 pod(s) selected".
+- Click "Pods" (or any other item) in the sidebar, then click "Logs" again. The Namespace dropdown still reads `default` and the trigger still reads "2 pod(s) selected"; open the dropdown and confirm the count reads "2 selected" with the same two pods ticked.
+- Nothing is streaming: the button reads "Stream" (not "Stop"), there is no "Streaming N pod(s)" chip row, the caption reads "No logs yet", and the log panel shows "Check pods or type a search, then press Stream." The selection came back; the stream did not.
+- Press "Stream". The two remembered pods stream straight away, with no re-picking.
+- Press "Stop", then reload the whole page in the browser (F5 or Ctrl-R). The namespace and the two ticked pods are still there, and again nothing is streaming. A reload, not only in-app navigation, keeps the scope.
+- With no pods checked, type `nginx` into the picker's search box and close the dropdown so the trigger reads "Search: nginx". Navigate away and back: the trigger still reads "Search: nginx". The search text is remembered too.
+
+### Stored pods that no longer exist
+- Check `nginx-one` and `redis-main`, then navigate away from the Logs page.
+- Delete one of them from the cluster, as a rolled deployment would: `kubectl --context kwok-karse-test delete pod redis-main` (this is you changing the cluster from your own terminal, not Karse: Karse never deletes anything).
+- Navigate back to the Logs page. The trigger reads "1 pod(s) selected" and only `nginx-one` is ticked. `redis-main` is not listed as ticked-but-missing anywhere.
+- Press "Stream" and tail `logs/audit-*.log`: the recorded `logs -f` command names `nginx-one` only. The pod that is gone is never sent to the backend.
+- Re-run the fixture setup script to bring the deleted pod back before continuing.
+
+### The two Clear controls
+- The page has two clear controls, and they do different things. Confirm both are on screen and separately labelled: "Clear saved scope" sits on the toolbar beside the Stream button, and "Clear" sits inside the pod picker dropdown next to the "N selected" count. Check this in both light and dark mode (toggle from the Config page): the two must stay tellable apart in either.
+- Select `default` from the Namespace dropdown and check `nginx-one`. Open the dropdown and press "Clear". The tick list empties ("0 selected") but the Namespace dropdown still reads `default`: the picker's Clear only unticks pods.
+- Check `nginx-one` again, then press "Clear saved scope" on the toolbar. The Namespace dropdown goes back to showing no namespace at all (just its "Namespace" label, the unset state it starts in; open it and "All namespaces" is the selected entry), the trigger returns to "Search pods...", any stream stops, and the "Clear saved scope" button greys out (there is nothing left to reset).
+- Reload the page. It comes back empty: no namespace shown, "Search pods...", "No logs yet". Clearing removed what was saved, so nothing is restored.
+
+### Damaged saved data
+- Open the browser dev tools console and run `localStorage.setItem("karse-log-scope", "{not json")`, then reload the page.
+- The Logs page loads normally in its empty state (no namespace shown, "Search pods...", "No logs yet"), with no error and no blank screen. Bad stored data is discarded rather than trusted.
+- Repeat with a wrong-typed record: `localStorage.setItem("karse-log-scope", JSON.stringify({ namespace: 7, pods: "nginx-one", search: null }))`, then reload. Same result: the page comes back empty and usable.
+
 ### Capped streaming-pod labels
 - This needs more than 8 streaming pods to exercise the cap. Use a namespace/fixture with at least 9 pods (for example scale the fixture up, or stream across all namespaces on a busier cluster).
 - Open the picker dropdown, type a substring that matches every pod (or check more than 8 pods), close the dropdown, and press "Stream".

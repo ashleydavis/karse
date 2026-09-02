@@ -16,7 +16,7 @@ import {
     Chip,
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlay, faStop, faCircleXmark, faAnglesUp, faAnglesDown } from "@fortawesome/free-solid-svg-icons";
+import { faPlay, faStop, faCircleXmark, faAnglesUp, faAnglesDown, faEraser } from "@fortawesome/free-solid-svg-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { LogStreamLine } from "karse-types";
 import { useKubeContext } from "../lib/kube-context";
@@ -30,6 +30,7 @@ import { colorForPod } from "../lib/log-pod-colors";
 import { DEFAULT_TIME_RANGE, timeRangeSeconds, type TimeRange } from "../lib/time-range";
 import { formatLocalTime, type TimestampMode } from "../lib/timestamps";
 import { useTimestampFormat } from "../lib/use-timestamp-format";
+import { loadLogScope, saveLogScope, clearLogScope, emptyLogScope, prunePods } from "../lib/log-scope-storage";
 
 // A rendered log line tagged with a stable key for React reconciliation.
 type RenderedLine = LogStreamLine & { key: number };
@@ -128,14 +129,19 @@ export type LogViewerProps = {
 // started by re-scoping (Logs page) or by re-mounting (Pod detail tab).
 export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
     const { current } = useKubeContext();
-    const [namespace, setNamespace] = useState<string>(fixedPod?.namespace ?? "");
+    // The scope left behind by the last visit to the Logs page, read once on mount so a
+    // return to the page lands on the same namespace with the same pods ticked. Only the
+    // full-picker mode persists anything: the Pod detail Logs tab is pinned to one pod by
+    // `fixedPod` and must neither read nor write the page's stored scope.
+    const [restoredScope] = useState(() => (fixedPod === undefined ? loadLogScope() : emptyLogScope()));
+    const [namespace, setNamespace] = useState<string>(fixedPod?.namespace ?? restoredScope.namespace);
     // The pod-picker search box. It filters the checkbox list, and when no pod is
     // explicitly checked it doubles as the wildcard/substring filter sent to the
     // backend (reconciling with logs-require-pods-1's "scope before streaming" gate).
-    const [search, setSearch] = useState<string>("");
+    const [search, setSearch] = useState<string>(restoredScope.search);
     // Names of the pods the user has checked in the picker. An explicit selection
     // takes precedence over the search filter when streaming.
-    const [selectedPods, setSelectedPods] = useState<string[]>([]);
+    const [selectedPods, setSelectedPods] = useState<string[]>(restoredScope.pods);
     const [streaming, setStreaming] = useState(false);
     const [lines, setLines] = useState<RenderedLine[]>([]);
     const [matchedPods, setMatchedPods] = useState<string[]>([]);
@@ -255,6 +261,56 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
     // Clears the explicit pod selection, returning the picker to search-filter mode.
     function clearSelection(): void {
         setSelectedPods([]);
+    }
+
+    // Writes the page's scope to localStorage whenever it changes, so navigating away and
+    // coming back, or reloading, lands on the same namespace with the same pods ticked.
+    // Only the scope is written: the stream and the lines it produced are not persisted,
+    // so a restore never re-opens a follow of its own accord.
+    useEffect(() => {
+        if (fixedPod !== undefined) {
+            return;
+        }
+        saveLogScope({
+            namespace,
+            pods: selectedPods,
+            search,
+        });
+    }, [fixedPod, namespace, selectedPods, search]);
+
+    // Whether the restored selection has already been reconciled against the cluster's
+    // current pods. Pruning happens once, on the first resolved pod list: later unticks
+    // are the user's own and re-running would undo them.
+    const prunedRef = useRef(false);
+
+    // Drops restored pods the cluster no longer has, once the pod list resolves. The
+    // restore itself is not held back for that fetch (the picker would sit empty while it
+    // ran), so the reconciliation follows it rather than blocking it.
+    useEffect(() => {
+        if (fixedPod !== undefined || prunedRef.current || podsData === undefined) {
+            return;
+        }
+        prunedRef.current = true;
+        const available = podsData.pods.map((pod) => pod.name);
+        setSelectedPods((prev) => prunePods(prev, available));
+    }, [fixedPod, podsData]);
+
+    // The page-level clear: resets the whole scope (namespace, ticked pods, search text)
+    // back to the page's original empty state, stops any stream, and deletes the stored
+    // entry so a later reload comes back empty too. Distinct from the pod picker's
+    // in-dropdown Clear, which only unticks pods and leaves the saved scope alone.
+    function clearStoredScope(): void {
+        stopStream();
+        setNamespace("");
+        setSelectedPods([]);
+        setSearch("");
+        setLines([]);
+        setMatchedPods([]);
+        setStreamError(null);
+        setNeedsSelection(false);
+        setLastLineAt(null);
+        activeScopeRef.current = null;
+        clearLogScope();
     }
 
     // Stops any active stream and clears the close handle.
@@ -599,6 +655,24 @@ export function LogViewer({ testIdPrefix, fixedPod }: LogViewerProps) {
                             Stop
                         </Button>
                     )}
+
+                    {/* The page-level clear, deliberately not a second bare "Clear": the
+                        pod picker's in-dropdown Clear only unticks pods, whereas this one
+                        resets the whole scope and forgets what was saved. Disabled while
+                        there is no scope to reset. */}
+                    <Tooltip title="Reset the namespace, pod selection and search, and forget the saved scope">
+                        <span>
+                            <Button
+                                variant="outlined"
+                                onClick={clearStoredScope}
+                                disabled={namespace === "" && selectedPods.length === 0 && search === ""}
+                                data-test-id={`${testIdPrefix}-clear-scope`}
+                                startIcon={<FontAwesomeIcon icon={faEraser} />}
+                            >
+                                Clear saved scope
+                            </Button>
+                        </span>
+                    </Tooltip>
 
                     <Typography
                         variant="caption"

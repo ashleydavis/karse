@@ -46,6 +46,27 @@ test.describe("karse e2e", () => {
         await page.goto("/cluster", { waitUntil: "networkidle" });
     }
 
+    // Removes the Logs page's saved scope (live-logs-6) from localStorage. The page writes
+    // its namespace, ticked pods and search text there and reads them back on mount, so a
+    // selection made by one test would otherwise be restored into the next one.
+    async function clearStoredLogScope(): Promise<void> {
+        // Before the shared page has loaded an app URL it sits on about:blank, which has no
+        // origin to hold storage and throws on any localStorage access. Nothing can be
+        // stored yet in that state, so there is nothing to remove.
+        if (!page.url().startsWith("http")) {
+            return;
+        }
+        await page.evaluate(() => localStorage.removeItem("karse-log-scope"));
+    }
+
+    // Navigate to the Logs page from a known-empty saved scope, which is what every logs
+    // test that is not about the restore itself expects. The restore tests navigate with
+    // page.goto directly so the stored scope is left in place for the page to read.
+    async function gotoLogs(): Promise<void> {
+        await clearStoredLogScope();
+        await page.goto("/logs", { waitUntil: "networkidle" });
+    }
+
     // Navigate to the nodes page and wait for at least one row to appear.
     async function navigateToNodes(): Promise<void> {
         await page.goto("/nodes", { waitUntil: "networkidle" });
@@ -7033,7 +7054,7 @@ test.describe("karse e2e", () => {
                 await route.fulfill({ json: FAKE_PODS });
             });
             await interceptStream();
-            await page.goto("/logs", { waitUntil: "networkidle" });
+            await gotoLogs();
         });
 
         test.afterAll(async () => {
@@ -7221,7 +7242,7 @@ test.describe("karse e2e", () => {
 
         test("last-updated indicator starts empty then reflects streamed log lines", async () => {
             // Fresh page so no stream has run yet: the indicator reads "No logs yet".
-            await page.goto("/logs", { waitUntil: "networkidle" });
+            await gotoLogs();
             const indicator = page.locator("[data-test-id='live-logs-last-updated']");
             await expect(indicator).toHaveText("No logs yet");
             // Scope and stream; once a line lands the caption flips to "Updated just now".
@@ -7256,7 +7277,7 @@ test.describe("karse e2e", () => {
                     body: buildSseBody(matched),
                 });
             });
-            await page.goto("/logs", { waitUntil: "networkidle" });
+            await gotoLogs();
             await openPicker();
             await page.locator("[data-test-id='live-logs-search'] input").fill("nginx");
             await closePicker();
@@ -7276,7 +7297,7 @@ test.describe("karse e2e", () => {
         // then presses Stream and waits for both chips and both log lines to land.
         // The shared starting point for the pod-removal tests below.
         async function streamBothPods(): Promise<void> {
-            await page.goto("/logs", { waitUntil: "networkidle" });
+            await gotoLogs();
             await openPicker();
             await page.locator("[data-test-id='live-logs-pod-list'] [data-test-id='live-logs-pod-option']", { hasText: "nginx-abc" })
                 .locator("input").check();
@@ -7358,6 +7379,279 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Live logs page: the scope remembered across navigation (live-logs-6) ──
+
+    test.describe("live logs remembered scope", () => {
+        // Two pods in "default" plus one in "kube-system", so a namespace choice and a pod
+        // choice can be told apart in the restored state.
+        const SCOPE_PODS = {
+            pods: [
+                { name: "nginx-abc", namespace: "default", phase: "Running", ready: "1/1", restarts: 0, createdAt: new Date().toISOString(), node: "node-1" },
+                { name: "redis-xyz", namespace: "default", phase: "Running", ready: "1/1", restarts: 0, createdAt: new Date().toISOString(), node: "node-1" },
+            ],
+        };
+
+        // The pod list a rolled deployment leaves behind: redis-xyz is gone and only
+        // nginx-abc survives, which is the stale-stored-pod case the restore has to prune.
+        const ROLLED_PODS = {
+            pods: [SCOPE_PODS.pods[0]],
+        };
+
+        const SCOPE_NAMESPACES = {
+            namespaces: [
+                { name: "default", labels: {}, resourceCount: 2 },
+                { name: "kube-system", labels: {}, resourceCount: 0 },
+            ],
+        };
+
+        // Serves whichever pod list the current test has installed, so a test can simulate
+        // pods disappearing between the save and the restore without re-routing.
+        let servedPods = SCOPE_PODS;
+
+        async function openPicker(): Promise<void> {
+            await page.locator("[data-test-id='live-logs-picker-trigger']").click();
+            await expect(page.locator("[data-test-id='live-logs-search']")).toBeVisible();
+        }
+
+        async function closePicker(): Promise<void> {
+            await page.locator(".MuiModal-root .MuiBackdrop-root").last().click();
+            await expect(page.locator("[data-test-id='live-logs-search']")).toHaveCount(0);
+        }
+
+        // Picks a namespace in the toolbar's Namespace select.
+        async function chooseNamespace(name: string): Promise<void> {
+            await page.locator("[data-test-id='live-logs-namespace-select'] [role='combobox']").click();
+            await page.locator("[data-test-id='live-logs-namespace-option']").filter({ hasText: new RegExp(`^${name}$`) }).click();
+            await expect(page.locator("[data-test-id='live-logs-namespace-select']")).toContainText(name);
+        }
+
+        // Asserts the Namespace select is back on its unset "All namespaces" value. MUI
+        // renders an empty Select value as a zero-width space rather than the placeholder
+        // option's label, so the check is that no namespace name is shown at all.
+        async function expectNamespaceUnset(): Promise<void> {
+            const shown = await page.locator("[data-test-id='live-logs-namespace-select'] [role='combobox']").innerText();
+            expect(shown.replace(/\u200b/g, "").trim()).toBe("");
+        }
+
+        // Ticks a pod in the picker, leaving the dropdown closed afterwards.
+        async function tickPod(name: string): Promise<void> {
+            await openPicker();
+            await page.locator("[data-test-id='live-logs-pod-list'] [data-test-id='live-logs-pod-option']", { hasText: name })
+                .locator("input[type='checkbox']")
+                .check();
+            await closePicker();
+        }
+
+        // Leaves the Logs page for another route and comes back, without touching the
+        // saved scope: this is the in-app navigation that used to lose the selection.
+        async function leaveAndReturn(): Promise<void> {
+            await page.goto("/pods", { waitUntil: "networkidle" });
+            await page.goto("/logs", { waitUntil: "networkidle" });
+        }
+
+        // Asserts the page came back with no stream running: the Stream button is idle,
+        // there is no "Streaming N pod(s)" chip row, and no line has ever landed.
+        async function expectNotStreaming(): Promise<void> {
+            await expect(page.locator("[data-test-id='live-logs-start']")).toBeVisible();
+            await expect(page.locator("[data-test-id='live-logs-stop']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='live-logs-matched']")).toHaveCount(0);
+            await expect(page.locator("[data-test-id='live-logs-last-updated']")).toHaveText("No logs yet");
+            await expect(page.locator("[data-test-id='live-logs-line']")).toHaveCount(0);
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+            await page.route("**/api/pods*", async (route) => {
+                await route.fulfill({ json: servedPods });
+            });
+            await page.route("**/api/namespaces*", async (route) => {
+                await route.fulfill({ json: SCOPE_NAMESPACES });
+            });
+            await page.route("**/api/logs/stream*", async (route) => {
+                const params = new URL(route.request().url()).searchParams;
+                const selected = params.getAll("pods");
+                const started = `event: started\ndata: ${JSON.stringify({ pods: selected.map((n) => ({ namespace: "default", name: n })) })}\n\n`;
+                const lines = selected
+                    .map((n) => `event: line\ndata: ${JSON.stringify({ namespace: "default", pod: n, line: `log line from ${n}` })}\n\n`)
+                    .join("");
+                await route.fulfill({
+                    headers: { "Content-Type": "text/event-stream" },
+                    body: started + lines,
+                });
+            });
+            await gotoLogs();
+        });
+
+        test.afterAll(async () => {
+            servedPods = SCOPE_PODS;
+            await clearStoredLogScope();
+            await page.unroute("**/api/pods*");
+            await page.unroute("**/api/namespaces*");
+            await page.unroute("**/api/logs/stream*");
+            setContext(CLUSTER_1);
+        });
+
+        test("restores the namespace and the ticked pods after navigating away and back", async () => {
+            // Scope the page by hand: a namespace plus one ticked pod.
+            await chooseNamespace("default");
+            await tickPod("nginx-abc");
+            await expect(page.locator("[data-test-id='live-logs-picker-trigger']")).toContainText("1 pod(s) selected");
+
+            // No stream is opened by the restore, so watch for one across the round trip.
+            let streamRequested = false;
+            const onRequest = (req: import("@playwright/test").Request) => {
+                if (req.url().includes("/api/logs/stream")) {
+                    streamRequested = true;
+                }
+            };
+            page.on("request", onRequest);
+            await leaveAndReturn();
+
+            // Same namespace, same pod, and the trigger summarises it exactly as it did
+            // when the selection was made by hand.
+            await expect(page.locator("[data-test-id='live-logs-namespace-select']")).toContainText("default");
+            await expect(page.locator("[data-test-id='live-logs-picker-trigger']")).toContainText("1 pod(s) selected");
+            await openPicker();
+            await expect(page.locator("[data-test-id='live-logs-selected-count']")).toHaveText("1 selected");
+            await expect(page.locator("[data-test-id='live-logs-pod-list'] [data-test-id='live-logs-pod-option']", { hasText: "nginx-abc" }).locator("input[type='checkbox']")).toBeChecked();
+            await closePicker();
+
+            // The scope came back, the stream did not.
+            await expectNotStreaming();
+            expect(streamRequested).toBe(false);
+            page.off("request", onRequest);
+        });
+
+        test("the restored selection survives a full page reload, not only in-app navigation", async () => {
+            let streamRequested = false;
+            const onRequest = (req: import("@playwright/test").Request) => {
+                if (req.url().includes("/api/logs/stream")) {
+                    streamRequested = true;
+                }
+            };
+            page.on("request", onRequest);
+            await page.reload({ waitUntil: "networkidle" });
+            await expect(page.locator("[data-test-id='live-logs-namespace-select']")).toContainText("default");
+            await expect(page.locator("[data-test-id='live-logs-picker-trigger']")).toContainText("1 pod(s) selected");
+            await expectNotStreaming();
+            expect(streamRequested).toBe(false);
+            page.off("request", onRequest);
+        });
+
+        test("a restored selection still streams the pods it names when Stream is pressed", async () => {
+            // The point of remembering the scope is that the slow part is already done:
+            // pressing Stream streams the restored pod with no re-picking.
+            const requestPromise = page.waitForRequest((req) => req.url().includes("/api/logs/stream") && req.url().includes("pods=nginx-abc"));
+            await page.locator("[data-test-id='live-logs-start']").click();
+            await requestPromise;
+            await expect(page.locator("[data-test-id='live-logs-viewer']")).toContainText("default/nginx-abc");
+            await page.locator("[data-test-id='live-logs-stop']").click();
+        });
+
+        test("stored pods the cluster no longer has are dropped on restore, and the rest survive", async () => {
+            // Tick both pods, so the stored scope names one pod that is about to vanish.
+            await tickPod("redis-xyz");
+            await expect(page.locator("[data-test-id='live-logs-picker-trigger']")).toContainText("2 pod(s) selected");
+
+            // A deployment rolls: redis-xyz is gone from the cluster on the next load.
+            servedPods = ROLLED_PODS;
+            let streamRequested = false;
+            const onRequest = (req: import("@playwright/test").Request) => {
+                if (req.url().includes("/api/logs/stream")) {
+                    streamRequested = true;
+                }
+            };
+            page.on("request", onRequest);
+            await page.reload({ waitUntil: "networkidle" });
+
+            // Only the surviving pod is restored, and the missing one is not shown as
+            // ticked-but-absent anywhere in the picker.
+            await expect(page.locator("[data-test-id='live-logs-picker-trigger']")).toContainText("1 pod(s) selected");
+            await openPicker();
+            await expect(page.locator("[data-test-id='live-logs-selected-count']")).toHaveText("1 selected");
+            await expect(page.locator("[data-test-id='live-logs-pod-list']")).not.toContainText("redis-xyz");
+            await closePicker();
+            expect(streamRequested).toBe(false);
+            page.off("request", onRequest);
+
+            // The pruned scope is what gets streamed: no request ever names the dead pod.
+            const requestPromise = page.waitForRequest((req) => req.url().includes("/api/logs/stream"));
+            await page.locator("[data-test-id='live-logs-start']").click();
+            const streamUrl = (await requestPromise).url();
+            expect(streamUrl).toContain("pods=nginx-abc");
+            expect(streamUrl).not.toContain("redis-xyz");
+            await page.locator("[data-test-id='live-logs-stop']").click();
+            servedPods = SCOPE_PODS;
+        });
+
+        test("the picker's Clear only unticks pods; the page's Clear saved scope resets everything", async () => {
+            // The two controls are separately labelled, so a reader can tell which one
+            // wipes the saved scope.
+            await expect(page.locator("[data-test-id='live-logs-clear-scope']")).toContainText("Clear saved scope");
+            await openPicker();
+            await expect(page.locator("[data-test-id='live-logs-clear']")).toHaveText("Clear");
+
+            // The in-dropdown Clear empties the tick list and leaves the namespace alone.
+            await page.locator("[data-test-id='live-logs-clear']").click();
+            await expect(page.locator("[data-test-id='live-logs-selected-count']")).toHaveText("0 selected");
+            await closePicker();
+            await expect(page.locator("[data-test-id='live-logs-picker-trigger']")).toContainText("Search pods...");
+            await expect(page.locator("[data-test-id='live-logs-namespace-select']")).toContainText("default");
+
+            // The page's Clear saved scope resets the namespace too.
+            await page.locator("[data-test-id='live-logs-clear-scope']").click();
+            await expectNamespaceUnset();
+        });
+
+        test("clearing empties the page and stays empty across a reload", async () => {
+            // Build a scope worth losing, then clear it.
+            await chooseNamespace("kube-system");
+            await openPicker();
+            await page.locator("[data-test-id='live-logs-search'] input").fill("ngin");
+            await closePicker();
+            await expect(page.locator("[data-test-id='live-logs-picker-trigger']")).toContainText("Search: ngin");
+
+            await page.locator("[data-test-id='live-logs-clear-scope']").click();
+            await expectNamespaceUnset();
+            await expect(page.locator("[data-test-id='live-logs-picker-trigger']")).toContainText("Search pods...");
+            await expect(page.locator("[data-test-id='live-logs-clear-scope']")).toBeDisabled();
+            await expectNotStreaming();
+
+            // The stored entry went with it, so a reload comes back empty rather than
+            // restoring what was just cleared.
+            await page.reload({ waitUntil: "networkidle" });
+            await expectNamespaceUnset();
+            await expect(page.locator("[data-test-id='live-logs-picker-trigger']")).toContainText("Search pods...");
+            await expect(page.locator("[data-test-id='live-logs-clear-scope']")).toBeDisabled();
+            await expectNotStreaming();
+        });
+
+        test("a search-only scope is restored, with the trigger summarising the search", async () => {
+            await openPicker();
+            await page.locator("[data-test-id='live-logs-search'] input").fill("redis");
+            await closePicker();
+            await leaveAndReturn();
+            await expect(page.locator("[data-test-id='live-logs-picker-trigger']")).toContainText("Search: redis");
+            await expectNotStreaming();
+            await page.locator("[data-test-id='live-logs-clear-scope']").click();
+        });
+
+        test("malformed stored data is discarded and the page falls back to its empty state", async () => {
+            await page.evaluate(() => localStorage.setItem("karse-log-scope", "{not json"));
+            await page.reload({ waitUntil: "networkidle" });
+            await expectNamespaceUnset();
+            await expect(page.locator("[data-test-id='live-logs-picker-trigger']")).toContainText("Search pods...");
+            await expectNotStreaming();
+
+            // Wrong-typed fields are discarded the same way, rather than restored.
+            await page.evaluate(() => localStorage.setItem("karse-log-scope", JSON.stringify({ namespace: 7, pods: "nginx-abc", search: null })));
+            await page.reload({ waitUntil: "networkidle" });
+            await expectNamespaceUnset();
+            await expect(page.locator("[data-test-id='live-logs-picker-trigger']")).toContainText("Search pods...");
+            await expectNotStreaming();
+        });
+    });
+
     test.describe("live logs page enlarged pod picker", () => {
         // A namespace with many pods, so the "have to scroll to see them all"
         // problem live-logs-4 fixes is reproducible: with a small dropdown this
@@ -7379,7 +7673,7 @@ test.describe("karse e2e", () => {
             await page.route("**/api/pods*", async (route) => {
                 await route.fulfill({ json: MANY_PODS });
             });
-            await page.goto("/logs", { waitUntil: "networkidle" });
+            await gotoLogs();
         });
 
         test.afterAll(async () => {
@@ -7626,7 +7920,7 @@ test.describe("karse e2e", () => {
 
         test.beforeEach(async () => {
             lastSince = null;
-            await page.goto("/logs", { waitUntil: "networkidle" });
+            await gotoLogs();
         });
 
         test.afterAll(async () => {
@@ -7729,7 +8023,7 @@ test.describe("karse e2e", () => {
                     body: buildLongSseBody(200),
                 });
             });
-            await page.goto("/logs", { waitUntil: "networkidle" });
+            await gotoLogs();
         });
 
         test.afterAll(async () => {
@@ -7743,7 +8037,7 @@ test.describe("karse e2e", () => {
         async function streamLongLog() {
             // Reload so each test starts from a fresh, non-streaming page (the
             // serial page is shared, and a prior test leaves the Stop button up).
-            await page.goto("/logs", { waitUntil: "networkidle" });
+            await gotoLogs();
             // Scope by searching: open the pod-picker dropdown, type a substring, close it.
             await page.locator("[data-test-id='live-logs-picker-trigger']").click();
             await expect(page.locator("[data-test-id='live-logs-search']")).toBeVisible();
@@ -7892,7 +8186,7 @@ test.describe("karse e2e", () => {
         // Streams the kwok `web` pod's live logs and waits until the arriving lines have
         // overflowed the viewer, so there is both history above and a bottom to follow.
         async function streamLiveLog() {
-            await page.goto("/logs", { waitUntil: "networkidle" });
+            await gotoLogs();
             await page.locator("[data-test-id='live-logs-picker-trigger']").click();
             await expect(page.locator("[data-test-id='live-logs-search']")).toBeVisible();
             await page.locator("[data-test-id='live-logs-search'] input").fill("web");
@@ -7965,7 +8259,7 @@ test.describe("karse e2e", () => {
         });
 
         test("the jump-to-top and jump-to-bottom buttons sit to the far right of the Stream button", async () => {
-            await page.goto("/logs", { waitUntil: "networkidle" });
+            await gotoLogs();
             const streamBox = (await page.locator("[data-test-id='live-logs-start']").boundingBox())!;
             const topBox = (await page.locator("[data-test-id='live-logs-jump-top']").boundingBox())!;
             const bottomBox = (await page.locator("[data-test-id='live-logs-jump-bottom']").boundingBox())!;
@@ -8048,7 +8342,7 @@ test.describe("karse e2e", () => {
                     body: buildManySseBody(MANY_PODS.pods.map((p) => p.name)),
                 });
             });
-            await page.goto("/logs", { waitUntil: "networkidle" });
+            await gotoLogs();
         });
 
         test.afterAll(async () => {
