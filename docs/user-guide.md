@@ -38,6 +38,8 @@ Open http://localhost:5173.
 
 The left sidebar has collapsible navigation. Click the chevron at the bottom to collapse it to icons only; hover an icon to see a tooltip with the page name.
 
+Pinned in their own section below the main list are **Report a bug**, which opens the Karse repository's new-issue page on GitHub in a new browser tab (Karse is local-only and read-only, so it cannot take a report itself), and **About**.
+
 - **Contexts**: manage kubeconfig contexts.
 - **All clusters**: a total across every configured context at once, and a per-cluster table.
 - **Cluster**: overview tiles and cluster stats.

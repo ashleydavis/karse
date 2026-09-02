@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Box, Typography, List, ListItemButton, ListItemIcon, ListItemText, Divider, Tooltip, IconButton } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
-import { faLink, faDharmachakra, faServer, faLayerGroup, faCube, faCubes, faDatabase, faSitemap, faBell, faStream, faCircleExclamation, faList, faGear, faChevronLeft, faChevronRight, faCircleInfo, faGaugeHigh, faGlobe } from "@fortawesome/free-solid-svg-icons";
+import { faLink, faDharmachakra, faServer, faLayerGroup, faCube, faCubes, faDatabase, faSitemap, faBell, faStream, faCircleExclamation, faList, faGear, faChevronLeft, faChevronRight, faGaugeHigh, faGlobe } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useShareableTo } from "../lib/nav-state";
 import { FROM_ALL_RESOURCES } from "../lib/breadcrumb-trail";
 import { TOP_BAR_HEIGHT } from "../lib/layout";
+import { BOTTOM_NAV_ITEMS, isExternalNavItem, isNavItemActive } from "./sidebar-nav";
+import type { NavItem } from "./sidebar-nav";
 
 const NAV_ITEMS = [
     { to: "/errors",       icon: faCircleExclamation, label: "Errors"   },
@@ -26,11 +27,6 @@ const NAV_ITEMS = [
     { to: "/config",       icon: faGear,          label: "Config"       },
 ];
 
-// Nav items pinned to the bottom of the sidebar, below the main resource nav.
-const BOTTOM_NAV_ITEMS = [
-    { to: "/about", icon: faCircleInfo, label: "About" },
-];
-
 export function Sidebar() {
     const { pathname } = useLocation();
     const [searchParams] = useSearchParams();
@@ -43,16 +39,28 @@ export function Sidebar() {
     const fromAllResources = searchParams.get("from") === FROM_ALL_RESOURCES;
 
     // Renders a single sidebar nav item (link with icon and label). Shared between
-    // the main nav list and the bottom-pinned nav list.
-    function renderNavItem({ to, icon, label }: { to: string; icon: IconDefinition; label: string }) {
-        const active = fromAllResources
-            ? to === "/all-resources"
-            : pathname === to || pathname.startsWith(to + "/");
+    // the main nav list and the bottom-pinned nav list, and between in-app route
+    // entries and outbound entries.
+    function renderNavItem(item: NavItem) {
+        const { icon, label } = item;
+        const active = isNavItemActive(item, pathname, fromAllResources);
+        // The link element differs by entry kind (react-router Link vs a plain
+        // anchor opening a new tab), so the props are not statically one type.
+        const linkProps: any = isExternalNavItem(item)
+            ? {
+                component: "a",
+                href: item.href,
+                target: "_blank",
+                rel: "noopener noreferrer",
+            }
+            : {
+                component: Link,
+                to: buildTo(item.to),
+            };
         return (
-            <Tooltip key={to} title={collapsed ? label : ""} placement="right">
+            <Tooltip key={isExternalNavItem(item) ? item.href : item.to} title={collapsed ? label : ""} placement="right">
                 <ListItemButton
-                    component={Link}
-                    to={buildTo(to)}
+                    {...linkProps}
                     selected={active}
                     aria-label={label.toLowerCase()}
                     sx={{

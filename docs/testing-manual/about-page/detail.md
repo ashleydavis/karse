@@ -38,7 +38,34 @@ show. Any fixture with at least one context works.
   `https://github.com/ashleydavis/karse`. Hovering shows that URL; clicking opens
   it in a **new browser tab** (the link has `target="_blank"`).
 
-## Scenario B: Light and dark mode
+## Scenario B: Report a bug
+
+**Fixture:** [_fixtures-kwok/13-two-contexts](../_fixtures-kwok/13-two-contexts/) (the
+same fixture as Scenario A; if it is still up, no new setup is needed)
+
+```sh
+./docs/testing-manual/_fixtures-kwok/13-two-contexts/setup.sh
+```
+
+### What to check
+- **Position**: the sidebar's bottom section (below the main resource nav) holds a
+  "Report a bug" entry directly above the "About" entry. It looks like every other
+  nav entry: bug icon, label, same padding and spacing.
+- **Link target**: hovering "Report a bug" shows
+  `https://github.com/ashleydavis/karse/issues/new`. Clicking it opens GitHub's
+  new-issue form for the Karse repository in a **new browser tab**, leaving Karse
+  on whatever page you were on.
+- **Never highlighted**: navigate to `/about` by clicking "About". "About" is
+  highlighted; "Report a bug", directly above it, is **not**. It stays unhighlighted
+  on every other page too.
+- **No breadcrumb**: the entry adds nothing to the breadcrumb trail, because it is
+  not an in-app page.
+- **Collapsed sidebar**: collapse the sidebar with the chevron at its foot. "Report
+  a bug" shows its icon only, with no label, like the entries above it. Hovering it
+  shows a tooltip to the right reading "Report a bug", and the link still opens the
+  new-issue page in a new tab.
+
+## Scenario C: Light and dark mode
 
 With the About page open, switch the color mode from the header (the moon/sun
 icon → Light / Dark / System).
@@ -46,6 +73,8 @@ icon → Light / Dark / System).
 ### What to check
 - The page renders correctly in both light and dark mode: the card, body text, and
   the GitHub link are legible in each, matching the rest of the app's theme.
+- The sidebar's bottom section, "Report a bug" included, is legible in both modes,
+  expanded and collapsed, matching the entries in the main nav above it.
 
 Teardown:
 

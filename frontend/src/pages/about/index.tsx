@@ -1,10 +1,7 @@
 import { Box, Card, CardContent, Link as MuiLink, Stack, Typography } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowUpRightFromSquare } from "@fortawesome/free-solid-svg-icons";
-
-// The public source repository. Mirrors the git remote (git@github.com:ashleydavis/karse.git)
-// so the About page always points users at the canonical project home.
-const GITHUB_URL = "https://github.com/ashleydavis/karse";
+import { GITHUB_URL } from "../../lib/repository";
 
 // Karse's author/maintainer, taken from the repository owner.
 const AUTHOR = "Ashley Davis";

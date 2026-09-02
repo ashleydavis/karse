@@ -11830,6 +11830,53 @@ test.describe("karse e2e", () => {
             await page.goto("/about", { waitUntil: "networkidle" });
             await expect(page.locator("[data-test-id='breadcrumb-item']").first()).toHaveText("About");
         });
+
+        // The bug-report entry is an outbound link to GitHub, so these tests assert
+        // its attributes rather than following it: the suite must make no outbound
+        // network request.
+        test("puts Report a bug directly above About in the bottom nav", async () => {
+            await page.goto("/about", { waitUntil: "networkidle" });
+            const entries = page.locator("[data-test-id='sidebar-bottom-nav'] .MuiListItemButton-root");
+            await expect(entries).toHaveCount(2);
+            await expect(entries.nth(0)).toHaveAttribute("aria-label", "report a bug");
+            await expect(entries.nth(1)).toHaveAttribute("aria-label", "about");
+        });
+
+        test("links Report a bug at the repo's new-issue page, opening in a new tab", async () => {
+            await page.goto("/about", { waitUntil: "networkidle" });
+            const link = page.locator("[data-test-id='sidebar-bottom-nav'] [aria-label='report a bug']");
+            await expect(link).toHaveAttribute("href", "https://github.com/ashleydavis/karse/issues/new");
+            await expect(link).toHaveAttribute("target", "_blank");
+            await expect(link).toHaveAttribute("rel", /noopener/);
+            await expect(link).toHaveAttribute("rel", /noreferrer/);
+        });
+
+        test("never highlights Report a bug, including on the adjacent About page", async () => {
+            await page.goto("/about", { waitUntil: "networkidle" });
+            const bottomNav = page.locator("[data-test-id='sidebar-bottom-nav']");
+            await expect(bottomNav.locator("[aria-label='about']")).toHaveClass(/Mui-selected/);
+            await expect(bottomNav.locator("[aria-label='report a bug']")).not.toHaveClass(/Mui-selected/);
+
+            await page.goto("/cluster", { waitUntil: "networkidle" });
+            await expect(bottomNav.locator("[aria-label='report a bug']")).not.toHaveClass(/Mui-selected/);
+        });
+
+        test("shows Report a bug as icon-only with a tooltip when the sidebar is collapsed", async () => {
+            await page.goto("/about", { waitUntil: "networkidle" });
+            await page.locator("[aria-label='collapse sidebar']").click();
+            await page.locator("[aria-label='expand sidebar']").waitFor({ state: "visible" });
+
+            const link = page.locator("[data-test-id='sidebar-bottom-nav'] [aria-label='report a bug']");
+            await expect(link).toBeVisible();
+            await expect(link).not.toContainText("Report a bug");
+
+            await link.hover();
+            await expect(page.locator("[role='tooltip']")).toHaveText("Report a bug");
+
+            // Leave the sidebar expanded again for the tests that follow.
+            await page.locator("[aria-label='expand sidebar']").click();
+            await page.locator("[aria-label='collapse sidebar']").waitFor({ state: "visible" });
+        });
     });
 
     // ── Resource utilization (closing coverage) ─────────────────────────────────
