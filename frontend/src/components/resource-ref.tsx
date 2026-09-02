@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Link as MuiLink } from "@mui/material";
-import { resourceNameSegments, resourcePath } from "../lib/resource-link";
+import { resourcePath } from "karse-types";
+import { resourceNameSegments } from "../lib/resource-link";
 import { useOriginTag, useShareableTo } from "../lib/nav-state";
 import { CopyNameButton } from "./copy-button";
 

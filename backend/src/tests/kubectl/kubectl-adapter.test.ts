@@ -805,12 +805,22 @@ describe("getNodeDetail", () => {
 });
 
 describe("getNamespaceDetail", () => {
-    // Argv keys for the seven parallel reads getNamespaceDetail performs.
+    // Argv keys for the namespace read plus the one read per kind listed on the
+    // Resources tab. There is deliberately no secrets key: getNamespaceDetail must never
+    // ask for them, and setRunnerHandlers throws on any argv it was not given, so a
+    // secrets read would fail the test loudly rather than pass unnoticed.
     const NS_KEY = "--context test-ctx get namespace ns-1 -o json";
     const PODS_KEY = "--context test-ctx -n ns-1 get pods -o json";
     const DEPLOYS_KEY = "--context test-ctx -n ns-1 get deployments -o json";
     const STATEFUL_KEY = "--context test-ctx -n ns-1 get statefulsets -o json";
     const DAEMON_KEY = "--context test-ctx -n ns-1 get daemonsets -o json";
+    const REPLICASET_KEY = "--context test-ctx -n ns-1 get replicasets -o json";
+    const JOB_KEY = "--context test-ctx -n ns-1 get jobs -o json";
+    const CRONJOB_KEY = "--context test-ctx -n ns-1 get cronjobs -o json";
+    const SERVICE_KEY = "--context test-ctx -n ns-1 get services -o json";
+    const INGRESS_KEY = "--context test-ctx -n ns-1 get ingresses -o json";
+    const CONFIGMAP_KEY = "--context test-ctx -n ns-1 get configmaps -o json";
+    const PVC_KEY = "--context test-ctx -n ns-1 get persistentvolumeclaims -o json";
     const QUOTA_KEY = "--context test-ctx -n ns-1 get resourcequotas -o json";
     const LIMIT_KEY = "--context test-ctx -n ns-1 get limitranges -o json";
 
@@ -836,6 +846,31 @@ describe("getNamespaceDetail", () => {
         };
     }
 
+    // A single resource quota item, shared by the quota-parsing and the quota-row tests so
+    // both read the same fixture.
+    function makeQuotaItem(): object {
+        return {
+            metadata: { name: "compute" },
+            spec: { hard: { "requests.cpu": "4", pods: "10" } },
+        };
+    }
+
+    // A single limit range item constraining container memory.
+    function makeLimitRangeItem(): object {
+        return {
+            metadata: { name: "mem-limit" },
+            spec: {
+                limits: [{
+                    type: "Container",
+                    min: { memory: "64Mi" },
+                    max: { memory: "1Gi" },
+                    default: { memory: "256Mi" },
+                    defaultRequest: { memory: "128Mi" },
+                }],
+            },
+        };
+    }
+
     // Installs handlers returning empty item lists for every sub-read, so a test
     // only has to override the reads it cares about.
     function emptyHandlers(): Record<string, () => CommandResult> {
@@ -845,8 +880,56 @@ describe("getNamespaceDetail", () => {
             [DEPLOYS_KEY]: () => ok(JSON.stringify({ items: [] })),
             [STATEFUL_KEY]: () => ok(JSON.stringify({ items: [] })),
             [DAEMON_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [REPLICASET_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [JOB_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [CRONJOB_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [SERVICE_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [INGRESS_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [CONFIGMAP_KEY]: () => ok(JSON.stringify({ items: [] })),
+            [PVC_KEY]: () => ok(JSON.stringify({ items: [] })),
             [QUOTA_KEY]: () => ok(JSON.stringify({ items: [] })),
             [LIMIT_KEY]: () => ok(JSON.stringify({ items: [] })),
+        };
+    }
+
+    // Handlers with one item of every listed kind, so a test can assert the full row set
+    // and its grouping in one pass.
+    function populatedHandlers(): Record<string, () => CommandResult> {
+        return {
+            ...emptyHandlers(),
+            [PODS_KEY]: () => ok(JSON.stringify({ items: [makePodItem("web-abc")] })),
+            [DEPLOYS_KEY]: () => ok(JSON.stringify({
+                items: [{ metadata: { name: "web" }, spec: { replicas: 3 }, status: { readyReplicas: 2 } }],
+            })),
+            [STATEFUL_KEY]: () => ok(JSON.stringify({
+                items: [{ metadata: { name: "db" }, spec: { replicas: 1 }, status: { readyReplicas: 1 } }],
+            })),
+            [DAEMON_KEY]: () => ok(JSON.stringify({
+                items: [{ metadata: { name: "agent" }, status: { desiredNumberScheduled: 4, numberReady: 4 } }],
+            })),
+            [REPLICASET_KEY]: () => ok(JSON.stringify({
+                items: [{ metadata: { name: "web-7d9" }, spec: { replicas: 3 }, status: { readyReplicas: 1 } }],
+            })),
+            [JOB_KEY]: () => ok(JSON.stringify({
+                items: [{ metadata: { name: "backup" }, spec: { completions: 2 }, status: { succeeded: 1 } }],
+            })),
+            [CRONJOB_KEY]: () => ok(JSON.stringify({
+                items: [{ metadata: { name: "nightly" }, spec: { schedule: "0 2 * * *", suspend: false } }],
+            })),
+            [SERVICE_KEY]: () => ok(JSON.stringify({
+                items: [{ metadata: { name: "web-svc" }, spec: { type: "ClusterIP", clusterIP: "10.96.0.7" } }],
+            })),
+            [INGRESS_KEY]: () => ok(JSON.stringify({
+                items: [{ metadata: { name: "web-ing" }, spec: { rules: [{ host: "web.example.com" }, { host: "api.example.com" }] } }],
+            })),
+            [CONFIGMAP_KEY]: () => ok(JSON.stringify({
+                items: [{ metadata: { name: "app-config" }, data: { "a.conf": "x", "b.conf": "y" } }],
+            })),
+            [PVC_KEY]: () => ok(JSON.stringify({
+                items: [{ metadata: { name: "data" }, status: { phase: "Bound" } }],
+            })),
+            [QUOTA_KEY]: () => ok(JSON.stringify({ items: [makeQuotaItem()] })),
+            [LIMIT_KEY]: () => ok(JSON.stringify({ items: [makeLimitRangeItem()] })),
         };
     }
 
@@ -863,49 +946,52 @@ describe("getNamespaceDetail", () => {
         expect(result.limits).toEqual([]);
     });
 
-    test("lists contained resources (pods, deployments, stateful sets, daemon sets) with detail paths", async () => {
-        setRunnerHandlers({
-            ...emptyHandlers(),
-            [PODS_KEY]: () => ok(JSON.stringify({ items: [makePodItem("web-abc")] })),
-            [DEPLOYS_KEY]: () => ok(JSON.stringify({
-                items: [{ metadata: { name: "web" }, spec: { replicas: 3 }, status: { readyReplicas: 2 } }],
-            })),
-            [STATEFUL_KEY]: () => ok(JSON.stringify({
-                items: [{ metadata: { name: "db" }, spec: { replicas: 1 }, status: { readyReplicas: 1 } }],
-            })),
-            [DAEMON_KEY]: () => ok(JSON.stringify({
-                items: [{ metadata: { name: "agent" }, status: { desiredNumberScheduled: 4, numberReady: 4 } }],
-            })),
-        });
+    test("lists one row per resource of every listed kind, grouped by kind, with a per-kind status and detail path", async () => {
+        setRunnerHandlers(populatedHandlers());
         const result = await getNamespaceDetail("test-ctx", "ns-1");
         expect(result.resources).toEqual([
             { kind: "Pod", name: "web-abc", status: "Running", detailPath: "/pods/ns-1/web-abc" },
             { kind: "Deployment", name: "web", status: "2/3 ready", detailPath: "/deployments/ns-1/web" },
             { kind: "StatefulSet", name: "db", status: "1/1 ready", detailPath: "/statefulsets/ns-1/db" },
             { kind: "DaemonSet", name: "agent", status: "4/4 ready", detailPath: "/daemonsets/ns-1/agent" },
+            { kind: "ReplicaSet", name: "web-7d9", status: "1/3 ready", detailPath: "/resources/replicasets/ns-1/web-7d9" },
+            { kind: "Job", name: "backup", status: "1/2 complete", detailPath: "/resources/jobs/ns-1/backup" },
+            { kind: "CronJob", name: "nightly", status: "0 2 * * *", detailPath: "/resources/cronjobs/ns-1/nightly" },
+            { kind: "Service", name: "web-svc", status: "ClusterIP 10.96.0.7", detailPath: "/resources/services/ns-1/web-svc" },
+            { kind: "Ingress", name: "web-ing", status: "web.example.com, api.example.com", detailPath: "/resources/ingresses/ns-1/web-ing" },
+            { kind: "ConfigMap", name: "app-config", status: "2 keys", detailPath: "/resources/configmaps/ns-1/app-config" },
+            { kind: "PersistentVolumeClaim", name: "data", status: "Bound", detailPath: "/resources/persistentvolumeclaims/ns-1/data" },
+            { kind: "ResourceQuota", name: "compute", status: "2 hard limits", detailPath: "/resources/resourcequotas/ns-1/compute" },
+            { kind: "LimitRange", name: "mem-limit", status: "Container", detailPath: "/resources/limitranges/ns-1/mem-limit" },
         ]);
     });
 
-    test("parses resource quotas and limit ranges", async () => {
+    test("summarises a suspended cron job, a host-less ingress and a single-key config map", async () => {
         setRunnerHandlers({
             ...emptyHandlers(),
-            [QUOTA_KEY]: () => ok(JSON.stringify({
-                items: [{ metadata: { name: "compute" }, spec: { hard: { "requests.cpu": "4", pods: "10" } } }],
+            [CRONJOB_KEY]: () => ok(JSON.stringify({
+                items: [{ metadata: { name: "paused" }, spec: { schedule: "*/5 * * * *", suspend: true } }],
             })),
-            [LIMIT_KEY]: () => ok(JSON.stringify({
-                items: [{
-                    metadata: { name: "mem-limit" },
-                    spec: {
-                        limits: [{
-                            type: "Container",
-                            min: { memory: "64Mi" },
-                            max: { memory: "1Gi" },
-                            default: { memory: "256Mi" },
-                            defaultRequest: { memory: "128Mi" },
-                        }],
-                    },
-                }],
+            [INGRESS_KEY]: () => ok(JSON.stringify({
+                items: [{ metadata: { name: "catch-all" }, spec: { rules: [{ http: { paths: [] } }] } }],
             })),
+            [CONFIGMAP_KEY]: () => ok(JSON.stringify({
+                items: [{ metadata: { name: "one-key" }, data: { "only.conf": "x" } }],
+            })),
+        });
+        const result = await getNamespaceDetail("test-ctx", "ns-1");
+        expect(result.resources).toEqual([
+            { kind: "CronJob", name: "paused", status: "*/5 * * * * (suspended)", detailPath: "/resources/cronjobs/ns-1/paused" },
+            { kind: "Ingress", name: "catch-all", status: "*", detailPath: "/resources/ingresses/ns-1/catch-all" },
+            { kind: "ConfigMap", name: "one-key", status: "1 key", detailPath: "/resources/configmaps/ns-1/one-key" },
+        ]);
+    });
+
+    test("parses resource quotas and limit ranges from the same reads that produce their rows", async () => {
+        setRunnerHandlers({
+            ...emptyHandlers(),
+            [QUOTA_KEY]: () => ok(JSON.stringify({ items: [makeQuotaItem()] })),
+            [LIMIT_KEY]: () => ok(JSON.stringify({ items: [makeLimitRangeItem()] })),
         });
         const result = await getNamespaceDetail("test-ctx", "ns-1");
         expect(result.quotas).toEqual([
@@ -922,9 +1008,31 @@ describe("getNamespaceDetail", () => {
                 default: "256Mi",
             },
         ]);
+        // The Status tab's quotas/limits and the Resources tab's rows come from one read
+        // per kind, so each kind is asked for exactly once.
+        const quotaReads = run.mock.calls.filter((call: any[]) => call[1].join(" ") === QUOTA_KEY);
+        const limitReads = run.mock.calls.filter((call: any[]) => call[1].join(" ") === LIMIT_KEY);
+        expect(quotaReads).toHaveLength(1);
+        expect(limitReads).toHaveLength(1);
     });
 
-    test("tolerates a failing sub-read and still returns namespace detail", async () => {
+    test("tolerates a failing sub-read for an added kind and still returns the other kinds", async () => {
+        setRunnerHandlers({
+            ...populatedHandlers(),
+            [CONFIGMAP_KEY]: () => fail("forbidden"),
+        });
+        const result = await getNamespaceDetail("test-ctx", "ns-1");
+        expect(result.name).toBe("ns-1");
+        expect(result.resources.filter((resource) => resource.kind === "ConfigMap")).toEqual([]);
+        expect(result.resources.map((resource) => resource.kind)).toEqual([
+            "Pod", "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Job", "CronJob",
+            "Service", "Ingress", "PersistentVolumeClaim", "ResourceQuota", "LimitRange",
+        ]);
+        expect(result.quotas).toHaveLength(1);
+        expect(result.limits).toHaveLength(1);
+    });
+
+    test("tolerates a failing pod sub-read", async () => {
         setRunnerHandlers({
             ...emptyHandlers(),
             [PODS_KEY]: () => fail("forbidden"),
@@ -932,6 +1040,14 @@ describe("getNamespaceDetail", () => {
         const result = await getNamespaceDetail("test-ctx", "ns-1");
         expect(result.name).toBe("ns-1");
         expect(result.resources).toEqual([]);
+    });
+
+    test("never reads secrets and never lists a secret row", async () => {
+        setRunnerHandlers(populatedHandlers());
+        const result = await getNamespaceDetail("test-ctx", "ns-1");
+        const argvs: string[] = run.mock.calls.map((call: any[]) => call[1].join(" "));
+        expect(argvs.some((argv) => /\bsecrets?\b/.test(argv))).toBe(false);
+        expect(result.resources.some((resource) => resource.kind === "Secret")).toBe(false);
     });
 
     test("throws when the namespace call fails", async () => {

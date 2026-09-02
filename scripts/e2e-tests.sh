@@ -383,6 +383,52 @@ spec:
   leaseDurationSeconds: 60
 EOF
 
+# Resources of the non-workload kinds the namespace detail page's Resources tab lists
+# (namespace-detail-3), so that tab has real rows of each to show and one to click through
+# to the generic detail page. All three are inert: nothing selects the service's pods, a
+# config map runs nothing, and the cron job is suspended so it never creates a job or a pod,
+# leaving every pod count the rest of the suite asserts on untouched.
+apply_manifest "" <<'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: default
+data:
+  app.conf: "listen 8080;"
+  log.level: "info"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-svc
+  namespace: default
+spec:
+  selector:
+    app: shop
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nightly-report
+  namespace: default
+spec:
+  schedule: "0 2 * * *"
+  suspend: true
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          containers:
+          - name: report
+            image: report:latest
+EOF
+
 # ── Cluster 2 nodes ──────────────────────────────────────────────────────────
 echo "--- Populating cluster 2 ---"
 apply_manifest "kwok-$KWOK_CLUSTER_2" <<'EOF'

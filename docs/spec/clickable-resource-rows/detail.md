@@ -4,7 +4,7 @@
 
 A cross-cutting navigation behaviour: every reference to a concrete resource on any page is a link to that resource's detail page. This covers both whole table *rows* and *inline references* (a single named resource shown in a detail field or a table cell).
 
-Backed by: the per-page table components under `frontend/src/pages/*/components/`, the shared `frontend/src/lib/table-row-style.ts` (row hover/cursor style), `frontend/src/lib/resource-link.ts` (the single route resolver, `resourcePath`), `frontend/src/components/resource-ref.tsx` (the shared `ResourceRef` inline-link component), and the detail routes in `frontend/src/app.tsx`.
+Backed by: the per-page table components under `frontend/src/pages/*/components/`, the shared `frontend/src/lib/table-row-style.ts` (row hover/cursor style), `packages/karse-types/src/index.ts` (the single route resolver, `resourcePath`, shared with the backend so both sides build the same routes), `frontend/src/components/resource-ref.tsx` (the shared `ResourceRef` inline-link component), and the detail routes in `frontend/src/app.tsx`.
 
 ## Behaviour
 

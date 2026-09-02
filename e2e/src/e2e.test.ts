@@ -5504,6 +5504,119 @@ test.describe("karse e2e", () => {
         });
     });
 
+    // ── Namespace detail Resources tab: the wider set of kinds ──────────────────
+    // Runs against the real kwok cluster rather than a routed fake, so it proves the
+    // backend really reads the added kinds and that their rows resolve to real pages.
+    // The e2e fixture seeds `default` with a ConfigMap (app-config), a Service (web-svc)
+    // and a suspended CronJob (nightly-report) alongside its pods and workloads, and the
+    // 0-replica `shop` Deployment leaves a ReplicaSet behind.
+    test.describe("namespace detail resources tab lists more than the workload kinds", () => {
+        // The Kind cell of every rendered resource row.
+        function kindCells() {
+            return page.locator("[data-test-id='namespace-resource-row'] td:nth-child(1)");
+        }
+
+        // The row whose Name cell is exactly this text.
+        function resourceRowNamed(name: string) {
+            return page.locator("[data-test-id='namespace-resource-row']").filter({
+                has: page.locator("td:nth-child(2)", { hasText: new RegExp(`^${name}$`) }),
+            });
+        }
+
+        test.beforeAll(async () => {
+            setContext(CLUSTER_1);
+        });
+
+        test.beforeEach(async () => {
+            await page.goto("/namespaces/default", { waitUntil: "networkidle" });
+            await page.locator("[data-test-id='namespace-tab-resources']").click();
+            await expect(page.locator("[data-test-id='namespace-resources-table']")).toBeVisible();
+        });
+
+        test("lists config maps, services, cron jobs and replica sets alongside the workload kinds", async () => {
+            const kinds = await kindCells().allTextContents();
+            expect(kinds).toContain("Pod");
+            expect(kinds).toContain("Deployment");
+            expect(kinds).toContain("StatefulSet");
+            expect(kinds).toContain("DaemonSet");
+            expect(kinds).toContain("ReplicaSet");
+            expect(kinds).toContain("ConfigMap");
+            expect(kinds).toContain("Service");
+            expect(kinds).toContain("CronJob");
+        });
+
+        test("each added kind carries its own kind-appropriate status summary", async () => {
+            await expect(resourceRowNamed("app-config")).toContainText("2 keys");
+            await expect(resourceRowNamed("web-svc")).toContainText("ClusterIP");
+            await expect(resourceRowNamed("nightly-report")).toContainText("0 2 * * * (suspended)");
+        });
+
+        test("rows are grouped by kind, pods first", async () => {
+            const kinds = await kindCells().allTextContents();
+            // Grouped, not interleaved: every row of a kind sits together, and the first
+            // group is Pod (the order NAMESPACE_RESOURCE_KINDS declares).
+            expect(kinds[0]).toBe("Pod");
+            const firstIndexOfKind = new Map<string, number>();
+            const lastIndexOfKind = new Map<string, number>();
+            kinds.forEach((kind, index) => {
+                if (!firstIndexOfKind.has(kind)) {
+                    firstIndexOfKind.set(kind, index);
+                }
+                lastIndexOfKind.set(kind, index);
+            });
+            for (const [kind, first] of firstIndexOfKind) {
+                const last = lastIndexOfKind.get(kind)!;
+                const runLength = kinds.slice(first, last + 1).filter((k) => k === kind).length;
+                expect(runLength).toBe(last - first + 1);
+            }
+        });
+
+        test("no secret is ever listed", async () => {
+            const kinds = await kindCells().allTextContents();
+            expect(kinds).not.toContain("Secret");
+        });
+
+        test("search narrows across the added kinds and clearing it restores them", async () => {
+            const all = await kindCells().count();
+            await page.locator("[data-test-id='namespace-resources-filter'] input").fill("ConfigMap");
+            await expect(resourceRowNamed("app-config")).toHaveCount(1);
+            // The search really narrows: fewer rows than before, and none of the pods the
+            // tab was already showing survive the term.
+            await expect(page.locator("[data-test-id='namespace-resource-row']")).not.toHaveCount(all);
+            const narrowed = await kindCells().allTextContents();
+            expect(narrowed).not.toContain("Pod");
+            await page.locator("[data-test-id='namespace-resources-filter'] input").fill("");
+            await expect(page.locator("[data-test-id='namespace-resource-row']")).toHaveCount(all);
+        });
+
+        test("the Kind header still sorts the widened list", async () => {
+            await page.locator("[data-test-id='namespace-resources-table'] thead th").filter({ hasText: "Kind" }).click();
+            const kinds = await kindCells().allTextContents();
+            expect(kinds).toEqual([...kinds].sort());
+        });
+
+        test("an added kind's row opens the generic detail page", async () => {
+            await resourceRowNamed("web-svc").click();
+            await expect(page).toHaveURL(/\/resources\/services\/default\/web-svc/);
+            await expect(page.locator("[data-test-id='resource-detail']")).toBeVisible();
+            await expect(page.locator("[data-test-id='resource-detail-kind-chip']")).toHaveText("Service");
+        });
+
+        test("the Status tab Resources count is still the pod count and still matches the namespaces list column", async () => {
+            const podRows = await page.locator("[data-test-id='namespace-resource-row']").filter({
+                has: page.locator("td:nth-child(1)", { hasText: /^Pod$/ }),
+            }).count();
+            await page.locator("[data-test-id='namespace-tab-detail']").click();
+            const stat = await page.locator("[data-test-id='namespace-stat'][data-stat='resources']").innerText();
+            expect(stat).toContain(`${podRows}`);
+            // The same number the namespaces list shows for `default`, which is what the
+            // pods-only definition exists to keep true.
+            await page.goto("/namespaces", { waitUntil: "networkidle" });
+            const listRow = page.locator("[data-test-id='namespace-row']").filter({ hasText: /^default/ });
+            await expect(listRow.locator("[data-test-id='namespace-resource-count']")).toHaveText(`${podRows}`);
+        });
+    });
+
     // ── Pods page ─────────────────────────────────────────────────────────────
 
     test.describe("pods page", () => {

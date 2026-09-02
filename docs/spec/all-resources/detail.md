@@ -9,7 +9,7 @@ Reached from the "All resources" entry in the left nav (`frontend/src/components
 Backed by:
 - `frontend/src/pages/all-resources/index.tsx` and `frontend/src/pages/all-resources/components/all-resources-table.tsx` (the page and its table).
 - `frontend/src/lib/all-resources.ts` (the cross-kind aggregation: the `AllResource` row shape and `aggregateResources` / `presentKinds`).
-- The shared table machinery it reuses: `frontend/src/lib/fuzzy-filter.ts` (search), `frontend/src/components/table-filter.tsx` + `frontend/src/lib/use-table-filter.ts` + `frontend/src/lib/table-filter-state.ts` (the shared filter editor, see [table-filter-1] via `resource-search`/`resource-stats`), `frontend/src/lib/resource-link.ts` + `frontend/src/lib/table-row-style.ts` (row navigation, see [clickable-resource-rows](../clickable-resource-rows/detail.md)), and `frontend/src/lib/resource-stats.ts` (per-kind health classification).
+- The shared table machinery it reuses: `frontend/src/lib/fuzzy-filter.ts` (search), `frontend/src/components/table-filter.tsx` + `frontend/src/lib/use-table-filter.ts` + `frontend/src/lib/table-filter-state.ts` (the shared filter editor, see [table-filter-1] via `resource-search`/`resource-stats`), `resourcePath` from `packages/karse-types` + `frontend/src/lib/table-row-style.ts` (row navigation, see [clickable-resource-rows](../clickable-resource-rows/detail.md)), and `frontend/src/lib/resource-stats.ts` (per-kind health classification).
 
 ## Data aggregation
 

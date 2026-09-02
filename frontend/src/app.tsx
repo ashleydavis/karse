@@ -21,7 +21,7 @@ import { ContainerDetailPage } from "./pages/container-detail";
 import { NodeDetailPage } from "./pages/node-detail";
 import { WorkloadDetailPage } from "./pages/workload-detail";
 import { ResourceDetailPage } from "./pages/resource-detail";
-import { GENERIC_DETAIL_ROOT } from "./lib/resource-link";
+import { GENERIC_DETAIL_ROOT } from "karse-types";
 import { LiveLogsPage } from "./pages/live-logs";
 import { AllResourcesPage } from "./pages/all-resources";
 import { AboutPage } from "./pages/about";

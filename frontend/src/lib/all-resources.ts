@@ -1,8 +1,8 @@
+import { resourcePath } from "karse-types";
 import type {
     Pod, Node, Namespace, Deployment, StatefulSet, DaemonSet,
     HorizontalPodAutoscaler,
 } from "karse-types";
-import { resourcePath } from "./resource-link";
 import {
     podHealth, nodeHealth, deploymentHealth, statefulSetHealth, daemonSetHealth,
     type ResourceHealth,

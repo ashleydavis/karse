@@ -258,6 +258,8 @@ Returns the detailed view of a single namespace: its phase, labels, annotations,
 
 - **Request query**: `context` (required) — the kubeconfig context name.
 - **Response 200**: `NamespaceDetail` — `name`, `phase`, `createdAt`, `labels`, `annotations`, `resources[]` (each `{ kind, name, status, detailPath }`), `quotas[]` (each `{ name, hard }`), `limits[]` (each `{ name, type, resource, min, max, defaultRequest, default }`).
+- **Kinds in `resources[]`**: Pod, Deployment, StatefulSet, DaemonSet, ReplicaSet, Job, CronJob, Service, Ingress, ConfigMap, PersistentVolumeClaim, ResourceQuota, LimitRange, grouped by kind in that order. Each row's `status` is a short per-kind summary and its `detailPath` is the resource's own page where it has one, the generic detail route (`/resources/:type/:namespace/:name`) otherwise. Secrets are never listed and never read.
+- The `quotas[]` / `limits[]` fields are parsed from the same `resourcequotas` / `limitranges` reads that produce those kinds' `resources[]` rows, so neither kind is read twice.
 - **Response 400**: `{ "error": "context query parameter is required" }` when `context` is missing or blank.
 - **Response 500**: `{ "error": "<kubectl stderr>" }` when the namespace read fails. The contained-resource and quota/limit sub-reads are tolerant: a failing sub-read contributes an empty list rather than failing the request.
 
@@ -274,7 +276,10 @@ curl -fsS 'http://127.0.0.1:5172/api/namespaces/team-a?context=my-ctx'
   "annotations": { "owner": "platform" },
   "resources": [
     { "kind": "Pod", "name": "web-abc", "status": "Running", "detailPath": "/pods/team-a/web-abc" },
-    { "kind": "Deployment", "name": "web", "status": "2/3 ready", "detailPath": "/deployments/team-a/web" }
+    { "kind": "Deployment", "name": "web", "status": "2/3 ready", "detailPath": "/deployments/team-a/web" },
+    { "kind": "Service", "name": "web-svc", "status": "ClusterIP 10.96.0.7", "detailPath": "/resources/services/team-a/web-svc" },
+    { "kind": "ConfigMap", "name": "app-config", "status": "2 keys", "detailPath": "/resources/configmaps/team-a/app-config" },
+    { "kind": "ResourceQuota", "name": "compute", "status": "1 hard limit", "detailPath": "/resources/resourcequotas/team-a/compute" }
   ],
   "quotas": [{ "name": "compute", "hard": { "pods": "10" } }],
   "limits": []

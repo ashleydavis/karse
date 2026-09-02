@@ -1,4 +1,5 @@
-import { resourceKindLabel, resourceNameSegments, resourcePath } from "../../lib/resource-link";
+import { resourcePath } from "karse-types";
+import { resourceKindLabel, resourceNameSegments } from "../../lib/resource-link";
 
 describe("resourcePath", () => {
     test("builds the pod route from namespace and name", () => {

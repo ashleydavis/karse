@@ -2,7 +2,7 @@
 // second line or grows the nav-bar height: middle-truncation of long resource
 // names and collapsing of over-long trails. Kept UI-free so it is unit-testable.
 
-import { GENERIC_DETAIL_ROOT } from "./resource-link";
+import { GENERIC_DETAIL_ROOT } from "karse-types";
 
 // One entry in the breadcrumb trail; a missing "to" marks the current (non-linked) page.
 export type Crumb = {

@@ -5,7 +5,7 @@ import {
 } from "./cache";
 import { parseCpuToMillicores, parseMemoryToBytes } from "./quantity";
 import { podWasOOMKilled, activeNodePressures } from "./health-rules";
-import { isReadableResourceKind, knownResourceKind } from "karse-types";
+import { isReadableResourceKind, knownResourceKind, resourcePath, RESOURCE_KINDS } from "karse-types";
 import type {
     Context, NodeStatus, Node, ClusterOverview, Namespace, Pod, PodPhase,
     Deployment, StatefulSet, DaemonSet, HorizontalPodAutoscaler,
@@ -997,117 +997,153 @@ export async function getWorkloadDetail(
     };
 }
 
-// Returns detailed information for a single namespace: its own metadata (phase,
-// labels, annotations) plus the resources contained in it (pods, deployments,
-// stateful sets, daemon sets) and any resource quotas / limit ranges that apply.
-// READ-ONLY. The namespace read is authoritative and re-throws on failure; the
-// contained-resource and quota/limit sub-reads are tolerant and degrade to empty
-// lists so a single failing kind does not fail the whole page.
+// One kind listed on the namespace detail page's Resources tab: the key into
+// RESOURCE_KINDS (which is also the resource name handed to `kubectl get`, and the source
+// of the singular display kind the rows carry), and how one item of that kind is
+// summarised into the row's short status string.
+//
+// The list is a table rather than a hand-written read-and-map block per kind so a further
+// kind is one entry here, not another copy of the same mapping code.
+type NamespaceResourceKind = {
+    token: string;
+    summarise: (item: any) => string;
+};
+
+// Renders a count with its unit, singular or plural ("1 key", "3 keys").
+function countLabel(count: number, unit: string): string {
+    return count === 1 ? `1 ${unit}` : `${count} ${unit}s`;
+}
+
+// The kinds the namespace detail page lists, in the order their groups appear in the
+// Resources table. Rows are grouped by kind in this fixed order, the same way the All
+// resources page groups its rows, so the two pages never disagree about how a mixed list
+// is arranged.
+//
+// Secrets are deliberately absent and must stay absent: Karse refuses to read them
+// (isReadableResourceKind in karse-types), because it would be rendering their contents
+// verbatim, so listing them here would either break that refusal or produce rows that
+// cannot be opened.
+const NAMESPACE_RESOURCE_KINDS: NamespaceResourceKind[] = [
+    { token: "pods", summarise: (item) => mapPodListItem(item).phase },
+    { token: "deployments", summarise: (item) => `${item.status?.readyReplicas ?? 0}/${item.spec?.replicas ?? 0} ready` },
+    { token: "statefulsets", summarise: (item) => `${item.status?.readyReplicas ?? 0}/${item.spec?.replicas ?? 0} ready` },
+    { token: "daemonsets", summarise: (item) => `${item.status?.numberReady ?? 0}/${item.status?.desiredNumberScheduled ?? 0} ready` },
+    { token: "replicasets", summarise: (item) => `${item.status?.readyReplicas ?? 0}/${item.spec?.replicas ?? 0} ready` },
+    { token: "jobs", summarise: (item) => `${item.status?.succeeded ?? 0}/${item.spec?.completions ?? 1} complete` },
+    { token: "cronjobs", summarise: summariseCronJob },
+    { token: "services", summarise: (item) => `${item.spec?.type ?? "ClusterIP"} ${item.spec?.clusterIP ?? "-"}` },
+    { token: "ingresses", summarise: summariseIngress },
+    { token: "configmaps", summarise: (item) => countLabel(Object.keys(item.data ?? {}).length + Object.keys(item.binaryData ?? {}).length, "key") },
+    { token: "persistentvolumeclaims", summarise: (item) => item.status?.phase ?? "Unknown" },
+    { token: "resourcequotas", summarise: (item) => countLabel(Object.keys(item.spec?.hard ?? item.status?.hard ?? {}).length, "hard limit") },
+    { token: "limitranges", summarise: summariseLimitRange },
+];
+
+// A cron job's schedule, with its suspended state appended when it is suspended, since a
+// suspended schedule is the difference between a job that runs and one that does not.
+function summariseCronJob(item: any): string {
+    const schedule: string = item.spec?.schedule ?? "-";
+    return item.spec?.suspend === true ? `${schedule} (suspended)` : schedule;
+}
+
+// The hosts an ingress routes, comma-separated. A rule without a host matches every host,
+// which is what kubectl shows as "*".
+function summariseIngress(item: any): string {
+    const rules: any[] = item.spec?.rules ?? [];
+    if (rules.length === 0) {
+        return "no hosts";
+    }
+    return rules.map((rule) => rule.host ?? "*").join(", ");
+}
+
+// The limit types a limit range constrains ("Container", "Pod"), comma-separated, that
+// being what distinguishes one limit range from another at a glance.
+function summariseLimitRange(item: any): string {
+    const limits: any[] = item.spec?.limits ?? [];
+    const types: string[] = limits.map((lim) => lim.type ?? "");
+    const named = types.filter((type) => type !== "");
+    return named.length === 0 ? "no limits" : named.join(", ");
+}
+
+// The `items` array of a `kubectl get <kind> -o json` list response, or an empty array
+// when the read failed. Every sub-read of the namespace detail is tolerant this way: one
+// kind the user cannot list contributes no rows rather than failing the whole page. Only
+// the namespace read itself is authoritative.
+function listItems(result: CommandResult): any[] {
+    if (result.exitCode !== 0) {
+        return [];
+    }
+    const items: any[] = JSON.parse(result.stdout).items ?? [];
+    return items;
+}
+
+// Detailed view of one namespace: its own metadata, every resource of the kinds in
+// NAMESPACE_RESOURCE_KINDS that lives in it, and the resource quotas and limit ranges that
+// apply to it. The quotas and limits are parsed from the same reads that produce the
+// ResourceQuota and LimitRange rows, so neither kind is read twice.
 export async function getNamespaceDetail(context: string, name: string): Promise<NamespaceDetail> {
     const ctx = ["--context", context];
-    const [
-        nsResult, podsResult, deploysResult, statefulResult, daemonResult, quotaResult, limitResult,
-    ] = await Promise.all([
+    const [nsResult, ...kindResults] = await Promise.all([
         kubectl([...ctx, "get", "namespace", name, "-o", "json"]),
-        kubectl([...ctx, "-n", name, "get", "pods", "-o", "json"]),
-        kubectl([...ctx, "-n", name, "get", "deployments", "-o", "json"]),
-        kubectl([...ctx, "-n", name, "get", "statefulsets", "-o", "json"]),
-        kubectl([...ctx, "-n", name, "get", "daemonsets", "-o", "json"]),
-        kubectl([...ctx, "-n", name, "get", "resourcequotas", "-o", "json"]),
-        kubectl([...ctx, "-n", name, "get", "limitranges", "-o", "json"]),
+        ...NAMESPACE_RESOURCE_KINDS.map((kind) => kubectl([...ctx, "-n", name, "get", kind.token, "-o", "json"])),
     ]);
-    if (nsResult.exitCode !== 0) {
-        throw new Error(nsResult.stderr);
+    if (nsResult!.exitCode !== 0) {
+        throw new Error(nsResult!.stderr);
     }
-    const ns = JSON.parse(nsResult.stdout);
+    const ns = JSON.parse(nsResult!.stdout);
 
+    // One entry per kind, in table order, so the rows below come out grouped by kind and
+    // the quota / limit parsing can reuse the reads rather than issuing its own.
+    const itemsByToken: Record<string, any[]> = {};
+    for (let i = 0; i < NAMESPACE_RESOURCE_KINDS.length; i++) {
+        itemsByToken[NAMESPACE_RESOURCE_KINDS[i]!.token] = listItems(kindResults[i]!);
+    }
+
+    // One row per resource, grouped by kind in table order. The detail route comes from
+    // the shared resourcePath resolver, so a kind with its own page lands on that page and
+    // every other kind falls back to the generic detail page.
     const resources: NamespaceResource[] = [];
-
-    // Pods in the namespace, summarised by phase, linking to the pod detail page.
-    if (podsResult.exitCode === 0) {
-        for (const item of (JSON.parse(podsResult.stdout).items as any[])) {
-            const pod = mapPodListItem(item);
+    for (const kind of NAMESPACE_RESOURCE_KINDS) {
+        const displayKind = RESOURCE_KINDS[kind.token]!.kind;
+        for (const item of itemsByToken[kind.token]!) {
             resources.push({
-                kind: "Pod",
-                name: pod.name,
-                status: pod.phase,
-                detailPath: `/pods/${pod.namespace}/${pod.name}`,
-            });
-        }
-    }
-    // Deployments, summarised by ready count, linking to the workload detail page.
-    if (deploysResult.exitCode === 0) {
-        for (const item of (JSON.parse(deploysResult.stdout).items as any[])) {
-            const desired: number = item.spec?.replicas ?? 0;
-            const ready: number = item.status?.readyReplicas ?? 0;
-            resources.push({
-                kind: "Deployment",
+                kind: displayKind,
                 name: item.metadata.name,
-                status: `${ready}/${desired} ready`,
-                detailPath: `/deployments/${name}/${item.metadata.name}`,
-            });
-        }
-    }
-    // Stateful sets, summarised by ready count.
-    if (statefulResult.exitCode === 0) {
-        for (const item of (JSON.parse(statefulResult.stdout).items as any[])) {
-            const desired: number = item.spec?.replicas ?? 0;
-            const ready: number = item.status?.readyReplicas ?? 0;
-            resources.push({
-                kind: "StatefulSet",
-                name: item.metadata.name,
-                status: `${ready}/${desired} ready`,
-                detailPath: `/statefulsets/${name}/${item.metadata.name}`,
-            });
-        }
-    }
-    // Daemon sets, summarised by ready/desired scheduled count.
-    if (daemonResult.exitCode === 0) {
-        for (const item of (JSON.parse(daemonResult.stdout).items as any[])) {
-            const desired: number = item.status?.desiredNumberScheduled ?? 0;
-            const ready: number = item.status?.numberReady ?? 0;
-            resources.push({
-                kind: "DaemonSet",
-                name: item.metadata.name,
-                status: `${ready}/${desired} ready`,
-                detailPath: `/daemonsets/${name}/${item.metadata.name}`,
+                status: kind.summarise(item),
+                detailPath: resourcePath(displayKind, item.metadata.name, name),
             });
         }
     }
 
     // Resource quotas declared in the namespace, with their hard limits.
     const quotas: NamespaceQuota[] = [];
-    if (quotaResult.exitCode === 0) {
-        for (const item of (JSON.parse(quotaResult.stdout).items as any[])) {
-            quotas.push({
-                name: item.metadata.name,
-                hard: (item.spec?.hard ?? item.status?.hard ?? {}) as Record<string, string>,
-            });
-        }
+    for (const item of itemsByToken["resourcequotas"]!) {
+        quotas.push({
+            name: item.metadata.name,
+            hard: (item.spec?.hard ?? item.status?.hard ?? {}) as Record<string, string>,
+        });
     }
 
     // Limit ranges declared in the namespace, flattened to one row per limit.
     const limits: NamespaceLimit[] = [];
-    if (limitResult.exitCode === 0) {
-        for (const item of (JSON.parse(limitResult.stdout).items as any[])) {
-            for (const lim of (item.spec?.limits ?? []) as any[]) {
-                const resourceNames = new Set<string>([
-                    ...Object.keys(lim.min ?? {}),
-                    ...Object.keys(lim.max ?? {}),
-                    ...Object.keys(lim.default ?? {}),
-                    ...Object.keys(lim.defaultRequest ?? {}),
-                ]);
-                for (const resource of resourceNames) {
-                    limits.push({
-                        name: item.metadata.name,
-                        type: lim.type ?? "",
-                        resource,
-                        min: lim.min?.[resource] ?? "-",
-                        max: lim.max?.[resource] ?? "-",
-                        defaultRequest: lim.defaultRequest?.[resource] ?? "-",
-                        default: lim.default?.[resource] ?? "-",
-                    });
-                }
+    for (const item of itemsByToken["limitranges"]!) {
+        for (const lim of (item.spec?.limits ?? []) as any[]) {
+            const resourceNames = new Set<string>([
+                ...Object.keys(lim.min ?? {}),
+                ...Object.keys(lim.max ?? {}),
+                ...Object.keys(lim.default ?? {}),
+                ...Object.keys(lim.defaultRequest ?? {}),
+            ]);
+            for (const resource of resourceNames) {
+                limits.push({
+                    name: item.metadata.name,
+                    type: lim.type ?? "",
+                    resource,
+                    min: lim.min?.[resource] ?? "-",
+                    max: lim.max?.[resource] ?? "-",
+                    defaultRequest: lim.defaultRequest?.[resource] ?? "-",
+                    default: lim.default?.[resource] ?? "-",
+                });
             }
         }
     }

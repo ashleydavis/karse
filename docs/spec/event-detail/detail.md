@@ -4,7 +4,7 @@
 
 A drill-down page for a single Kubernetes event, reached by clicking a row in the events table (`events-feed`).
 
-Backed by: `GET /api/events` (reused; no new endpoint), `frontend/src/pages/event-detail/`, the shared `frontend/src/components/resource-ref.tsx` / `frontend/src/lib/resource-link.ts` resolver (see `clickable-resource-rows`), and the `/events/:uid` route in `frontend/src/app.tsx`.
+Backed by: `GET /api/events` (reused; no new endpoint), `frontend/src/pages/event-detail/`, the shared `frontend/src/components/resource-ref.tsx` / `resourcePath` resolver in `packages/karse-types` (see `clickable-resource-rows`), and the `/events/:uid` route in `frontend/src/app.tsx`.
 
 ## Behaviour
 

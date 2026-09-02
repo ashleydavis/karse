@@ -34,7 +34,12 @@ EOF
 kubectl wait --for=condition=Ready node/fake-node-1 --timeout=30s
 
 # A namespace with labels and annotations, holding a deployment (and pods) plus a
-# resource quota and a limit range, so every section of the Status tab is populated.
+# resource quota and a limit range, so every section of the Status tab is populated,
+# and one resource of each non-workload kind the Resources tab lists (config map,
+# service, persistent volume claim, cron job, ingress) so that tab has a row of each
+# to show. Those five are inert: nothing backs the service, nothing mounts the config
+# map, no volume matches the claim, no controller reads the ingress, and the cron job
+# is suspended, so none of them adds a pod to the namespace's counts.
 kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: Namespace
@@ -85,6 +90,74 @@ spec:
       containers:
       - name: db
         image: postgres:15
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: team-a
+data:
+  app.conf: "listen 8080;"
+  log.level: "info"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-svc
+  namespace: team-a
+spec:
+  selector:
+    app: web
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-data
+  namespace: team-a
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nightly-report
+  namespace: team-a
+spec:
+  schedule: "0 2 * * *"
+  suspend: true
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: report
+            image: report:latest
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-ing
+  namespace: team-a
+spec:
+  rules:
+  - host: web.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web-svc
+            port:
+              number: 80
 ---
 apiVersion: v1
 kind: ResourceQuota

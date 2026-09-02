@@ -169,6 +169,30 @@ spec:
         type: Utilization
         averageUtilization: 80
 ---
+# A config map and a service in `default`, so the namespace detail resources[] has rows of
+# kinds outside the four workload kinds to assert on (namespace-detail-3). Both are inert:
+# nothing mounts the config map and nothing backs the service.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: smoke-config
+  namespace: default
+data:
+  app.conf: "listen 8080;"
+  log.level: "info"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: smoke-svc
+  namespace: default
+spec:
+  selector:
+    app: smoke-deploy
+  ports:
+  - port: 80
+    targetPort: 8080
+---
 # A kind Karse does not know by name, so the generic resource endpoints are exercised
 # against something outside the table of kinds compiled into the app.
 apiVersion: coordination.k8s.io/v1
@@ -338,6 +362,25 @@ echo "$NS_DETAIL" | jq -e '.name == "default" and has("phase") and has("labels")
 # default holds smoke-pod and smoke-deploy, so its resource list must include them.
 echo "$NS_DETAIL" | jq -e '.resources | any(.kind == "Pod" and .name == "smoke-pod" and .detailPath == "/pods/default/smoke-pod")' > /dev/null
 echo "$NS_DETAIL" | jq -e '.resources | any(.kind == "Deployment" and .name == "smoke-deploy" and .detailPath == "/deployments/default/smoke-deploy")' > /dev/null
+# The list is wider than the four workload kinds: the config map and service seeded above
+# are listed too, each with a kind-appropriate status and a generic detail route. Only
+# directly-applied objects are asserted on, never controller-created ones (a replica set,
+# say), which may not exist yet this early after the manifest is applied.
+echo "$NS_DETAIL" | jq -e '.resources | any(.kind == "ConfigMap" and .name == "smoke-config" and .status == "2 keys" and .detailPath == "/resources/configmaps/default/smoke-config")' > /dev/null
+echo "$NS_DETAIL" | jq -e '.resources | any(.kind == "Service" and .name == "smoke-svc" and (.status | startswith("ClusterIP")) and .detailPath == "/resources/services/default/smoke-svc")' > /dev/null
+# Secrets are never listed, whatever the namespace holds.
+echo "$NS_DETAIL" | jq -e '.resources | all(.kind != "Secret")' > /dev/null
+# The Resources count the namespaces list shows for `default` is the pod count, not the
+# size of resources[]. `default` holds more non-pod resources than pods, so the column must
+# come out strictly smaller than the list the detail page returns; if the count were ever
+# loosened to "length of resources[]" the two would be equal and this would fail.
+NS_LIST_COUNT=$(curl -fsS "$BASE/api/namespaces?context=$CURRENT_CTX" \
+    | jq '.namespaces[] | select(.name == "default") | .resourceCount')
+NS_TOTAL_ROWS=$(echo "$NS_DETAIL" | jq '.resources | length')
+if [[ "$NS_LIST_COUNT" -ge "$NS_TOTAL_ROWS" ]]; then
+    echo "namespaces list Resources column ($NS_LIST_COUNT) is not the pod count: it matches or exceeds the whole resources[] list ($NS_TOTAL_ROWS)" >&2
+    exit 1
+fi
 echo "OK"
 
 echo "--- GET /api/pods (all namespaces) ---"

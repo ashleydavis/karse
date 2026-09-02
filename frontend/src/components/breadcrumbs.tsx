@@ -4,7 +4,7 @@ import { faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { collapseCrumbs, middleTruncate, originCrumbs, tabLabel, LIST_LABELS, POD_TAB_LABELS, CONTAINER_TAB_LABELS, MAX_NAME_LENGTH, MAX_TRAIL_ITEMS } from "../lib/breadcrumb-trail";
-import { GENERIC_DETAIL_ROOT } from "../lib/resource-link";
+import { GENERIC_DETAIL_ROOT } from "karse-types";
 import type { Crumb } from "../lib/breadcrumb-trail";
 import { useKubeContext } from "../lib/kube-context";
 import { fetchEvents } from "../lib/api-client";

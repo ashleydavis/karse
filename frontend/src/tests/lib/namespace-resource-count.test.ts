@@ -37,6 +37,29 @@ describe("namespaceResourceCount", () => {
         expect(namespaceResourceCount(resources)).toBe(0);
     });
 
+    test("still counts pods only when the list holds every kind the Resources tab now lists", () => {
+        // namespace-detail-3 widened resources[] well beyond the four workload kinds. The
+        // headline Resources count is still the pod count, so it keeps agreeing with the
+        // namespaces list column however many other kinds arrive alongside the pods.
+        const resources = [
+            makeResource("Pod", "web-1"),
+            makeResource("Pod", "web-2"),
+            makeResource("Deployment", "web"),
+            makeResource("StatefulSet", "db"),
+            makeResource("DaemonSet", "agent"),
+            makeResource("ReplicaSet", "web-7d9"),
+            makeResource("Job", "backup"),
+            makeResource("CronJob", "nightly"),
+            makeResource("Service", "web-svc"),
+            makeResource("Ingress", "web-ing"),
+            makeResource("ConfigMap", "app-config"),
+            makeResource("PersistentVolumeClaim", "data"),
+            makeResource("ResourceQuota", "compute"),
+            makeResource("LimitRange", "mem-limit"),
+        ];
+        expect(namespaceResourceCount(resources)).toBe(2);
+    });
+
     test("returns 0 for an empty resource list", () => {
         expect(namespaceResourceCount([])).toBe(0);
     });
